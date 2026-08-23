@@ -1,15 +1,14 @@
-import type { SeatId } from '@parlour/engine';
 import { NostrSignaling, type SignalPayload } from './NostrSignaling';
 import { createRoomCode, normalizeRoomCode, roomJoinUrl } from './roomCode';
-import { HEARTBEAT_INTERVAL_MS, MultiplayerState, type SeatPresence } from './resilience';
+import { HEARTBEAT_INTERVAL_MS, MultiplayerState } from './resilience';
 import { validateEmote } from './emotes';
+import { dispatchWireData, type PeerDescriptor, type WireMessage } from './wireSchema';
 import type {
   AppliedPacket,
   AuthorityAdapter,
   Emote,
   PlayerAction,
   PresenceEvent,
-  ReplaySnapshot,
   RoomHandle,
   RoomSettings,
   Transport,
@@ -28,27 +27,6 @@ export const DEFAULT_ICE_SERVERS: RTCIceServer[] = [
   },
 ];
 
-type PeerDescriptor = { peerId: string; profileId: string };
-
-type WireMessage =
-  | { type: 'hello'; profileId: string }
-  | {
-      type: 'welcome';
-      hostId: string;
-      seat: SeatId;
-      seats: Array<[SeatId, SeatPresence]>;
-      peers: PeerDescriptor[];
-      snapshot: ReplaySnapshot;
-    }
-  | { type: 'mesh.peers'; peers: PeerDescriptor[] }
-  | { type: 'intent'; action: PlayerAction }
-  | { type: 'applied'; packet: AppliedPacket }
-  | { type: 'heartbeat'; sentAt: number }
-  | { type: 'host.changed'; hostId: string; stateHash: string }
-  | { type: 'sync.request'; expectedSeq: number }
-  | { type: 'sync.snapshot'; snapshot: ReplaySnapshot }
-  | { type: 'emote'; emote: Emote };
-
 type PeerLink = {
   pc: RTCPeerConnection;
   channel?: RTCDataChannel;
@@ -66,21 +44,6 @@ type P2PTransportOptions = {
   randomBytes?: (length: number) => Uint8Array;
   peerConnection?: (configuration: RTCConfiguration) => RTCPeerConnection;
 };
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object';
-}
-
-function parseWire(data: string): WireMessage | null {
-  if (data.length > 512_000) return null;
-  try {
-    const value: unknown = JSON.parse(data);
-    if (!isRecord(value) || typeof value.type !== 'string') return null;
-    return value as WireMessage;
-  } catch {
-    return null;
-  }
-}
 
 export class P2PTransport implements Transport {
   private readonly authority: AuthorityAdapter;
@@ -253,9 +216,11 @@ export class P2PTransport implements Transport {
       this.emitPresence({ kind: 'connection', state: 'connected' });
     };
     channel.onmessage = (event) => {
-      if (typeof event.data !== 'string') return;
-      const message = parseWire(event.data);
-      if (message) void this.receiveWire(peerId, message);
+      dispatchWireData(
+        event.data,
+        (message) => this.receiveWire(peerId, message),
+        (message) => this.emitPresence({ kind: 'error', message }),
+      );
     };
   }
 
@@ -298,7 +263,7 @@ export class P2PTransport implements Transport {
           this.resilience.seats.set(seat, occupant);
         }
         await this.authority.importSnapshot(message.snapshot);
-        this.connectMesh(message.peers);
+        await this.connectMesh(message.peers);
         this.emitPresence({
           kind: 'peer.joined',
           peerId: this.signaling.publicKey,
@@ -306,7 +271,7 @@ export class P2PTransport implements Transport {
         });
         return;
       case 'mesh.peers':
-        this.connectMesh(message.peers);
+        await this.connectMesh(message.peers);
         return;
       case 'intent':
         if (this.isHost() && this.seatForPeer(peerId) === message.action.seat) {
@@ -410,11 +375,13 @@ export class P2PTransport implements Transport {
     return [...this.profiles].map(([peerId, profileId]) => ({ peerId, profileId }));
   }
 
-  private connectMesh(peers: PeerDescriptor[]): void {
+  private async connectMesh(peers: PeerDescriptor[]): Promise<void> {
+    const connections: Promise<void>[] = [];
     for (const peer of peers) {
       this.profiles.set(peer.peerId, peer.profileId);
-      if (this.signaling.publicKey < peer.peerId) void this.connect(peer.peerId, true);
+      if (this.signaling.publicKey < peer.peerId) connections.push(this.connect(peer.peerId, true));
     }
+    await Promise.all(connections);
   }
 
   private async applyAsHost(action: PlayerAction): Promise<void> {
