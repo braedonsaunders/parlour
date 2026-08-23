@@ -10,6 +10,7 @@ import {
   type AudioSettings,
 } from '@/lib/audio/AudioManager';
 import { SOUND_MANIFEST } from '@/lib/audio/manifest';
+import { useProfileStore } from '@/stores/profile';
 
 type AudioStore = {
   channels: AudioSettings;
@@ -32,9 +33,30 @@ let bound = false;
 function bindManager(manager: AudioManager): void {
   if (bound) return;
   bound = true;
+
+  const persistedMutes = useProfileStore.getState().settings.audioMuted;
+  for (const channel of ['master', 'music', 'sfx'] as const) {
+    if (manager.getSettings()[channel].muted !== persistedMutes[channel]) {
+      manager.setMuted(channel, persistedMutes[channel]);
+    }
+  }
+
   useAudioStore.setState({ channels: manager.getSettings(), unlocked: manager.isUnlocked() });
   manager.subscribe((channels) => {
     useAudioStore.setState({ channels, unlocked: manager.isUnlocked() });
+    const profile = useProfileStore.getState();
+    const audioMuted = {
+      master: channels.master.muted,
+      music: channels.music.muted,
+      sfx: channels.sfx.muted,
+    };
+    if (
+      profile.settings.audioMuted.master !== audioMuted.master ||
+      profile.settings.audioMuted.music !== audioMuted.music ||
+      profile.settings.audioMuted.sfx !== audioMuted.sfx
+    ) {
+      profile.updateSettings({ audioMuted });
+    }
   });
 }
 
