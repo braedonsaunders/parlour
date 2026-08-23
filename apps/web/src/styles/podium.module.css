@@ -1,0 +1,131 @@
+.stage {
+  display: flex;
+  min-height: 100dvh;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2rem;
+  padding: 3rem 1.5rem;
+}
+
+.headline {
+  text-align: center;
+}
+
+.overline {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: rgba(215, 237, 242, 0.65);
+}
+
+.modeLine {
+  margin-top: 0.35rem;
+  font-size: 0.85rem;
+  color: var(--ink-dim);
+}
+
+.plaqueRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  justify-content: center;
+  gap: 1rem;
+}
+
+.plaque {
+  position: relative;
+  display: flex;
+  width: 12.5rem;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.55rem;
+  overflow: hidden;
+  padding: 1.5rem 1rem 1rem;
+  border-radius: var(--radius-fat);
+  border: 2px solid rgba(175, 218, 228, 0.22);
+  background:
+    linear-gradient(180deg, rgba(36, 74, 92, 0.94), rgba(15, 30, 39, 0.96)) padding-box,
+    linear-gradient(160deg, var(--plaque-accent), transparent 60%) border-box;
+  box-shadow:
+    inset 0 2px 0 rgba(215, 237, 242, 0.18),
+    var(--shadow-lift);
+}
+
+.plaque[data-winner] {
+  border-color: var(--hearth-glow);
+  box-shadow:
+    inset 0 2px 0 rgba(255, 244, 226, 0.25),
+    0 0 60px -10px rgba(242, 176, 106, 0.7),
+    var(--shadow-lift);
+  transform: translateY(-8px) scale(1.05);
+}
+
+.plaqueName {
+  font-family: var(--font-display), sans-serif;
+  font-weight: 800;
+  font-size: 1.05rem;
+  color: var(--ink);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.medal {
+  position: absolute;
+  top: -0.9rem;
+  left: 50%;
+  translate: -50% 0;
+  padding: 0.22rem 0.8rem;
+  border-radius: var(--radius-pill);
+  border: 2px solid rgba(20, 34, 47, 0.55);
+  color: #241304;
+  font-family: var(--font-display), sans-serif;
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+
+.statsRow {
+  display: flex;
+  gap: 0.9rem;
+  margin-top: 0.2rem;
+}
+
+.statsRow div {
+  text-align: center;
+}
+
+.statsRow dt {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(215, 237, 242, 0.6);
+}
+
+.statsRow dd {
+  font-family: var(--font-display), sans-serif;
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: var(--hearth-200, #f2cfa4);
+}
+
+.coinField {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.coin {
+  position: absolute;
+  top: 0;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 32% 28%, #ffe9c4, #f2b06a 55%, #b46a24);
+  border: 1px solid rgba(120, 57, 29, 0.55);
+  opacity: 0;
+}
