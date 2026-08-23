@@ -53,6 +53,9 @@ export interface BotGameRecord {
 
 const DEFAULT_MAX_EVENTS = 10_000;
 
+/** Thrown when a bot-driven match exceeds `maxEvents` without ending. */
+export class BotGameStalledError extends Error {}
+
 function samePayload(a: unknown, b: unknown): boolean {
   return JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
 }
@@ -77,13 +80,14 @@ export function runBotGame<S, C extends RuleValues>(
 
   while (session.status === 'playing') {
     if (applied >= maxEvents) {
-      throw new Error(
+      throw new BotGameStalledError(
         `runBotGame: exceeded ${maxEvents} events without ending (seed ${opts.seed})`,
       );
     }
 
     const actor = session.phase.actor;
-    if (actor === null) throw new Error(`runBotGame: stalled flow — no acting seat (seed ${opts.seed})`);
+    if (actor === null)
+      throw new Error(`runBotGame: stalled flow — no acting seat (seed ${opts.seed})`);
 
     const policy = opts.policies[actor];
     if (!policy) throw new Error(`runBotGame: no bot policy seated at ${actor}`);
@@ -123,6 +127,10 @@ export function runBotGame<S, C extends RuleValues>(
 export interface SimulationRecord extends BotGameRecord {
   /** seats ranked 1st after any tie/penalty rules — may share the rank */
   winners: readonly SeatId[];
+  /** optional per-seat policy labels captured by simulateGames */
+  labels?: readonly string[];
+  /** true when the game exceeded maxEvents and was recorded as abandoned */
+  stalled?: boolean;
 }
 
 export interface SimulateOptions<S, C extends RuleValues> extends Omit<
@@ -132,6 +140,13 @@ export interface SimulateOptions<S, C extends RuleValues> extends Omit<
   baseSeed: number;
   /** builds the seated policies for each game index; must be deterministic */
   seatPoliciesFor: (gameIndex: number) => SeatPolicies<S>;
+  /** optional per-seat labels (persona/tier names) recorded alongside results */
+  seatLabelsFor?: (gameIndex: number) => readonly string[];
+  /**
+   * record stalled games as `{ stalled: true }` results instead of throwing —
+   * batch sims surface the stall rate instead of dying on one bad seed
+   */
+  tolerateStalls?: boolean;
 }
 
 export function simulateGames<S, C extends RuleValues>(
@@ -145,8 +160,29 @@ export function simulateGames<S, C extends RuleValues>(
   const records: SimulationRecord[] = [];
   for (let i = 0; i < games; i++) {
     const seed = (opts.baseSeed + i) | 0;
-    const record = runBotGame(def, { ...opts, seed, policies: opts.seatPoliciesFor(i) });
-    records.push({ ...record, winners: winnersOf(record.result) });
+    let record: BotGameRecord;
+    try {
+      record = runBotGame(def, { ...opts, seed, policies: opts.seatPoliciesFor(i) });
+    } catch (error) {
+      if (opts.tolerateStalls && error instanceof BotGameStalledError) {
+        records.push({
+          seed,
+          seats: 0,
+          events: opts.maxEvents ?? DEFAULT_MAX_EVENTS,
+          result: null,
+          winners: [],
+          labels: opts.seatLabelsFor?.(i),
+          stalled: true,
+        });
+        continue;
+      }
+      throw error;
+    }
+    records.push({
+      ...record,
+      winners: winnersOf(record.result),
+      labels: opts.seatLabelsFor?.(i),
+    });
   }
   return records;
 }
@@ -187,6 +223,11 @@ export function aggregateWinRates(
     }
   }
   return [...rows.entries()]
-    .map(([key, row]) => ({ key, games: row.games, credits: row.credits, winRate: row.games > 0 ? row.credits / row.games : 0 }))
+    .map(([key, row]) => ({
+      key,
+      games: row.games,
+      credits: row.credits,
+      winRate: row.games > 0 ? row.credits / row.games : 0,
+    }))
     .sort((a, b) => a.key.localeCompare(b.key));
 }

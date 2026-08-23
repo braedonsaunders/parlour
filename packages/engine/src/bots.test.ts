@@ -117,6 +117,8 @@ describe('enumerateLegalMoves + chooseBotMove', () => {
   });
 });
 
+import { BotGameStalledError } from './bots';
+
 describe('runBotGame', () => {
   it('drives a match to completion deterministically', () => {
     const a = runBotGame(raceGame, { seed: 7, policies: POLICIES });
@@ -141,8 +143,26 @@ describe('runBotGame', () => {
       scriptedPolicy('stall-2', [0]),
     ];
     expect(() => runBotGame(raceGame, { seed: 7, policies: stalling, maxEvents: 25 })).toThrow(
+      BotGameStalledError,
+    );
+    expect(() => runBotGame(raceGame, { seed: 7, policies: stalling, maxEvents: 25 })).toThrow(
       /exceeded 25 events/,
     );
+  });
+
+  it('simulateGames can record stalls instead of dying mid-batch', () => {
+    const records = simulateGames(raceGame, 3, {
+      baseSeed: 7,
+      seatPoliciesFor: () => [
+        scriptedPolicy('stall-0', [0]),
+        scriptedPolicy('stall-1', [0]),
+        scriptedPolicy('stall-2', [0]),
+      ],
+      maxEvents: 25,
+      tolerateStalls: true,
+    });
+    expect(records).toHaveLength(3);
+    for (const record of records) expect(record.stalled).toBe(true);
   });
 
   it('rejects empty policy tables', () => {
@@ -152,7 +172,9 @@ describe('runBotGame', () => {
 
 describe('simulateGames', () => {
   it('runs zero games into zero records', () => {
-    expect(simulateGames(raceGame, 0, { baseSeed: 1, seatPoliciesFor: () => POLICIES })).toEqual([]);
+    expect(simulateGames(raceGame, 0, { baseSeed: 1, seatPoliciesFor: () => POLICIES })).toEqual(
+      [],
+    );
   });
 
   it('rejects negative game counts', () => {
@@ -165,12 +187,14 @@ describe('simulateGames', () => {
     const records = simulateGames(raceGame, 4, {
       baseSeed: 100,
       seatPoliciesFor: (i) => (i % 2 === 0 ? POLICIES : [POLICIES[0], POLICIES[1]]),
+      seatLabelsFor: (i) => (i % 2 === 0 ? ['g0', 'g1', 'g2'] : ['g0', 'g1']),
     });
     expect(records).toHaveLength(4);
     for (const [i, record] of records.entries()) {
       expect(record.seed).toBe((100 + i) | 0);
       expect(record.winners.length).toBeGreaterThanOrEqual(1);
       expect(record.winners[0]).toBeLessThan(record.seats);
+      if (i % 2 === 0) expect(record.labels).toEqual(['g0', 'g1', 'g2']);
     }
   });
 });
