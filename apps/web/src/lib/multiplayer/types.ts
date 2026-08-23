@@ -30,6 +30,22 @@ export type ReplaySnapshot = {
   settings: RoomSettings;
 };
 
+export type SeatPresence = {
+  peerId: PeerId;
+  profileId: ProfileId;
+  bot: boolean;
+};
+
+export type PresenceSnapshot = {
+  version: number;
+  seats: Array<[SeatId, SeatPresence]>;
+};
+
+export type MigrationSnapshot = {
+  replay: ReplaySnapshot;
+  presence: PresenceSnapshot;
+};
+
 export type PresenceEvent =
   | { kind: 'peer.joined'; peerId: PeerId; seat: SeatId }
   | { kind: 'peer.left'; peerId: PeerId; seat: SeatId; bot: true }
