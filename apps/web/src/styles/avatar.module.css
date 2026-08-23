@@ -5,9 +5,12 @@
   flex: none;
   border-radius: 28%;
   border: 2px solid rgba(20, 34, 47, 0.55);
-  color: rgba(25, 14, 4, 0.82);
-  font-family: var(--font-display), sans-serif;
-  font-weight: 800;
-  text-shadow: 0 1px 0 rgba(255, 240, 218, 0.45);
+  overflow: hidden;
   user-select: none;
+}
+
+.badge svg {
+  width: 92%;
+  height: 92%;
+  filter: drop-shadow(0 3px 2px rgba(21, 40, 51, 0.28));
 }

@@ -5,8 +5,11 @@ import { type FxEvent } from '@parlour/engine';
 import { gsap } from 'gsap';
 import { AnimatePresence, motion } from 'motion/react';
 import { getAvatar } from '@/lib/avatars';
+import { getAudioManager } from '@/lib/audio/AudioManager';
+import { soundCuesForFx } from '@/lib/audio/cues';
 import { buildFxTimeline, type FxCue, type Zone } from '@/lib/table/fx-motion';
 import { PlayingCard } from './PlayingCard';
+import { AvatarBadge } from '@/components/AvatarBadge';
 import styles from '@/styles/table.module.css';
 
 export type TablePlayer = {
@@ -52,6 +55,7 @@ export type TableScreenProps = {
 export function TableScreen(props: TableScreenProps) {
   const { view, error } = props;
   const rootRef = useRef<HTMLElement>(null);
+  useTableAudio(props.fx, props.fxKey);
 
   if (error) {
     return (
@@ -130,6 +134,16 @@ export function TableScreen(props: TableScreenProps) {
   );
 }
 
+function useTableAudio(fx: readonly FxEvent[], fxKey: string | number) {
+  useEffect(() => {
+    const audio = getAudioManager();
+    const timers = soundCuesForFx(fx).map((cue) =>
+      window.setTimeout(() => audio.play(cue.id, { rate: cue.rate }), cue.atMs),
+    );
+    return () => timers.forEach((timer) => window.clearTimeout(timer));
+  }, [fx, fxKey]);
+}
+
 function Seat({ player, active }: { player: TablePlayer; active: boolean }) {
   const avatar = getAvatar(player.avatarId);
   const count = player.handCount ?? player.hand.length;
@@ -151,9 +165,11 @@ function Seat({ player, active }: { player: TablePlayer; active: boolean }) {
           ))}
         </div>
       )}
-      <div className={styles.avatar} aria-hidden="true">
-        {avatar.name.slice(0, 1)}
-      </div>
+      <AvatarBadge
+        avatarId={player.avatarId}
+        size="clamp(3.2rem, 5.6vw, 4.8rem)"
+        className={styles.avatar}
+      />
       <div className={styles.nameplate}>
         <strong>{player.name}</strong>
         {player.isBot && <small>bot</small>}

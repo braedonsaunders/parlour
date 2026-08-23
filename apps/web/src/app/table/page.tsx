@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Fx, type FxEvent, type MatchResult } from '@parlour/engine';
 import { RoundEndOverlay } from '@/components/celebration/RoundEndOverlay';
@@ -43,6 +43,8 @@ function ActiveSoloTable({ transport }: { transport: LocalTransport }) {
   const router = useRouter();
   const setLastMatch = useMatchFlowStore((state) => state.setLastMatch);
   const registerPlayAgain = useMatchFlowStore((state) => state.registerPlayAgain);
+  const recordResult = useProfileStore((state) => state.recordResult);
+  const reportedMatch = useRef<LocalTransport | null>(null);
   const [snapshot, setSnapshot] = useState(() => transport.getSnapshot());
   const [fx, setFx] = useState<readonly FxEvent[]>(() => snapshot.session.setupFx ?? []);
   const [roundFx, setRoundFx] = useState<readonly FxEvent[]>(() => snapshot.session.setupFx ?? []);
@@ -127,8 +129,11 @@ function ActiveSoloTable({ transport }: { transport: LocalTransport }) {
   ]);
 
   useEffect(() => {
-    if (snapshot.matchWinner === null) return;
+    if (snapshot.matchWinner === null || reportedMatch.current === transport) return;
+    reportedMatch.current = transport;
     const result = matchResult(snapshot);
+    const localMetrics = snapshot.metrics[0] ?? { blitzes: 0, knocks: 0, knockWins: 0 };
+    recordResult({ won: snapshot.matchWinner === 0, ...localMetrics });
     setLastMatch({
       result,
       seats: snapshot.players.map(({ seat, name, avatarId }) => ({ seat, name, avatarId })),
@@ -137,7 +142,7 @@ function ActiveSoloTable({ transport }: { transport: LocalTransport }) {
     });
     registerPlayAgain(() => router.push('/table'));
     router.push('/match-end');
-  }, [registerPlayAgain, router, setLastMatch, snapshot]);
+  }, [recordResult, registerPlayAgain, router, setLastMatch, snapshot, transport]);
 
   const view = tableView(snapshot, transport);
   const nextRound = useCallback(() => accept(transport.startNextRound()), [accept, transport]);
@@ -224,8 +229,8 @@ function matchResult(snapshot: SoloSnapshot): MatchResult {
       priorValue = value;
       const detail: Record<string, number> =
         snapshot.mode === 'classic'
-          ? { livesLeft: value, blitzes: 0, knockWins: 0 }
-          : { roundWins: value, blitzes: 0, knockWins: 0 };
+          ? { livesLeft: value, ...snapshot.metrics[seat] }
+          : { roundWins: value, ...snapshot.metrics[seat] };
       return {
         seat,
         rank: priorRank,

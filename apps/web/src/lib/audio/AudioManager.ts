@@ -33,6 +33,7 @@ type Entry = {
   howl: Howl | null;
   failed: boolean;
   active: number;
+  voices: Map<number, number>;
   lastPlayedAt: number;
 };
 
@@ -143,6 +144,7 @@ export class AudioManager {
           howl: null,
           failed: false,
           active: 0,
+          voices: new Map(),
           lastPlayedAt: Number.NEGATIVE_INFINITY,
         });
       }
@@ -174,12 +176,18 @@ export class AudioManager {
     entry.active += 1;
 
     const soundId = howl.play();
-    const voiceGain = clamp01(gain * (entry.def.volume ?? 1) * (options.volume ?? 1));
+    const voiceScale = clamp01((entry.def.volume ?? 1) * (options.volume ?? 1));
+    const voiceGain = clamp01(gain * voiceScale);
+    entry.voices.set(soundId, voiceScale);
     howl.volume(voiceGain, soundId);
     if (options.rate !== undefined) howl.rate(options.rate, soundId);
 
+    let released = false;
     const release = () => {
-      entry.active = Math.max(0, entry.active - 1);
+      if (released) return;
+      released = true;
+      entry.voices.delete(soundId);
+      entry.active = entry.voices.size;
     };
     howl.once('end', release, soundId);
     howl.once('stop', release, soundId);
@@ -193,6 +201,7 @@ export class AudioManager {
     if (!entry?.howl) return;
     entry.howl.stop();
     entry.active = 0;
+    entry.voices.clear();
   }
 
   stopAll(): void {
@@ -230,6 +239,7 @@ export class AudioManager {
       howl.once('loaderror', () => {
         entry.failed = true;
         entry.active = 0;
+        entry.voices.clear();
       });
       entry.howl = howl;
       return howl;
@@ -240,12 +250,24 @@ export class AudioManager {
   }
 
   private applyMasterVolume(): void {
-    const master = this.settings.master;
-    Howler.volume?.(master.muted ? 0 : master.volume);
+    // Per-voice gain folds in master + channel so independent live channel
+    // controls can update loops without double-applying the master volume.
+    Howler.volume?.(1);
+  }
+
+  private applyActiveVolumes(): void {
+    for (const entry of this.entries.values()) {
+      if (!entry.howl) continue;
+      const channelGain = this.gainFor(entry.def.channel);
+      for (const [id, voiceScale] of entry.voices) {
+        entry.howl.volume(clamp01(channelGain * voiceScale), id);
+      }
+    }
   }
 
   private commit(): void {
     this.applyMasterVolume();
+    this.applyActiveVolumes();
     this.writeStorage();
     this.notify();
   }

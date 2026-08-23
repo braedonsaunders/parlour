@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "type-check": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "generate:audio": "node scripts/generate-audio.mjs"
   },
   "dependencies": {
     "@parlour/engine": "workspace:*",

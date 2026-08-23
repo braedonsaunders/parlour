@@ -8,6 +8,7 @@ export type ProfileStats = {
   games: number;
   wins: number;
   blitzes: number;
+  knocks: number;
   knockWins: number;
   bestStreak: number;
   currentStreak: number;
@@ -19,10 +20,11 @@ export type ProfileSettings = {
   lastHouseRulePreset: string;
 };
 
-export type RoundOutcome = {
+export type MatchOutcome = {
   won: boolean;
-  blitzed?: boolean;
-  wonByKnock?: boolean;
+  blitzes: number;
+  knocks: number;
+  knockWins: number;
 };
 
 export type ProfileState = {
@@ -33,7 +35,7 @@ export type ProfileState = {
   setName: (name: string) => void;
   setAvatarId: (avatarId: string) => void;
   updateSettings: (patch: Partial<ProfileSettings>) => void;
-  recordResult: (outcome: RoundOutcome) => void;
+  recordResult: (outcome: MatchOutcome) => void;
   resetStats: () => void;
 };
 
@@ -41,6 +43,7 @@ export const EMPTY_STATS: ProfileStats = {
   games: 0,
   wins: 0,
   blitzes: 0,
+  knocks: 0,
   knockWins: 0,
   bestStreak: 0,
   currentStreak: 0,
@@ -52,16 +55,21 @@ export const DEFAULT_PROFILE_SETTINGS: ProfileSettings = {
   lastHouseRulePreset: 'classic-pub',
 };
 
-export function applyResult(stats: ProfileStats, outcome: RoundOutcome): ProfileStats {
+export function applyResult(stats: ProfileStats, outcome: MatchOutcome): ProfileStats {
   const currentStreak = outcome.won ? stats.currentStreak + 1 : 0;
   return {
     games: stats.games + 1,
     wins: stats.wins + (outcome.won ? 1 : 0),
-    blitzes: stats.blitzes + (outcome.blitzed ? 1 : 0),
-    knockWins: stats.knockWins + (outcome.won && outcome.wonByKnock ? 1 : 0),
+    blitzes: stats.blitzes + safeCount(outcome.blitzes),
+    knocks: stats.knocks + safeCount(outcome.knocks),
+    knockWins: stats.knockWins + safeCount(outcome.knockWins),
     currentStreak,
     bestStreak: Math.max(stats.bestStreak, currentStreak),
   };
+}
+
+function safeCount(value: number): number {
+  return Number.isFinite(value) ? Math.max(0, Math.floor(value)) : 0;
 }
 
 export const useProfileStore = create<ProfileState>()(
@@ -80,7 +88,16 @@ export const useProfileStore = create<ProfileState>()(
     }),
     {
       name: PROFILE_STORAGE_KEY,
-      version: 1,
+      version: 2,
+      migrate: (persisted) => {
+        if (typeof persisted !== 'object' || persisted === null) return persisted;
+        const profile = persisted as Partial<ProfileState>;
+        return {
+          ...profile,
+          stats: { ...EMPTY_STATS, ...(profile.stats ?? {}) },
+          settings: { ...DEFAULT_PROFILE_SETTINGS, ...(profile.settings ?? {}) },
+        };
+      },
       partialize: (state) => ({
         name: state.name,
         avatarId: state.avatarId,
@@ -93,4 +110,8 @@ export const useProfileStore = create<ProfileState>()(
 
 export function winRate(stats: ProfileStats): number {
   return stats.games === 0 ? 0 : stats.wins / stats.games;
+}
+
+export function knockSuccessRate(stats: ProfileStats): number {
+  return stats.knocks === 0 ? 0 : stats.knockWins / stats.knocks;
 }
