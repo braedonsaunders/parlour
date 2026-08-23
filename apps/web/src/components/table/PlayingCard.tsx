@@ -14,7 +14,6 @@ export type PlayingCardProps = {
   card?: string;
   faceDown?: boolean;
   compact?: boolean;
-  selected?: boolean;
   disabled?: boolean;
   rotation?: number;
   onClick?: () => void;
@@ -24,7 +23,6 @@ export function PlayingCard({
   card,
   faceDown = false,
   compact = false,
-  selected = false,
   disabled = false,
   rotation = 0,
   onClick,
@@ -34,7 +32,6 @@ export function PlayingCard({
     styles.card,
     compact ? styles.cardCompact : '',
     faceDown ? styles.cardBack : styles.cardFace,
-    selected ? styles.cardSelected : '',
     disabled ? styles.cardDisabled : '',
   ]
     .filter(Boolean)
@@ -49,7 +46,7 @@ export function PlayingCard({
         style={style}
         onClick={onClick}
         disabled={disabled}
-        aria-label={faceDown ? 'Face-down card' : `Select ${parsed?.label ?? card ?? 'card'}`}
+        aria-label={faceDown ? 'Face-down card' : `Discard ${parsed?.label ?? card ?? 'card'}`}
       >
         <CardContents parsed={parsed} faceDown={faceDown} />
       </button>
