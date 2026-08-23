@@ -295,10 +295,10 @@ export interface GameDef<S, C extends RuleValues> {
 // Session runtime (implemented by engine; signatures pinned here)
 // ---------------------------------------------------------------------------
 
-export interface ApplyOutcome<S> {
+export interface ApplyOutcome<S, C extends RuleValues = RuleValues> {
   events: AppliedEvent[];
   fx: FxEvent[];
-  session: GameSession<S>;
+  session: GameSession<S, C>;
   rejected?: RuleError;
 }
 
@@ -313,6 +313,10 @@ export interface GameSession<S, C extends RuleValues = RuleValues> {
   status: 'playing' | 'ended';
   result: MatchResult | null;
   botsEnabled(seat: SeatId): boolean;
+  /** fx emitted by def.setup — the opening deal animation */
+  setupFx?: readonly FxEvent[];
+  /** hash of the most recently applied event; compare to a log tail to detect divergence */
+  lastAppliedHash?: string | null;
 }
 
 export declare function stateHash(state: unknown): string;
@@ -326,7 +330,7 @@ export declare function sessionApply<S, C extends RuleValues>(
   seat: SeatId,
   moveId: string,
   payload?: unknown,
-): ApplyOutcome<S>;
+): ApplyOutcome<S, C>;
 export declare function replaySession<S, C extends RuleValues>(
   def: GameDef<S, C>,
   seed: number,

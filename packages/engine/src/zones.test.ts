@@ -1,0 +1,48 @@
+import { describe, expect, it } from 'vitest';
+import { makeRng } from './rng';
+import { stdDeck } from './types';
+import { addTo, addToBottom, drawFrom, peekTop, removeFrom, shuffledIds } from './zones';
+
+describe('zones', () => {
+  const zone = Object.freeze(['S1', 'H2', 'D3', 'C4']);
+
+  it('draws from the top without mutating the source', () => {
+    const { drawn, rest } = drawFrom(zone, 2);
+    expect(drawn).toEqual(['S1', 'H2']);
+    expect(rest).toEqual(['D3', 'C4']);
+    expect(zone).toEqual(['S1', 'H2', 'D3', 'C4']);
+  });
+
+  it('clamps over-draws and non-positive draws', () => {
+    expect(drawFrom(zone, 99)).toEqual({ drawn: [...zone], rest: [] });
+    expect(drawFrom(zone, 0)).toEqual({ drawn: [], rest: [...zone] });
+    expect(drawFrom(zone, -1)).toEqual({ drawn: [], rest: [...zone] });
+  });
+
+  it('peeks the top card and null when empty', () => {
+    expect(peekTop(zone)).toBe('S1');
+    expect(peekTop([])).toBeNull();
+  });
+
+  it('adds to top and bottom', () => {
+    expect(addTo(zone, 'S13')).toEqual(['S13', 'S1', 'H2', 'D3', 'C4']);
+    expect(addToBottom(zone, 'S13')).toEqual(['S1', 'H2', 'D3', 'C4', 'S13']);
+    expect(zone).toHaveLength(4);
+  });
+
+  it('removes a card by id and no-ops on misses', () => {
+    expect(removeFrom(zone, 'D3')).toEqual(['S1', 'H2', 'C4']);
+    const miss = removeFrom(zone, 'ZZ');
+    expect(miss).toEqual([...zone]);
+    expect(miss).not.toBe(zone);
+  });
+
+  it('shuffles a deck deterministically into a new array', () => {
+    const deck = stdDeck();
+    const a = shuffledIds(deck, makeRng(2024));
+    const b = shuffledIds(deck, makeRng(2024));
+    expect(a).toEqual(b);
+    expect(a).not.toEqual([...deck.cardIds]);
+    expect([...a].sort()).toEqual([...deck.cardIds].sort());
+  });
+});
