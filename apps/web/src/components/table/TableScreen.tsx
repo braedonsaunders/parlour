@@ -46,6 +46,7 @@ export type TableScreenProps = {
   onDraw?: (source: 'stock' | 'discard') => void;
   onDiscard?: (card: string) => void;
   onKnock?: () => void;
+  onMenu?: () => void;
 };
 
 export function TableScreen(props: TableScreenProps) {
@@ -85,6 +86,7 @@ export function TableScreen(props: TableScreenProps) {
           type="button"
           className={`${styles.menuButton} btn-fat btn-fat--ghost`}
           aria-label="Table menu"
+          onClick={props.onMenu}
         >
           •••
         </button>

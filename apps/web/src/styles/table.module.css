@@ -272,7 +272,6 @@
 }
 
 button.card {
-  color: inherit;
   cursor: pointer;
 }
 button.card:not(:disabled):hover {

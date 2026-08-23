@@ -24,6 +24,7 @@ export const metadata: Metadata = {
   title: 'parlour',
   description: 'Cozy card games. Blitz first.',
   manifest: '/manifest.webmanifest',
+  icons: { icon: '/icon.svg', apple: '/icon.svg' },
   appleWebApp: { capable: true, title: 'parlour', statusBarStyle: 'black-translucent' },
 };
 
