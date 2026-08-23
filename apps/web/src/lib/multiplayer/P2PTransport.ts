@@ -1,6 +1,6 @@
 import type { SeatId } from '@parlour/engine';
+import { createRoomCode, roomJoinUrl, validateRoomCode } from '../rooms/code';
 import { NostrSignaling, type SignalPayload } from './NostrSignaling';
-import { createRoomCode, normalizeRoomCode, roomJoinUrl } from './roomCode';
 import { HEARTBEAT_INTERVAL_MS, MultiplayerState, type SeatPresence } from './resilience';
 import { validateEmote } from './emotes';
 import type {
@@ -135,8 +135,9 @@ export class P2PTransport implements Transport {
 
   async join(rawCode: string): Promise<RoomHandle> {
     this.assertOpen();
-    const code = normalizeRoomCode(rawCode);
-    if (!code) throw new Error('Room codes use four letters or digits');
+    const verdict = validateRoomCode(rawCode);
+    if (!verdict.ok) throw new Error('Room codes use four unambiguous letters or digits');
+    const { code } = verdict;
     this.emitPresence({ kind: 'connection', state: 'connecting' });
     const room = await this.signaling.resolve(code);
     this.startRoom(code, room.hostPubkey);
