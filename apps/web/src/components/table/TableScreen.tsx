@@ -8,6 +8,7 @@ import { getAvatar } from '@/lib/avatars';
 import { getAudioManager } from '@/lib/audio/AudioManager';
 import { soundCuesForFx } from '@/lib/audio/cues';
 import { buildFxTimeline, type FxCue, type Zone } from '@/lib/table/fx-motion';
+import { ownerCurrentCount } from '@/lib/table/owner-count';
 import { PlayingCard } from './PlayingCard';
 import { AvatarBadge } from '@/components/AvatarBadge';
 import styles from '@/styles/table.module.css';
@@ -230,8 +231,13 @@ function LocalHand(props: TableScreenProps & { view: TableView }) {
   const player = props.view.players.find(({ isLocal }) => isLocal);
   if (!player) return null;
   const canChoose = props.view.legal.discardCards.length > 0 && !props.busy;
+  const currentCount = ownerCurrentCount(props.view.players);
   return (
     <div className={styles.localHand} data-zone={`hand:${player.seat}`} aria-label="Your hand">
+      <output className={styles.ownerCount} aria-label={`My current count: ${currentCount ?? 0}`}>
+        <span>My count</span>
+        <strong>{currentCount ?? 0}</strong>
+      </output>
       <AnimatePresence initial={false} mode="popLayout">
         {player.hand.map((card, index) => (
           <motion.div
