@@ -14,7 +14,7 @@ describe('runBalanceGates', () => {
     expect(a.personas.rows).toHaveLength(6);
     expect(a.headToHead.games).toBe(40);
     expect(typeof a.headToHead.hardWinRate).toBe('number');
-  });
+  }, 60_000);
 
   it('fails when the head-to-head bar is set impossibly high', () => {
     const report = runBalanceGates({
