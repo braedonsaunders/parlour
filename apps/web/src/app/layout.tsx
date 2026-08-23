@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import { Baloo_2, Nunito_Sans } from 'next/font/google';
+import { ComfortSync } from '@/components/ComfortSync';
 import { DioramaStage } from '@/components/DioramaStage';
 import { PwaRegister } from '@/components/PwaRegister';
 import { RotatePrompt } from '@/components/RotatePrompt';
@@ -41,6 +42,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <DioramaStage />
         <div className="relative z-10 min-h-dvh">{children}</div>
         <RotatePrompt />
+        <ComfortSync />
         <PwaRegister />
       </body>
     </html>
