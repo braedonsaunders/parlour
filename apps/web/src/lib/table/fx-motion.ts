@@ -1,0 +1,172 @@
+import { Fx, type FxEvent } from '@parlour/engine';
+
+export const FX_TIMING = {
+  cardFlightMs: 180,
+  drawFlightMs: 200,
+  settleMs: 80,
+  dealStaggerMinMs: 60,
+  dealStaggerMaxMs: 90,
+  knockMs: 900,
+  blitzMs: 1100,
+  showdownMs: 560,
+  chipLossMs: 640,
+  maxBurstMs: 1200,
+} as const;
+
+export type Zone = 'stock' | 'discard' | `hand:${number}` | `seat:${number}`;
+
+type BaseCue = {
+  id: string;
+  startMs: number;
+  durationMs: number;
+  source: FxEvent;
+};
+
+export type FxCue =
+  | (BaseCue & { type: 'deal'; card: string; from: Zone; to: Zone })
+  | (BaseCue & { type: 'draw'; card: string; from: Zone; to: `hand:${number}`; seat: number })
+  | (BaseCue & {
+      type: 'discard';
+      card: string;
+      from: `hand:${number}`;
+      to: 'discard';
+      seat: number;
+    })
+  | (BaseCue & { type: 'knock'; seat: number })
+  | (BaseCue & { type: 'blitz'; seat: number; handValue: number })
+  | (BaseCue & { type: 'showdown'; seat: number; handValue: number })
+  | (BaseCue & { type: 'chip-loss'; seat: number; livesLeft: number })
+  | (BaseCue & { type: 'turn'; seat: number });
+
+type Payload = Record<string, unknown>;
+
+function payloadOf(event: FxEvent): Payload {
+  if (typeof event.payload !== 'object' || event.payload === null || Array.isArray(event.payload)) {
+    throw new Error(`${event.kind} fx requires an object payload`);
+  }
+  return event.payload as Payload;
+}
+
+function stringField(event: FxEvent, field: string): string {
+  const value = payloadOf(event)[field];
+  if (typeof value !== 'string' || value.length === 0) {
+    throw new Error(`${event.kind} fx requires a non-empty ${field}`);
+  }
+  return value;
+}
+
+function numberField(event: FxEvent, field: string): number {
+  const value = payloadOf(event)[field];
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw new Error(`${event.kind} fx requires a finite ${field}`);
+  }
+  return value;
+}
+
+function zoneField(event: FxEvent, field: string): Zone {
+  const value = stringField(event, field);
+  if (
+    value === 'stock' ||
+    value === 'discard' ||
+    /^hand:\d+$/.test(value) ||
+    /^seat:\d+$/.test(value)
+  ) {
+    return value as Zone;
+  }
+  throw new Error(`${event.kind} fx has an invalid ${field} zone: ${value}`);
+}
+
+function cueFor(event: FxEvent, index: number): FxCue | null {
+  const base = {
+    id: `${index}:${event.kind}`,
+    startMs: Math.max(0, event.at ?? 0),
+    source: event,
+  };
+
+  switch (event.kind) {
+    case Fx.DealCard:
+      return {
+        ...base,
+        type: 'deal',
+        card: stringField(event, 'card'),
+        from: zoneField(event, 'from'),
+        to: zoneField(event, 'to'),
+        durationMs: FX_TIMING.cardFlightMs,
+      };
+    case Fx.DrawCard: {
+      const seat = numberField(event, 'seat');
+      return {
+        ...base,
+        type: 'draw',
+        card: stringField(event, 'card'),
+        from: zoneField(event, 'from'),
+        to: `hand:${seat}`,
+        seat,
+        durationMs: FX_TIMING.drawFlightMs,
+      };
+    }
+    case Fx.DiscardCard: {
+      const seat = numberField(event, 'seat');
+      return {
+        ...base,
+        type: 'discard',
+        card: stringField(event, 'card'),
+        from: `hand:${seat}`,
+        to: 'discard',
+        seat,
+        durationMs: FX_TIMING.cardFlightMs + FX_TIMING.settleMs,
+      };
+    }
+    case Fx.Knock:
+      return {
+        ...base,
+        type: 'knock',
+        seat: numberField(event, 'seat'),
+        durationMs: FX_TIMING.knockMs,
+      };
+    case Fx.Blitz:
+      return {
+        ...base,
+        type: 'blitz',
+        seat: numberField(event, 'seat'),
+        handValue: numberField(event, 'handValue'),
+        durationMs: FX_TIMING.blitzMs,
+      };
+    case Fx.ShowdownReveal:
+      return {
+        ...base,
+        type: 'showdown',
+        seat: numberField(event, 'seat'),
+        handValue: numberField(event, 'handValue'),
+        durationMs: FX_TIMING.showdownMs,
+      };
+    case Fx.ChipLoss:
+      return {
+        ...base,
+        type: 'chip-loss',
+        seat: numberField(event, 'seat'),
+        livesLeft: numberField(event, 'livesLeft'),
+        durationMs: FX_TIMING.chipLossMs,
+      };
+    case Fx.TurnRing:
+      return {
+        ...base,
+        type: 'turn',
+        seat: numberField(event, 'seat'),
+        durationMs: FX_TIMING.settleMs * 3,
+      };
+    default:
+      return null;
+  }
+}
+
+/**
+ * Converts engine presentation hints into renderer-ready cues. No game state is
+ * inspected here: if the engine did not emit an effect, the table stays still.
+ */
+export function buildFxTimeline(events: readonly FxEvent[]): FxCue[] {
+  return events
+    .map(cueFor)
+    .filter((cue): cue is FxCue => cue !== null)
+    .sort((a, b) => a.startMs - b.startMs);
+}
