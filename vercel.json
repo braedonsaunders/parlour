@@ -3,5 +3,6 @@
   "framework": null,
   "installCommand": "pnpm install",
   "buildCommand": "pnpm --filter @parlour/web... build",
-  "outputDirectory": "apps/web/out"
+  "outputDirectory": "apps/web/out",
+  "rewrites": [{ "source": "/join/:code", "destination": "/join.html" }]
 }
