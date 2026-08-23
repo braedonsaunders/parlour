@@ -1,0 +1,285 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.skipVeil {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(120% 90% at 50% 100%, rgba(9, 20, 27, 0.88), rgba(9, 20, 27, 0.55));
+  border: 0;
+  cursor: pointer;
+  backdrop-filter: blur(3px);
+}
+
+.skipVeil:focus-visible {
+  outline: 3px solid var(--hearth-core);
+  outline-offset: -6px;
+}
+
+.stage {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  width: min(58rem, calc(100% - 2rem));
+  margin-bottom: max(4vh, 1.25rem);
+  pointer-events: none;
+}
+
+/* --- banner --------------------------------------------------------------- */
+
+.banner {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.55rem 1.6rem;
+  border-radius: var(--radius-fat);
+  border: 2px solid rgba(255, 244, 226, 0.35);
+  background: linear-gradient(180deg, rgba(36, 74, 92, 0.96), rgba(15, 30, 39, 0.96));
+  box-shadow:
+    inset 0 2px 0 rgba(215, 237, 242, 0.2),
+    var(--shadow-lift);
+  animation: banner-slam 240ms var(--ease-pop) both;
+}
+
+.banner[data-kind='blitz'] {
+  border-color: var(--hearth-glow);
+  box-shadow:
+    inset 0 2px 0 rgba(255, 244, 226, 0.28),
+    0 0 56px -8px rgba(242, 176, 106, 0.65);
+}
+
+@keyframes banner-slam {
+  from {
+    transform: scale(1.35);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.bannerText {
+  font-family: var(--font-display), sans-serif;
+  font-size: clamp(1.9rem, 5vw, 2.9rem);
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: var(--hearth-200, #f2cfa4);
+  text-shadow:
+    0 0 26px rgba(242, 176, 106, 0.55),
+    0 3px 0 rgba(120, 57, 29, 0.55);
+  white-space: nowrap;
+}
+
+.bannerSub {
+  font-size: 0.85rem;
+  color: var(--ink-dim);
+  max-width: 14rem;
+  text-align: left;
+}
+
+.blitzNumeral {
+  font-family: var(--font-display), sans-serif;
+  font-size: 2.6rem;
+  font-weight: 800;
+  color: #ffd9a0;
+  text-shadow: 0 0 18px rgba(242, 176, 106, 0.8);
+  animation: numeral-pop 700ms var(--ease-pop) both;
+}
+
+@keyframes numeral-pop {
+  0% {
+    transform: scale(0.2) rotate(-12deg);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.25) rotate(4deg);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+  }
+}
+
+/* --- reveals --------------------------------------------------------------- */
+
+.revealRow {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.7rem;
+}
+
+.revealCard {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.45rem 0.9rem;
+  border-radius: var(--radius-chunky);
+  border: 2px solid rgba(175, 218, 228, 0.2);
+  background: rgba(21, 40, 51, 0.82);
+  opacity: 0.45;
+  transition:
+    opacity var(--dur-feedback) ease,
+    transform 220ms var(--ease-pop);
+}
+
+.revealCard[data-shown='true'] {
+  opacity: 1;
+  border-color: var(--seat-accent);
+  transform: translateY(-6px) scale(1.06);
+}
+
+.revealName {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--ink-dim);
+}
+
+.revealValue {
+  font-family: var(--font-display), sans-serif;
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--ink);
+  min-width: 2ch;
+  text-align: center;
+}
+
+/* --- standings ------------------------------------------------------------- */
+
+.standings {
+  display: grid;
+  grid-auto-flow: column;
+  gap: 0.5rem;
+  max-width: 100%;
+}
+
+.standingRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.8rem;
+  border-radius: var(--radius-pill);
+  border: 1px solid rgba(175, 218, 228, 0.16);
+  background: rgba(15, 30, 39, 0.85);
+  transition: box-shadow 240ms ease;
+}
+
+.standingRow[data-lost='true'] {
+  border-color: rgba(194, 89, 63, 0.75);
+  animation: row-shake 320ms ease-out;
+}
+
+@keyframes row-shake {
+  0%,
+  100% {
+    translate: 0 0;
+  }
+  30% {
+    translate: -3px 0;
+  }
+  60% {
+    translate: 3px 0;
+  }
+}
+
+.standingName {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--ink-dim);
+  max-width: 7rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.delta {
+  font-family: var(--font-display), sans-serif;
+  font-weight: 800;
+  font-size: 0.85rem;
+  color: #e88a70;
+  animation: delta-drop 480ms var(--ease-pop) both;
+}
+
+@keyframes delta-drop {
+  from {
+    transform: translateY(-10px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.lifePips {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.lifePips i {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 32% 28%, #ffd9a0, #e29349 60%);
+  border: 1px solid rgba(120, 57, 29, 0.6);
+}
+
+.lifePips em {
+  font-style: normal;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #e88a70;
+}
+
+/* --- countdown -------------------------------------------------------------- */
+
+.countdownWrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 2.4rem;
+  margin-bottom: 0.2rem;
+}
+
+.countdownRing {
+  width: 2.2rem;
+  height: 2.2rem;
+  border-radius: 50%;
+  border: 3px solid rgba(175, 218, 228, 0.25);
+  border-top-color: var(--hearth-glow);
+  animation-name: ring-drain;
+  animation-timing-function: linear;
+  animation-fill-mode: both;
+}
+
+@keyframes ring-drain {
+  from {
+    rotate: 0deg;
+  }
+  to {
+    rotate: 360deg;
+  }
+}
+
+.countdownLabel {
+  margin-left: 0.55rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(215, 237, 242, 0.75);
+}
