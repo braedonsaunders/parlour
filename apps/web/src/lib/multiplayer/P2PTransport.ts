@@ -12,6 +12,7 @@ import type {
   ReplaySnapshot,
   RoomHandle,
   RoomSettings,
+  SnapshotNotification,
   Transport,
 } from './types';
 
@@ -94,6 +95,7 @@ export class P2PTransport implements Transport {
   private readonly links = new Map<string, PeerLink>();
   private readonly profiles = new Map<string, string>();
   private readonly eventListeners = new Set<(event: AppliedPacket) => void>();
+  private readonly snapshotListeners = new Set<(notification: SnapshotNotification) => void>();
   private readonly presenceListeners = new Set<(event: PresenceEvent) => void>();
   private readonly emoteListeners = new Set<(peerId: string, emote: Emote) => void>();
   private readonly lastReceivedEmote = new Map<string, number>();
@@ -102,6 +104,7 @@ export class P2PTransport implements Transport {
   private signalSubscription?: { close(): void };
   private heartbeatTimer?: ReturnType<typeof setInterval>;
   private lastEmoteAt = -Infinity;
+  private pendingResync = false;
   private closed = false;
 
   constructor(options: P2PTransportOptions) {
@@ -169,6 +172,11 @@ export class P2PTransport implements Transport {
   onEvent(callback: (event: AppliedPacket) => void): () => void {
     this.eventListeners.add(callback);
     return () => this.eventListeners.delete(callback);
+  }
+
+  onSnapshot(callback: (notification: SnapshotNotification) => void): () => void {
+    this.snapshotListeners.add(callback);
+    return () => this.snapshotListeners.delete(callback);
   }
 
   onPresence(callback: (presence: PresenceEvent) => void): () => void {
@@ -322,8 +330,12 @@ export class P2PTransport implements Transport {
           localHash,
           message.packet.stateHash,
         );
-        if (mismatch) this.sendTo(this.resilience!.hostId, { type: 'sync.request', ...mismatch });
-        else this.emitEvent(message.packet);
+        if (mismatch) {
+          if (!this.pendingResync) {
+            this.pendingResync = true;
+            this.sendTo(this.resilience!.hostId, { type: 'sync.request', ...mismatch });
+          }
+        } else this.emitEvent(message.packet);
         return;
       }
       case 'sync.request':
@@ -331,14 +343,19 @@ export class P2PTransport implements Transport {
           this.sendTo(peerId, { type: 'sync.snapshot', snapshot: this.authority.exportSnapshot() });
         return;
       case 'sync.snapshot':
-        if (peerId === this.resilience?.hostId)
+        if (peerId === this.resilience?.hostId && this.pendingResync) {
           await this.authority.importSnapshot(message.snapshot);
+          const snapshot = this.authority.exportSnapshot();
+          this.pendingResync = false;
+          this.emitSnapshot({ kind: 'snapshot', reason: 'divergence', snapshot });
+        }
         return;
       case 'host.changed':
         if (peerId !== message.hostId || message.hostId !== this.lowestConnectedPeer()) return;
         this.resilience!.hostId = message.hostId;
         this.emitPresence({ kind: 'host.changed', hostId: message.hostId });
         if (this.authority.exportSnapshot().stateHash !== message.stateHash) {
+          this.pendingResync = true;
           this.sendTo(peerId, {
             type: 'sync.request',
             expectedSeq: this.authority.exportSnapshot().log.length,
@@ -470,6 +487,10 @@ export class P2PTransport implements Transport {
 
   private emitEvent(event: AppliedPacket): void {
     for (const listener of this.eventListeners) listener(event);
+  }
+
+  private emitSnapshot(notification: SnapshotNotification): void {
+    for (const listener of this.snapshotListeners) listener(notification);
   }
 
   private emitPresence(event: PresenceEvent): void {

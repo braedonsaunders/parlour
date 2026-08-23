@@ -84,7 +84,7 @@ export class EngineAuthority<S, C extends RuleValues> implements AuthorityAdapte
       seats: snapshot.settings.seats,
     });
     if (stateHash(replayed.state) !== snapshot.stateHash) throw new Error('snapshot hash mismatch');
-    this.session = replayed;
+    this.session = { ...replayed, log: [...snapshot.log] };
   }
 
   setSeatBot(seat: number, bot: boolean): void {

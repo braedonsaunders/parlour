@@ -1,9 +1,14 @@
+import { createSession } from '@parlour/engine';
+import { blitzConfigSchema, createBlitzDef } from '@parlour/game-blitz';
 import { describe, expect, it, vi } from 'vitest';
 import {
   ACTION_CACHE_LIMIT,
   EMOTES,
+  EngineAuthority,
   HEARTBEAT_TIMEOUT_MS,
   MultiplayerState,
+  NostrSignaling,
+  P2PTransport,
   normalizeRoomCode,
   roomJoinUrl,
   validateEmote,
@@ -81,5 +86,85 @@ describe('quick emotes', () => {
       ok: false,
       reason: 'unsupported-emote',
     });
+  });
+});
+
+describe('divergence recovery', () => {
+  it('notifies a snapshot subscriber exactly once with the atomically corrected snapshot', async () => {
+    const def = createBlitzDef();
+    const config = blitzConfigSchema.defaults();
+    const settings = { gameId: 'blitz', seats: 2, config };
+    const host = new EngineAuthority({
+      def,
+      session: createSession(def, { seed: 7, config, seats: 2 }),
+      settings,
+      now: () => 100,
+    });
+    const authority = new EngineAuthority({
+      def,
+      session: createSession(def, { seed: 7, config, seats: 2 }),
+      settings,
+    });
+    const initial = authority.exportSnapshot();
+    const actor = host.getSession().phase.actor!;
+    const move = def.flow.legalMoves(host.getSession().state, host.getSession().phase)[0]!;
+    const packet = host.apply({
+      id: 'action-1',
+      seat: actor,
+      move: move.id,
+      payload: move.payload,
+    });
+    const corrected = host.exportSnapshot();
+    vi.spyOn(authority, 'applyRemote').mockReturnValue(initial.stateHash);
+    const importSnapshot = vi.spyOn(authority, 'importSnapshot');
+    const signaling = new NostrSignaling({
+      relays: [],
+      pool: {
+        ensureRelay: vi.fn(),
+        publish: vi.fn(() => []),
+        querySync: vi.fn(async () => []),
+        subscribeMany: vi.fn(() => ({ close() {} })),
+        close: vi.fn(),
+      },
+    });
+    const transport = new P2PTransport({
+      authority,
+      profileId: 'guest-profile',
+      signaling,
+      origin: 'https://parlour.test',
+    });
+    const harness = transport as unknown as {
+      startRoom(code: string, hostId: string): void;
+      receiveWire(peerId: string, message: unknown): Promise<void>;
+      sendTo: ReturnType<typeof vi.fn>;
+    };
+    harness.sendTo = vi.fn();
+    harness.startRoom('AB2Z', 'host');
+    const observations: unknown[] = [];
+    transport.onSnapshot((notification) => {
+      observations.push({ notification, authority: authority.exportSnapshot() });
+    });
+
+    await harness.receiveWire('host', {
+      type: 'applied',
+      packet,
+    });
+    expect(harness.sendTo).toHaveBeenCalledWith('host', {
+      type: 'sync.request',
+      expectedSeq: 0,
+    });
+    expect(observations).toEqual([]);
+
+    await harness.receiveWire('host', { type: 'sync.snapshot', snapshot: corrected });
+    await harness.receiveWire('host', { type: 'sync.snapshot', snapshot: corrected });
+
+    expect(observations).toEqual([
+      {
+        notification: { kind: 'snapshot', reason: 'divergence', snapshot: corrected },
+        authority: corrected,
+      },
+    ]);
+    expect(importSnapshot).toHaveBeenCalledOnce();
+    transport.close();
   });
 });
