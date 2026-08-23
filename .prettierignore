@@ -3,3 +3,4 @@ pnpm-lock.yaml
 out/
 .next/
 node_modules/
+apps/web/next-env.d.ts
