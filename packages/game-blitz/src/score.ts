@@ -41,9 +41,7 @@ export function scoreRound(state: BlitzState): RoundOutcome {
   const loserSet = new Set(losers);
   const surviving = seats
     .filter((s) => !loserSet.has(s))
-    .sort(
-      (a, b) => (values.get(b) as number) - (values.get(a) as number) || a - b,
-    );
+    .sort((a, b) => (values.get(b) as number) - (values.get(a) as number) || a - b);
 
   const topSurviving = surviving[0];
   if (topSurviving === undefined) {
@@ -56,7 +54,11 @@ export function scoreRound(state: BlitzState): RoundOutcome {
 
   // 3. rankings: winners first, then the rest by value, losers last
   const runnerUp = surviving.slice(winners.length);
-  const ordered = [...winners.slice().sort((a, b) => a - b), ...runnerUp, ...losers.slice().sort((a, b) => a - b)];
+  const ordered = [
+    ...winners.slice().sort((a, b) => a - b),
+    ...runnerUp,
+    ...losers.slice().sort((a, b) => a - b),
+  ];
   const rankings: MatchResultRank[] = ordered.map((seat, index) => ({
     seat,
     rank: winners.includes(seat) ? 1 : index + 1,

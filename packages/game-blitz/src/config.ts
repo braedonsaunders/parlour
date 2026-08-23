@@ -41,7 +41,7 @@ export const blitzConfigSchema = defineConfig<BlitzConfig>(
     {
       key: 'discardLock',
       kind: 'toggle',
-      label: "Lock the discard you just drew",
+      label: 'Lock the discard you just drew',
       default: true,
     },
   ],
