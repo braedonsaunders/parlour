@@ -1,0 +1,75 @@
+.slots {
+  display: flex;
+  gap: 0.8rem;
+}
+
+.slot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 4.2rem;
+  height: 5.4rem;
+  border-radius: var(--radius-chunky);
+  border: 3px dashed rgba(175, 218, 228, 0.35);
+  background: rgba(21, 40, 51, 0.62);
+  font-family: var(--font-display), sans-serif;
+  font-size: 2.6rem;
+  font-weight: 800;
+  color: var(--ink);
+  transition:
+    border-color var(--dur-tap) ease,
+    transform var(--dur-feedback) var(--ease-pop);
+}
+
+.slot[data-filled='true'] {
+  border-style: solid;
+  border-color: var(--hearth-glow);
+  background: linear-gradient(180deg, rgba(246, 189, 122, 0.16), rgba(21, 40, 51, 0.72));
+  text-shadow: var(--shadow-glow);
+  transform: translateY(-3px);
+}
+
+.keypad {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.45rem;
+  max-width: 30rem;
+}
+
+.key {
+  height: 2.7rem;
+  border-radius: 0.9rem;
+  border: 2px solid rgba(20, 34, 47, 0.55);
+  background: linear-gradient(180deg, #3d6579 0%, #25586e 55%, #1c3d50 100%);
+  color: var(--ink-dim);
+  font-family: var(--font-display), sans-serif;
+  font-size: 1rem;
+  font-weight: 800;
+  box-shadow:
+    inset 0 1px 0 rgba(215, 237, 242, 0.28),
+    inset 0 -3px 0 rgba(10, 22, 30, 0.5),
+    var(--shadow-ambient);
+  transition:
+    transform var(--dur-tap) var(--ease-pop),
+    filter var(--dur-tap) ease;
+  will-change: transform;
+}
+
+.key:hover:not(:disabled) {
+  transform: translateY(-2px) scale(1.05);
+  filter: saturate(1.1);
+}
+
+.key:active:not(:disabled) {
+  transform: translateY(1px) scale(0.96);
+}
+
+.key:focus-visible {
+  outline: 3px solid var(--hearth-core);
+  outline-offset: 2px;
+}
+
+.key:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
