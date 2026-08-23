@@ -1,0 +1,17 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --parlour-bg: #152833;
+  --parlour-amber: #e29349;
+  --parlour-teal: #2f86a1;
+}
+
+html,
+body {
+  height: 100%;
+  background: var(--parlour-bg);
+  color: #fdf6ec;
+  overscroll-behavior: none;
+}

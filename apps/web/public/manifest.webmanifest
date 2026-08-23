@@ -1,0 +1,18 @@
+{
+  "name": "parlour",
+  "short_name": "parlour",
+  "description": "Cozy card games. Blitz first.",
+  "start_url": "/",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#152833",
+  "theme_color": "#152833",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
