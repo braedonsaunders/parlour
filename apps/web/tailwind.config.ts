@@ -34,9 +34,20 @@ const config: Config = {
       },
       borderRadius: {
         chunky: '1.25rem',
+        fat: '1.75rem',
       },
       fontFamily: {
-        display: ['var(--font-display)'],
+        display: ['var(--font-display)', 'ui-rounded', 'system-ui', 'sans-serif'],
+        sans: ['var(--font-body)', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+      },
+      boxShadow: {
+        ambient: 'var(--shadow-ambient)',
+        lift: 'var(--shadow-lift)',
+        hearth: 'var(--shadow-glow)',
+      },
+      transitionTimingFunction: {
+        pop: 'cubic-bezier(0.34, 1.56, 0.64, 1)',
+        settle: 'cubic-bezier(0.2, 0.8, 0.3, 1)',
       },
     },
   },

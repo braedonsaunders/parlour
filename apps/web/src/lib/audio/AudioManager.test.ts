@@ -1,0 +1,262 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+const { FakeHowl, howlerVolume } = vi.hoisted(() => {
+  type Handler = () => void;
+
+  class Fake {
+    static instances: Fake[] = [];
+
+    private handlers = new Map<string, Handler[]>();
+    private nextId = 1;
+
+    readonly volumeCalls: Array<[number, number]> = [];
+    readonly rateCalls: Array<[number, number]> = [];
+    stopped = 0;
+
+    constructor(public readonly options: { src: string[]; loop?: boolean }) {
+      Fake.instances.push(this);
+    }
+
+    play(): number {
+      return this.nextId++;
+    }
+
+    volume(value: number, id: number): void {
+      this.volumeCalls.push([value, id]);
+    }
+
+    rate(value: number, id: number): void {
+      this.rateCalls.push([value, id]);
+    }
+
+    stop(): void {
+      this.stopped += 1;
+    }
+
+    once(event: string, callback: Handler, id?: number): void {
+      const key = `${event}:${id ?? '*'}`;
+      const list = this.handlers.get(key) ?? [];
+      list.push(callback);
+      this.handlers.set(key, list);
+    }
+
+    emit(event: string, id?: number): void {
+      const key = `${event}:${id ?? '*'}`;
+      const list = this.handlers.get(key) ?? [];
+      this.handlers.set(key, []);
+      for (const handler of list) handler();
+    }
+  }
+
+  return { FakeHowl: Fake, howlerVolume: vi.fn() };
+});
+
+type FakeHowl = InstanceType<typeof FakeHowl>;
+
+vi.mock('howler', () => ({
+  Howl: FakeHowl,
+  Howler: {
+    volume: (value: number) => howlerVolume(value),
+    ctx: { resume: () => Promise.resolve() },
+  },
+}));
+
+import {
+  AudioManager,
+  AUDIO_STORAGE_KEY,
+  DEFAULT_SETTINGS,
+  parseSettings,
+  serializeSettings,
+  type SoundDef,
+} from './AudioManager';
+
+const MANIFEST: readonly SoundDef[] = [
+  { id: 'pop', src: '/audio/pop.mp3', channel: 'sfx', cap: 2, minInterval: 0 },
+  { id: 'thud', src: '/audio/thud.mp3', channel: 'sfx', cap: 1, minInterval: 500 },
+  { id: 'loop', src: '/audio/loop.mp3', channel: 'music', loop: true, cap: 1, minInterval: 0 },
+];
+
+function makeManager() {
+  const manager = new AudioManager();
+  manager.preload(MANIFEST);
+  return manager;
+}
+
+function installMemoryStorage(): Storage {
+  const map = new Map<string, string>();
+  const storage: Storage = {
+    get length() {
+      return map.size;
+    },
+    clear: () => map.clear(),
+    getItem: (key) => map.get(key) ?? null,
+    key: (index) => Array.from(map.keys())[index] ?? null,
+    removeItem: (key) => void map.delete(key),
+    setItem: (key, value) => void map.set(key, String(value)),
+  };
+  Object.defineProperty(globalThis, 'localStorage', {
+    value: storage,
+    configurable: true,
+    writable: true,
+  });
+  return storage;
+}
+
+let localStorage: Storage;
+
+beforeEach(() => {
+  localStorage = installMemoryStorage();
+  FakeHowl.instances = [];
+  howlerVolume.mockClear();
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date('2026-08-23T12:00:00Z'));
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+});
+
+describe('settings persistence', () => {
+  it('starts from defaults when storage is empty', () => {
+    expect(makeManager().getSettings()).toEqual(DEFAULT_SETTINGS);
+  });
+
+  it('writes a versioned channel payload under the v1 key', () => {
+    const manager = makeManager();
+    manager.setMuted('music', true);
+    manager.setVolume('sfx', 0.5);
+
+    const raw = localStorage.getItem(AUDIO_STORAGE_KEY);
+    expect(raw).not.toBeNull();
+    expect(JSON.parse(raw as string)).toEqual({
+      v: 1,
+      channels: {
+        master: DEFAULT_SETTINGS.master,
+        music: { volume: DEFAULT_SETTINGS.music.volume, muted: true },
+        sfx: { volume: 0.5, muted: false },
+      },
+    });
+  });
+
+  it('rehydrates mutes from storage on construction', () => {
+    localStorage.setItem(
+      AUDIO_STORAGE_KEY,
+      serializeSettings({
+        master: { volume: 0.8, muted: false },
+        music: { volume: 0.2, muted: true },
+        sfx: { volume: 0.7, muted: false },
+      }),
+    );
+
+    const settings = makeManager().getSettings();
+    expect(settings.music.muted).toBe(true);
+    expect(settings.sfx.volume).toBe(0.7);
+  });
+
+  it('falls back to defaults on corrupt or partial payloads', () => {
+    expect(parseSettings('not json at all')).toEqual(DEFAULT_SETTINGS);
+    expect(parseSettings(JSON.stringify({ v: 1, channels: { sfx: { muted: true } } }))).toEqual({
+      ...DEFAULT_SETTINGS,
+      sfx: { volume: DEFAULT_SETTINGS.sfx.volume, muted: true },
+    });
+  });
+
+  it('clamps volumes into 0..1', () => {
+    const manager = makeManager();
+    manager.setVolume('master', 4);
+    manager.setVolume('sfx', -2);
+    expect(manager.getSettings().master.volume).toBe(1);
+    expect(manager.getSettings().sfx.volume).toBe(0);
+  });
+
+  it('folds master mute into channel gain', () => {
+    const manager = makeManager();
+    expect(manager.gainFor('sfx')).toBeGreaterThan(0);
+    manager.setMuted('master', true);
+    expect(manager.gainFor('sfx')).toBe(0);
+    expect(manager.gainFor('music')).toBe(0);
+  });
+});
+
+describe('voice concurrency', () => {
+  it('counts active voices up to the per-id cap and drops the overflow', () => {
+    const manager = makeManager();
+
+    expect(manager.play('pop')).not.toBeNull();
+    expect(manager.play('pop')).not.toBeNull();
+    expect(manager.activeVoices('pop')).toBe(2);
+
+    expect(manager.play('pop')).toBeNull();
+    expect(manager.activeVoices('pop')).toBe(2);
+  });
+
+  it('frees a voice slot when a sound ends', () => {
+    const manager = makeManager();
+    manager.play('pop');
+    manager.play('pop');
+
+    const howl = FakeHowl.instances[0] as FakeHowl;
+    howl.emit('end', 1);
+    expect(manager.activeVoices('pop')).toBe(1);
+
+    expect(manager.play('pop')).not.toBeNull();
+    expect(manager.activeVoices('pop')).toBe(2);
+  });
+
+  it('enforces the per-id minimum interval', () => {
+    const manager = makeManager();
+    expect(manager.play('thud')).not.toBeNull();
+
+    const howl = FakeHowl.instances[0] as FakeHowl;
+    howl.emit('end', 1);
+    expect(manager.play('thud')).toBeNull();
+
+    vi.advanceTimersByTime(600);
+    expect(manager.play('thud')).not.toBeNull();
+  });
+
+  it('drops playback while the owning channel is muted', () => {
+    const manager = makeManager();
+    manager.setMuted('sfx', true);
+    expect(manager.play('pop')).toBeNull();
+    expect(manager.activeVoices('pop')).toBe(0);
+  });
+
+  it('ignores unknown ids and resets voices when an asset fails to load', () => {
+    const manager = makeManager();
+    expect(manager.play('nope')).toBeNull();
+
+    manager.play('loop');
+    const howl = FakeHowl.instances[0] as FakeHowl;
+    expect(howl.options.loop).toBe(true);
+
+    howl.emit('loaderror');
+    expect(manager.activeVoices('loop')).toBe(0);
+    expect(manager.play('loop')).toBeNull();
+  });
+
+  it('applies channel gain and rate to each voice', () => {
+    const manager = makeManager();
+    manager.setVolume('master', 0.5);
+    manager.setVolume('sfx', 0.5);
+    manager.play('pop', { volume: 0.5, rate: 1.2 });
+
+    const howl = FakeHowl.instances[0] as FakeHowl;
+    expect(howl.volumeCalls[0]?.[0]).toBeCloseTo(0.125);
+    expect(howl.rateCalls[0]?.[0]).toBe(1.2);
+  });
+});
+
+describe('unlock', () => {
+  it('unlocks on the first user gesture only', () => {
+    const manager = makeManager();
+    expect(manager.isUnlocked()).toBe(false);
+
+    manager.unlock();
+    window.dispatchEvent(new Event('pointerdown'));
+    expect(manager.isUnlocked()).toBe(true);
+
+    window.dispatchEvent(new Event('keydown'));
+    expect(manager.isUnlocked()).toBe(true);
+  });
+});
