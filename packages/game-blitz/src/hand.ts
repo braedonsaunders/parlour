@@ -55,7 +55,11 @@ export function handValue(hand: readonly CardId[], config: BlitzConfig): number 
   return best;
 }
 
-/** Blitz = holding a suited 31 (spec §5.1); three-of-a-kind never blitzes. */
+/**
+ * Blitz = holding a suited exactly-31 (spec §5.1: "reaching exactly 31").
+ * Transient four-card hands can sum higher than 31 mid-turn — that is not a
+ * blitz. Three-of-a-kind never blitzes.
+ */
 export function isBlitz(hand: readonly CardId[]): boolean {
-  return (bestSuit(hand)?.value ?? 0) >= BLITZ_VALUE;
+  return (bestSuit(hand)?.value ?? 0) === BLITZ_VALUE;
 }

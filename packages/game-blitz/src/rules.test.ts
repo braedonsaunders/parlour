@@ -6,7 +6,6 @@ import {
   replaySession,
   sessionApply,
   stateHash,
-  type AppliedEvent,
   type GameSession,
 } from '@parlour/engine';
 import { describe, expect, it } from 'vitest';
@@ -99,6 +98,8 @@ describe('handValue', () => {
     expect(handValue(['S1', 'S12', 'S13'], BASE)).toBe(31);
     expect(isBlitz(['S1', 'S12', 'S13'])).toBe(true);
     expect(isBlitz(['S1', 'S12', 'H13'])).toBe(false);
+    // transient four-card hands may sum past 31 mid-turn — not a blitz
+    expect(isBlitz(['S1', 'S10', 'S11', 'S12'])).toBe(false);
   });
 
   it('counts three of a kind per house rule', () => {
@@ -157,7 +158,12 @@ describe('scoreRound', () => {
     const outcome = scoreRound(state);
     expect(outcome.winners).toEqual([2]);
     expect(outcome.rankings.filter((r) => r.rank === 1)).toHaveLength(1);
-    expect(outcome.rankings.slice(-2).map((r) => r.seat).sort()).toEqual([0, 1]);
+    expect(
+      outcome.rankings
+        .slice(-2)
+        .map((r) => r.seat)
+        .sort(),
+    ).toEqual([0, 1]);
   });
 
   it('tieLowest=nobody spares the tied lows but still crowns the top', () => {
@@ -299,7 +305,10 @@ describe('blitz round flow', () => {
 
   it('ends instantly on a dealt blitz before any turn', () => {
     const state = freshState({
-      hands: [['S1', 'S12', 'S13'], ['C2', 'C3', 'C4']],
+      hands: [
+        ['S1', 'S12', 'S13'],
+        ['C2', 'C3', 'C4'],
+      ],
     });
     expect(blitzSeat(state)).toBe(0);
     expect(def.end(state)).toMatchObject({ winner: 0, reason: 'blitz' });
