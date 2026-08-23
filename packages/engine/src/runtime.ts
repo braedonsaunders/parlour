@@ -63,7 +63,11 @@ export function createSession<S, C extends RuleValues>(
   const fx = createFx();
   const config = def.configSchema.resolve(opts.config);
   const state = def.setup({ config, seats: opts.seats, rng, fx });
-  const phase = def.flow.start(state, opts.seats);
+  let phase = def.flow.start(state, opts.seats);
+  // A match can be over before any move (e.g. a blitz dealt on the deal).
+  const initialResult = def.end(state);
+
+  if (initialResult) phase = { ...phase, actor: null };
 
   return {
     def,
@@ -73,8 +77,8 @@ export function createSession<S, C extends RuleValues>(
     log: [],
     state,
     phase,
-    status: 'playing',
-    result: null,
+    status: initialResult ? 'ended' : 'playing',
+    result: initialResult ?? null,
     botsEnabled: allBots,
     setupFx: fx.events.slice(),
     lastAppliedHash: null,
