@@ -14,6 +14,7 @@ import {
 } from '@parlour/engine';
 import { blitzConfigSchema, type BlitzConfig } from './config';
 import { isBlitz } from './hand';
+import { TIER_BOTS } from './bots/personas';
 import { matchResultOf, scoreRound } from './score';
 import type { BlitzState, RoundOutcome } from './state';
 
@@ -26,10 +27,6 @@ export const HAND_SIZE = 3;
 
 function withDrawnFromDiscard(state: BlitzState, card: CardId | null): BlitzState {
   return { ...state, drawnFromDiscard: card };
-}
-
-function nextTurn(state: BlitzState): BlitzState {
-  return { ...state, turn: (state.turn + 1) % state.seats };
 }
 
 /** lowest-numbered seat currently holding a suited 31, if any (spec §5.1) */
@@ -202,10 +199,13 @@ const flow: GameDef<BlitzState, BlitzConfig>['flow'] = {
   legalMoves(state, phase) {
     if (phase.actor === null || state.outcome) return [];
     if (phase.phase === 'discard') {
-      return (state.hands[phase.actor] ?? []).map((card) => ({
-        id: 'discard',
-        payload: { card },
-      }) satisfies LegalMove);
+      return (state.hands[phase.actor] ?? []).map(
+        (card) =>
+          ({
+            id: 'discard',
+            payload: { card },
+          }) satisfies LegalMove,
+      );
     }
     const moves: LegalMove[] = [{ id: 'draw.stock' }];
     if (state.discard.length > 0) moves.push({ id: 'draw.discard' });
@@ -222,7 +222,9 @@ const flow: GameDef<BlitzState, BlitzConfig>['flow'] = {
     if (blitting !== null) {
       return {
         phase: turnPhase(state),
-        autoMoves: [{ seat: null, move: 'blitz', payload: { seat: blitting }, reason: 'hand hits 31' }],
+        autoMoves: [
+          { seat: null, move: 'blitz', payload: { seat: blitting }, reason: 'hand hits 31' },
+        ],
       };
     }
 
@@ -253,7 +255,7 @@ export interface BlitzDefOptions {
  * timed — spec §5.3) composes separate sessions of this def.
  */
 export function createBlitzDef(options: BlitzDefOptions = {}): GameDef<BlitzState, BlitzConfig> {
-  const bots = options.bots ?? [];
+  const bots = options.bots ?? TIER_BOTS;
   return {
     id: 'blitz',
     configSchema: blitzConfigSchema,
