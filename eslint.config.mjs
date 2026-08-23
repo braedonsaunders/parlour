@@ -6,6 +6,8 @@ import tseslint from 'typescript-eslint';
 const engineFiles = ['packages/engine/src/**/*.ts', 'packages/*/src/**/*.ts'];
 const engineExempt = ['**/*.test.ts', '**/cli/**/*.ts', '**/sim/**'];
 
+const cliFiles = ['packages/*/src/cli/**/*.ts'];
+
 const eslintConfig = [
   {
     ignores: [
@@ -40,6 +42,13 @@ const eslintConfig = [
       'no-console': ['warn', { allow: ['warn', 'error'] }],
       'prefer-const': 'error',
       eqeqeq: ['error', 'always'],
+    },
+  },
+
+  {
+    files: cliFiles,
+    rules: {
+      'no-console': 'off',
     },
   },
 
