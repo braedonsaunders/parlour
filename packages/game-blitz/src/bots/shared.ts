@@ -6,20 +6,37 @@ import { dangerScore, discardLoss, inferOpponents, type OpponentInsight } from '
 /** Tunable knobs every persona/tier skews off these defaults (spec §9). */
 export interface BotParams {
   /** base hand-value threshold for knocking */
-  knockAt: number;
+  readonly knockAt: number;
   /** Monte-Carlo P(win | knock now) gate; null = probability unused (tier 1–2) */
-  knockProb: number | null;
+  readonly knockProb: number | null;
   /** expected one-turn improvement credited to opponents when pricing a knock */
-  opponentUplift: number;
+  readonly opponentUplift: number;
   /** how strongly opponent suit-inference shapes discard safety (0 = blind) */
-  memory: number;
+  readonly memory: number;
   /** keep drawing toward 31 instead of banking a solid knock */
-  chaseBlitz: boolean;
+  readonly chaseBlitz: boolean;
   /** weight on denying the discard top from suit-hungry opponents */
-  denial: number;
+  readonly denial: number;
   /** how much opponents' hidden cards are assumed curated toward strength */
-  curationBias: number;
+  readonly curationBias: number;
+  /** hard-tier thresholds that may be skewed by a persona */
+  readonly hard: HardBotParams;
 }
+
+export interface HardBotParams {
+  /** minimum next-draw blitz probability worth chasing over a safe knock */
+  readonly chaseBar: number;
+  /** final-turn hand value below which the bot seeks a rescue draw */
+  readonly desperationValue: number;
+  /** discard-top gain required to take it instead of drawing blind */
+  readonly desperationRescueGain: number;
+}
+
+export const HARD_BOT_DEFAULTS: HardBotParams = Object.freeze({
+  chaseBar: 0.08,
+  desperationValue: 29,
+  desperationRescueGain: 3,
+});
 
 export function isDiscardPhase(legal: readonly LegalMove[]): boolean {
   return legal.some((m) => m.id === 'discard');

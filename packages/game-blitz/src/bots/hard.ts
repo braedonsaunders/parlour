@@ -5,7 +5,6 @@ import { bestSwap, inferOpponents, knockWinProbability, stockDrawEv, unseenPool 
 import { chooseSafeDiscard, isDiscardPhase, turnMoves, type BotParams } from './shared';
 
 const MC_SAMPLES = 96;
-const CHASE_BAR = Number(process.env.CHASE ?? 0.08);
 const BLITZ_EQUITY = 12;
 
 /**
@@ -35,12 +34,12 @@ export function makeHardBot(params: BotParams, id = 'hard', label = 'Hard'): Bot
       // worth more than marginal swaps — keep drawing unless the top wins now
       if (view.knocker !== null && view.knocker !== seat && stock && discardTop) {
         const desperate =
-          handValue(hand, view.rules) < Number(process.env.DESP_VALUE ?? 29) &&
+          handValue(hand, view.rules) < params.hard.desperationValue &&
           blitzChanceNextDraw(view, seat) >= 0.04;
         if (desperate) {
           const topNow = view.discard[0]!;
           const rescue = bestSwap(hand, topNow, view.rules);
-          return rescue.gain >= Number(process.env.DESP_RESCUE ?? 3) ? discardTop : stock;
+          return rescue.gain >= params.hard.desperationRescueGain ? discardTop : stock;
         }
       }
 
@@ -94,7 +93,7 @@ function shouldKnock(
   // while the hand is still worth chasing; late hands must close the round
   if (params.chaseBlitz && value >= 20 && value <= 26) {
     const pBlitz = blitzChanceNextDraw(view, seat);
-    if (pBlitz >= CHASE_BAR) return false;
+    if (pBlitz >= params.hard.chaseBar) return false;
   }
 
   return winProb >= (params.knockProb ?? 0.75);
