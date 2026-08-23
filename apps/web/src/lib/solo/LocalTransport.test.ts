@@ -54,4 +54,24 @@ describe('LocalTransport M2 acceptance', () => {
     expect(outcome.rejected?.code).toBe('illegal-move');
     expect(transport.getSnapshot().session.log).toHaveLength(0);
   });
+
+  it('tracks a human knock once when the round resolves', () => {
+    const transport = new LocalTransport({
+      mode: 'classic',
+      seats: 2,
+      botTier: 1,
+      seed: 8,
+      player: { name: 'You', avatarId: 'ember' },
+    });
+
+    expect(transport.dispatch('knock').rejected).toBeNull();
+    transport.playBotsUntilHuman();
+
+    const snapshot = transport.getSnapshot();
+    expect(snapshot.session.status).toBe('ended');
+    expect(snapshot.metrics[0]?.knocks).toBe(1);
+    expect(snapshot.metrics[0]?.knockWins).toBe(
+      snapshot.session.state.outcome?.winners.includes(0) ? 1 : 0,
+    );
+  });
 });

@@ -51,9 +51,16 @@ export interface SoloSnapshot {
   session: GameSession<BlitzState, BlitzConfig>;
   lives: readonly number[];
   wins: readonly number[];
+  metrics: readonly MatchMetrics[];
   startedAtMs: number;
   durationMs: number | null;
   matchWinner: number | null;
+}
+
+export interface MatchMetrics {
+  blitzes: number;
+  knocks: number;
+  knockWins: number;
 }
 
 export interface LocalDispatch {
@@ -78,6 +85,7 @@ export class LocalTransport {
   private round = 1;
   private lives: number[];
   private wins: number[];
+  private metrics: MatchMetrics[];
   private matchWinner: number | null = null;
   private roundScored = false;
 
@@ -89,6 +97,11 @@ export class LocalTransport {
     );
     this.lives = Array.from({ length: options.seats }, () => STARTING_LIVES);
     this.wins = Array.from({ length: options.seats }, () => 0);
+    this.metrics = Array.from({ length: options.seats }, () => ({
+      blitzes: 0,
+      knocks: 0,
+      knockWins: 0,
+    }));
     this.session = this.createRound();
     if (this.session.status === 'ended') {
       const fx = [...(this.session.setupFx ?? [])];
@@ -105,6 +118,7 @@ export class LocalTransport {
       session: this.session,
       lives: this.lives,
       wins: this.wins,
+      metrics: this.metrics.map((metric) => ({ ...metric })),
       startedAtMs: this.options.startedAtMs ?? 0,
       durationMs: this.options.mode === 'timed' ? TIMED_DURATION_MS : null,
       matchWinner: this.matchWinner,
@@ -236,6 +250,17 @@ export class LocalTransport {
     const winners =
       outcome?.winners ??
       (this.session.result?.winner === null ? [] : [this.session.result?.winner]);
+
+    if (outcome?.reason === 'blitz') {
+      for (const winner of winners) {
+        if (winner !== undefined) this.metrics[winner]!.blitzes += 1;
+      }
+    }
+    const knocker = this.session.state.knocker;
+    if (knocker !== null) {
+      this.metrics[knocker]!.knocks += 1;
+      if (winners.includes(knocker)) this.metrics[knocker]!.knockWins += 1;
+    }
 
     if (this.options.mode === 'classic') {
       const losers =

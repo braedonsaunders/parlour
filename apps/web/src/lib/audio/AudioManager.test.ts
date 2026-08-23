@@ -176,6 +176,20 @@ describe('settings persistence', () => {
     expect(manager.gainFor('sfx')).toBe(0);
     expect(manager.gainFor('music')).toBe(0);
   });
+
+  it('applies channel mute changes to an already-playing music loop', () => {
+    const manager = makeManager();
+    manager.play('loop');
+    const howl = FakeHowl.instances[0] as FakeHowl;
+
+    manager.setMuted('music', true);
+    expect(howl.volumeCalls.at(-1)).toEqual([0, 1]);
+
+    manager.setMuted('music', false);
+    expect(howl.volumeCalls.at(-1)?.[0]).toBeCloseTo(
+      DEFAULT_SETTINGS.master.volume * DEFAULT_SETTINGS.music.volume,
+    );
+  });
 });
 
 describe('voice concurrency', () => {

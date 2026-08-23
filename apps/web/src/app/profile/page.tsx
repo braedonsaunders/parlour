@@ -3,7 +3,9 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { AVATARS } from '@/lib/avatars';
-import { winRate, useProfileStore } from '@/stores/profile';
+import { knockSuccessRate, winRate, useProfileStore } from '@/stores/profile';
+import { useAudioStore } from '@/stores/audio';
+import type { AudioChannel } from '@/lib/audio/AudioManager';
 import { AvatarBadge } from '@/components/AvatarBadge';
 
 export default function ProfilePage() {
@@ -16,6 +18,10 @@ export default function ProfilePage() {
   const updateSettings = useProfileStore((s) => s.updateSettings);
   const resetStats = useProfileStore((s) => s.resetStats);
   const [confirmingReset, setConfirmingReset] = useState(false);
+  const audioChannels = useAudioStore((s) => s.channels);
+  const audioUnlocked = useAudioStore((s) => s.unlocked);
+  const setVolume = useAudioStore((s) => s.setVolume);
+  const toggleMuted = useAudioStore((s) => s.toggleMuted);
 
   useEffect(() => {
     if (confirmingReset) {
@@ -25,6 +31,7 @@ export default function ProfilePage() {
   }, [confirmingReset]);
 
   const rate = Math.round(winRate(stats) * 100);
+  const knockRate = Math.round(knockSuccessRate(stats) * 100);
 
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-4xl flex-col gap-6 px-6 py-8">
@@ -104,9 +111,30 @@ export default function ProfilePage() {
           <Stat label="Wins" value={stats.wins} />
           <Stat label="Win rate" value={`${rate}%`} />
           <Stat label="Blitzes" value={stats.blitzes} />
-          <Stat label="Knock wins" value={stats.knockWins} />
+          <Stat label="Knock success" value={`${knockRate}%`} />
           <Stat label="Best streak" value={stats.bestStreak} />
         </dl>
+      </section>
+
+      <section aria-label="Audio settings" className="panel-soft p-5">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-dusk-200">Sound</h2>
+          <span className="text-xs text-dusk-200/75">
+            {audioUnlocked ? 'playing at the table' : 'starts on your first tap'}
+          </span>
+        </div>
+        <div className="mt-3 grid gap-3 sm:grid-cols-3">
+          {(['master', 'music', 'sfx'] as const).map((channel) => (
+            <AudioControl
+              key={channel}
+              channel={channel}
+              volume={audioChannels[channel].volume}
+              muted={audioChannels[channel].muted}
+              onVolume={(volume) => setVolume(channel, volume)}
+              onToggle={() => toggleMuted(channel)}
+            />
+          ))}
+        </div>
       </section>
 
       <section aria-label="Accessibility" className="panel-soft p-5">
@@ -119,6 +147,50 @@ export default function ProfilePage() {
         />
       </section>
     </main>
+  );
+}
+
+function AudioControl({
+  channel,
+  volume,
+  muted,
+  onVolume,
+  onToggle,
+}: {
+  channel: AudioChannel;
+  volume: number;
+  muted: boolean;
+  onVolume: (volume: number) => void;
+  onToggle: () => void;
+}) {
+  const label = channel === 'sfx' ? 'Effects' : `${channel[0]!.toUpperCase()}${channel.slice(1)}`;
+  return (
+    <div className="rounded-chunky border border-dusk-700/40 bg-dusk-950/60 p-3">
+      <div className="flex items-center justify-between gap-2">
+        <label htmlFor={`volume-${channel}`} className="font-display font-bold text-hearth-50">
+          {label}
+        </label>
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-pressed={muted}
+          className="rounded-pill border border-dusk-700 px-2.5 py-1 text-xs font-bold text-dusk-100 hover:text-hearth-200"
+        >
+          {muted ? 'Muted' : 'On'}
+        </button>
+      </div>
+      <input
+        id={`volume-${channel}`}
+        type="range"
+        min="0"
+        max="1"
+        step="0.05"
+        value={volume}
+        onChange={(event) => onVolume(event.currentTarget.valueAsNumber)}
+        aria-label={`${label} volume`}
+        className="mt-3 w-full accent-hearth-400"
+      />
+    </div>
   );
 }
 

@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import { Baloo_2, Nunito_Sans } from 'next/font/google';
 import { ComfortSync } from '@/components/ComfortSync';
+import { AudioDirector } from '@/components/AudioDirector';
 import { DioramaStage } from '@/components/DioramaStage';
 import { PwaRegister } from '@/components/PwaRegister';
 import { RotatePrompt } from '@/components/RotatePrompt';
@@ -24,7 +25,7 @@ export const metadata: Metadata = {
   title: 'parlour',
   description: 'Cozy card games. Blitz first.',
   manifest: '/manifest.webmanifest',
-  icons: { icon: '/icon.svg', apple: '/icon.svg' },
+  icons: { icon: '/icon-192.png', apple: '/icon-192.png' },
   appleWebApp: { capable: true, title: 'parlour', statusBarStyle: 'black-translucent' },
 };
 
@@ -44,6 +45,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <div className="relative z-10 min-h-dvh">{children}</div>
         <RotatePrompt />
         <ComfortSync />
+        <AudioDirector />
         <PwaRegister />
       </body>
     </html>
