@@ -50,6 +50,34 @@ describe('table overlay stacking', () => {
     );
   });
 
+  it('lifts the Wild last-card call off the hand rail on a portrait phone', () => {
+    // The shared rail is pinned bottom-right, which on a phone is on top of the
+    // fanned hand and inside the home indicator's reach. Wild's one-turn
+    // last-card window has to be somewhere a thumb can find it, so on portrait
+    // it centres above the felt with the table's other decision prompts.
+    const portraitRail = wild.match(
+      /@media \(orientation:\s*portrait\)\s*\{[\s\S]*?\.actionRail\.actionRail\s*\{([^}]*)\}/,
+    );
+    expect(portraitRail, 'wild overrides the action rail on portrait').not.toBeNull();
+    expect(portraitRail![1]).toMatch(/right:\s*auto;/);
+    expect(portraitRail![1]).toMatch(/left:\s*50%;/);
+    expect(portraitRail![1]).toMatch(/bottom:\s*27%;/);
+    expect(zIndexFor(wild, '.actionRail.actionRail')).toBeGreaterThan(
+      zIndexFor(table, '.localHand'),
+    );
+  });
+
+  it('sweeps the Wild turn clock from CSS rather than a render loop', () => {
+    // Driving the ring from React meant a re-render ten times a second for the
+    // whole of every turn; the sweep is linear over a known duration, so the
+    // stylesheet owns it and the component only ticks the digit.
+    expect(wild).toMatch(
+      /\.turnClockProgress\s*\{[^}]*animation:\s*turnClockSweep var\(--turn-duration[^}]*\}/,
+    );
+    expect(wild).toMatch(/@keyframes turnClockSweep/);
+    expect(wild).not.toMatch(/transition:\s*stroke-dashoffset/);
+  });
+
   it('parks the Euchre trump badge below the north player', () => {
     expect(declarationsFor(euchre, '.trumpBadge')).toMatch(
       /top:\s*clamp\(6\.4rem,\s*17vh,\s*7\.8rem\);/,

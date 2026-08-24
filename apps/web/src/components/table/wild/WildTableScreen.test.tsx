@@ -278,15 +278,22 @@ describe('WildTableScreen turn affordances', () => {
 
     expect(container.querySelector('[aria-label="Game clock"]')?.textContent).toBe('Game5:00');
     expect(container.querySelector('[data-testid="turn-clock"]')?.textContent).toBe('You15');
+    // The ring sweeps from CSS over the turn's own duration rather than from a
+    // ten-times-a-second render, so the clock publishes the duration and the
+    // stylesheet animates it.
     const progress = container.querySelector<SVGCircleElement>(
       '[data-testid="turn-clock-progress"]',
     );
-    expect(Number(progress?.style.strokeDashoffset)).toBe(0);
+    expect(progress).not.toBeNull();
+    expect(
+      container.querySelector<HTMLElement>('[data-testid="turn-clock"]')?.style.getPropertyValue(
+        '--turn-duration',
+      ),
+    ).toBe('15000ms');
 
     act(() => vi.advanceTimersByTime(1_000));
     expect(container.querySelector('[aria-label="Game clock"]')?.textContent).toBe('Game4:59');
     expect(container.querySelector('[data-testid="turn-clock"]')?.textContent).toBe('You14');
-    expect(Number(progress?.style.strokeDashoffset)).toBeGreaterThan(0);
   });
 
   it('places a two-player opponent directly across from every local seat', () => {
