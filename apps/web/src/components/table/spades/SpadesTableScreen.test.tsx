@@ -715,8 +715,13 @@ describe('SpadesTableScreen last-hand summary', () => {
     )!;
     const rows = panel.querySelector('ul')!;
     expect(toggle.getAttribute('aria-expanded')).toBe('true');
+    expect(toggle.getAttribute('aria-controls')).toBe(rows.id);
     expect(toggle.textContent).toContain('us -160');
     expect(toggle.textContent).toContain('them +61');
+    const compactText = [...toggle.querySelectorAll('span')].find((span) =>
+      span.textContent?.includes('us -160'),
+    );
+    expect(compactText?.getAttribute('aria-hidden')).toBeNull();
 
     act(() => toggle.click());
     expect(toggle.getAttribute('aria-expanded')).toBe('false');
@@ -726,6 +731,48 @@ describe('SpadesTableScreen last-hand summary', () => {
     act(() => toggle.click());
     expect(toggle.getAttribute('aria-expanded')).toBe('true');
     expect(rows.hidden).toBe(false);
+  });
+
+  it('starts compact before paint on a short table and follows viewport changes', () => {
+    let compact = true;
+    const listeners = new Set<() => void>();
+    Object.defineProperty(window, 'matchMedia', {
+      configurable: true,
+      value: (query: string) => ({
+        get matches() {
+          return query.includes('max-width: 900px') ? compact : false;
+        },
+        media: query,
+        onchange: null,
+        addEventListener: (_type: string, listener: () => void) => listeners.add(listener),
+        removeEventListener: (_type: string, listener: () => void) => listeners.delete(listener),
+        dispatchEvent: () => true,
+      }),
+    });
+
+    act(() =>
+      root.render(
+        createElement(SpadesTableScreen, {
+          view: makeView({ lastHand: SUMMARY as never }),
+          fx: [],
+          fxKey: 'responsive-ledger',
+        }),
+      ),
+    );
+    const panel = container.querySelector('[data-testid="spades-last-hand"]')!;
+    expect(panel.getAttribute('data-expanded')).toBe('false');
+
+    act(() => {
+      compact = false;
+      listeners.forEach((listener) => listener());
+    });
+    expect(panel.getAttribute('data-expanded')).toBe('true');
+
+    act(() => {
+      compact = true;
+      listeners.forEach((listener) => listener());
+    });
+    expect(panel.getAttribute('data-expanded')).toBe('false');
   });
 
   it('renders nothing before the first hand is scored', () => {

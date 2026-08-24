@@ -2,7 +2,7 @@
 
 import {
   useCallback,
-  useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type CSSProperties,
@@ -313,9 +313,9 @@ function Seat({
 function LastHandSummary({ view }: { view: SpadesTableView }) {
   const summary = view.lastHand;
   const summaryHandNo = summary?.handNo ?? null;
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useState(false);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (summaryHandNo === null || typeof window.matchMedia !== 'function') return;
     const compact = window.matchMedia(
       '(max-width: 900px), (orientation: landscape) and (max-height: 560px)',
@@ -345,10 +345,11 @@ function LastHandSummary({ view }: { view: SpadesTableView }) {
           className={styles.lastHandToggle}
           data-testid="spades-last-hand-toggle"
           aria-expanded={expanded}
+          aria-controls={`spades-last-hand-rows-${summary.handNo}`}
           onClick={() => setExpanded((value) => !value)}
         >
           <strong>Hand {summary.handNo}</strong>
-          <span className={styles.lastHandCompact} aria-hidden="true">
+          <span className={styles.lastHandCompact}>
             {summary.teams
               .map(
                 (team) =>
@@ -366,7 +367,11 @@ function LastHandSummary({ view }: { view: SpadesTableView }) {
           </em>
         )}
       </header>
-      <ul className={styles.lastHandRows} hidden={!expanded}>
+      <ul
+        id={`spades-last-hand-rows-${summary.handNo}`}
+        className={styles.lastHandRows}
+        hidden={!expanded}
+      >
         {summary.teams.map((team) => (
           <li
             key={team.team}

@@ -485,6 +485,7 @@
 
 .lastHandToggle {
   display: flex;
+  min-block-size: 2.75rem;
   min-width: 0;
   flex: 1;
   align-items: center;
