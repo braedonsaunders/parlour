@@ -446,5 +446,8 @@ function Cue({
 
   if (cue.type === 'layoff' || cue.type === 'gin-burst') return null; // rendered by the Gin table
 
-  return <span data-fx-cue={cue.id} data-seat-burst={cue.seat} className={styles.turnPop} />;
+  if (cue.type === 'turn') {
+    return <span data-fx-cue={cue.id} data-seat-burst={cue.seat} className={styles.turnPop} />;
+  }
+  return null;
 }

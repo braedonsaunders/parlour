@@ -119,7 +119,15 @@ export default function JoinPage() {
         fallbackError={error}
         onConnected={(gameId) =>
           router.replace(
-            gameId === 'wildpile' ? '/wild/table' : gameId === 'gin' ? '/gin/table' : '/table',
+            gameId === 'wildpile'
+              ? '/wild/table'
+              : gameId === 'hearts'
+                ? '/hearts/table'
+                : gameId === 'gin'
+                  ? '/gin/table'
+                  : gameId === 'president'
+                    ? '/president/table'
+                    : '/table',
           )
         }
       />

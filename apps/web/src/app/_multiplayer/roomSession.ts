@@ -29,6 +29,12 @@ import {
   type WildpileState,
 } from '@parlour/game-wildpile';
 import {
+  heartsConfigSchema,
+  heartsGame,
+  type HeartsRules,
+  type HeartsState,
+} from '@parlour/game-hearts';
+import {
   createGinMatchDef,
   ginConfigSchema,
   type GinConfig,
@@ -58,7 +64,7 @@ import { NostrSignaling, type RoomAnnouncement } from '@/lib/multiplayer/NostrSi
 import { validateRoomCode } from '@/lib/rooms/code';
 import { hasValidSeatCount, seatRangeFor } from '@/lib/rooms/seatRange';
 
-export type MultiplayerGameId = 'blitz' | 'wildpile' | 'gin' | 'president';
+export type MultiplayerGameId = 'blitz' | 'wildpile' | 'hearts' | 'gin' | 'president';
 
 /** What the room badge shows about privacy — see lib/multiplayer/veil. */
 export type MultiplayerSecurity = {
@@ -81,6 +87,7 @@ export type MultiplayerSecurity = {
 export type MultiplayerGameSession =
   | GameSession<BlitzState, BlitzConfig>
   | GameSession<WildpileState, WildpileRules>
+  | GameSession<HeartsState, HeartsRules>
   | GameSession<GinMatchState, GinConfig>
   | GameSession<PresidentState, PresidentRules>;
 
@@ -938,6 +945,14 @@ export function wildMultiplayerSession(
     : null;
 }
 
+export function heartsMultiplayerSession(
+  snapshot: MultiplayerRoomSnapshot,
+): GameSession<HeartsState, HeartsRules> | null {
+  return snapshot.gameId === 'hearts'
+    ? (snapshot.session as GameSession<HeartsState, HeartsRules> | null)
+    : null;
+}
+
 export function presidentMultiplayerSession(
   snapshot: MultiplayerRoomSnapshot,
 ): GameSession<PresidentState, PresidentRules> | null {
@@ -952,6 +967,7 @@ function stateHolds(state: unknown, handle: string): boolean {
 
 /** The game pack a room's settings name. */
 function gameDefFor(settings: RoomSettings) {
+  if (settings.gameId === 'hearts') return heartsGame;
   if (settings.gameId === 'gin') return createGinMatchDef();
   if (settings.gameId === 'wildpile') return wildpileGame;
   if (settings.gameId === 'president') return presidentGame;
@@ -1007,6 +1023,14 @@ function resolveRoomSettings(settings: RoomSettings): RoomSettings {
       security,
     };
   }
+  if (settings.gameId === 'hearts') {
+    return {
+      gameId: 'hearts',
+      seats: settings.seats,
+      config: heartsConfigSchema.resolve(settings.config as Partial<HeartsRules>),
+      security,
+    };
+  }
   if (settings.gameId === 'gin') {
     return {
       gameId: 'gin',
@@ -1041,6 +1065,12 @@ function createRoomRuntime(
   const runtimeSettings: RoomSettings = veiled ? settings : { ...settings, security: 'open' };
   const seatsRange = seatRangeFor(settings.gameId);
   const common = { settings: runtimeSettings, onSeatBot, seatsRange };
+  if (settings.gameId === 'hearts') {
+    const config = settings.config as HeartsRules;
+    const session = createSession(heartsGame, { seed, config, seats: settings.seats, ...veil });
+    const authority = new EngineAuthority({ def: heartsGame, session, ...common });
+    return { session, authority };
+  }
   if (settings.gameId === 'gin') {
     const def = createGinMatchDef();
     const config = settings.config as GinConfig;

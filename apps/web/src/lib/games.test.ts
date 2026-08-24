@@ -5,7 +5,7 @@ import { GAMES, getGame, getGameMode, isGameId, isGameModeId, modePreset } from 
 
 describe('game shelf catalog', () => {
   it('leads with blitz and keeps the shelf growing', () => {
-    expect(GAMES.map((g) => g.id)).toEqual(['blitz', 'wild', 'gin', 'president']);
+    expect(GAMES.map((g) => g.id)).toEqual(['blitz', 'wild', 'hearts', 'gin', 'president']);
   });
 
   it('every game carries complete presentation data', () => {
@@ -20,9 +20,10 @@ describe('game shelf catalog', () => {
     }
   });
 
-  it('every shipped game routes to its setup screen (M5 exit)', () => {
+  it('all shelf games are playable and route to their setup screens', () => {
     expect(getGame('blitz').href).toBe('/play');
     expect(getGame('wild').href).toBe('/wild');
+    expect(getGame('hearts').href).toBe('/hearts');
     expect(getGame('gin').href).toBe('/gin');
     expect(getGame('president').href).toBe('/president');
   });

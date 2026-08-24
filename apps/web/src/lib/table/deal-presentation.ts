@@ -83,6 +83,8 @@ export function useDealPresentation(
   const [landedCueIds, setLandedCueIds] = useState<ReadonlySet<string>>(() => new Set());
 
   useLayoutEffect(() => {
+    // State changes ride a microtask so the effect body itself never sets
+    // state synchronously (react-hooks/set-state-in-effect).
     if (!plan) {
       const clear = window.setTimeout(() => setLandedCueIds(new Set()), 0);
       return () => window.clearTimeout(clear);
