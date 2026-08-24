@@ -465,6 +465,83 @@ const sounds = [
     prompt:
       'One or two playing cards are pushed firmly across a felt table between players: compact paper-textured slide swish with a soft decisive settle, no voice or flourish.',
   },
+  {
+    name: 'poker-chips-soft',
+    duration: 0.5,
+    outputDuration: 0.16,
+    mono: true,
+    prompt:
+      'Exactly three or four clay poker chips are set down gently together on close-mic felt in one motion: one soft muted ceramic cluster with no ring, bounce, music, or table-room sound. Subtle enough for constant calls and blinds.',
+  },
+  {
+    name: 'poker-chips-hard',
+    duration: 0.5,
+    outputDuration: 0.28,
+    mono: true,
+    prompt:
+      'A substantial stack of clay poker chips is pushed firmly across close-mic felt and released: short dense chip clatter, soft felt slide, authoritative settle. Clearly heavier than a gentle three-chip call, but the same muted clay objects.',
+  },
+  {
+    name: 'poker-fold',
+    duration: 0.5,
+    outputDuration: 0.22,
+    mono: true,
+    prompt:
+      'Exactly two playing cards are flicked face-down together and skid a few inches away across close-mic poker felt: quick dry paperboard snap and dismissive short slide, then silence.',
+  },
+  {
+    name: 'poker-check',
+    duration: 0.5,
+    outputDuration: 0.145,
+    sourceHitDuration: 0.055,
+    repeatAtMs: 68,
+    postGainDb: -6,
+    mono: true,
+    prompt:
+      'Exactly one light human knuckle tap on a felt-covered wooden poker table: close-mic, soft, dry, compact, with almost no resonance. A quiet checking gesture, not a forceful Gin Rummy knock.',
+  },
+  {
+    name: 'poker-board',
+    duration: 0.5,
+    outputDuration: 0.2,
+    mono: true,
+    prompt:
+      'Exactly one playing card turns face-up and is laid onto close-mic poker felt: a quick clean paperboard flip snap and soft flat contact, no flourish or long tail. Designed to repeat cleanly three times in rapid succession.',
+  },
+  {
+    name: 'poker-pot',
+    duration: 0.55,
+    outputDuration: 0.46,
+    mono: true,
+    prompt:
+      'A large mixed pot of clay poker chips is swept in one motion from the middle of a close-mic felt table toward one seat: broad felt slide, dense muted chip movement, then a satisfying compact settle.',
+  },
+  {
+    name: 'poker-award',
+    duration: 0.75,
+    outputDuration: 0.65,
+    mono: true,
+    prompt:
+      'A won pot of clay poker chips arrives and settles warmly in front of a player on close-mic felt: smooth chip slide into a generous rounded clatter, then a clean satisfying finish. No fanfare or melody.',
+  },
+  {
+    name: 'poker-bust',
+    duration: 0.85,
+    outputDuration: 0.75,
+    postGainDb: 8,
+    mono: true,
+    prompt:
+      'A friendly final poker elimination sting: one last clay chip tips over on felt, followed by two warm muted notes descending like a gentle sigh. Conclusive and good-natured, not tragic, flashy, or casino-like.',
+  },
+  {
+    name: 'poker-blinds-up',
+    duration: 0.75,
+    outputDuration: 0.65,
+    postGainDb: 4,
+    mono: true,
+    prompt:
+      'One restrained dealer time signal for poker blinds increasing: a low warm clockwork tick blooms into a single rounded brass table bell chime with a short clean decay. Calm authority, no melody or alarm.',
+  },
 ];
 
 const masterTargets = {
@@ -531,6 +608,15 @@ const masterTargets = {
   'president-scum': -18,
   'president-role-chime': -18,
   'president-exchange-swish': -18,
+  'poker-chips-soft': -17,
+  'poker-chips-hard': -16,
+  'poker-fold': -16,
+  'poker-check': -17,
+  'poker-board': -17,
+  'poker-pot': -16,
+  'poker-award': -16,
+  'poker-bust': -16,
+  'poker-blinds-up': -16,
 };
 
 function option(name) {
@@ -591,6 +677,7 @@ for (const sound of selected) {
       sound.tempo,
       sound.repeatAtMs,
       sound.sourceHitDuration,
+      sound.postGainDb,
     );
     continue;
   }
@@ -637,6 +724,7 @@ for (const sound of selected) {
       sound.tempo,
       sound.repeatAtMs,
       sound.sourceHitDuration,
+      sound.postGainDb,
     );
   } finally {
     rmSync(source, { force: true });
@@ -657,6 +745,7 @@ function master(
   tempo,
   repeatAtMs,
   sourceHitDuration,
+  postGainDb,
 ) {
   if (typeof targetLufs !== 'number') throw new Error(`Missing mastering target for ${output}`);
   const temporary = `${output}.master.mp3`;
@@ -682,6 +771,8 @@ function master(
     );
   }
   outputFilters.push(`loudnorm=I=${targetLufs}:TP=-1.5:LRA=7`);
+  if (typeof postGainDb === 'number') outputFilters.push(`volume=${postGainDb}dB`);
+  outputFilters.push('alimiter=limit=0.6:attack=5:release=50:level=false');
 
   const filterArgs =
     typeof repeatAtMs === 'number'
