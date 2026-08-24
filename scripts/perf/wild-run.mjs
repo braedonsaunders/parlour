@@ -247,7 +247,13 @@ await page.waitForTimeout(300);
 
 const visible = async (testId) => {
   const locator = page.getByTestId(testId);
-  return (await locator.count()) > 0 && (await locator.first().isVisible().catch(() => false));
+  return (
+    (await locator.count()) > 0 &&
+    (await locator
+      .first()
+      .isVisible()
+      .catch(() => false))
+  );
 };
 
 let moves = 0;
@@ -290,10 +296,7 @@ async function playMatch(matchIndex) {
       .catch(() => []);
     await page.waitForTimeout(IDLE_MS);
     await sampleMetrics('idle-end');
-    const [before, after] = [
-      metricSamples.at(-2),
-      metricSamples.at(-1),
-    ];
+    const [before, after] = [metricSamples.at(-2), metricSamples.at(-1)];
     const seconds = (after.at - before.at) / 1000;
     idle = {
       seconds: Math.round(seconds * 10) / 10,
@@ -308,97 +311,121 @@ async function playMatch(matchIndex) {
   }
 
   while (Date.now() - matchStart < MAX_MS) {
-  steps += 1;
-  if (page.url().includes('/match-end')) break;
+    steps += 1;
+    if (page.url().includes('/match-end')) break;
 
-  // The last-card affordance: record where it actually lands on the phone
-  // the first time it appears, then use it.
-  if (await visible('call-last-card')) {
-    sawLastCardButton = true;
-    if (!lastCardButtonBox) {
-      lastCardButtonBox = await page
+    // The last-card affordance: record where it actually lands on the phone
+    // the first time it appears, then use it.
+    if (await visible('call-last-card')) {
+      sawLastCardButton = true;
+      if (!lastCardButtonBox) {
+        lastCardButtonBox = await page
+          .getByTestId('call-last-card')
+          .boundingBox()
+          .catch(() => null);
+        const rail = await page
+          .locator('[data-zone^="hand:"]')
+          .first()
+          .boundingBox()
+          .catch(() => null);
+        lastCardButtonBox = { button: lastCardButtonBox, handRail: rail };
+        await page.screenshot({ path: `${OUT}/${LABEL}-last-card.png` }).catch(() => {});
+      }
+      await page
         .getByTestId('call-last-card')
-        .boundingBox()
-        .catch(() => null);
-      const rail = await page
-        .locator('[data-zone^="hand:"]')
-        .first()
-        .boundingBox()
-        .catch(() => null);
-      lastCardButtonBox = { button: lastCardButtonBox, handRail: rail };
-      await page.screenshot({ path: `${OUT}/${LABEL}-last-card.png` }).catch(() => {});
+        .click({ timeout: 2000 })
+        .catch(() => {});
+      lastCardCalls += 1;
+      await page.waitForTimeout(120);
+      continue;
     }
-    await page.getByTestId('call-last-card').click({ timeout: 2000 }).catch(() => {});
-    lastCardCalls += 1;
-    await page.waitForTimeout(120);
-    continue;
-  }
 
-  if (await visible('color-wheel')) {
-    await page
-      .locator('[data-wedge="0"]')
-      .click({ timeout: 2000 })
-      .catch(() => {});
-    await page.waitForTimeout(400);
-    continue;
-  }
+    if (await visible('color-wheel')) {
+      await page
+        .locator('[data-wedge="0"]')
+        .click({ timeout: 2000 })
+        .catch(() => {});
+      await page.waitForTimeout(400);
+      continue;
+    }
 
-  if (await visible('swap-chooser')) {
-    await page
-      .getByTestId('swap-chooser')
-      .getByRole('button')
-      .first()
-      .click({ timeout: 2000 })
-      .catch(() => {});
-    await page.waitForTimeout(400);
-    continue;
-  }
+    if (await visible('swap-chooser')) {
+      await page
+        .getByTestId('swap-chooser')
+        .getByRole('button')
+        .first()
+        .click({ timeout: 2000 })
+        .catch(() => {});
+      await page.waitForTimeout(400);
+      continue;
+    }
 
-  if (await visible('challenge-prompt')) {
-    await page.getByTestId('accept-draw-four').click({ timeout: 2000 }).catch(() => {});
-    await page.waitForTimeout(400);
-    continue;
-  }
+    if (await visible('challenge-prompt')) {
+      await page
+        .getByTestId('accept-draw-four')
+        .click({ timeout: 2000 })
+        .catch(() => {});
+      await page.waitForTimeout(400);
+      continue;
+    }
 
-  const jumpPass = page.getByRole('alertdialog').getByRole('button', { name: 'Pass' });
-  if ((await jumpPass.count()) && (await jumpPass.first().isVisible().catch(() => false))) {
-    await jumpPass.first().click({ timeout: 2000 }).catch(() => {});
-    await page.waitForTimeout(300);
-    continue;
-  }
+    const jumpPass = page.getByRole('alertdialog').getByRole('button', { name: 'Pass' });
+    if (
+      (await jumpPass.count()) &&
+      (await jumpPass
+        .first()
+        .isVisible()
+        .catch(() => false))
+    ) {
+      await jumpPass
+        .first()
+        .click({ timeout: 2000 })
+        .catch(() => {});
+      await page.waitForTimeout(300);
+      continue;
+    }
 
-  const playable = page.locator('[data-hand-card][data-playable="true"] button:not([disabled])');
-  if (await playable.count()) {
-    await playable
-      .first()
-      .click({ timeout: 2000 })
-      .catch(() => {});
-    moves += 1;
-    if (moves % 5 === 0) await sampleMetrics(`move-${moves}`);
+    const playable = page.locator('[data-hand-card][data-playable="true"] button:not([disabled])');
+    if (await playable.count()) {
+      await playable
+        .first()
+        .click({ timeout: 2000 })
+        .catch(() => {});
+      moves += 1;
+      if (moves % 5 === 0) await sampleMetrics(`move-${moves}`);
+      await page.waitForTimeout(260);
+      continue;
+    }
+
+    if (await visible('pass-drawn-card')) {
+      await page
+        .getByTestId('pass-drawn-card')
+        .click({ timeout: 2000 })
+        .catch(() => {});
+      moves += 1;
+      await page.waitForTimeout(260);
+      continue;
+    }
+
+    const stock = page.locator('[data-zone="stock"]:not([disabled])');
+    if (
+      (await stock.count()) &&
+      (await stock
+        .first()
+        .isEnabled()
+        .catch(() => false))
+    ) {
+      await stock
+        .first()
+        .click({ timeout: 2000 })
+        .catch(() => {});
+      moves += 1;
+      await page.waitForTimeout(320);
+      continue;
+    }
+
     await page.waitForTimeout(260);
-    continue;
-  }
-
-  if (await visible('pass-drawn-card')) {
-    await page.getByTestId('pass-drawn-card').click({ timeout: 2000 }).catch(() => {});
-    moves += 1;
-    await page.waitForTimeout(260);
-    continue;
-  }
-
-  const stock = page.locator('[data-zone="stock"]:not([disabled])');
-  if ((await stock.count()) && (await stock.first().isEnabled().catch(() => false))) {
-    await stock
-      .first()
-      .click({ timeout: 2000 })
-      .catch(() => {});
-    moves += 1;
-    await page.waitForTimeout(320);
-    continue;
-  }
-
-  await page.waitForTimeout(260);
-  if (steps % 20 === 0) await sampleMetrics(`wait-${steps}`);
+    if (steps % 20 === 0) await sampleMetrics(`wait-${steps}`);
   }
   await page.evaluate((index) => window.__perfMark?.(`over-${index}`), matchIndex).catch(() => {});
 }
@@ -535,7 +562,8 @@ const report = {
     worstMs: Math.max(0, ...frames),
     over33ms: frames.filter((value) => value > 33).length,
     over100ms: frames.filter((value) => value > 100).length,
-    droppedPct: Math.round((frames.filter((value) => value > 20).length / frames.length) * 1000) / 10,
+    droppedPct:
+      Math.round((frames.filter((value) => value > 20).length / frames.length) * 1000) / 10,
   },
   longTasks: {
     count: raw.longTasks.length,

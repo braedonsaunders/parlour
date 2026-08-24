@@ -347,7 +347,8 @@ export class P2PTransport implements Transport {
     link.pc.close();
 
     const spent = this.redials.get(peerId) ?? 0;
-    const dials = peerId === this.resilience?.hostId ? !this.isHost() : this.signaling.publicKey < peerId;
+    const dials =
+      peerId === this.resilience?.hostId ? !this.isHost() : this.signaling.publicKey < peerId;
     if (!dials || spent >= MAX_REDIALS) return;
     this.redials.set(peerId, spent + 1);
     const timer = setTimeout(() => {

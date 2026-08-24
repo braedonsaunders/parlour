@@ -29,11 +29,7 @@ import {
 } from '@/lib/multiplayer/veil';
 import { botTurnKey } from './botSeats';
 import { NostrSignaling, type RoomAnnouncement } from '@/lib/multiplayer/NostrSignaling';
-import {
-  createDealNonce,
-  dealCommitment,
-  DealSeedRound,
-} from '@/lib/multiplayer/dealSeed';
+import { createDealNonce, dealCommitment, DealSeedRound } from '@/lib/multiplayer/dealSeed';
 import { validateRoomCode } from '@/lib/rooms/code';
 import { hasValidSeatCount } from '@/lib/rooms/seatRange';
 import type { MultiplayerGameId } from '@/lib/rooms/gameIds';
@@ -398,7 +394,9 @@ export class MultiplayerRoomSession {
         });
       })
       .catch((error: unknown) => {
-        this.update({ error: error instanceof Error ? error.message : 'the deal could not be checked' });
+        this.update({
+          error: error instanceof Error ? error.message : 'the deal could not be checked',
+        });
       });
   }
 

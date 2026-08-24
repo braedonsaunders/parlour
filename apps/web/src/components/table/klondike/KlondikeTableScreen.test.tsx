@@ -385,17 +385,24 @@ describe('KlondikeTableScreen', () => {
       expect(wasteCard()!.hasAttribute('data-just-drawn')).toBe(false);
     });
 
-    it('keeps the fresh-draw ring a different colour from the selection ring', () => {
-      // If these ever collapse to one colour, "this just arrived" and "you are
-      // holding this" become the same signal.
-      expect(KLONDIKE_STYLES).toContain('--kl-select:');
-      expect(KLONDIKE_STYLES).toContain('--kl-fresh:');
-      expect(KLONDIKE_STYLES).toContain('[data-just-drawn] > [data-card-chassis]');
-      const select = /--kl-select:\s*([^;]+);/.exec(KLONDIKE_STYLES)?.[1]?.trim();
-      const fresh = /--kl-fresh:\s*([^;]+);/.exec(KLONDIKE_STYLES)?.[1]?.trim();
-      expect(select).toBeTruthy();
-      expect(fresh).toBeTruthy();
-      expect(select).not.toBe(fresh);
+    it('keeps the fresh-draw ring visually distinct from the selection ring', () => {
+      // Selection is teal and shipped separately; a freshly turned waste card
+      // is amber. If these ever collapse to one colour, "this just arrived" and
+      // "you are holding this" become the same signal.
+      const selectionRule =
+        /\[data-selected='true'\][^{]*\{[^}]*outline:\s*3px solid (#[0-9a-f]{6})/i;
+      const selectionTeal = selectionRule.exec(KLONDIKE_STYLES)?.[1]?.toLowerCase();
+      expect(selectionTeal, 'the selection outline colour').toBeTruthy();
+
+      const fresh = /--kl-fresh:\s*([^;]+);/.exec(KLONDIKE_STYLES)?.[1]?.trim().toLowerCase();
+      expect(fresh, 'the fresh-draw token').toBeTruthy();
+      expect(fresh).not.toBe(selectionTeal);
+
+      // The call-out is scoped to the board and stands down for a card the
+      // player has actually picked up, so the two never fight over one card.
+      expect(KLONDIKE_STYLES).toContain(
+        ".board [data-just-drawn]:not([data-selected='true']) > [data-card-chassis]",
+      );
     });
   });
 });

@@ -351,7 +351,11 @@ describe('multiplayer route composition', () => {
     );
     const guest = new MultiplayerRoomSession(
       { name: 'Guest', avatarId: 'cobalt', profileId: 'seed-guest' },
-      { signaling: broker.signaling('seed-guest-peer'), peerConnection: rtc.factory('seed-guest'), seed: 7 },
+      {
+        signaling: broker.signaling('seed-guest-peer'),
+        peerConnection: rtc.factory('seed-guest'),
+        seed: 7,
+      },
     );
     sessions.push(host, guest);
 
@@ -378,11 +382,19 @@ describe('multiplayer route composition', () => {
     const rtc = new MockRtcNetwork();
     const host = new MultiplayerRoomSession(
       { name: 'Host', avatarId: 'ember', profileId: 'stage-host' },
-      { signaling: broker.signaling('stage-host-peer'), peerConnection: rtc.factory('stage-host'), seed: 42 },
+      {
+        signaling: broker.signaling('stage-host-peer'),
+        peerConnection: rtc.factory('stage-host'),
+        seed: 42,
+      },
     );
     const guest = new MultiplayerRoomSession(
       { name: 'Guest', avatarId: 'cobalt', profileId: 'stage-guest' },
-      { signaling: broker.signaling('stage-guest-peer'), peerConnection: rtc.factory('stage-guest'), seed: 7 },
+      {
+        signaling: broker.signaling('stage-guest-peer'),
+        peerConnection: rtc.factory('stage-guest'),
+        seed: 7,
+      },
     );
     sessions.push(host, guest);
 
