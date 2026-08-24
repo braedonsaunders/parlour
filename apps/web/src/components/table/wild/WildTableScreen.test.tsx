@@ -120,12 +120,12 @@ describe('WildTableScreen turn affordances', () => {
   it('opens the shared table settings and confirms before quitting', () => {
     const onQuit = vi.fn();
     act(() => {
-      root.render(
-        createElement(WildTableScreen, { view: VIEW, fx: [], fxKey: 0, onQuit }),
-      );
+      root.render(createElement(WildTableScreen, { view: VIEW, fx: [], fxKey: 0, onQuit }));
     });
 
-    act(() => container.querySelector<HTMLButtonElement>('button[aria-label="Table menu"]')?.click());
+    act(() =>
+      container.querySelector<HTMLButtonElement>('button[aria-label="Table menu"]')?.click(),
+    );
 
     expect(container.querySelector('[role="dialog"][aria-label="Table menu"]')).not.toBeNull();
     expect(container.querySelector('[data-testid="background-picker"]')).not.toBeNull();
@@ -133,7 +133,9 @@ describe('WildTableScreen turn affordances', () => {
 
     act(() => container.querySelector<HTMLButtonElement>('[data-testid="quit-to-menu"]')?.click());
     expect(onQuit).not.toHaveBeenCalled();
-    expect(container.querySelector('[role="dialog"][aria-label="Quit this match?"]')).not.toBeNull();
+    expect(
+      container.querySelector('[role="dialog"][aria-label="Quit this match?"]'),
+    ).not.toBeNull();
 
     act(() => container.querySelector<HTMLButtonElement>('[data-testid="confirm-quit"]')?.click());
     expect(onQuit).toHaveBeenCalledOnce();

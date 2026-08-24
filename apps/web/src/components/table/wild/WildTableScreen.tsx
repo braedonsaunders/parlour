@@ -10,7 +10,7 @@ import { type DealPresentation, useDealPresentation } from '@/lib/table/deal-pre
 import { buildFxTimeline, type FxCue } from '@/lib/table/fx-motion';
 import type { WildSeatView, WildTableView } from '@/lib/wild/view';
 import { discardRotation, useFxAnimation, useTableAudio } from '../fx-animation';
-import { HandRail } from '../HandRail';
+import { HandRail, HandRailCard } from '../HandRail';
 import { TableMenu } from '../TableMenu';
 import { WildCard } from './WildCard';
 import { AvatarBadge } from '@/components/AvatarBadge';
@@ -313,30 +313,21 @@ function LocalHand({
     >
       <AnimatePresence initial={false} mode="popLayout">
         {visibleHand.map((card, index) => {
-          const fanIndex = index - (visibleHand.length - 1) / 2;
           const playable = view.legal.playCards.includes(card);
           return (
-            <motion.div
-              layout
-              layoutId={`card:${card}`}
+            <HandRailCard
               key={card}
-              className={tableStyles.handCard}
-              data-hand-card
-              data-playable={showLegality ? playable : undefined}
-              style={{ '--fan-index': fanIndex, '--fan-abs': Math.abs(fanIndex) } as CSSProperties}
-              initial={{ y: 24, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: -24, opacity: 0 }}
-              transition={{ duration: 0.22, ease: [0.2, 0.8, 0.3, 1] }}
+              cardId={card}
+              index={index}
+              count={visibleHand.length}
+              playable={showLegality ? playable : undefined}
             >
-              <div className={tableStyles.handFan}>
-                <WildCard
-                  card={card}
-                  disabled={!canChoose || !playable}
-                  onClick={() => onPlay?.(card)}
-                />
-              </div>
-            </motion.div>
+              <WildCard
+                card={card}
+                disabled={!canChoose || !playable}
+                onClick={() => onPlay?.(card)}
+              />
+            </HandRailCard>
           );
         })}
       </AnimatePresence>

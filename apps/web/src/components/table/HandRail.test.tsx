@@ -1,5 +1,16 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { calculateFanStep } from './HandRail';
+
+const styles = readFileSync(join(process.cwd(), 'src/styles/table.module.css'), 'utf8');
+
+function declarationsFor(selector: string): string {
+  const escapedSelector = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const match = styles.match(new RegExp(`${escapedSelector}\\s*\\{([^}]*)\\}`));
+  expect(match, `${selector} exists`).not.toBeNull();
+  return match![1]!;
+}
 
 describe('calculateFanStep', () => {
   it('keeps UNO-like overlap for an ordinary seven-card hand', () => {
@@ -19,5 +30,10 @@ describe('calculateFanStep', () => {
 
   it('centers a one-card hand without an offset', () => {
     expect(calculateFanStep(390, 82, 1)).toBe(0);
+  });
+
+  it('puts pointer hit-testing on each transformed card instead of its centered wrapper', () => {
+    expect(declarationsFor('.handCard')).toMatch(/pointer-events:\s*none;/);
+    expect(declarationsFor('.localHand .card')).toMatch(/pointer-events:\s*auto;/);
   });
 });

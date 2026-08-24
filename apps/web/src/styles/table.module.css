@@ -307,10 +307,10 @@
   animation: dealFanBloom 360ms var(--ease-pop) both;
 }
 
-.ownerCount {
+.ownerCount,
+.ownerLives {
   position: absolute;
   z-index: 3;
-  left: 0;
   top: 4.2rem;
   display: grid;
   justify-items: center;
@@ -325,6 +325,10 @@
     0 8px 18px rgba(3, 15, 20, 0.46);
   font-family: var(--font-display), sans-serif;
   line-height: 1;
+}
+
+.ownerCount {
+  left: 0;
 }
 
 .ownerCount span {
@@ -342,25 +346,26 @@
 }
 
 .ownerLives {
-  display: flex !important;
-  align-items: center;
-  justify-content: center;
-  gap: 0.35rem;
-  width: 100%;
-  margin-top: 0.38rem;
-  padding-top: 0.36rem;
-  border-top: 1px solid rgba(255, 224, 173, 0.3);
+  right: 0;
+  width: 4.8rem;
+  padding-block: 0.64rem;
 }
 
-.ownerLives b {
-  font-size: 0.56rem;
+.ownerLives > span:first-child {
+  color: var(--hearth-core);
+  font-size: 0.62rem;
+  font-weight: 800;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
 .ownerLifePips {
-  display: flex !important;
+  position: absolute;
+  top: calc(100% + 0.38rem);
+  left: 50%;
+  display: flex;
   gap: 0.2rem;
+  translate: -50% 0;
 }
 
 .ownerLifePips i {
@@ -380,11 +385,12 @@
   top: 0.9rem;
   width: var(--hand-card-width);
   margin-left: calc(var(--hand-card-width) / -2);
-  pointer-events: auto;
+  pointer-events: none;
 }
 
 .localHand .card {
   width: 100%;
+  pointer-events: auto;
 }
 
 .handFan {
@@ -904,10 +910,17 @@ button.card:not(:disabled):hover {
     bottom: -0.4rem;
     width: min(30rem, 100vw);
   }
-  .ownerCount {
-    left: 50%;
+  .ownerCount,
+  .ownerLives {
     top: -2.9rem;
-    translate: -50% 0;
+  }
+  .ownerCount {
+    left: calc(50% - 0.25rem);
+    translate: -100% 0;
+  }
+  .ownerLives {
+    right: auto;
+    left: calc(50% + 0.25rem);
   }
   .actionRail {
     right: max(0.9rem, env(safe-area-inset-right));
@@ -929,6 +942,11 @@ button.card:not(:disabled):hover {
   }
   .ownerCount {
     left: -1.2rem;
+    translate: 0 0;
+  }
+  .ownerLives {
+    right: -1.2rem;
+    left: auto;
   }
   .piles {
     top: 50.5%;

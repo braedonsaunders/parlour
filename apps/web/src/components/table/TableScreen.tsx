@@ -9,7 +9,7 @@ import { type DealPresentation, useDealPresentation } from '@/lib/table/deal-pre
 import { buildFxTimeline, type FxCue } from '@/lib/table/fx-motion';
 import { ownerCurrentCount } from '@/lib/table/owner-count';
 import { discardRotation, useFxAnimation, useTableAudio } from './fx-animation';
-import { HandRail } from './HandRail';
+import { HandRail, HandRailCard } from './HandRail';
 import { PlayingCard } from './PlayingCard';
 import { TableMenu } from './TableMenu';
 import { AvatarBadge } from '@/components/AvatarBadge';
@@ -301,46 +301,42 @@ function LocalHand(props: TableScreenProps & { view: TableView; deal: DealPresen
       label="Your hand"
       dealState={props.deal.sequence ? (props.deal.complete ? 'complete' : 'dealing') : undefined}
       accessory={
-        <output className={styles.ownerCount}>
-          <span>My count</span>
-          <strong aria-label={`My current count: ${currentCount ?? 0}`}>{currentCount ?? 0}</strong>
-          <span className={styles.ownerLives} aria-label={`My lives: ${player.lives}`}>
-            <b aria-hidden="true">Lives</b>
+        <>
+          <output
+            className={styles.ownerCount}
+            aria-label={`My current count: ${currentCount ?? 0}`}
+          >
+            <span>My count</span>
+            <strong>{currentCount ?? 0}</strong>
+          </output>
+          <div className={styles.ownerLives} aria-label={`My lives: ${player.lives}`}>
+            <span aria-hidden="true">My lives</span>
             <span className={styles.ownerLifePips} aria-hidden="true">
               {Array.from({ length: player.lives }, (_, index) => (
                 <i key={index} />
               ))}
             </span>
-          </span>
-        </output>
+          </div>
+        </>
       }
     >
       <AnimatePresence initial={false} mode="popLayout">
         {visibleHand.map((card, index) => {
-          const fanIndex = index - (visibleHand.length - 1) / 2;
           const playable = canChoose && props.view.legal.discardCards.includes(card);
           return (
-            <motion.div
-              layout
-              layoutId={`card:${card}`}
+            <HandRailCard
               key={card}
-              className={styles.handCard}
-              data-hand-card
-              data-playable={canChoose ? playable : undefined}
-              style={{ '--fan-index': fanIndex, '--fan-abs': Math.abs(fanIndex) } as CSSProperties}
-              initial={{ y: 24, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: -24, opacity: 0 }}
-              transition={{ duration: 0.22, ease: [0.2, 0.8, 0.3, 1] }}
+              cardId={card}
+              index={index}
+              count={visibleHand.length}
+              playable={canChoose ? playable : undefined}
             >
-              <div className={styles.handFan}>
-                <PlayingCard
-                  card={card}
-                  disabled={!playable}
-                  onClick={() => props.onDiscard?.(card)}
-                />
-              </div>
-            </motion.div>
+              <PlayingCard
+                card={card}
+                disabled={!playable}
+                onClick={() => props.onDiscard?.(card)}
+              />
+            </HandRailCard>
           );
         })}
       </AnimatePresence>
