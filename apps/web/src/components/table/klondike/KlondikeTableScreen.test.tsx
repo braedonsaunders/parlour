@@ -175,6 +175,14 @@ describe('KlondikeTableScreen', () => {
     expect(onDispatch).toHaveBeenCalledWith(chosen!.move.id, chosen!.move.payload);
   });
 
+  it('does not let Undo race the safe-finish loop', () => {
+    const { view } = table();
+    render({ ...view, canUndo: true }, { busy: true });
+    expect(
+      container.querySelector<HTMLButtonElement>('[data-testid="klondike-undo"]')!.disabled,
+    ).toBe(true);
+  });
+
   it('collapses the real opening layout and all flights for profile calm motion', () => {
     vi.useFakeTimers();
     useProfileStore.setState((state) => ({

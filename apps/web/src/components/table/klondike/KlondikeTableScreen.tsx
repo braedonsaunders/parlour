@@ -412,7 +412,7 @@ function ReadyKlondikeTable({
           className="btn-fat btn-fat--ghost"
           data-testid="klondike-undo"
           onClick={onUndo}
-          disabled={!view.canUndo || deal.dealing}
+          disabled={!view.canUndo || deal.dealing || busy}
         >
           Undo
         </button>
