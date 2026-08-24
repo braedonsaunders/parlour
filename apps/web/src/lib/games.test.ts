@@ -1,5 +1,6 @@
 import { blitzCatalog } from '@parlour/game-blitz';
 import { cribbageCatalog } from '@parlour/game-cribbage';
+import { heartsCatalog } from '@parlour/game-hearts';
 import { ginCatalog } from '@parlour/game-gin';
 import { presidentCatalog } from '@parlour/game-president';
 import { wildpileCatalog } from '@parlour/game-wildpile';
@@ -8,7 +9,14 @@ import { GAMES, getGame, getGameMode, isGameId, isGameModeId, modePreset } from 
 
 describe('game shelf catalog', () => {
   it('leads with blitz and keeps the shelf growing', () => {
-    expect(GAMES.map((g) => g.id)).toEqual(['blitz', 'cribbage', 'wild', 'gin', 'president']);
+    expect(GAMES.map((g) => g.id)).toEqual([
+      'blitz',
+      'cribbage',
+      'wild',
+      'hearts',
+      'gin',
+      'president',
+    ]);
   });
 
   it('every game carries complete presentation data', () => {
@@ -23,10 +31,11 @@ describe('game shelf catalog', () => {
     }
   });
 
-  it('every game is playable and routes to its setup screen', () => {
+  it('all shelf games are playable and route to their setup screens', () => {
     expect(getGame('blitz').href).toBe('/play');
     expect(getGame('cribbage').href).toBe('/cribbage');
     expect(getGame('wild').href).toBe('/wild');
+    expect(getGame('hearts').href).toBe('/hearts');
     expect(getGame('gin').href).toBe('/gin');
     expect(getGame('president').href).toBe('/president');
   });
@@ -47,6 +56,7 @@ describe('game shelf catalog', () => {
     expect(getGame('blitz')).toBe(blitzCatalog);
     expect(getGame('cribbage')).toBe(cribbageCatalog);
     expect(getGame('wild')).toBe(wildpileCatalog);
+    expect(getGame('hearts')).toBe(heartsCatalog);
     expect(getGame('gin')).toBe(ginCatalog);
     expect(getGame('president')).toBe(presidentCatalog);
   });

@@ -593,7 +593,8 @@ function Cue({ cue, localSeat }: { cue: FxCue; localSeat: number }) {
     );
   }
 
-  if (cue.type === 'blitz' || cue.type === 'chip-loss') return null;
-
-  return <span data-fx-cue={cue.id} data-seat-burst={cue.seat} className={styles.turnPop} />;
+  if (cue.type === 'turn') {
+    return <span data-fx-cue={cue.id} data-seat-burst={cue.seat} className={styles.turnPop} />;
+  }
+  return null;
 }

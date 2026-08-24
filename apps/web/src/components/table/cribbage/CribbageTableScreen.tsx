@@ -562,6 +562,8 @@ function CribCue({ cue, localSeat }: { cue: FxCue; localSeat: number }) {
     cue.type === 'flip' ||
     cue.type === 'draw' ||
     cue.type === 'discard' ||
+    cue.type === 'trick-play' ||
+    cue.type === 'transfer' ||
     cue.type === 'layoff'
   ) {
     return (

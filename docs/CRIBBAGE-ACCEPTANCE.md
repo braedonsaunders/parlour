@@ -30,7 +30,7 @@ Date: 2026-08-24
 ## Automated gates
 
 - Cribbage engine: 4 files / 55 tests; type-check and build pass.
-- Full repository: engine 117, Blitz 57, Cribbage 55, Gin 63, President 34, Ratscrew 32, Wild 47, and web 424 tests pass.
+- Full repository: engine 117, Blitz 57, Cribbage 55, Hearts 53, Gin 63, President 34, Ratscrew 32, shared Tricks 24, Wild 47, and web 441 tests pass.
 - Repo-wide `lint`, `type-check`, `build`, and `format:check` pass on the synchronized feature branch.
 - Browser release-artifact loop: desktop setup, Match Play boundary, two-card selection, crib commit, bot discard, starter cut, and live pegging verified; mobile setup and live pegging inspected at 390 × 844; `render_game_to_text` matched the visible state; no console errors.
 - The bundled web-game client itself could not launch because its pinned Chromium 1208 extraction stalled on this host. The installed Playwright CLI/Chromium 1234 completed the required equivalent snapshots, interaction loop, text-state inspection, and console review.

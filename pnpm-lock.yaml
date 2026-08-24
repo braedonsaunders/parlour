@@ -47,6 +47,9 @@ importers:
       '@parlour/game-cribbage':
         specifier: workspace:*
         version: link:../../packages/game-cribbage
+      '@parlour/game-hearts':
+        specifier: workspace:*
+        version: link:../../packages/game-hearts
       '@parlour/game-gin':
         specifier: workspace:*
         version: link:../../packages/game-gin
@@ -155,6 +158,22 @@ importers:
         specifier: ^4.0.18
         version: 4.1.11(@types/node@24.13.3)(jsdom@27.4.0(@noble/hashes@2.0.1))(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@1.21.7)(tsx@4.23.12))
 
+  packages/game-hearts:
+    dependencies:
+      '@parlour/engine':
+        specifier: workspace:*
+        version: link:../engine
+      '@parlour/tricks':
+        specifier: workspace:*
+        version: link:../tricks
+    devDependencies:
+      tsx:
+        specifier: ^4.20.0
+        version: 4.23.12
+      vitest:
+        specifier: ^4.0.18
+        version: 4.1.11(@types/node@24.13.3)(jsdom@27.4.0(@noble/hashes@2.0.1))(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@1.21.7)(tsx@4.23.12))
+
   packages/game-president:
     dependencies:
       '@parlour/engine':
@@ -182,6 +201,16 @@ importers:
         version: 4.1.11(@types/node@24.13.3)(jsdom@27.4.0(@noble/hashes@2.0.1))(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@1.21.7)(tsx@4.23.12))
 
   packages/game-wildpile:
+    dependencies:
+      '@parlour/engine':
+        specifier: workspace:*
+        version: link:../engine
+    devDependencies:
+      vitest:
+        specifier: ^4.0.18
+        version: 4.1.11(@types/node@24.13.3)(jsdom@27.4.0(@noble/hashes@2.0.1))(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@1.21.7)(tsx@4.23.12))
+
+  packages/tricks:
     dependencies:
       '@parlour/engine':
         specifier: workspace:*
