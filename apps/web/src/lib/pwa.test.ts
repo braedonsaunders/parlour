@@ -119,6 +119,9 @@ describe('installable offline shell', () => {
     expect(readFileSync(join(process.cwd(), 'src/app/profile/page.tsx'), 'utf8')).toContain(
       'safe-page',
     );
+    const home = readFileSync(join(process.cwd(), 'src/app/page.tsx'), 'utf8');
+    expect(home).toMatch(/chrome-ne fixed/);
+    expect(home).not.toMatch(/chrome-ne absolute/);
   });
 
   it('removes production service workers and parlour caches during development', () => {
