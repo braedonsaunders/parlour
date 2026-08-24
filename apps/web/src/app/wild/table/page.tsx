@@ -2,7 +2,12 @@
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { useRouter } from 'next/navigation';
-import { type WildpileColor, type WildpileRules, type WildpileState } from '@parlour/game-wildpile';
+import {
+  wildpileDiscardAllCards,
+  type WildpileColor,
+  type WildpileRules,
+  type WildpileState,
+} from '@parlour/game-wildpile';
 import { WildTableScreen } from '@/components/table/wild/WildTableScreen';
 import { useSoloTable } from '@/lib/table/useSoloTable';
 import { WildTransport, type WildSnapshot } from '@/lib/solo/WildTransport';
@@ -36,6 +41,7 @@ function SoloWildTablePage() {
   const mode = useWildSetupStore((state) => state.mode);
   const seats = useWildSetupStore((state) => state.seats);
   const overrides = useWildSetupStore((state) => state.overrides);
+  const botTier = useWildSetupStore((state) => state.botTier);
   const name = useProfileStore((state) => state.name);
   const avatarId = useProfileStore((state) => state.avatarId);
   const [transport, setTransport] = useState<WildTransport | null>(null);
@@ -50,6 +56,7 @@ function SoloWildTablePage() {
           seats,
           seed: Date.now() | 0,
           player: { name, avatarId },
+          botTier,
           rules: JSON.parse(rulesKey) as typeof rules,
         }),
       );
@@ -57,7 +64,7 @@ function SoloWildTablePage() {
     return () => window.clearTimeout(timer);
     // rulesKey stands in for the rules object so a fresh identity per render
     // does not re-deal the table.
-  }, [avatarId, mode, name, seats, rulesKey]);
+  }, [avatarId, botTier, mode, name, seats, rulesKey]);
 
   if (!transport) return <WildTableScreen view={null} fx={[]} fxKey="loading" />;
   return <ActiveWildTable transport={transport} />;
@@ -71,14 +78,16 @@ function ActiveMultiplayerWildTable({ room }: { room: MultiplayerRoomSession }) 
   const recordMatch = useHistoryStore((state) => state.recordMatch);
   const snapshot = useSyncExternalStore(room.subscribe, room.getSnapshot, room.getSnapshot);
   const reportedMatch = useRef(false);
+  const [startedAtMs] = useState(() => Date.now());
   const [localError, setLocalError] = useState<string | null>(null);
   const session = multiplayerSession<WildpileState, WildpileRules>(snapshot, 'wildpile');
   const localSeat = snapshot.localSeat;
+  const matchEndsAt = startedAtMs + (session?.config.matchTimeMinutes ?? 5) * 60_000;
 
   const dispatch = useCallback(
-    (move: string, payload?: unknown) => {
+    (move: string, payload?: unknown, reveals?: readonly string[]) => {
       try {
-        room.send(move, payload);
+        room.send(move, payload, reveals);
         setLocalError(null);
       } catch (error) {
         setLocalError(error instanceof Error ? error.message : 'The move could not be sent.');
@@ -86,6 +95,41 @@ function ActiveMultiplayerWildTable({ room }: { room: MultiplayerRoomSession }) 
     },
     [room],
   );
+
+  useEffect(() => {
+    if (!snapshot.isHost || session?.status !== 'playing' || session.phase.actor === null) return;
+    const actor = session.phase.actor;
+    const timer = window.setTimeout(() => {
+      try {
+        room.inject('timeout', { kind: 'turn', actor });
+      } catch {
+        // The move that beat the clock already replaced this timer's phase.
+      }
+    }, session.config.turnTimeSeconds * 1_000);
+    return () => window.clearTimeout(timer);
+  }, [
+    room,
+    session?.config.turnTimeSeconds,
+    session?.log.length,
+    session?.phase.actor,
+    session?.status,
+    snapshot.isHost,
+  ]);
+
+  useEffect(() => {
+    if (!snapshot.isHost || session?.status !== 'playing') return;
+    const timer = window.setTimeout(
+      () => {
+        try {
+          room.inject('timeout', { kind: 'match' });
+        } catch {
+          // A hand emptied at the same instant; that result wins the race.
+        }
+      },
+      Math.max(0, matchEndsAt - Date.now()),
+    );
+    return () => window.clearTimeout(timer);
+  }, [matchEndsAt, room, session?.status, snapshot.isHost]);
 
   useEffect(() => {
     if (!session?.result || localSeat === null || reportedMatch.current) return;
@@ -167,15 +211,22 @@ function ActiveMultiplayerWildTable({ room }: { room: MultiplayerRoomSession }) 
     session,
     matchWinner: session.result?.winner ?? null,
   };
+  const playCard = (card: string) => {
+    const cards = session.state.hands[localSeat] ?? [];
+    dispatch('playCard', { card }, wildpileDiscardAllCards(cards, card));
+  };
 
   return (
     <WildTableScreen
       view={wildTableView(wildSnapshot, legal, localSeat)}
+      matchEndsAt={matchEndsAt}
+      turnDurationMs={session.config.turnTimeSeconds * 1_000}
+      turnClockKey={`${session.log.length}:${session.phase.actor ?? 'ended'}`}
       fx={snapshot.fx}
       fxKey={snapshot.fxKey}
       busy={!isLocalTurn}
       error={localError ?? snapshot.error}
-      onPlay={(card) => dispatch('playCard', { card })}
+      onPlay={playCard}
       onDraw={() => dispatch('draw')}
       onChooseColor={(color: WildpileColor) => dispatch('chooseColor', { color })}
       onDeclineJump={() => dispatch('declineJump')}
@@ -204,10 +255,37 @@ function ActiveWildTable({ transport }: { transport: WildTransport }) {
       current.session.phase.phase === 'play' ? 480 + (current.session.phase.actor ?? 0) * 90 : 240,
     [],
   );
-  const { snapshot, fx, fxKey, error, dispatch } = useSoloTable(transport, {
+  const { snapshot, fx, fxKey, error, dispatch, accept } = useSoloTable(transport, {
     round: (current) => current.session,
     botPaceMs,
   });
+  useEffect(() => {
+    if (snapshot.session.status !== 'playing') return;
+    const actor = snapshot.session.phase.actor;
+    if (actor === null) return;
+    const timer = window.setTimeout(() => {
+      accept(transport.timeoutTurn(actor));
+    }, snapshot.session.config.turnTimeSeconds * 1_000);
+    return () => window.clearTimeout(timer);
+  }, [
+    accept,
+    snapshot.session.config.turnTimeSeconds,
+    snapshot.session.log.length,
+    snapshot.session.phase.actor,
+    snapshot.session.status,
+    transport,
+  ]);
+
+  useEffect(() => {
+    if (snapshot.session.status !== 'playing') return;
+    const timer = window.setTimeout(
+      () => {
+        accept(transport.timeoutMatch());
+      },
+      Math.max(0, transport.matchEndsAt() - Date.now()),
+    );
+    return () => window.clearTimeout(timer);
+  }, [accept, snapshot.session.status, transport]);
 
   useEffect(() => {
     if (snapshot.matchWinner === null || reportedMatch.current === transport) return;
@@ -250,6 +328,9 @@ function ActiveWildTable({ transport }: { transport: WildTransport }) {
   return (
     <WildTableScreen
       view={view}
+      matchEndsAt={transport.matchEndsAt()}
+      turnDurationMs={snapshot.session.config.turnTimeSeconds * 1_000}
+      turnClockKey={`${snapshot.session.log.length}:${snapshot.session.phase.actor ?? 'ended'}`}
       fx={fx}
       fxKey={fxKey}
       busy={snapshot.session.phase.actor !== 0 || snapshot.session.status !== 'playing'}

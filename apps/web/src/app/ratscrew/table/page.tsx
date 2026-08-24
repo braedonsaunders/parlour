@@ -37,6 +37,7 @@ function SoloRatscrewTablePage() {
   const mode = useRatscrewSetupStore((state) => state.mode);
   const seats = useRatscrewSetupStore((state) => state.seats);
   const overrides = useRatscrewSetupStore((state) => state.overrides);
+  const botTier = useRatscrewSetupStore((state) => state.botTier);
   const name = useProfileStore((state) => state.name);
   const avatarId = useProfileStore((state) => state.avatarId);
   const [transport, setTransport] = useState<RatscrewTransport | null>(null);
@@ -51,6 +52,7 @@ function SoloRatscrewTablePage() {
         seed: Date.now() | 0,
         rules: JSON.parse(rulesKey) as typeof rules,
         player: { name, avatarId },
+        botTier,
       });
       setTransport(active);
     }, 0);
@@ -60,7 +62,7 @@ function SoloRatscrewTablePage() {
     };
     // rulesKey stands in for the rules object so a fresh identity per render
     // does not re-deal the table.
-  }, [avatarId, name, seats, rulesKey]);
+  }, [avatarId, botTier, name, seats, rulesKey]);
 
   if (!transport) return <RatscrewTableScreen view={null} fx={[]} fxKey="loading" />;
   return <LiveRatscrewTable transport={transport} />;

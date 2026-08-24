@@ -3,16 +3,18 @@ import { ratscrewConfigSchema, type RatscrewConfig } from '@parlour/game-ratscre
 import { create } from 'zustand';
 import { getGameMode, modePreset } from '@/lib/games';
 import { isRatscrewModeId, type RatscrewModeId } from '@/lib/ratscrew/modes';
-import type { SeatCount } from '@/stores/setup';
+import { clampBotTier, type BotTier, type SeatCount } from '@/stores/setup';
 
 export type RatscrewSetupState = {
   mode: RatscrewModeId;
   seats: SeatCount;
+  botTier: BotTier;
   /** Per-key overrides layered on top of the selected mode's preset. */
   overrides: Partial<RatscrewConfig>;
   /** Takes the registry's string ids; anything unknown is ignored. */
   setMode: (mode: string) => void;
   setSeats: (seats: number) => void;
+  setBotTier: (tier: number) => void;
   setRule: (key: string, value: RatscrewConfig[string]) => void;
   resetRules: () => void;
 };
@@ -42,10 +44,12 @@ export function ratscrewRulesFor(
 export const useRatscrewSetupStore = create<RatscrewSetupState>()((set) => ({
   mode: 'classic',
   seats: 4,
+  botTier: 2,
   overrides: {},
   // Switching preset drops per-knob overrides: the tile you picked is the table.
   setMode: (mode) => set({ mode: isRatscrewModeId(mode) ? mode : 'classic', overrides: {} }),
   setSeats: (seats) => set({ seats: clampSeats(seats) }),
+  setBotTier: (tier) => set({ botTier: clampBotTier(tier) }),
   setRule: (key, value) =>
     set((state) => ({
       overrides: { ...state.overrides, [key]: value } as Partial<RatscrewConfig>,

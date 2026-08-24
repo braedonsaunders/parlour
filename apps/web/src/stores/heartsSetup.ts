@@ -3,13 +3,16 @@ import { heartsConfigSchema, type HeartsRules } from '@parlour/game-hearts';
 import { create } from 'zustand';
 import { getGameMode, modePreset } from '@/lib/games';
 import { isHeartsModeId, type HeartsModeId } from '@/lib/hearts/modes';
+import { clampBotTier, type BotTier } from '@/stores/setup';
 
 export type HeartsSetupState = {
   mode: HeartsModeId;
+  botTier: BotTier;
   /** Per-key overrides layered on top of the selected mode's preset. */
   overrides: Partial<HeartsRules>;
   /** Takes the registry's string ids; anything unknown is ignored. */
   setMode: (mode: string) => void;
+  setBotTier: (tier: number) => void;
   setRule: (key: string, value: HeartsRules[string]) => void;
   resetRules: () => void;
 };
@@ -28,9 +31,11 @@ export function heartsRulesFor(mode: HeartsModeId, overrides: Partial<HeartsRule
  */
 export const useHeartsSetupStore = create<HeartsSetupState>()((set) => ({
   mode: 'classic',
+  botTier: 2,
   overrides: {},
   // Switching preset drops per-knob overrides: the tile you picked is the table.
   setMode: (mode) => set(isHeartsModeId(mode) ? { mode, overrides: {} } : {}),
+  setBotTier: (tier) => set({ botTier: clampBotTier(tier) }),
   setRule: (key, value) =>
     set((state) => ({ overrides: { ...state.overrides, [key]: value } as Partial<HeartsRules> })),
   resetRules: () => set({ overrides: {} }),

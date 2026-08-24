@@ -223,7 +223,8 @@ function cueFor(event: FxEvent, index: number): FxCue | null {
       };
     // A card passing between hands (secret passes): same flight shape as a
     // deal, but the zones name the two hands involved.
-    case 'hearts.transfer': {
+    case 'hearts.transfer':
+    case 'wildpile.transfer': {
       const from = zoneField(event, 'from');
       const to = zoneField(event, 'to');
       return {
@@ -232,7 +233,7 @@ function cueFor(event: FxEvent, index: number): FxCue | null {
         card: stringField(event, 'card'),
         from,
         to,
-        durationMs: FX_TIMING.cardFlightMs,
+        durationMs: durationField(event, FX_TIMING.cardFlightMs),
       };
     }
     // Hearts moments ride the shared burst vocabulary.

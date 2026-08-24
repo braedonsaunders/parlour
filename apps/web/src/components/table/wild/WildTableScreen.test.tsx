@@ -237,6 +237,49 @@ describe('WildTableScreen turn affordances', () => {
     expect(getMusicController().getState().mood).toBeNull();
   });
 
+  it('shows live places and tense music from the real final-minute deadline', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-24T12:00:00Z'));
+    act(() =>
+      root.render(
+        createElement(WildTableScreen, {
+          view: VIEW,
+          fx: [],
+          fxKey: 0,
+          matchEndsAt: Date.now() + 59_000,
+        }),
+      ),
+    );
+
+    const standings = container.querySelector('[aria-label="Live standings"]');
+    expect(standings?.textContent).toContain('59s left');
+    expect(standings?.textContent).toContain('1stYou2 cards');
+    expect(standings?.textContent).toContain('2ndSlate5 cards');
+    expect(getMusicController().getState().mood).toBe('tense');
+  });
+
+  it('renders swap cards flying between the two correct hand zones', () => {
+    act(() =>
+      root.render(
+        createElement(WildTableScreen, {
+          view: VIEW,
+          fx: [
+            {
+              kind: 'wildpile.transfer',
+              payload: { card: 'red-7-0', from: 'hand:0', to: 'hand:1', dur: 240 },
+            },
+          ],
+          fxKey: 'swap',
+        }),
+      ),
+    );
+
+    expect(container.querySelector('[data-fx-cue="0:wildpile.transfer"]')).not.toBeNull();
+    expect(
+      container.querySelector('[data-fx-cue="0:wildpile.transfer"] [aria-label="red 7"]'),
+    ).not.toBeNull();
+  });
+
   it('draws from the deck itself and ships no draw button', () => {
     const onDraw = vi.fn();
     act(() =>
@@ -399,6 +442,43 @@ describe('WildTableScreen turn affordances', () => {
 
     const layer = container.querySelector('[data-testid="card-drop-fx"]');
     expect(layer?.querySelector('[data-shape="swirl"]')).not.toBeNull();
+  });
+
+  it('renders and announces a Drop All color dump', () => {
+    const view = {
+      ...VIEW,
+      hand: ['red-discard-all-0', 'blue-2-0'],
+      legal: { ...VIEW.legal, playCards: ['red-discard-all-0'] },
+    };
+    act(() =>
+      root.render(
+        createElement(WildTableScreen, {
+          view,
+          fx: [
+            {
+              kind: Fx.DiscardCard,
+              payload: { card: 'red-discard-all-0', seat: 0 },
+              at: 130,
+            },
+            {
+              kind: 'wildpile.discard-all',
+              payload: { seat: 0, color: 'red', amount: 3 },
+              at: 130,
+            },
+          ],
+          fxKey: 'drop-all',
+        }),
+      ),
+    );
+
+    expect(container.querySelector('[aria-label="Play red drop all"]')).not.toBeNull();
+    expect(container.querySelector('[data-shape="shockwave"]')?.textContent).toContain('ALL');
+    expect(container.querySelector('[data-testid="wild-announcer"]')?.textContent).toContain(
+      'Drop all!',
+    );
+    expect(container.querySelector('[data-testid="wild-announcer"]')?.textContent).toContain(
+      'You shed 3 red cards',
+    );
   });
 
   it('offers the Draw Four challenge with both prices on it', () => {

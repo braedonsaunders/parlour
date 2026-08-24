@@ -5,7 +5,6 @@ import {
   dealOrder,
   drawFrom,
   isVeilHandle,
-  removeFrom,
   veilSupport,
   type AutoMove,
   type BotPolicy,
@@ -52,6 +51,10 @@ export interface WildpileRules {
   challengeDrawFour: boolean;
   /** Cards dealt to each seat. */
   handSize: number;
+  /** Seconds allowed for one visible decision before the authority plays it. */
+  turnTimeSeconds: number;
+  /** Minutes before the deal is ranked with cards still in hand. */
+  matchTimeMinutes: number;
   [key: string]: ConfigFieldValue;
 }
 
@@ -110,6 +113,8 @@ export interface WildpileState {
    */
   calledLastCard: boolean[];
   winner: SeatId | null;
+  /** Filled only by the replay-logged match clock expiry. */
+  timeoutRankings: SeatId[] | null;
   rules: WildpileRules;
   /**
    * True when the round is dealt under Veil: hands and stock hold opaque
@@ -143,6 +148,28 @@ export const wildpileConfig = defineConfig<WildpileRules>(
       default: 7,
       group: 'The deal',
       help: 'How many cards each seat starts with.',
+    },
+    {
+      key: 'turnTimeSeconds',
+      kind: 'int',
+      label: 'Seconds per turn',
+      min: 5,
+      max: 60,
+      default: 20,
+      advanced: true,
+      group: 'Timing',
+      help: 'When the clock runs out, the table makes a legal play for that seat.',
+    },
+    {
+      key: 'matchTimeMinutes',
+      kind: 'int',
+      label: 'Match minutes',
+      min: 2,
+      max: 15,
+      default: 5,
+      advanced: true,
+      group: 'Timing',
+      help: 'At zero, the player with the lightest remaining hand wins.',
     },
     {
       key: 'stackDrawTwo',
@@ -249,7 +276,7 @@ function isRealCard(card: CardId): boolean {
 
 /**
  * The swap wilds ship with the deck but only join the shuffle when the table
- * asks for them, so a classic pile stays exactly 108 cards.
+ * asks for them, so the ordinary pile stays exactly 112 cards.
  */
 function wildpileDealtDeck(config: WildpileRules): DeckDef {
   return config.swapCards ? wildpileDeck : { ...wildpileDeck, cardIds: WILDPILE_BASE_CARD_IDS };
@@ -320,22 +347,45 @@ function sevenZeroEffect(state: WildpileState, card: CardId): 'swap' | 'rotate' 
 
 /** Every hand moves one seat in the direction of play. */
 function rotateHands(state: WildpileState, ctx: MoveCtx): WildpileState {
+  const transfers: { card: CardId; from: SeatId; to: SeatId }[] = [];
+  const longestHand = Math.max(...state.hands.map((cards) => cards.length));
+  for (let index = 0; index < longestHand; index++) {
+    for (let from = 0; from < state.seats; from++) {
+      const card = state.hands[from]?.[index];
+      if (card) transfers.push({ card, from, to: nextSeat(state, from) });
+    }
+  }
+  const settledAt = emitHandTransfers(transfers, ctx);
   const hands = state.hands.map((_, seat) => {
     // The seat that *gives* to `seat` is one step against the play direction.
     const from = (seat - state.direction + state.seats) % state.seats;
     return (state.hands[from] ?? []).slice();
   });
-  ctx.fx.emit('wildpile.rotate', { direction: state.direction });
+  ctx.fx.emit('wildpile.rotate', { direction: state.direction }, settledAt);
   return { ...state, hands, calledLastCard: state.calledLastCard.map(() => false) };
 }
 
 function swapHands(state: WildpileState, a: SeatId, b: SeatId, ctx: MoveCtx): WildpileState {
+  const transfers: { card: CardId; from: SeatId; to: SeatId }[] = [];
+  const left = state.hands[a] ?? [];
+  const right = state.hands[b] ?? [];
+  for (let index = 0; index < Math.max(left.length, right.length); index++) {
+    const fromA = left[index];
+    const fromB = right[index];
+    if (fromA) transfers.push({ card: fromA, from: a, to: b });
+    if (fromB) transfers.push({ card: fromB, from: b, to: a });
+  }
+  const settledAt = emitHandTransfers(transfers, ctx);
   const hands = state.hands.map((cards, seat) => {
     if (seat === a) return (state.hands[b] ?? []).slice();
     if (seat === b) return (state.hands[a] ?? []).slice();
     return cards.slice();
   });
-  ctx.fx.emit('wildpile.swap', { seat: a, target: b });
+  ctx.fx.emit(
+    'wildpile.swap',
+    { seat: a, target: b, amount: left.length, targetAmount: right.length },
+    settledAt,
+  );
   return {
     ...state,
     hands,
@@ -343,6 +393,28 @@ function swapHands(state: WildpileState, a: SeatId, b: SeatId, ctx: MoveCtx): Wi
       seat === a || seat === b ? false : armed,
     ),
   };
+}
+
+/** Card-by-card flights make a hand exchange readable without dragging out a large hand. */
+function emitHandTransfers(
+  transfers: readonly { card: CardId; from: SeatId; to: SeatId }[],
+  ctx: MoveCtx,
+): number {
+  const lastIndex = Math.max(0, transfers.length - 1);
+  const stagger = lastIndex === 0 ? 0 : Math.min(62, Math.floor(620 / lastIndex));
+  transfers.forEach((transfer, index) => {
+    ctx.fx.emit(
+      'wildpile.transfer',
+      {
+        card: transfer.card,
+        from: `hand:${transfer.from}`,
+        to: `hand:${transfer.to}`,
+        dur: 240,
+      },
+      index * stagger,
+    );
+  });
+  return lastIndex * stagger + 240;
 }
 
 /** Pool every hand, shuffle, and redeal round-robin from the next seat. */
@@ -402,7 +474,9 @@ function exactJumpCards(state: WildpileState, seat: SeatId): CardId[] {
 }
 
 function phaseFor(state: WildpileState) {
-  if (state.winner !== null) return { phase: 'ended', actor: null, round: 1 };
+  if (state.winner !== null || state.timeoutRankings !== null) {
+    return { phase: 'ended', actor: null, round: 1 };
+  }
   if (state.awaitingColor !== null) {
     return { phase: 'choose-color', actor: state.awaitingColor, round: 1 };
   }
@@ -481,6 +555,27 @@ function validatePlayable(state: WildpileState, seat: SeatId, payload: unknown):
   return canPlay(state, card) ? true : error('card-not-playable', `${card} cannot be played`);
 }
 
+/**
+ * A Drop All card takes every other card of its colour with it. The action card
+ * remains on top; swept action cards are only cargo and never fire themselves.
+ */
+export function wildpileDiscardAllCards(cards: readonly CardId[], played: CardId): CardId[] {
+  const face = wildpileFace(played);
+  if (face.meta.kind !== 'discard-all' || !face.color) return [played];
+  return [
+    played,
+    ...cards.filter((card) => card !== played && wildpileFace(card).color === face.color),
+  ];
+}
+
+/** Keep even a huge colour dump inside one authored burst. */
+const DISCARD_ALL_STEP_MS = 65;
+const DISCARD_ALL_SPAN_MAX_MS = 650;
+
+function discardAllStep(count: number): number {
+  return Math.min(DISCARD_ALL_STEP_MS, DISCARD_ALL_SPAN_MAX_MS / Math.max(1, count - 1));
+}
+
 function playResolved(
   state: WildpileState,
   seat: SeatId,
@@ -488,10 +583,32 @@ function playResolved(
   ctx: MoveCtx,
 ): WildpileState {
   const face = wildpileFace(card);
+  const discarded = wildpileDiscardAllCards(hand(state, seat), card);
+  const swept = discarded.slice(1);
+  const discardAll = face.meta.kind === 'discard-all';
+  const stepMs = discardAllStep(discarded.length);
+  const actionDelayMs = discardAll ? swept.length * stepMs : 0;
   const hands = state.hands.map((cards, index) =>
-    index === seat ? removeFrom(cards, card) : cards.slice(),
+    index === seat ? cards.filter((held) => !discarded.includes(held)) : cards.slice(),
   );
-  ctx.fx.emit(Fx.DiscardCard, { card, seat, to: 'discard' });
+
+  if (discardAll) {
+    swept.forEach((sweptCard, index) =>
+      ctx.fx.emit(
+        Fx.DiscardCard,
+        { card: sweptCard, seat, to: 'discard', passive: true },
+        index * stepMs,
+      ),
+    );
+    ctx.fx.emit(Fx.DiscardCard, { card, seat, to: 'discard' }, actionDelayMs);
+    ctx.fx.emit(
+      'wildpile.discard-all',
+      { seat, color: face.color, amount: discarded.length },
+      actionDelayMs,
+    );
+  } else {
+    ctx.fx.emit(Fx.DiscardCard, { card, seat, to: 'discard' });
+  }
 
   const reachedLastCard = hands[seat]?.length === 1;
   const protectedSeat = state.calledLastCard[seat] ?? false;
@@ -500,7 +617,7 @@ function playResolved(
   let next: WildpileState = {
     ...state,
     hands,
-    discard: addTo(state.discard, card),
+    discard: discardAll ? [card, ...swept, ...state.discard] : addTo(state.discard, card),
     activeColor: face.color ?? null,
     interrupt: null,
     drawnCard: null,
@@ -577,14 +694,14 @@ function playResolved(
     // Head-to-head there is only one hand to take, so skip the pointless prompt.
     if (next.seats === 2) {
       next = swapHands(next, seat, nextSeat(next, seat), ctx);
-      ctx.fx.emit(Fx.TurnRing, { seat: resumeTurn }, 80);
+      ctx.fx.emit(Fx.TurnRing, { seat: resumeTurn }, actionDelayMs + 80);
       return { ...next, turn: resumeTurn };
     }
     return { ...next, awaitingSwap: seat, turn: seat };
   }
 
   const interrupted = withInterrupt(next, card, seat, resumeTurn, passedOver);
-  ctx.fx.emit(Fx.TurnRing, { seat: interrupted.turn }, 80);
+  ctx.fx.emit(Fx.TurnRing, { seat: interrupted.turn }, actionDelayMs + 80);
   return interrupted;
 }
 
@@ -804,15 +921,21 @@ const challengeDrawFour: Move<WildpileState> = {
 };
 
 /**
- * Last-card protection. Arm it while holding two — the seat that plays down to
- * one without it is caught and draws {@link LAST_CARD_PENALTY}.
+ * Last-card protection. Usually this arms while holding two; Drop All can make
+ * a larger hand fall straight to one, so the real question is whether any
+ * playable card would leave exactly one behind.
  */
 const callLastCard: Move<WildpileState> = {
   validate(state, seat) {
     if (state.calledLastCard[seat]) return error('already-called', 'protection is already armed');
-    return hand(state, seat).length === 2
+    const cards = hand(state, seat);
+    const canReachOne = cards.some(
+      (card) =>
+        canPlay(state, card) && cards.length - wildpileDiscardAllCards(cards, card).length === 1,
+    );
+    return canReachOne
       ? true
-      : error('not-last-card', 'protection arms only on the second-to-last card');
+      : error('not-last-card', 'no playable card would leave exactly one card');
   },
   apply(state, seat, _payload, ctx) {
     ctx.fx.emit('wildpile.last-card-armed', { seat });
@@ -893,15 +1016,111 @@ const declineJump: Move<WildpileState> = {
   },
 };
 
+type WildpileTimeoutPayload = { kind: 'turn'; actor: SeatId } | { kind: 'match' };
+
+function timeoutPayload(payload: unknown): WildpileTimeoutPayload | null {
+  if (typeof payload !== 'object' || payload === null || Array.isArray(payload)) return null;
+  const record = payload as Record<string, unknown>;
+  if (record.kind === 'match') return { kind: 'match' };
+  if (
+    record.kind === 'turn' &&
+    typeof record.actor === 'number' &&
+    Number.isInteger(record.actor)
+  ) {
+    return { kind: 'turn', actor: record.actor };
+  }
+  return null;
+}
+
+function remainingHandValue(cards: readonly CardId[]): number {
+  return cards.reduce((total, card) => {
+    if (!isRealCard(card)) return total;
+    const kind = wildpileFace(card).meta.kind;
+    if (kind === 'number') return total + (wildpileFace(card).meta.value ?? 0);
+    if (kind === 'skip' || kind === 'reverse' || kind === 'draw-two') return total + 20;
+    if (kind === 'discard-all') return total + 30;
+    return total + 50;
+  }, 0);
+}
+
+function timeoutOrder(state: WildpileState): SeatId[] {
+  return state.hands
+    .map((cards, seat) => ({ seat, cards: cards.length }))
+    .sort((left, right) => left.cards - right.cards || left.seat - right.seat)
+    .map(({ seat }) => seat);
+}
+
+/** Authority-only clock event. Its timestamp and chosen action live in the replay log. */
+const timeout: Move<WildpileState> = {
+  validate() {
+    return error('authority-only', 'timeouts are applied by the table authority');
+  },
+  apply(state, _seat, payload, ctx) {
+    const parsed = timeoutPayload(payload);
+    if (!parsed) throw new Error('timeout apply requires a clock payload');
+    if (parsed.kind === 'match') {
+      const timeoutRankings = timeoutOrder(state);
+      ctx.fx.emit('wildpile.match-timeout', { winner: timeoutRankings[0] ?? null });
+      return { ...state, timeoutRankings };
+    }
+
+    const actor = parsed.actor;
+    ctx.fx.emit('wildpile.turn-timeout', { seat: actor });
+    if (state.awaitingColor === actor) {
+      return chooseColor.apply(state, actor, { color: preferredColor(state, actor) }, ctx);
+    }
+    if (state.awaitingSwap === actor) {
+      const target = state.hands
+        .map((cards, seat) => ({ seat, count: cards.length }))
+        .filter((entry) => entry.seat !== actor)
+        .sort((left, right) => right.count - left.count || left.seat - right.seat)[0]?.seat;
+      return target === undefined ? state : chooseTarget.apply(state, actor, { seat: target }, ctx);
+    }
+    if (state.interrupt?.candidates[0] === actor) {
+      return declineJump.apply(state, actor, undefined, ctx);
+    }
+    if (state.turn !== actor) return state;
+    if (state.veiled) {
+      return state.drawnCard !== null
+        ? pass.apply(state, actor, undefined, ctx)
+        : draw.apply(state, actor, undefined, ctx);
+    }
+
+    const playable = legalMoves(state).find((move) => move.id === 'playCard');
+    if (playable) {
+      const card = payloadCard(playable.payload);
+      if (!card) return state;
+      const cards = hand(state, actor);
+      const reachesOne = cards.length - wildpileDiscardAllCards(cards, card).length === 1;
+      const armed = reachesOne
+        ? {
+            ...state,
+            calledLastCard: state.calledLastCard.map((value, seat) =>
+              seat === actor ? true : value,
+            ),
+          }
+        : state;
+      return playCard.apply(armed, actor, { card }, ctx);
+    }
+    if (state.drawnCard !== null) return pass.apply(state, actor, undefined, ctx);
+    return draw.apply(state, actor, undefined, ctx);
+  },
+};
+
 /** Offered alongside the seat's real options — arming never costs the turn. */
 function lastCardMoves(state: WildpileState, seat: SeatId): LegalMove[] {
-  return hand(state, seat).length === 2 && !state.calledLastCard[seat]
+  const cards = hand(state, seat);
+  const canReachOne = cards.some(
+    (card) =>
+      canPlay(state, card) && cards.length - wildpileDiscardAllCards(cards, card).length === 1,
+  );
+  return canReachOne && !state.calledLastCard[seat]
     ? [{ id: 'callLastCard', hint: 'protect your last card' }]
     : [];
 }
 
 function legalMoves(state: WildpileState): LegalMove[] {
-  if (state.winner !== null) return [];
+  if (state.winner !== null || state.timeoutRankings !== null) return [];
   if (state.awaitingColor !== null) {
     return WILDPILE_COLORS.map((color) => ({ id: 'chooseColor', payload: { color } }));
   }
@@ -956,6 +1175,21 @@ function forcedPickup(state: WildpileState, phase: PhaseState): AutoMove | null 
 }
 
 function result(state: WildpileState): MatchResult | null {
+  if (state.timeoutRankings) {
+    const winner = state.timeoutRankings[0] ?? null;
+    return {
+      winner,
+      rankings: state.timeoutRankings.map((seat, index) => ({
+        seat,
+        rank: index + 1,
+        detail: {
+          cards: state.hands[seat]?.length ?? 0,
+          value: remainingHandValue(state.hands[seat] ?? []),
+        },
+      })),
+      reason: 'match-timeout',
+    };
+  }
   if (state.winner === null) return null;
   const rankings = state.hands
     .map((cards, seat) => ({ seat, cards: cards.length }))
@@ -981,6 +1215,20 @@ const flow: Flow<WildpileState> = {
     if (ended) return { phase, ended };
     const auto = forcedPickup(state, phase);
     return auto ? { phase, autoMoves: [auto] } : { phase };
+  },
+  canInject(state, phase, moveId, payload, meta) {
+    if (moveId !== 'timeout') return error('unsupported-injection', 'only Wild clocks inject');
+    const parsed = timeoutPayload(payload);
+    if (!parsed) return error('bad-timeout', 'timeout needs a valid clock payload');
+    if (parsed.kind === 'match') {
+      const elapsed = meta.atMs ?? 0;
+      return elapsed >= state.rules.matchTimeMinutes * 60_000
+        ? true
+        : error('match-clock-live', 'the match clock still has time');
+    }
+    return phase.actor === parsed.actor
+      ? true
+      : error('stale-turn-clock', 'that seat is no longer on the clock');
   },
 };
 
@@ -1008,7 +1256,30 @@ function botChallengeChance(state: WildpileState, accused: SeatId): number {
   return Math.min(60, hand(state, accused).length * 8);
 }
 
-const bot: BotPolicy<WildpileState> = {
+const easyBot: BotPolicy<WildpileState> = {
+  id: 'wildpile-easy',
+  label: 'Easy Wild Bot',
+  tier: 1,
+  chooseMove(_state, _seat, legal, rng) {
+    const colorMoves = legal.filter((move) => move.id === 'chooseColor');
+    if (colorMoves.length > 0) return colorMoves[rng.int(colorMoves.length)]!;
+    const call = legal.find((move) => move.id === 'callLastCard');
+    if (call) return call;
+    const targets = legal.filter((move) => move.id === 'chooseTarget');
+    if (targets.length > 0) return targets[rng.int(targets.length)]!;
+    const plays = legal.filter((move) => move.id === 'playCard');
+    if (plays.length > 0) return plays[rng.int(plays.length)]!;
+    return (
+      legal.find((move) => move.id === 'declineJump') ??
+      legal.find((move) => move.id === 'draw') ??
+      legal.find((move) => move.id === 'pass') ??
+      legal[0] ??
+      null
+    );
+  },
+};
+
+const mediumBot: BotPolicy<WildpileState> = {
   id: 'wildpile-house-bot',
   label: 'House Bot',
   tier: 2,
@@ -1051,6 +1322,73 @@ const bot: BotPolicy<WildpileState> = {
     );
   },
 };
+
+const hardBot: BotPolicy<WildpileState> = {
+  id: 'wildpile-hard',
+  label: 'Hard Wild Bot',
+  tier: 3,
+  chooseMove(state, seat, legal, rng) {
+    const color = preferredColor(state, seat);
+    const colorMove = legal.find(
+      (move) =>
+        move.id === 'chooseColor' &&
+        (move.payload as { color?: unknown } | undefined)?.color === color,
+    );
+    if (colorMove) return colorMove;
+    const callMove = legal.find((move) => move.id === 'callLastCard');
+    if (callMove) return callMove;
+    const swapMoves = legal.filter((move) => move.id === 'chooseTarget');
+    if (swapMoves.length > 0) {
+      return swapMoves.reduce((best, move) => {
+        const size = (target: LegalMove) => hand(state, payloadSeat(target.payload) ?? seat).length;
+        return size(move) > size(best) ? move : best;
+      });
+    }
+    const plays = legal.filter((move) => move.id === 'playCard');
+    if (plays.length > 0) {
+      return plays.reduce((best, move) => {
+        const score = (candidate: LegalMove) => {
+          const card = payloadCard(candidate.payload);
+          if (!card) return -1;
+          const face = wildpileFace(card);
+          const dumped = wildpileDiscardAllCards(hand(state, seat), card).length;
+          const action =
+            face.meta.kind === 'discard-all'
+              ? 80
+              : face.meta.kind === 'wild-draw-four'
+                ? 18
+                : face.meta.kind === 'draw-two'
+                  ? 14
+                  : face.meta.kind === 'skip' || face.meta.kind === 'reverse'
+                    ? 9
+                    : isWildKind(face.meta.kind)
+                      ? 4
+                      : 0;
+          return dumped * 100 + action;
+        };
+        return score(move) > score(best) ? move : best;
+      });
+    }
+    const challengeMove = legal.find((move) => move.id === 'challengeDrawFour');
+    if (challengeMove && state.challenge) {
+      const chance = botChallengeChance(state, state.challenge.accused) + 18;
+      if (rng.int(100) < Math.min(82, chance)) return challengeMove;
+    }
+    return (
+      legal.find((move) => move.id === 'declineJump') ??
+      legal.find((move) => move.id === 'draw') ??
+      legal.find((move) => move.id === 'pass') ??
+      legal[0] ??
+      null
+    );
+  },
+};
+
+export const WILDPILE_BOTS: readonly BotPolicy<WildpileState>[] = [easyBot, mediumBot, hardBot];
+
+export function wildpileTierBot(tier: 1 | 2 | 3): BotPolicy<WildpileState> {
+  return WILDPILE_BOTS[tier - 1]!;
+}
 
 export const wildpileGame: GameDef<WildpileState, WildpileRules> = {
   id: 'wildpile',
@@ -1108,6 +1446,7 @@ export const wildpileGame: GameDef<WildpileState, WildpileRules> = {
       challenge: null,
       calledLastCard: Array.from({ length: seats }, () => false),
       winner: null,
+      timeoutRankings: null,
       rules: config,
       veiled: ctx.veiled === true,
     };
@@ -1121,6 +1460,7 @@ export const wildpileGame: GameDef<WildpileState, WildpileRules> = {
     declineJump,
     callLastCard,
     challengeDrawFour,
+    timeout,
   },
   flow,
   playerView(state, seat) {
@@ -1133,5 +1473,5 @@ export const wildpileGame: GameDef<WildpileState, WildpileRules> = {
     };
   },
   end: result,
-  bots: [bot],
+  bots: WILDPILE_BOTS,
 };

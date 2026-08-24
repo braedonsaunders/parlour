@@ -9,6 +9,7 @@ import { getGame } from '@/lib/games';
 import type { GameMode } from '@/lib/games';
 import { HowToPlayButton } from '@/components/HowToPlay';
 import { RuleSettings } from '@/components/settings/RuleSettings';
+import { BotDifficultyPicker } from '@/components/setup/BotDifficultyPicker';
 import { useCenteredCarousel } from '@/hooks/useCenteredCarousel';
 import { HEARTS_MODES } from '@/lib/hearts/modes';
 import { heartsRulesFor, useHeartsSetupStore } from '@/stores/heartsSetup';
@@ -19,7 +20,9 @@ export default function HeartsSetupPage() {
   const router = useRouter();
   const mode = useHeartsSetupStore((s) => s.mode);
   const overrides = useHeartsSetupStore((s) => s.overrides);
+  const botTier = useHeartsSetupStore((s) => s.botTier);
   const setMode = useHeartsSetupStore((s) => s.setMode);
+  const setBotTier = useHeartsSetupStore((s) => s.setBotTier);
   const setRule = useHeartsSetupStore((s) => s.setRule);
   const resetRules = useHeartsSetupStore((s) => s.resetRules);
   const [starting, setStarting] = useState(false);
@@ -66,12 +69,15 @@ export default function HeartsSetupPage() {
         className="mx-auto mb-auto flex w-full max-w-3xl flex-col gap-4 rounded-chunky px-6 pb-8"
         aria-label="Table setup"
       >
-        <div className="panel-soft p-4">
-          <p className="text-xs font-bold uppercase tracking-[0.2em] text-dusk-200">Seats</p>
-          <p className="mt-1.5 font-display text-2xl font-extrabold text-hearth-50">4 players</p>
-          <p className="mt-1 text-xs text-dusk-200/80">
-            you + 3 bots in solo · every chair filled for friend rooms
-          </p>
+        <div className="panel-soft flex flex-wrap items-center justify-between gap-4 p-4">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-dusk-200">Seats</p>
+            <p className="mt-1.5 font-display text-2xl font-extrabold text-hearth-50">4 players</p>
+            <p className="mt-1 text-xs text-dusk-200/80">
+              you + 3 bots in solo · every chair filled for friend rooms
+            </p>
+          </div>
+          <BotDifficultyPicker value={botTier} onChange={setBotTier} />
         </div>
 
         <RuleSettings

@@ -19,7 +19,7 @@ function clampSeats(value: number): SeatCount {
   return 4;
 }
 
-function clampBotTier(value: number): BotTier {
+export function clampBotTier(value: number): BotTier {
   return value === 1 || value === 2 || value === 3 ? value : 2;
 }
 

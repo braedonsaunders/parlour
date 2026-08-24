@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { blitzHowToPlay } from '@parlour/game-blitz';
 import { HowToPlayButton } from '@/components/HowToPlay';
+import { BotDifficultyPicker } from '@/components/setup/BotDifficultyPicker';
 import { useCenteredCarousel } from '@/hooks/useCenteredCarousel';
 import { GameArt } from '@/components/GameArt';
 import { getGame } from '@/lib/games';
@@ -14,12 +15,6 @@ import styles from '@/styles/modes.module.css';
 import gameStyles from '@/styles/games.module.css';
 
 const SEAT_OPTIONS = getGame('blitz').seats;
-const TIERS = [
-  { tier: 1, label: 'Easy' },
-  { tier: 2, label: 'Medium' },
-  { tier: 3, label: 'Hard' },
-] as const;
-
 export default function ModeSelectPage() {
   const router = useRouter();
   const mode = useSetupStore((s) => s.mode);
@@ -80,12 +75,7 @@ export default function ModeSelectPage() {
             onPick={(raw) => setSeats(Number(raw))}
             hint={`you + ${seats - 1} bot${seats > 2 ? 's' : ''}`}
           />
-          <Stepper
-            label="Bot skill"
-            value={TIERS.find((t) => t.tier === botTier)!.label}
-            options={TIERS.map((t) => t.label)}
-            onPick={(label) => setBotTier(TIERS.find((t) => t.label === label)!.tier)}
-          />
+          <BotDifficultyPicker value={botTier} onChange={setBotTier} />
         </div>
 
         <button

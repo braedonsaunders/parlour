@@ -15,8 +15,8 @@ export const wildpileCatalog: GameCatalogEntry<WildpileRules> = {
   subtitle: 'the shedding game',
   tagline: 'Shed every card',
   description:
-    'A 108-card riot of skips, reverses, draw-fours and jump-ins. Same warm table, a much louder deck.',
-  facts: ['2–4 players', 'action cards', 'solo or friends'],
+    'A 112-card riot of skips, reverses, draw-fours, color dumps and jump-ins. Same warm table, a much louder deck.',
+  facts: ['2–4 players', 'timed deal', 'solo or friends'],
   accent: '#c8566b',
   shade: '#7c2c3e',
   art: [
@@ -37,7 +37,7 @@ export const wildpileCatalog: GameCatalogEntry<WildpileRules> = {
       name: 'Classic',
       tagline: 'By the book',
       description:
-        'Match the color or the number, shed every card. No stacking, no jump-ins — a polite riot.',
+        'Match the color or the number, then drop a whole color at once. No stacking, no jump-ins — a polite riot.',
       facts: ['one deal', 'no stacking', '~5 min'],
       accent: '#4ba1ba',
       shade: '#25586e',

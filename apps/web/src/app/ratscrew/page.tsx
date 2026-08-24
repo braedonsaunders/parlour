@@ -8,6 +8,7 @@ import { GameArt } from '@/components/GameArt';
 import { getGame } from '@/lib/games';
 import { HowToPlayButton } from '@/components/HowToPlay';
 import { RuleSettings } from '@/components/settings/RuleSettings';
+import { BotDifficultyPicker } from '@/components/setup/BotDifficultyPicker';
 import { useCenteredCarousel } from '@/hooks/useCenteredCarousel';
 import { RATSCREW_MODES } from '@/lib/ratscrew/modes';
 import { useRatscrewSetupStore, ratscrewRulesFor } from '@/stores/ratscrewSetup';
@@ -20,8 +21,10 @@ export default function RatscrewSetupPage() {
   const router = useRouter();
   const mode = useRatscrewSetupStore((s) => s.mode);
   const seats = useRatscrewSetupStore((s) => s.seats);
+  const botTier = useRatscrewSetupStore((s) => s.botTier);
   const setMode = useRatscrewSetupStore((s) => s.setMode);
   const setSeats = useRatscrewSetupStore((s) => s.setSeats);
+  const setBotTier = useRatscrewSetupStore((s) => s.setBotTier);
   const overrides = useRatscrewSetupStore((s) => s.overrides);
   const setRule = useRatscrewSetupStore((s) => s.setRule);
   const resetRules = useRatscrewSetupStore((s) => s.resetRules);
@@ -93,6 +96,7 @@ export default function RatscrewSetupPage() {
               you + {seats - 1} bot{seats > 2 ? 's' : ''} with real reflexes
             </p>
           </div>
+          <BotDifficultyPicker value={botTier} onChange={setBotTier} />
         </div>
 
         <RuleSettings

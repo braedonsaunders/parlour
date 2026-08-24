@@ -73,6 +73,7 @@ export function dropEffectsForFx(
 
   return fx.flatMap((event, index): DropEffect[] => {
     if (event.kind !== Fx.DiscardCard && event.kind !== Fx.FlipCard) return [];
+    if (payloadOf(event)?.passive === true) return [];
     const card = cardOf(event);
     if (!card) return [];
     const effect = pack.effectFor(card);
@@ -86,6 +87,13 @@ export function dropEffectsForFx(
       },
     ];
   });
+}
+
+function payloadOf(event: FxEvent): Record<string, unknown> | null {
+  if (typeof event.payload !== 'object' || event.payload === null || Array.isArray(event.payload)) {
+    return null;
+  }
+  return event.payload as Record<string, unknown>;
 }
 
 function cardOf(event: FxEvent): string | null {

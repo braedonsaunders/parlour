@@ -6,18 +6,13 @@ import { useState } from 'react';
 import { ginHowToPlay } from '@parlour/game-gin';
 import { HowToPlayButton } from '@/components/HowToPlay';
 import { RuleSettings } from '@/components/settings/RuleSettings';
+import { BotDifficultyPicker } from '@/components/setup/BotDifficultyPicker';
 import { useCenteredCarousel } from '@/hooks/useCenteredCarousel';
 import { getGame } from '@/lib/games';
 import { GIN_MODES, type GinModeDef } from '@/lib/gin/modes';
 import { useGinSetupStore, ginRulesFor } from '@/stores/ginSetup';
 import styles from '@/styles/modes.module.css';
 import gameStyles from '@/styles/games.module.css';
-
-const TIERS = [
-  { tier: 1, label: 'Easy' },
-  { tier: 2, label: 'Medium' },
-  { tier: 3, label: 'Hard' },
-] as const;
 
 export default function GinSetupPage() {
   const router = useRouter();
@@ -81,26 +76,7 @@ export default function GinSetupPage() {
             </p>
             <p className="mt-1 text-xs text-dusk-200/80">you + one bot</p>
           </div>
-          <div>
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-dusk-200">Bot skill</p>
-            <div className="mt-1.5 flex items-center gap-2" role="group" aria-label="Bot skill">
-              {TIERS.map((tier) => (
-                <button
-                  key={tier.tier}
-                  type="button"
-                  aria-pressed={tier.tier === botTier}
-                  onClick={() => setBotTier(tier.tier)}
-                  className={`rounded-fat border-2 px-3.5 py-1.5 font-display text-sm font-extrabold transition-transform duration-150 ease-pop hover:-translate-y-0.5 ${
-                    tier.tier === botTier
-                      ? 'border-hearth-700 bg-gradient-to-b from-hearth-300 to-hearth-500 text-hearth-900'
-                      : 'border-dusk-700/60 bg-dusk-950/70 text-dusk-100'
-                  }`}
-                >
-                  {tier.label}
-                </button>
-              ))}
-            </div>
-          </div>
+          <BotDifficultyPicker value={botTier} onChange={setBotTier} />
         </div>
 
         <RuleSettings

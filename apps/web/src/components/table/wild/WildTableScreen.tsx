@@ -12,7 +12,6 @@ import { AnimatePresence, motion } from 'motion/react';
 import { getAvatar } from '@/lib/avatars';
 import { WILDPILE_SFX_PACK } from '@/lib/audio/sfx';
 import { useMatchTension } from '@/lib/audio/tension';
-import { WILD_MATCH_PACE_MS } from '@/lib/wild/modes';
 import { useMusicMood } from '@/stores/audio';
 import { type DealPresentation, useDealPresentation } from '@/lib/table/deal-presentation';
 import { buildFxTimeline, type FxCue } from '@/lib/table/fx-motion';
@@ -54,6 +53,11 @@ export type WildTableScreenProps = {
   onChooseTarget?: (seat: number) => void;
   onPass?: () => void;
   onChallengeDrawFour?: () => void;
+  /** Authority deadline for the configurable match clock. */
+  matchEndsAt?: number;
+  /** Duration and replay-derived key for the current seat's visible decision clock. */
+  turnDurationMs?: number;
+  turnClockKey?: string | number;
   /** Fired only after the player confirms quitting from the shared table menu. */
   onQuit?: () => void;
 };
@@ -62,6 +66,7 @@ export function WildTableScreen(props: WildTableScreenProps) {
   const { view, error } = props;
   const rootRef = useRef<HTMLElement>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [clockNow, setClockNow] = useState(() => Date.now());
   const deal = useDealPresentation(props.fx, props.fxKey);
   useTableAudio(props.fx, props.fxKey, WILDPILE_SFX_PACK.id);
 
@@ -73,13 +78,28 @@ export function WildTableScreen(props: WildTableScreenProps) {
   );
   const pickupCount = useWildPickupCount(pickup, props.fxKey);
 
-  // The pile has no clock, so the tense cue rides Wild's five-minute pace and
-  // comes in for the closing minute; it releases when the hand is over.
-  const tense = useMatchTension({
-    expectedMs: WILD_MATCH_PACE_MS,
+  // Real Wild tables use the authority deadline. The fallback keeps isolated
+  // story/tests musical even when they render the screen without a transport.
+  const fallbackTense = useMatchTension({
+    expectedMs: 300_000,
     running: Boolean(view) && view?.activeSeat !== null,
   });
+  const remainingMs =
+    props.matchEndsAt === undefined ? null : Math.max(0, props.matchEndsAt - clockNow);
+  const finalMinute = remainingMs !== null && remainingMs <= 60_000;
+  const tense =
+    remainingMs === null ? fallbackTense : Boolean(view?.activeSeat !== null && finalMinute);
   useMusicMood(tense ? 'tense' : null);
+
+  useEffect(() => {
+    if (props.matchEndsAt === undefined || !view || view.activeSeat === null) {
+      return;
+    }
+    const sync = () => setClockNow(Date.now());
+    sync();
+    const timer = window.setInterval(sync, 1_000);
+    return () => window.clearInterval(timer);
+  }, [props.matchEndsAt, view, view?.activeSeat]);
 
   useEffect(() => {
     const gameWindow = window as Window & { render_game_to_text?: () => string };
@@ -143,6 +163,13 @@ export function WildTableScreen(props: WildTableScreenProps) {
           <span className={tableStyles.eyebrow}>Wild</span>
           <strong>{view.phaseLabel}</strong>
         </div>
+        {props.turnDurationMs !== undefined && view.activeSeat !== null && (
+          <TurnClock
+            key={props.turnClockKey}
+            durationMs={props.turnDurationMs}
+            mine={view.activeSeat === view.localSeat}
+          />
+        )}
         <button
           type="button"
           className={`${tableStyles.menuButton} btn-fat btn-fat--ghost`}
@@ -168,6 +195,9 @@ export function WildTableScreen(props: WildTableScreenProps) {
           />
         ))}
         <TableBadges view={view} />
+        {finalMinute && remainingMs !== null && (
+          <LiveStandings players={view.players} remainingMs={remainingMs} />
+        )}
         <Piles view={view} busy={localBusy} onDraw={props.onDraw} deal={deal} />
         <LocalHand view={view} busy={localBusy} onPlay={props.onPlay} deal={deal} />
         <WildFxLayer
@@ -262,6 +292,58 @@ export function WildTableScreen(props: WildTableScreenProps) {
       />
     </main>
   );
+}
+
+function LiveStandings({
+  players,
+  remainingMs,
+}: {
+  players: readonly WildSeatView[];
+  remainingMs: number;
+}) {
+  const ordered = [...players].sort(
+    (left, right) => left.handCount - right.handCount || left.seat - right.seat,
+  );
+  const seconds = Math.ceil(remainingMs / 1_000);
+  return (
+    <aside className={`${wildStyles.liveStandings} panel-soft`} aria-label="Live standings">
+      <strong>{seconds}s left</strong>
+      <ol>
+        {ordered.map((player, index) => (
+          <li key={player.seat} data-local={player.isLocal || undefined}>
+            <span>{ordinal(index + 1)}</span>
+            <b>{player.isLocal ? 'You' : player.name}</b>
+            <small>{player.handCount} cards</small>
+          </li>
+        ))}
+      </ol>
+    </aside>
+  );
+}
+
+function TurnClock({ durationMs, mine }: { durationMs: number; mine: boolean }) {
+  const [remainingMs, setRemainingMs] = useState(durationMs);
+
+  useEffect(() => {
+    const startedAt = Date.now();
+    const sync = () => setRemainingMs(Math.max(0, durationMs - (Date.now() - startedAt)));
+    const timer = window.setInterval(sync, 250);
+    return () => window.clearInterval(timer);
+  }, [durationMs]);
+
+  return (
+    <div className={`${wildStyles.turnClock} pill-soft`} aria-label="Turn clock">
+      <span>{mine ? 'Your clock' : 'Turn clock'}</span>
+      <strong>{Math.ceil(remainingMs / 1_000)}s</strong>
+    </div>
+  );
+}
+
+function ordinal(place: number): string {
+  if (place === 1) return '1st';
+  if (place === 2) return '2nd';
+  if (place === 3) return '3rd';
+  return `${place}th`;
 }
 
 /** The loudest call landing on a seat, for the stamp pinned over their avatar. */
@@ -731,10 +813,17 @@ function WildFxLayer({
 }
 
 function Cue({ cue, localSeat }: { cue: FxCue; localSeat: number }) {
-  if (cue.type === 'deal' || cue.type === 'flip' || cue.type === 'draw' || cue.type === 'discard') {
+  if (
+    cue.type === 'deal' ||
+    cue.type === 'flip' ||
+    cue.type === 'draw' ||
+    cue.type === 'discard' ||
+    cue.type === 'transfer'
+  ) {
     const faceDown =
       (cue.type === 'deal' && cue.to !== `hand:${localSeat}` && cue.to !== 'discard') ||
-      (cue.type === 'draw' && cue.to !== `hand:${localSeat}`);
+      (cue.type === 'draw' && cue.to !== `hand:${localSeat}`) ||
+      (cue.type === 'transfer' && cue.from !== `hand:${localSeat}`);
     return (
       <div data-fx-cue={cue.id} data-card-flight className={tableStyles.flyingCard}>
         <i className={tableStyles.cardTrail} />

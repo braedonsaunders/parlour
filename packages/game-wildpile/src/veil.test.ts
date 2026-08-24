@@ -82,6 +82,31 @@ describe('wildpile under Veil', () => {
     expect(state.hands[1]!.every((card) => card.startsWith('v#'))).toBe(true);
   });
 
+  it('opens and drops every matching-color card carried by Drop All', () => {
+    const { session } = veiled();
+    const state = session.state as WildpileState;
+    const [dropHandle, numberHandle, keepHandle] = state.hands[0]!;
+    const outcome = sessionApply(
+      wildpileGame,
+      session,
+      0,
+      'playCard',
+      { card: 'red-discard-all-0' },
+      {
+        reveals: [
+          [dropHandle!, 'red-discard-all-0'],
+          [numberHandle!, 'red-9-0'],
+          [keepHandle!, 'blue-9-0'],
+        ],
+      },
+    );
+
+    expect(outcome.rejected).toBeUndefined();
+    const dropped = outcome.session.state as WildpileState;
+    expect(dropped.discard.slice(0, 2)).toEqual(['red-discard-all-0', 'red-9-0']);
+    expect(dropped.hands[0]).toContain('blue-9-0');
+  });
+
   it('refuses a play whose opened card does not match the pile', () => {
     const { session } = veiled();
     const handle = (session.state as WildpileState).hands[0]![0]!;

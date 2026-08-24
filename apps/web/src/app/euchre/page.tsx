@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { GameArt } from '@/components/GameArt';
+import { BotDifficultyPicker } from '@/components/setup/BotDifficultyPicker';
 import { useCenteredCarousel } from '@/hooks/useCenteredCarousel';
 import { EUCHRE_MODES, type EuchreModeDef } from '@/lib/euchre/modes';
 import { getGameMode } from '@/lib/games';
@@ -13,7 +14,9 @@ import styles from '@/styles/modes.module.css';
 export default function EuchreSetupPage() {
   const router = useRouter();
   const mode = useEuchreSetupStore((s) => s.mode);
+  const botTier = useEuchreSetupStore((s) => s.botTier);
   const setMode = useEuchreSetupStore((s) => s.setMode);
+  const setBotTier = useEuchreSetupStore((s) => s.setBotTier);
   const [starting, setStarting] = useState(false);
   const carouselRef = useCenteredCarousel(mode);
 
@@ -69,9 +72,7 @@ export default function EuchreSetupPage() {
               friends
             </p>
           </div>
-          <span className="pill-soft font-display text-sm font-extrabold" aria-hidden="true">
-            ♠♥ · ♦♣
-          </span>
+          <BotDifficultyPicker value={botTier} onChange={setBotTier} />
         </div>
 
         <div className="mx-auto flex w-full max-w-xl flex-wrap justify-center gap-3">

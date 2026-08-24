@@ -40,6 +40,7 @@ export default function EuchreTablePage() {
 
 function SoloEuchreTablePage() {
   const mode = useEuchreSetupStore((state) => state.mode);
+  const botTier = useEuchreSetupStore((state) => state.botTier);
   const name = useProfileStore((state) => state.name);
   const avatarId = useProfileStore((state) => state.avatarId);
   const [transport, setTransport] = useState<EuchreTransport | null>(null);
@@ -51,11 +52,12 @@ function SoloEuchreTablePage() {
           mode,
           seed: Date.now() | 0,
           player: { name, avatarId },
+          botTier,
         }),
       );
     }, 0);
     return () => window.clearTimeout(timer);
-  }, [avatarId, mode, name]);
+  }, [avatarId, botTier, mode, name]);
 
   if (!transport) return <EuchreTableScreen view={null} fx={[]} fxKey="loading" />;
   return <ActiveSoloEuchreTable transport={transport} />;

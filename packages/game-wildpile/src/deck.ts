@@ -12,15 +12,16 @@ export const WILDPILE_COLORS = ['red', 'yellow', 'green', 'blue'] as const;
 export type WildpileColor = (typeof WILDPILE_COLORS)[number];
 
 /**
- * Every face the pile can hold. The first six make up the standard 108-card
- * deck; the two swap wilds are the optional extras dealt in when the table
- * turns on hand-swapping.
+ * Every face the pile can hold. The first seven make up Wild's 112-card deck;
+ * the two swap wilds are the optional extras dealt in when the table turns on
+ * hand-swapping.
  */
 export type WildpileKind =
   | 'number'
   | 'skip'
   | 'reverse'
   | 'draw-two'
+  | 'discard-all'
   | 'wild'
   | 'wild-draw-four'
   | 'wild-swap'
@@ -90,6 +91,13 @@ for (const color of WILDPILE_COLORS) {
       });
     }
   }
+
+  add(`${color}-discard-all-0`, {
+    label: `${color} drop all`,
+    short: 'ALL',
+    color,
+    meta: { kind: 'discard-all' },
+  });
 }
 
 for (let copy = 0; copy < 4; copy++) {
@@ -127,7 +135,7 @@ export const wildpileDeck: DeckDef = {
   faces,
 };
 
-/** The 108 cards every Wild table deals, without the optional swap wilds. */
+/** The 112 cards every Wild table deals, without the optional swap wilds. */
 export const WILDPILE_BASE_CARD_IDS: readonly CardId[] = baseCardIds;
 
 /** The four optional swap wilds, dealt in only when the table enables them. */
@@ -176,6 +184,7 @@ const HAND_KIND_ORDER: Readonly<Record<WildpileKind, number>> = {
   skip: 10,
   reverse: 11,
   'draw-two': 12,
+  'discard-all': 13,
   wild: 0,
   'wild-draw-four': 1,
   'wild-swap': 2,

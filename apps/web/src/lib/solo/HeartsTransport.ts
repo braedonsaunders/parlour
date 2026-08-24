@@ -15,6 +15,7 @@ import {
 } from '@parlour/engine';
 import {
   createHeartsMatchDef,
+  HEARTS_BOTS,
   heartsConfigSchema,
   heartsPersona,
   type HeartsMatchState,
@@ -22,6 +23,7 @@ import {
   type HeartsState,
 } from '@parlour/game-hearts';
 import type { HeartsModeId } from '@/lib/hearts/modes';
+import type { BotTier } from '@/stores/setup';
 
 /** House opponents — personas map onto the shared avatar cast. */
 const SEAT_PERSONAS = ['rose', 'flint', 'dove'] as const;
@@ -68,7 +70,9 @@ export class HeartsTransport {
     mode: HeartsModeId;
     seed: number;
     player: { name: string; avatarId: string };
+    botTier?: BotTier;
   };
+  private readonly policy;
   private session: HeartsMatchSession;
 
   constructor(options: {
@@ -77,8 +81,10 @@ export class HeartsTransport {
     config?: HeartsRules;
     seed: number;
     player: { name: string; avatarId: string };
+    botTier?: BotTier;
   }) {
     this.options = options;
+    this.policy = HEARTS_BOTS[(options.botTier ?? 2) - 1]!;
     this.session = createMatch(this.matchDef, {
       seed: options.seed | 0,
       config: options.config ?? applyPreset(heartsConfigSchema, options.mode),
@@ -123,7 +129,7 @@ export class HeartsTransport {
     const pending = this.pendingBotSeat();
     if (pending === null) return this.reject('not-bot-turn', 'no bot is currently deciding');
     const [seat] = pending;
-    const policy = heartsPersona(SEAT_PERSONAS[seat - 1] ?? 'flint').bot;
+    const policy = this.policy;
     const state = this.session.round.state;
     const legal =
       this.matchDef.game.flow.legalMovesFor?.(state, this.session.round.phase, seat) ?? [];

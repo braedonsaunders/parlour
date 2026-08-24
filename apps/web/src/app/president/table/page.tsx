@@ -37,6 +37,7 @@ function SoloPresidentTablePage() {
   const mode = usePresidentSetupStore((state) => state.mode);
   const seats = usePresidentSetupStore((state) => state.seats);
   const overrides = usePresidentSetupStore((state) => state.overrides);
+  const botTier = usePresidentSetupStore((state) => state.botTier);
   const name = useProfileStore((state) => state.name);
   const avatarId = useProfileStore((state) => state.avatarId);
   const [transport, setTransport] = useState<PresidentTransport | null>(null);
@@ -50,11 +51,12 @@ function SoloPresidentTablePage() {
           seats,
           seed: Date.now() | 0,
           player: { name, avatarId },
+          botTier,
         }),
       );
     }, 0);
     return () => window.clearTimeout(timer);
-  }, [avatarId, mode, name, overrides, seats]);
+  }, [avatarId, botTier, mode, name, overrides, seats]);
 
   if (!transport) return <PresidentTableScreen view={null} fx={[]} fxKey="loading" />;
   return <ActivePresidentTable transport={transport} />;

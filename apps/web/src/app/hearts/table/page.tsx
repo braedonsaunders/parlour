@@ -40,6 +40,7 @@ export default function HeartsTablePage() {
 function SoloHeartsTablePage() {
   const mode = useHeartsSetupStore((state) => state.mode);
   const overrides = useHeartsSetupStore((state) => state.overrides);
+  const botTier = useHeartsSetupStore((state) => state.botTier);
   const name = useProfileStore((state) => state.name);
   const avatarId = useProfileStore((state) => state.avatarId);
   const [transport, setTransport] = useState<HeartsTransport | null>(null);
@@ -52,11 +53,12 @@ function SoloHeartsTablePage() {
           mode,
           seed: Date.now() | 0,
           player: { name, avatarId },
+          botTier,
         }),
       );
     }, 0);
     return () => window.clearTimeout(timer);
-  }, [avatarId, mode, name, overrides]);
+  }, [avatarId, botTier, mode, name, overrides]);
 
   if (!transport) return <HeartsTableScreen view={null} fx={[]} fxKey="loading" />;
   return <ActiveSoloHeartsTable transport={transport} />;

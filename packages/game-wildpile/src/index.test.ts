@@ -1,4 +1,5 @@
 import {
+  Fx,
   applyPreset,
   createFx,
   createSession,
@@ -6,6 +7,7 @@ import {
   runBotGame,
   replaySession,
   sessionApply,
+  sessionInject,
   stateHash,
   type GameSession,
 } from '@parlour/engine';
@@ -18,6 +20,8 @@ import {
   wildpileConfig,
   wildpileDeck,
   wildpileGame,
+  wildpileTierBot,
+  WILDPILE_BOTS,
   type WildpileState,
 } from './index';
 
@@ -52,6 +56,7 @@ function fixture(overrides: Partial<WildpileState> = {}): GameSession<WildpileSt
     challenge: null,
     calledLastCard: [false, false, false],
     winner: null,
+    timeoutRankings: null,
     rules: defaults,
     veiled: false,
     ...overrides,
@@ -65,12 +70,17 @@ function fixture(overrides: Partial<WildpileState> = {}): GameSession<WildpileSt
 }
 
 describe('wildpile deck and setup', () => {
-  it('defines the complete 108-card standard deck plus the optional swap wilds', () => {
+  it('ships one policy per shared difficulty tier', () => {
+    expect(WILDPILE_BOTS.map((bot) => bot.tier)).toEqual([1, 2, 3]);
+    expect([1, 2, 3].map((tier) => wildpileTierBot(tier as 1 | 2 | 3).tier)).toEqual([1, 2, 3]);
+  });
+
+  it('defines the complete 112-card Wild deck plus the optional swap wilds', () => {
     expect(GAME_ID).toBe('wildpile');
-    expect(WILDPILE_BASE_CARD_IDS).toHaveLength(108);
+    expect(WILDPILE_BASE_CARD_IDS).toHaveLength(112);
     expect(WILDPILE_SWAP_CARD_IDS).toHaveLength(4);
-    expect(wildpileDeck.cardIds).toHaveLength(112);
-    expect(new Set(wildpileDeck.cardIds)).toHaveLength(112);
+    expect(wildpileDeck.cardIds).toHaveLength(116);
+    expect(new Set(wildpileDeck.cardIds)).toHaveLength(116);
     expect(
       Object.values(wildpileDeck.faces).filter((face) => face.meta?.kind === 'wild'),
     ).toHaveLength(4);
@@ -83,13 +93,16 @@ describe('wildpile deck and setup', () => {
     expect(
       Object.values(wildpileDeck.faces).filter((face) => face.meta?.kind === 'wild-shuffle'),
     ).toHaveLength(2);
+    expect(
+      Object.values(wildpileDeck.faces).filter((face) => face.meta?.kind === 'discard-all'),
+    ).toHaveLength(4);
   });
 
   it('deals seven each, starts on a number, emits deal fx, and is seed-stable', () => {
     const a = createSession(wildpileGame, { seed: 2026, config: defaults, seats: 4 });
     const b = createSession(wildpileGame, { seed: 2026, config: defaults, seats: 4 });
     expect(a.state.hands.map((hand) => hand.length)).toEqual([7, 7, 7, 7]);
-    expect(a.state.stock).toHaveLength(79);
+    expect(a.state.stock).toHaveLength(83);
     expect(wildpileDeck.faces[a.state.discard[0] as string]?.meta?.kind).toBe('number');
     expect(a.setupFx).toHaveLength(29);
     expect(stateHash(a.state)).toBe(stateHash(b.state));
@@ -274,6 +287,71 @@ describe('wildpile moves and flow', () => {
     expect(stacked.session.log.at(-1)).toMatchObject({ move: 'draw', seat: 1, automatic: true });
   });
 
+  it('drops every card of its color under Drop All without firing swept actions', () => {
+    const dropped = sessionApply(
+      wildpileGame,
+      fixture({
+        rules: { ...defaults, jumpIn: false },
+        hands: [
+          [card('discard-all'), card('2'), card('skip'), card('4', 'blue'), card('6', 'green')],
+          [card('1')],
+          [card('2')],
+        ],
+      }),
+      0,
+      'playCard',
+      { card: card('discard-all') },
+    );
+
+    expect(dropped.rejected).toBeUndefined();
+    expect(dropped.session.state.hands[0]).toEqual([card('4', 'blue'), card('6', 'green')]);
+    expect(dropped.session.state.discard.slice(0, 4)).toEqual([
+      card('discard-all'),
+      card('2'),
+      card('skip'),
+      card('3'),
+    ]);
+    expect(dropped.session.state.activeColor).toBe('red');
+    expect(dropped.session.state.turn).toBe(1);
+    expect(dropped.fx).toContainEqual({
+      kind: 'wildpile.discard-all',
+      payload: { seat: 0, color: 'red', amount: 3 },
+      at: 130,
+    });
+    expect(dropped.fx.filter((event) => event.kind === Fx.DiscardCard)).toHaveLength(3);
+    expect(dropped.fx.some((event) => event.kind === 'wildpile.skip')).toBe(false);
+  });
+
+  it('can go out on Drop All and offers last-card protection for a partial dump', () => {
+    const winner = sessionApply(
+      wildpileGame,
+      fixture({
+        rules: { ...defaults, jumpIn: false },
+        hands: [[card('discard-all'), card('8')], [card('1')], [card('2')]],
+      }),
+      0,
+      'playCard',
+      { card: card('discard-all') },
+    );
+    expect(winner.session.state.hands[0]).toEqual([]);
+    expect(winner.session.result?.winner).toBe(0);
+
+    const needsCall = fixture({
+      rules: { ...defaults, jumpIn: false },
+      hands: [[card('discard-all'), card('8'), card('4', 'blue')], [card('1')], [card('2')]],
+    });
+    expect(
+      wildpileGame.flow.legalMoves(needsCall.state, needsCall.phase).map((move) => move.id),
+    ).toContain('callLastCard');
+    const armed = sessionApply(wildpileGame, needsCall, 0, 'callLastCard').session;
+    const dropped = sessionApply(wildpileGame, armed, 0, 'playCard', {
+      card: card('discard-all'),
+    });
+    expect(dropped.session.state.hands[0]).toEqual([card('4', 'blue')]);
+    expect(dropped.fx).toContainEqual({ kind: 'wildpile.last-card', payload: { seat: 0 } });
+    expect(dropped.fx.some((event) => event.kind === 'wildpile.caught')).toBe(false);
+  });
+
   it('requires a color sub-decision after a wild and applies draw-four stacking rules', () => {
     const wildSession = fixture({
       hands: [[card('wild'), card('6', 'green')], [card('1')], [card('2')]],
@@ -409,6 +487,15 @@ describe('wildpile moves and flow', () => {
     ]);
     expect(taken.session.state.hands[1]).toEqual([card('6', 'green'), card('5', 'blue')]);
     expect(taken.session.state.turn).toBe(1);
+    expect(
+      taken.fx.filter((event) => event.kind === 'wildpile.transfer').map((event) => event.payload),
+    ).toEqual([
+      { card: card('6', 'green'), from: 'hand:0', to: 'hand:1', dur: 240 },
+      { card: card('1'), from: 'hand:1', to: 'hand:0', dur: 240 },
+      { card: card('5', 'blue'), from: 'hand:0', to: 'hand:1', dur: 240 },
+      { card: card('2', 'blue'), from: 'hand:1', to: 'hand:0', dur: 240 },
+      { card: card('4', 'green'), from: 'hand:1', to: 'hand:0', dur: 240 },
+    ]);
 
     const rotated = sessionApply(
       wildpileGame,
@@ -429,6 +516,48 @@ describe('wildpile moves and flow', () => {
     expect(rotated.session.state.hands[1]).toEqual([card('6', 'green'), card('5', 'blue')]);
     expect(rotated.session.state.hands[2]).toEqual([card('1')]);
     expect(rotated.session.state.hands[0]).toHaveLength(3);
+    expect(rotated.fx.filter((event) => event.kind === 'wildpile.transfer')).toHaveLength(6);
+  });
+
+  it('logs turn and match clock expiry, auto-plays, and ranks hands still holding cards', () => {
+    const turn = sessionInject(
+      wildpileGame,
+      fixture(),
+      'timeout',
+      { kind: 'turn', actor: 0 },
+      {
+        atMs: defaults.turnTimeSeconds * 1_000,
+      },
+    );
+    expect(turn.rejected).toBeUndefined();
+    expect(turn.events[0]).toMatchObject({ move: 'timeout', injected: true });
+    expect(turn.fx.some((event) => event.kind === 'wildpile.turn-timeout')).toBe(true);
+    expect(turn.session.state.hands[0]).toHaveLength(1);
+
+    const early = sessionInject(
+      wildpileGame,
+      fixture(),
+      'timeout',
+      { kind: 'match' },
+      {
+        atMs: defaults.matchTimeMinutes * 60_000 - 1,
+      },
+    );
+    expect(early.rejected?.code).toBe('match-clock-live');
+
+    const expired = sessionInject(
+      wildpileGame,
+      fixture(),
+      'timeout',
+      { kind: 'match' },
+      {
+        atMs: defaults.matchTimeMinutes * 60_000,
+      },
+    );
+    expect(expired.rejected).toBeUndefined();
+    expect(expired.session.status).toBe('ended');
+    expect(expired.session.result).toMatchObject({ winner: 2, reason: 'match-timeout' });
+    expect(expired.session.result?.rankings.map((entry) => entry.seat)).toEqual([2, 0, 1]);
   });
 
   it('keeps the turn after a voluntary draw lands something playable', () => {
@@ -664,14 +793,14 @@ describe('wildpile moves and flow', () => {
       ...session.state.discard,
     ];
     expect(inPlay(off).some((id) => WILDPILE_SWAP_CARD_IDS.includes(id))).toBe(false);
-    expect(inPlay(off)).toHaveLength(108);
+    expect(inPlay(off)).toHaveLength(112);
 
     const on = createSession(wildpileGame, {
       seed: 3,
       config: { ...defaults, swapCards: true },
       seats: 4,
     });
-    expect(inPlay(on)).toHaveLength(112);
+    expect(inPlay(on)).toHaveLength(116);
   });
 
   it('publishes all four legal wild colors', () => {

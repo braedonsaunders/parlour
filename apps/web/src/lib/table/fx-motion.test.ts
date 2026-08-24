@@ -75,6 +75,25 @@ describe('table fx timeline', () => {
     expect(discard).toMatchObject({ type: 'discard', from: 'hand:1', to: 'peg' });
   });
 
+  it('maps Wild hand exchanges onto the shared transfer flight', () => {
+    const [transfer] = buildFxTimeline([
+      {
+        kind: 'wildpile.transfer',
+        payload: { card: 'red-7-0', from: 'hand:0', to: 'hand:2', dur: 240 },
+        at: 62,
+      },
+    ]);
+
+    expect(transfer).toMatchObject({
+      type: 'transfer',
+      card: 'red-7-0',
+      from: 'hand:0',
+      to: 'hand:2',
+      startMs: 62,
+      durationMs: 240,
+    });
+  });
+
   it('holds the next actor until the final cue has landed and settled', () => {
     const events: FxEvent[] = [
       {

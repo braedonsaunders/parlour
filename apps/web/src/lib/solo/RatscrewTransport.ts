@@ -17,13 +17,7 @@ import {
   type RatscrewState,
 } from '@parlour/game-ratscrew';
 import { ratscrewModeForRules } from '@/lib/ratscrew/modes';
-
-/** House opponents — reflex personas, one tier step apart around the table. */
-const RATSCREW_BOTS = [
-  { personaId: 'quinn', name: 'Quinn', avatarId: 'quinn' },
-  { personaId: 'bolt', name: 'Bolt', avatarId: 'bolt' },
-  { personaId: 'jinx', name: 'Jinx', avatarId: 'jinx' },
-] as const;
+import type { BotTier } from '@/stores/setup';
 
 export interface RatscrewPlayer {
   seat: number;
@@ -40,6 +34,7 @@ export interface RatscrewTransportOptions {
   player: { name: string; avatarId: string };
   /** test hook: virtual clock (ms) */
   now?: () => number;
+  botTier?: BotTier;
 }
 
 export interface RatscrewSnapshot {
@@ -102,11 +97,12 @@ export class RatscrewTransport {
       config: options.rules,
       seats: options.seats,
     });
+    const candidates = PERSONA_BY_TIER.filter(
+      (candidate) => candidate.tier === (options.botTier ?? 2),
+    );
+    if (candidates.length === 0) throw new Error('ratscrew ships no bot for that tier');
     for (let seat = 1; seat < options.seats; seat++) {
-      const bot = RATSCREW_BOTS[(seat - 1) % RATSCREW_BOTS.length]!;
-      const persona = PERSONA_BY_TIER.find((candidate) => candidate.id === bot.personaId);
-      if (!persona) throw new Error(`unknown ratscrew persona: ${bot.personaId}`);
-      this.personas.set(seat, persona);
+      this.personas.set(seat, candidates[(seat - 1) % candidates.length]!);
     }
     this.scheduleNext();
   }
@@ -329,8 +325,13 @@ export class RatscrewTransport {
         isBot: false,
       },
       ...Array.from({ length: this.seatCount - 1 }, (_, index) => {
-        const bot = RATSCREW_BOTS[index % RATSCREW_BOTS.length]!;
-        return { seat: index + 1, name: bot.name, avatarId: bot.avatarId, isBot: true };
+        const persona = this.personas.get(index + 1)!;
+        return {
+          seat: index + 1,
+          name: persona.label,
+          avatarId: persona.id === 'rusty' ? 'rust' : persona.id,
+          isBot: true,
+        };
       }),
     ];
   }

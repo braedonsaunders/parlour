@@ -7,6 +7,7 @@ import { presidentConfig, presidentHowToPlay } from '@parlour/game-president';
 import { GameArt } from '@/components/GameArt';
 import { HowToPlayButton } from '@/components/HowToPlay';
 import { RuleSettings } from '@/components/settings/RuleSettings';
+import { BotDifficultyPicker } from '@/components/setup/BotDifficultyPicker';
 import { useCenteredCarousel } from '@/hooks/useCenteredCarousel';
 import { getGame } from '@/lib/games';
 import { PRESIDENT_MODES, type PresidentModeDef } from '@/lib/president/modes';
@@ -20,8 +21,10 @@ export default function PresidentSetupPage() {
   const router = useRouter();
   const mode = usePresidentSetupStore((s) => s.mode);
   const seats = usePresidentSetupStore((s) => s.seats);
+  const botTier = usePresidentSetupStore((s) => s.botTier);
   const setMode = usePresidentSetupStore((s) => s.setMode);
   const setSeats = usePresidentSetupStore((s) => s.setSeats);
+  const setBotTier = usePresidentSetupStore((s) => s.setBotTier);
   const overrides = usePresidentSetupStore((s) => s.overrides);
   const setRule = usePresidentSetupStore((s) => s.setRule);
   const resetRules = usePresidentSetupStore((s) => s.resetRules);
@@ -93,6 +96,7 @@ export default function PresidentSetupPage() {
               you + {seats - 1} rivals — the full ladder, crowns included
             </p>
           </div>
+          <BotDifficultyPicker value={botTier} onChange={setBotTier} />
         </div>
 
         <RuleSettings

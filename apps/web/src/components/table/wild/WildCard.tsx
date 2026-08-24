@@ -95,7 +95,17 @@ function CardContents({ face, faceDown }: { face: WildpileFace | null; faceDown:
         {short}
       </span>
       <span className={wildStyles.pip} aria-hidden="true">
-        {face.meta.kind === 'wild' ? <small>WILD</small> : short}
+        {face.meta.kind === 'wild' ? (
+          <small>WILD</small>
+        ) : face.meta.kind === 'discard-all' ? (
+          <span className={wildStyles.dropAllMark}>
+            <i />
+            <i />
+            <strong>ALL</strong>
+          </span>
+        ) : (
+          short
+        )}
       </span>
     </>
   );

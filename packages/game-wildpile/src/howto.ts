@@ -3,7 +3,7 @@ import type { HowToPlayDoc } from '@parlour/engine';
 /** Player-facing instructions rendered verbatim by the app's help modal. */
 export const wildpileHowToPlay: HowToPlayDoc = {
   summary:
-    'A 108-card shedding riot — match the top of the pile, unleash action cards, and dump your hand first.',
+    'A 112-card shedding riot — match the top of the pile, unleash action cards, and dump your hand first.',
   objective:
     'Be the first player with no cards left. Action cards slow everyone else down — unless they fight back.',
   sections: [
@@ -20,6 +20,10 @@ export const wildpileHowToPlay: HowToPlayDoc = {
         { label: 'Skip', text: 'the next player loses their turn — and cannot jump back in' },
         { label: 'Reverse', text: 'play flips direction; head-to-head it hands you another turn' },
         { label: 'Draw Two', text: 'the next player picks up two and loses the turn' },
+        {
+          label: 'Drop All',
+          text: 'discard every card in your hand of its color beneath it; swept action cards do not fire',
+        },
         { label: 'Wild', text: 'play it anytime and call the next color' },
         { label: 'Wild Draw Four', text: 'call the color AND hand the next player four cards' },
         {
@@ -34,6 +38,23 @@ export const wildpileHowToPlay: HowToPlayDoc = {
       body: [
         'Down to two cards? Hit "Last card!" before you play. Reach one card without calling it and you are caught for two.',
         'Drawing puts you back above the line, so the call has to be made again.',
+      ],
+    },
+    {
+      heading: 'The clocks',
+      body: [
+        'Every turn is timed. If its clock reaches zero, the table makes a legal play for that player so the pile keeps moving.',
+        'The deal has a match clock too. During its final minute, live first-through-fourth places appear and update as hands change.',
+      ],
+      bullets: [
+        {
+          label: 'At match zero',
+          text: 'fewest cards wins; equal hand sizes are settled in seat order so every replay has one clear result',
+        },
+        {
+          label: 'Advanced options',
+          text: 'set the seconds per turn and total match minutes before the deal',
+        },
       ],
     },
     {
@@ -67,7 +88,7 @@ export const wildpileHowToPlay: HowToPlayDoc = {
     {
       heading: 'Winning',
       body: [
-        'Empty your hand to win the deal. Rankings follow how many cards everyone else was still holding when you went out.',
+        'Empty your hand to win before the match clock expires. Otherwise, the lightest remaining hand wins at zero.',
       ],
     },
   ],

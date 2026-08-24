@@ -1,6 +1,6 @@
 /* Wild deck skin + table furniture. Structural table classes (screen, seats,
    piles, hand fan, fx layer) come from table.module.css; only what the loud
-   108-card deck adds lives here. */
+   112-card deck adds lives here. */
 
 /* --- card faces ---------------------------------------------------------- */
 
@@ -49,6 +49,45 @@
 
 .pip small {
   font-size: 0.55em;
+}
+
+.dropAllMark {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 62%;
+  aspect-ratio: 0.9;
+  font-size: 0.28em;
+  letter-spacing: 0.04em;
+}
+
+.dropAllMark i {
+  position: absolute;
+  width: 72%;
+  height: 58%;
+  border: 2px solid rgba(255, 253, 246, 0.9);
+  border-radius: 0.22em;
+  background: rgba(70, 30, 24, 0.13);
+}
+
+.dropAllMark i:first-child {
+  translate: -18% -18%;
+}
+
+.dropAllMark i:nth-child(2) {
+  translate: 18% 18%;
+}
+
+.dropAllMark strong {
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 72%;
+  height: 58%;
+  border-radius: 0.22em;
+  background: rgba(255, 253, 246, 0.94);
+  color: rgba(34, 23, 18, 0.84);
+  text-shadow: none;
 }
 
 /* oval "table sticker" behind the center pip, like the reference deck */
@@ -633,6 +672,70 @@
   font-weight: 800;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+}
+
+.liveStandings {
+  position: absolute;
+  z-index: 8;
+  top: 4.6rem;
+  left: clamp(0.65rem, 2.5vw, 2rem);
+  width: min(12.5rem, 34vw);
+  padding: 0.65rem 0.75rem;
+  color: var(--paper-100);
+  pointer-events: none;
+}
+
+.liveStandings > strong {
+  display: block;
+  margin-bottom: 0.35rem;
+  color: #ffd17e;
+  font-family: var(--font-display), sans-serif;
+  font-size: 0.78rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.liveStandings ol {
+  display: grid;
+  gap: 0.22rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.liveStandings li {
+  display: grid;
+  grid-template-columns: 2rem 1fr auto;
+  gap: 0.35rem;
+  align-items: baseline;
+  font-size: 0.72rem;
+}
+
+.liveStandings li[data-local] {
+  color: #ffe3a8;
+}
+
+.liveStandings li span,
+.liveStandings li small {
+  color: rgba(255, 239, 211, 0.72);
+  font-size: 0.64rem;
+}
+
+.turnClock {
+  display: inline-flex;
+  gap: 0.45rem;
+  align-items: baseline;
+  margin-left: auto;
+  color: rgba(255, 239, 211, 0.78);
+  font-family: var(--font-display), sans-serif;
+  font-size: 0.66rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.turnClock strong {
+  color: #ffd17e;
+  font-size: 0.94rem;
 }
 
 @keyframes stockBeckon {

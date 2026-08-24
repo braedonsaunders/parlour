@@ -7,21 +7,12 @@ import { cribbageConfigSchema, cribbageHowToPlay } from '@parlour/game-cribbage'
 import { GameArt } from '@/components/GameArt';
 import { HowToPlayButton } from '@/components/HowToPlay';
 import { RuleSettings } from '@/components/settings/RuleSettings';
+import { BotDifficultyPicker } from '@/components/setup/BotDifficultyPicker';
 import { useCenteredCarousel } from '@/hooks/useCenteredCarousel';
 import { CRIBBAGE_MODES, type CribbageModeDef } from '@/lib/cribbage/modes';
-import {
-  cribbageRulesFor,
-  useCribbageSetupStore,
-  type CribbageBotTier,
-} from '@/stores/cribbageSetup';
+import { cribbageRulesFor, useCribbageSetupStore } from '@/stores/cribbageSetup';
 import modeStyles from '@/styles/modes.module.css';
 import gameStyles from '@/styles/games.module.css';
-
-const TIERS = [
-  { tier: 1, label: 'Rookie' },
-  { tier: 2, label: 'Regular' },
-  { tier: 3, label: 'Sharp' },
-] as const;
 
 export default function CribbageSetupPage() {
   const router = useRouter();
@@ -86,28 +77,7 @@ export default function CribbageSetupPage() {
             </p>
             <p className="text-xs text-dusk-200/80">dealer alternates every hand</p>
           </div>
-          <div>
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-dusk-200">
-              House player
-            </p>
-            <div className="mt-1.5 flex gap-2" role="group" aria-label="Bot skill">
-              {TIERS.map((option) => (
-                <button
-                  key={option.tier}
-                  type="button"
-                  aria-pressed={botTier === option.tier}
-                  onClick={() => setBotTier(option.tier as CribbageBotTier)}
-                  className={`rounded-fat border-2 px-3.5 py-1.5 font-display text-sm font-extrabold transition-transform duration-150 ease-pop hover:-translate-y-0.5 ${
-                    botTier === option.tier
-                      ? 'border-hearth-700 bg-gradient-to-b from-hearth-300 to-hearth-500 text-hearth-900'
-                      : 'border-dusk-700/60 bg-dusk-950/70 text-dusk-100'
-                  }`}
-                >
-                  {option.label}
-                </button>
-              ))}
-            </div>
-          </div>
+          <BotDifficultyPicker value={botTier} onChange={setBotTier} />
         </div>
 
         <RuleSettings

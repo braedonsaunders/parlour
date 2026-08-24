@@ -8,6 +8,7 @@ import { GameArt } from '@/components/GameArt';
 import { getGame } from '@/lib/games';
 import { HowToPlayButton } from '@/components/HowToPlay';
 import { RuleSettings } from '@/components/settings/RuleSettings';
+import { BotDifficultyPicker } from '@/components/setup/BotDifficultyPicker';
 import { useCenteredCarousel } from '@/hooks/useCenteredCarousel';
 import { WILD_MODES, type WildModeDef } from '@/lib/wild/modes';
 import { useWildSetupStore, wildRulesFor } from '@/stores/wildSetup';
@@ -20,8 +21,10 @@ export default function WildSetupPage() {
   const router = useRouter();
   const mode = useWildSetupStore((s) => s.mode);
   const seats = useWildSetupStore((s) => s.seats);
+  const botTier = useWildSetupStore((s) => s.botTier);
   const setMode = useWildSetupStore((s) => s.setMode);
   const setSeats = useWildSetupStore((s) => s.setSeats);
+  const setBotTier = useWildSetupStore((s) => s.setBotTier);
   const overrides = useWildSetupStore((s) => s.overrides);
   const setRule = useWildSetupStore((s) => s.setRule);
   const resetRules = useWildSetupStore((s) => s.resetRules);
@@ -93,6 +96,7 @@ export default function WildSetupPage() {
               you + {seats - 1} bot{seats > 2 ? 's' : ''}
             </p>
           </div>
+          <BotDifficultyPicker value={botTier} onChange={setBotTier} />
         </div>
 
         <RuleSettings

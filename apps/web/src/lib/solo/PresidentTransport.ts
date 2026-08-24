@@ -12,12 +12,14 @@ import {
 } from '@parlour/engine';
 import {
   presidentGame,
+  presidentBots,
   MIN_SEATS,
   MAX_SEATS,
   type PresidentRules,
   type PresidentState,
 } from '@parlour/game-president';
 import type { PresidentModeId } from '@/lib/president/modes';
+import type { BotTier } from '@/stores/setup';
 
 /** House opponents — names match the avatar cast so the table reads cohesively. */
 const PRESIDENT_BOTS = [
@@ -44,6 +46,7 @@ export interface PresidentTransportOptions {
   seats: number;
   seed: number;
   player: { name: string; avatarId: string };
+  botTier?: BotTier;
 }
 
 export interface PresidentSnapshot {
@@ -68,6 +71,7 @@ export interface PresidentDispatch {
 export class PresidentTransport {
   private readonly def = presidentGame;
   private readonly options: PresidentTransportOptions;
+  private readonly policy;
   private session: GameSession<PresidentState, PresidentRules>;
 
   constructor(options: PresidentTransportOptions) {
@@ -79,6 +83,7 @@ export class PresidentTransport {
       throw new Error(`president requires ${MIN_SEATS}–${MAX_SEATS} seats`);
     }
     this.options = options;
+    this.policy = presidentBots[(options.botTier ?? 2) - 1]!;
     this.session = createSession(this.def, {
       seed: options.seed | 0,
       config: options.rules ?? applyPreset(this.def.configSchema, options.mode),
@@ -117,8 +122,7 @@ export class PresidentTransport {
     if (this.session.status !== 'playing' || seat === null || seat === 0) {
       return this.reject('not-bot-turn', 'no bot is currently acting');
     }
-    const policy = this.def.bots[seat % this.def.bots.length] ?? this.def.bots[0];
-    if (!policy) throw new Error('president ships no bot policy');
+    const policy = this.policy;
     const legal = this.def.flow.legalMovesFor
       ? this.def.flow.legalMovesFor(this.session.state, this.session.phase, seat)
       : this.def.flow.legalMoves(this.session.state, this.session.phase);

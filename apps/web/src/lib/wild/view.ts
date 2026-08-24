@@ -145,6 +145,7 @@ export type WildAnnouncementKind =
   | 'skip'
   | 'reverse'
   | 'draw-stack'
+  | 'discard-all'
   | 'last-card'
   | 'swap'
   | 'rotate'
@@ -171,6 +172,7 @@ const ANNOUNCEMENT_ORDER: readonly WildAnnouncementKind[] = [
   'reverse',
   'skip',
   'draw-stack',
+  'discard-all',
   'shuffle-hands',
   'rotate',
   'swap',
@@ -225,6 +227,18 @@ export function wildAnnouncements(
         const amount = numberField(event, 'amount') ?? 0;
         return [
           { ...base, kind: 'draw-stack', seat: null, text: `+${amount}`, detail: 'Pick it up' },
+        ];
+      }
+      case 'wildpile.discard-all': {
+        const amount = numberField(event, 'amount') ?? 0;
+        const color = stringField(event, 'color') ?? 'matching';
+        return [
+          {
+            ...base,
+            kind: 'discard-all',
+            text: 'Drop all!',
+            detail: `${nameOf(seat)} shed ${amount} ${color} card${amount === 1 ? '' : 's'}`,
+          },
         ];
       }
       case 'wildpile.challenge': {

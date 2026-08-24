@@ -63,9 +63,13 @@ export function parlourCuesForFx(fx: readonly FxEvent[]): SoundCue[] {
 export function wildpileCuesForFx(fx: readonly FxEvent[]): SoundCue[] {
   const hasWild = fx.some((event) => event.kind === 'wildpile.wild');
   const hasActionCard = fx.some((event) =>
-    ['wildpile.wild', 'wildpile.reverse', 'wildpile.skip', 'wildpile.draw-stack'].includes(
-      event.kind,
-    ),
+    [
+      'wildpile.wild',
+      'wildpile.reverse',
+      'wildpile.skip',
+      'wildpile.draw-stack',
+      'wildpile.discard-all',
+    ].includes(event.kind),
   );
 
   return fx.flatMap((event) => {
@@ -100,6 +104,8 @@ export function wildpileCuesForFx(fx: readonly FxEvent[]): SoundCue[] {
           { id: voice, atMs: atMs + 320 },
         ];
       }
+      case 'wildpile.discard-all':
+        return [{ id: 'wildpile.wild.surge', atMs: atMs + 120 }];
       case 'wildpile.color': {
         const color = payloadString(event, 'color');
         const voice =

@@ -3,17 +3,20 @@ import { presidentConfig, type PresidentRules } from '@parlour/game-president';
 import { create } from 'zustand';
 import { getGameMode, modePreset } from '@/lib/games';
 import { isPresidentModeId, type PresidentModeId } from '@/lib/president/modes';
+import { clampBotTier, type BotTier } from '@/stores/setup';
 
 export const PRESIDENT_SEAT_OPTIONS = [4, 5, 6, 7, 8] as const;
 
 export type PresidentSetupState = {
   mode: PresidentModeId;
   seats: number;
+  botTier: BotTier;
   /** Per-key overrides layered on top of the selected mode's preset. */
   overrides: Partial<PresidentRules>;
   /** Takes the registry's string ids; anything unknown is ignored. */
   setMode: (mode: string) => void;
   setSeats: (seats: number) => void;
+  setBotTier: (tier: number) => void;
   setRule: (key: string, value: PresidentRules[string]) => void;
   resetRules: () => void;
 };
@@ -42,10 +45,12 @@ export function presidentRulesFor(
 export const usePresidentSetupStore = create<PresidentSetupState>()((set) => ({
   mode: 'classic',
   seats: 5,
+  botTier: 2,
   overrides: {},
   // Switching preset drops per-knob overrides: the tile you picked is the table.
   setMode: (mode) => set(isPresidentModeId(mode) ? { mode, overrides: {} } : {}),
   setSeats: (seats) => set({ seats: clampSeats(seats) }),
+  setBotTier: (tier) => set({ botTier: clampBotTier(tier) }),
   setRule: (key, value) =>
     set((state) => ({
       overrides: { ...state.overrides, [key]: value } as Partial<PresidentRules>,

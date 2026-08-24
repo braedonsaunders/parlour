@@ -30,6 +30,8 @@ export const WILD_DROP_EFFECTS: DropEffectPack = {
         return { shape: 'slash', color: tint, intensity: 0.75, glyph: '⊘' };
       case 'draw-two':
         return { shape: 'sparks', color: tint, intensity: 0.85, glyph: '+2' };
+      case 'discard-all':
+        return { shape: 'shockwave', color: tint, intensity: 1, glyph: 'ALL' };
       case 'wild-draw-four':
         return { shape: 'sparks', color: WILD_TINT, intensity: 1, glyph: '+4' };
       case 'wild':

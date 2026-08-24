@@ -4,15 +4,21 @@ import {
   createSession,
   makeRng,
   sessionApply,
+  sessionInject,
   type AppliedEvent,
   type FxEvent,
   type GameSession,
   type LegalMove,
   type RuleError,
 } from '@parlour/engine';
-import { wildpileGame, type WildpileRules, type WildpileState } from '@parlour/game-wildpile';
+import {
+  wildpileGame,
+  wildpileTierBot,
+  type WildpileRules,
+  type WildpileState,
+} from '@parlour/game-wildpile';
 import type { WildModeId } from '@/lib/wild/modes';
-import type { SeatCount } from '@/stores/setup';
+import type { BotTier, SeatCount } from '@/stores/setup';
 
 /** House opponents — names match the avatar cast so the table reads cohesively. */
 const WILD_BOTS = [
@@ -35,6 +41,9 @@ export interface WildTransportOptions {
   player: { name: string; avatarId: string };
   /** Fully resolved table rules. Defaults to the mode's preset when omitted. */
   rules?: WildpileRules;
+  botTier?: BotTier;
+  /** Test hook for replay-stable authority time. */
+  now?: () => number;
 }
 
 export interface WildSnapshot {
@@ -60,10 +69,17 @@ export interface WildDispatch {
 export class WildTransport {
   private readonly def = wildpileGame;
   private readonly options: WildTransportOptions;
+  private readonly policy;
+  private readonly now: () => number;
+  private readonly startedAtMs: number;
+  private atMs = 0;
   private session: GameSession<WildpileState, WildpileRules>;
 
   constructor(options: WildTransportOptions) {
     this.options = options;
+    this.policy = wildpileTierBot(options.botTier ?? 2);
+    this.now = options.now ?? (() => Date.now());
+    this.startedAtMs = this.now();
     this.session = createSession(this.def, {
       seed: options.seed | 0,
       config: options.rules ?? applyPreset(this.def.configSchema, options.mode),
@@ -90,7 +106,9 @@ export class WildTransport {
     if (this.session.status !== 'playing') {
       return this.reject('match-ended', 'the match has ended');
     }
-    const outcome = sessionApply(this.def, this.session, 0, move, payload);
+    const outcome = sessionApply(this.def, this.session, 0, move, payload, {
+      atMs: this.stamp(),
+    });
     if (outcome.rejected) return this.reject(outcome.rejected.code, outcome.rejected.message);
     this.session = outcome.session;
     return { events: outcome.events, fx: outcome.fx, rejected: null, snapshot: this.getSnapshot() };
@@ -101,15 +119,16 @@ export class WildTransport {
     if (this.session.status !== 'playing' || seat === null || seat === 0) {
       return this.reject('not-bot-turn', 'no bot is currently acting');
     }
-    const policy = this.def.bots?.[0];
-    if (!policy) throw new Error('wildpile ships no bot policy');
+    const policy = this.policy;
     const legal = this.def.flow.legalMoves(this.session.state, this.session.phase);
     if (legal.length === 0) throw new Error(`bot seat ${seat} has no legal move`);
     const rng = makeRng(this.options.seed).fork(`event:${this.session.log.length}`);
     const choice =
       chooseBotMove(policy, this.def.playerView(this.session.state, seat), seat, legal, rng) ??
       legal[0]!;
-    const applied = sessionApply(this.def, this.session, seat, choice.id, choice.payload);
+    const applied = sessionApply(this.def, this.session, seat, choice.id, choice.payload, {
+      atMs: this.stamp(),
+    });
     if (applied.rejected) {
       throw new Error(`${policy.id} chose ${choice.id}: ${applied.rejected.message}`);
     }
@@ -125,6 +144,46 @@ export class WildTransport {
       outcomes.push(this.playBotTurn());
     }
     return outcomes;
+  }
+
+  timeoutTurn(actor: number): WildDispatch {
+    const outcome = sessionInject(
+      this.def,
+      this.session,
+      'timeout',
+      { kind: 'turn', actor },
+      {
+        atMs: this.stamp(),
+      },
+    );
+    if (outcome.rejected) return this.reject(outcome.rejected.code, outcome.rejected.message);
+    this.session = outcome.session;
+    return { events: outcome.events, fx: outcome.fx, rejected: null, snapshot: this.getSnapshot() };
+  }
+
+  timeoutMatch(): WildDispatch {
+    const outcome = sessionInject(
+      this.def,
+      this.session,
+      'timeout',
+      { kind: 'match' },
+      {
+        atMs: this.stamp(),
+      },
+    );
+    if (outcome.rejected) return this.reject(outcome.rejected.code, outcome.rejected.message);
+    this.session = outcome.session;
+    return { events: outcome.events, fx: outcome.fx, rejected: null, snapshot: this.getSnapshot() };
+  }
+
+  matchEndsAt(): number {
+    return this.startedAtMs + this.session.config.matchTimeMinutes * 60_000;
+  }
+
+  private stamp(): number {
+    const elapsed = Math.max(0, Math.round(this.now() - this.startedAtMs));
+    this.atMs = Math.max(this.atMs, elapsed);
+    return this.atMs;
   }
 
   private players(): WildPlayer[] {
