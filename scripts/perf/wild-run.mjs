@@ -609,7 +609,8 @@ console.log(`react     ${report.reactCommits} commits (${report.commitsPerSecond
 if (idle) console.log(`idle      ${JSON.stringify(idle)}`);
 if (runningAnimations.length) {
   console.log(`animating ${runningAnimations.length} on an idle table:`);
-  for (const a of runningAnimations) console.log(`  ${a.state.padEnd(8)} ${String(a.name).padEnd(24)} ${a.className}`);
+  for (const a of runningAnimations)
+    console.log(`  ${a.state.padEnd(8)} ${String(a.name).padEnd(24)} ${a.className}`);
 }
 for (const outcome of matchOutcomes) console.log(`podium    ${JSON.stringify(outcome)}`);
 console.log(`reload    ${JSON.stringify(reloadSurvival)}`);

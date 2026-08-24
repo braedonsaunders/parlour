@@ -286,9 +286,9 @@ describe('WildTableScreen turn affordances', () => {
     );
     expect(progress).not.toBeNull();
     expect(
-      container.querySelector<HTMLElement>('[data-testid="turn-clock"]')?.style.getPropertyValue(
-        '--turn-duration',
-      ),
+      container
+        .querySelector<HTMLElement>('[data-testid="turn-clock"]')
+        ?.style.getPropertyValue('--turn-duration'),
     ).toBe('15000ms');
 
     act(() => vi.advanceTimersByTime(1_000));

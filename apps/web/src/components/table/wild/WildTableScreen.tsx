@@ -306,26 +306,28 @@ function useSecondsLeft(endsAt: number | undefined): number {
  * it is scheduled for the moment it becomes true instead.
  */
 function useFinalMinute(endsAt: number | undefined): boolean {
-  const [reached, setReached] = useState(
-    () => endsAt !== undefined && endsAt - Date.now() <= 60_000,
+  /*
+   * Whether the table was ALREADY inside the final minute is sampled once, in
+   * the lazy initializer; every later arrival comes off a timer.
+   *
+   * Neither half is incidental. Reading the clock during render is impure, and
+   * setting state synchronously inside the effect cascades a render — the two
+   * lint rules pull in opposite directions, and scheduling at `max(0,
+   * remaining)` satisfies both: an already-expired clock simply fires on the
+   * next tick instead of during the effect.
+   */
+  const [firedFor, setFiredFor] = useState<number | null>(() =>
+    endsAt !== undefined && endsAt - Date.now() <= 60_000 ? endsAt : null,
   );
 
   useEffect(() => {
-    if (endsAt === undefined) {
-      setReached(false);
-      return;
-    }
-    const untilFinalMinute = endsAt - 60_000 - Date.now();
-    if (untilFinalMinute <= 0) {
-      setReached(true);
-      return;
-    }
-    setReached(false);
-    const timer = window.setTimeout(() => setReached(true), untilFinalMinute);
+    if (endsAt === undefined) return;
+    const remaining = endsAt - 60_000 - Date.now();
+    const timer = window.setTimeout(() => setFiredFor(endsAt), Math.max(0, remaining));
     return () => window.clearTimeout(timer);
   }, [endsAt]);
 
-  return reached;
+  return endsAt !== undefined && firedFor === endsAt;
 }
 
 function LiveStandings({ players, endsAt }: { players: readonly WildSeatView[]; endsAt: number }) {
