@@ -256,6 +256,7 @@ let sawLastCardButton = false;
 let lastCardButtonBox = null;
 let steps = 0;
 let idle = null;
+let runningAnimations = [];
 
 async function playMatch(matchIndex) {
   const matchStart = Date.now();
@@ -270,6 +271,23 @@ async function playMatch(matchIndex) {
   // game sits on, so it matters more than any single animation.
   if (IDLE_MS > 0 && matchIndex === 0) {
     await sampleMetrics('idle-start');
+    // Every running animation is a style recalculation per frame, so name them
+    // rather than guessing which ones are still burning the idle table.
+    runningAnimations = await page
+      .evaluate(() =>
+        document.getAnimations().map((animation) => {
+          const target = animation.effect?.target;
+          return {
+            name: animation.animationName ?? animation.transitionProperty ?? 'unknown',
+            state: animation.playState,
+            className:
+              typeof target?.className === 'string'
+                ? target.className.slice(0, 70)
+                : (target?.tagName ?? '?'),
+          };
+        }),
+      )
+      .catch(() => []);
     await page.waitForTimeout(IDLE_MS);
     await sampleMetrics('idle-end');
     const [before, after] = [
@@ -533,6 +551,7 @@ const report = {
     topAttribution: [...attribution.values()].sort((a, b) => b.ms - a.ms).slice(0, 10),
   },
   idle,
+  runningAnimations,
   lastCard: { seen: sawLastCardButton, calls: lastCardCalls, geometry: lastCardButtonBox },
   matches: matchOutcomes,
   reloadSurvival,
@@ -560,6 +579,10 @@ console.log(
 );
 console.log(`react     ${report.reactCommits} commits (${report.commitsPerSecond}/s)`);
 if (idle) console.log(`idle      ${JSON.stringify(idle)}`);
+if (runningAnimations.length) {
+  console.log(`animating ${runningAnimations.length} on an idle table:`);
+  for (const a of runningAnimations) console.log(`  ${a.state.padEnd(8)} ${String(a.name).padEnd(24)} ${a.className}`);
+}
 for (const outcome of matchOutcomes) console.log(`podium    ${JSON.stringify(outcome)}`);
 console.log(`reload    ${JSON.stringify(reloadSurvival)}`);
 console.log(`last card ${JSON.stringify(report.lastCard.geometry)}`);
