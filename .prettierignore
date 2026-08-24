@@ -5,3 +5,5 @@ out/
 node_modules/
 .pnpm-store/
 apps/web/next-env.d.ts
+apps/desktop/src-tauri/gen/
+apps/desktop/src-tauri/target/

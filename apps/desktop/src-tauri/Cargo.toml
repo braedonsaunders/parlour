@@ -1,0 +1,30 @@
+[package]
+name = "parlour-desktop"
+version = "0.1.0"
+description = "Native desktop shell for Parlour"
+authors = ["Braedon Saunders"]
+edition = "2021"
+rust-version = "1.77.2"
+license = "MIT"
+repository = "https://github.com/braedonsaunders/parlour"
+
+[lib]
+name = "parlour_desktop_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[[bin]]
+name = "parlour"
+path = "src/main.rs"
+
+[build-dependencies]
+tauri-build = { version = "2.6.3", features = [] }
+
+[dependencies]
+tauri = { version = "2.11.5", features = [] }
+
+[profile.release]
+panic = "abort"
+codegen-units = 1
+lto = true
+opt-level = "s"
+strip = true

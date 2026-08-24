@@ -1,0 +1,15 @@
+{
+  "name": "@parlour/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Native desktop shell for Parlour",
+  "scripts": {
+    "tauri": "tauri",
+    "desktop:dev": "tauri dev",
+    "desktop:build": "tauri build",
+    "type-check": "cargo check --manifest-path src-tauri/Cargo.toml"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.11.4"
+  }
+}

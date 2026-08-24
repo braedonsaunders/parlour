@@ -4,6 +4,7 @@ import {
   ROOM_CODE_ALPHABET,
   ROOM_CODE_LENGTH,
   normalizeRoomCode,
+  resolveRoomShareOrigin,
   roomJoinUrl,
   validateRoomCode,
 } from './code';
@@ -70,7 +71,19 @@ describe('room codes', () => {
   });
 
   it('builds join URLs only for validated room codes', () => {
-    expect(roomJoinUrl('https://parlour.app/', ' ab-2z ')).toBe('https://parlour.app/join/AB2Z');
+    expect(roomJoinUrl('https://parlour.app/', ' ab-2z ')).toBe(
+      'https://parlour.app/join/?code=AB2Z',
+    );
     expect(() => roomJoinUrl('https://parlour.app/', 'OI10')).toThrow('invalid room code');
+  });
+
+  it('prefers a configured public share origin for packaged clients', () => {
+    expect(resolveRoomShareOrigin('http://tauri.localhost', 'https://play.parlour.app/path')).toBe(
+      'https://play.parlour.app',
+    );
+    expect(resolveRoomShareOrigin('https://preview.example')).toBe('https://preview.example');
+    expect(() => resolveRoomShareOrigin('http://tauri.localhost', 'tauri://localhost')).toThrow(
+      'room share origin must use http or https',
+    );
   });
 });

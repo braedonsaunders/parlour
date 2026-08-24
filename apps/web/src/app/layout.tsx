@@ -23,11 +23,27 @@ const body = Nunito_Sans({
 });
 
 export const metadata: Metadata = {
-  title: 'parlour',
-  description: 'Cozy card games. Blitz first.',
+  title: {
+    default: 'parlour',
+    template: '%s · parlour',
+  },
+  applicationName: 'parlour',
+  description:
+    'Pull up a chair for beautifully animated card games with friends or offline against bots.',
+  keywords: ['card games', 'multiplayer', 'offline games', 'party games'],
+  category: 'games',
   manifest: '/manifest.webmanifest',
-  icons: { icon: '/icon-192.png', apple: '/icon-192.png' },
+  icons: {
+    icon: [
+      { url: '/icon.svg', type: 'image/svg+xml' },
+      { url: '/icon-192.png', type: 'image/png', sizes: '192x192' },
+    ],
+    apple: [{ url: '/icon-192.png', type: 'image/png', sizes: '192x192' }],
+    shortcut: '/icon-192.png',
+  },
   appleWebApp: { capable: true, title: 'parlour', statusBarStyle: 'black-translucent' },
+  formatDetection: { telephone: false },
+  other: { 'mobile-web-app-capable': 'yes' },
 };
 
 export const viewport: Viewport = {
@@ -36,6 +52,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   viewportFit: 'cover',
+  colorScheme: 'dark',
 };
 
 const developmentPwaReset = `

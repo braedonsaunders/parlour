@@ -3,7 +3,5 @@
   "framework": null,
   "installCommand": "pnpm install",
   "buildCommand": "pnpm --filter @parlour/web... build",
-  "outputDirectory": "apps/web/out",
-  "cleanUrls": true,
-  "rewrites": [{ "source": "/join/:code", "destination": "/join" }]
+  "outputDirectory": "apps/web/out"
 }

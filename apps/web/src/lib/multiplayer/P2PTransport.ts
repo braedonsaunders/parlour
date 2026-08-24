@@ -1,4 +1,9 @@
-import { createRoomCode, roomJoinUrl, validateRoomCode } from '../rooms/code';
+import {
+  createRoomCode,
+  resolveRoomShareOrigin,
+  roomJoinUrl,
+  validateRoomCode,
+} from '../rooms/code';
 import { seatRangeFor } from '../rooms/seatRange';
 import { NostrSignaling, type RoomAnnouncement, type SignalPayload } from './NostrSignaling';
 import {
@@ -103,7 +108,9 @@ export class P2PTransport implements Transport {
     };
     this.signaling = options.signaling ?? new NostrSignaling();
     this.iceServers = options.iceServers ?? DEFAULT_ICE_SERVERS;
-    this.origin = options.origin ?? window.location.origin;
+    this.origin =
+      options.origin ??
+      resolveRoomShareOrigin(window.location.origin, process.env.NEXT_PUBLIC_PARLOUR_SHARE_ORIGIN);
     this.now = options.now ?? (() => Date.now());
     this.heartbeatIntervalMs = options.heartbeatIntervalMs ?? HEARTBEAT_INTERVAL_MS;
     this.heartbeatTimeoutMs = options.heartbeatTimeoutMs ?? HEARTBEAT_TIMEOUT_MS;

@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "postbuild": "node scripts/generate-pwa.mjs",
     "start": "next start",
     "type-check": "tsc --noEmit",
     "test": "vitest run",

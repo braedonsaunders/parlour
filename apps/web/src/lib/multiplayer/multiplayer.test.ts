@@ -61,7 +61,7 @@ describe('room identity', () => {
     expect(normalizeRoomCode('OI10')).toBe('OI10');
     expect(validateRoomCode('OI10').ok).toBe(false);
     expect(validateRoomCode('ABC').ok).toBe(false);
-    expect(roomJoinUrl('https://parlour.app/', 'ab2z')).toBe('https://parlour.app/join/AB2Z');
+    expect(roomJoinUrl('https://parlour.app/', 'ab2z')).toBe('https://parlour.app/join/?code=AB2Z');
   });
 });
 

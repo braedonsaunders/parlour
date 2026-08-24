@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { motion } from 'motion/react';
 import { AvatarBadge } from '@/components/AvatarBadge';
 import { MainMenuMuteButton } from '@/components/MainMenuMuteButton';
+import { PwaInstall } from '@/components/PwaInstall';
 import { ScenePicker } from '@/components/backgrounds/ScenePicker';
 import { useAudioManager } from '@/stores/audio';
 import { useProfileStore } from '@/stores/profile';
@@ -94,6 +95,7 @@ export default function TitlePage() {
         >
           Have a room code? Join a table →
         </Link>
+        <PwaInstall />
         <span className="pill-soft mt-1 cursor-default select-none text-xs uppercase tracking-[0.25em] text-dusk-200">
           a growing shelf of card games
         </span>

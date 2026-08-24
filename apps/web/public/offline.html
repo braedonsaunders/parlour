@@ -10,11 +10,12 @@
         box-sizing: border-box;
       }
       body {
-        min-height: 100vh;
+        min-height: 100dvh;
         margin: 0;
         display: grid;
         place-items: center;
-        padding: 24px;
+        padding: max(24px, env(safe-area-inset-top)) max(24px, env(safe-area-inset-right))
+          max(24px, env(safe-area-inset-bottom)) max(24px, env(safe-area-inset-left));
         color: #fdf6ec;
         font:
           600 16px/1.5 ui-rounded,
@@ -58,6 +59,16 @@
         font: inherit;
         font-weight: 800;
         box-shadow: inset 0 -4px #78391d88;
+        cursor: pointer;
+      }
+      button:focus-visible {
+        outline: 3px solid #ffd9a0;
+        outline-offset: 4px;
+      }
+      .aside {
+        margin-top: 12px;
+        font-size: 13px;
+        color: #afdae4;
       }
     </style>
   </head>
@@ -65,7 +76,8 @@
     <main>
       <img src="/icon-192.png" alt="" />
       <h1>You’re still at the table.</h1>
-      <p>The network stepped away. Solo games you’ve opened remain available offline.</p>
+      <p>The network stepped away. Your installed solo games are still ready to play.</p>
+      <p class="aside">Friend rooms will be waiting when you reconnect.</p>
       <button type="button" onclick="location.reload()">Try again</button>
     </main>
   </body>

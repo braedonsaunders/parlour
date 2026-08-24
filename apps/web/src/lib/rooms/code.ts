@@ -39,8 +39,20 @@ export function createRoomCode(randomBytes: (length: number) => Uint8Array): Nor
     .join('');
 }
 
+export function resolveRoomShareOrigin(runtimeOrigin: string, configuredOrigin?: string): string {
+  if (!configuredOrigin?.trim()) return runtimeOrigin;
+
+  const url = new URL(configuredOrigin);
+  if (url.protocol !== 'https:' && url.protocol !== 'http:') {
+    throw new Error('room share origin must use http or https');
+  }
+  return url.origin;
+}
+
 export function roomJoinUrl(origin: string, rawCode: string): string {
   const verdict = validateRoomCode(rawCode);
   if (!verdict.ok) throw new Error('invalid room code');
-  return new URL(`/join/${verdict.code}`, origin).toString();
+  const url = new URL('/join/', origin);
+  url.searchParams.set('code', verdict.code);
+  return url.toString();
 }

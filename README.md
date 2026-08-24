@@ -5,9 +5,10 @@
 ### A deterministic card-game engine — and the cozy table it deals on.
 
 One pure TypeScript engine. A growing shelf of card games on top of it.
-Solo against bots or with friends on a four-letter room code — no accounts, no servers, no install.
+Solo against bots or with friends on a four-letter room code — no accounts and no game server.
 
 [![Play now](https://img.shields.io/badge/▶_Play_now-parlour-e29349?style=for-the-badge)](https://parlour-liart.vercel.app)
+[![Download desktop](https://img.shields.io/badge/↓_Download-macOS_·_Windows_·_Linux-2f86a1?style=for-the-badge)](https://github.com/braedonsaunders/parlour/releases/latest)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
@@ -15,13 +16,23 @@ Solo against bots or with friends on a four-letter room code — no accounts, no
 [![P2P](https://img.shields.io/badge/multiplayer-WebRTC_+_Nostr-2f86a1)](#multiplayer-comes-with-the-engine)
 [![Backend](https://img.shields.io/badge/backend-none-54a06e)](#why-there-is-no-server)
 
-[Play now](https://parlour-liart.vercel.app) · [The engine](#one-engine-many-tables) · [The shelf](#the-shelf) · [Multiplayer](#multiplayer-comes-with-the-engine) · [Add a game](#adding-a-game) · [Run it locally](#run-it-locally)
+[Play now](https://parlour-liart.vercel.app) · [Install](#install-parlour) · [The engine](#one-engine-many-tables) · [The shelf](#the-shelf) · [Multiplayer](#multiplayer-comes-with-the-engine) · [Add a game](#adding-a-game) · [Run it locally](#run-it-locally)
 
 </div>
 
 <img src="docs/shots/title.png" alt="parlour title screen — a campfire under the northern lights" width="100%" />
 
 ---
+
+## Install Parlour
+
+The web app remains the fastest way in, and Vercel stays useful for production and preview URLs. It is not a runtime dependency: the same static export is also packaged into native desktop apps. Packaged room links use the replaceable `PARLOUR_SHARE_ORIGIN` GitHub Actions variable, so releases can point at any HTTPS static host.
+
+- **iPhone and iPad:** open the web app in Safari, tap **Add to Home Screen** in Parlour, then use **Share → Add to Home Screen**.
+- **Android:** tap Parlour's **Install app** button and accept the browser's install prompt.
+- **macOS, Windows, and Linux:** download the installer for your platform from the [latest GitHub Release](https://github.com/braedonsaunders/parlour/releases/latest).
+
+Desktop builds are not code-signed yet, so macOS and Windows may show an unfamiliar-developer warning. Release artifacts are built directly from tagged source by GitHub Actions.
 
 ## One engine, many tables
 
@@ -182,6 +193,8 @@ No account, but not anonymous either. Everything lives in your browser: a name, 
 ```bash
 pnpm install
 pnpm dev                      # Next dev server
+pnpm desktop:dev              # Tauri shell + Next dev server
+pnpm desktop:build            # native installer for this platform
 pnpm -r test                  # vitest across every package
 pnpm -r build                 # typecheck + build everything
 pnpm sim -- --games 10000     # headless Blitz bot simulation
@@ -200,6 +213,7 @@ parlour/
     game-ratscrew/   # Egyptian Ratscrew, slap windows and all
   apps/
     web/             # the app — Next.js, static export
+    desktop/         # thin Tauri shell around that same export
 ```
 
 ## Roadmap
@@ -208,6 +222,7 @@ parlour/
 - [x] The feel milestone — fx-driven animation, art, audio, celebrations
 - [x] Local profiles, lifetime stats, friend head-to-head history, PWA
 - [x] P2P multiplayer — room codes, share links, host election, bot takeover, rejoin
+- [x] Installable PWA and native macOS, Windows, and Linux releases
 - [x] Second and third games built entirely on the public engine API
 - [x] Veiled-deck primitives in the engine
 - [ ] The rest of the shelf: Gin, Hearts, Euchre, Cribbage, President

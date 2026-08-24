@@ -5,6 +5,8 @@
   "packageManager": "pnpm@10.30.3",
   "scripts": {
     "dev": "pnpm --filter @parlour/web dev",
+    "desktop:dev": "pnpm --filter @parlour/desktop desktop:dev",
+    "desktop:build": "pnpm --filter @parlour/desktop desktop:build",
     "build": "pnpm -r build",
     "test": "pnpm -r test",
     "lint": "eslint packages apps --ext .ts,.tsx",

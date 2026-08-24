@@ -1,0 +1,178 @@
+name: Release desktop apps
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: desktop-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  create-release:
+    name: Prepare draft release
+    runs-on: ubuntu-latest
+    outputs:
+      release_id: ${{ steps.release.outputs.release_id }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 26
+
+      - name: Verify tag and app versions
+        run: node apps/desktop/scripts/check-release-version.mjs "${GITHUB_REF_NAME}"
+
+      - name: Verify public room-link origin
+        env:
+          PARLOUR_SHARE_ORIGIN: ${{ vars.PARLOUR_SHARE_ORIGIN }}
+        run: |
+          node -e "const value = process.env.PARLOUR_SHARE_ORIGIN; if (!value) throw new Error('PARLOUR_SHARE_ORIGIN repository variable is required'); const url = new URL(value); if (url.protocol !== 'https:') throw new Error('PARLOUR_SHARE_ORIGIN must use HTTPS')"
+
+      - name: Create draft GitHub Release
+        id: release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          existing_release="$(
+            gh api --paginate "repos/${GITHUB_REPOSITORY}/releases?per_page=100" |
+              jq -s --arg tag "${GITHUB_REF_NAME}" '[.[][] | select(.tag_name == $tag)] | first'
+          )"
+
+          if [ "${existing_release}" != 'null' ]; then
+            if [ "$(jq -r '.draft' <<< "${existing_release}")" != 'true' ]; then
+              echo "A published release already exists for ${GITHUB_REF_NAME}." >&2
+              exit 1
+            fi
+            release_id="$(jq -r '.id' <<< "${existing_release}")"
+          else
+            release_id="$(gh api \
+              --method POST \
+              "repos/${GITHUB_REPOSITORY}/releases" \
+              -f tag_name="${GITHUB_REF_NAME}" \
+              -f target_commitish="${GITHUB_SHA}" \
+              -f name="Parlour ${GITHUB_REF_NAME}" \
+              -f body='Install Parlour for your platform from the assets below. These initial desktop builds are not yet code-signed.' \
+              -F draft=true \
+              -F prerelease=false \
+              -F generate_release_notes=true \
+              --jq '.id')"
+          fi
+
+          echo "release_id=${release_id}" >> "${GITHUB_OUTPUT}"
+
+  release:
+    name: ${{ matrix.name }}
+    needs: create-release
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macOS (Apple Silicon)
+            runner: macos-latest
+            target: aarch64-apple-darwin
+            bundles: app,dmg
+          - name: macOS (Intel)
+            runner: macos-latest
+            target: x86_64-apple-darwin
+            bundles: app,dmg
+          - name: Windows (x64)
+            runner: windows-latest
+            target: x86_64-pc-windows-msvc
+            bundles: nsis
+          - name: Linux (x64)
+            runner: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            bundles: appimage,deb
+
+    env:
+      CI: true
+      NEXT_PUBLIC_PARLOUR_SHARE_ORIGIN: ${{ vars.PARLOUR_SHARE_ORIGIN }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install Linux build and media dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y \
+            build-essential \
+            file \
+            gstreamer1.0-libav \
+            gstreamer1.0-plugins-bad \
+            gstreamer1.0-plugins-base \
+            gstreamer1.0-plugins-good \
+            gstreamer1.0-pulseaudio \
+            libayatana-appindicator3-dev \
+            libfuse2 \
+            libgtk-3-dev \
+            librsvg2-dev \
+            libssl-dev \
+            libwebkit2gtk-4.1-dev \
+            libxdo-dev \
+            patchelf \
+            xdg-utils
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Install Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 26
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Cache Rust build artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/desktop/src-tauri -> target
+          cache-on-failure: true
+
+      - name: Install workspace dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build installers and publish GitHub Release
+        uses: tauri-apps/tauri-action@v1.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: apps/desktop
+          tauriScript: pnpm tauri
+          args: --target ${{ matrix.target }} --bundles ${{ matrix.bundles }}
+          releaseId: ${{ needs.create-release.outputs.release_id }}
+          retryAttempts: 2
+          uploadUpdaterJson: false
+          uploadUpdaterSignatures: false
+
+  publish-release:
+    name: Publish complete release
+    needs: [create-release, release]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_ID: ${{ needs.create-release.outputs.release_id }}
+        run: |
+          gh api \
+            --method PATCH \
+            "repos/${GITHUB_REPOSITORY}/releases/${RELEASE_ID}" \
+            -F draft=false \
+            --silent

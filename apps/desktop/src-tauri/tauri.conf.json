@@ -1,0 +1,98 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Parlour",
+  "version": "0.1.0",
+  "identifier": "com.braedonsaunders.parlour",
+  "mainBinaryName": "parlour",
+  "build": {
+    "beforeDevCommand": "pnpm --dir ../web dev --hostname 127.0.0.1",
+    "beforeBuildCommand": "pnpm --dir ../web build",
+    "devUrl": "http://127.0.0.1:3000",
+    "frontendDist": "../../web/out"
+  },
+  "app": {
+    "withGlobalTauri": false,
+    "windows": [
+      {
+        "label": "main",
+        "title": "Parlour",
+        "width": 1280,
+        "height": 800,
+        "minWidth": 960,
+        "minHeight": 600,
+        "center": true,
+        "resizable": true,
+        "fullscreen": false,
+        "theme": "Dark",
+        "backgroundColor": "#0b151c",
+        "backgroundThrottling": "disabled",
+        "allowLinkPreview": false,
+        "dragDropEnabled": false,
+        "zoomHotkeysEnabled": false,
+        "useHttpsScheme": true
+      }
+    ],
+    "security": {
+      "capabilities": ["main"],
+      "csp": {
+        "default-src": ["'self'", "customprotocol:", "asset:"],
+        "base-uri": ["'self'"],
+        "connect-src": [
+          "'self'",
+          "ipc:",
+          "http://ipc.localhost",
+          "https://ipc.localhost",
+          "wss://relay.damus.io",
+          "wss://nos.lol",
+          "wss://relay.nostr.band",
+          "wss://nostr.wine",
+          "wss://relay.primal.net",
+          "stun:",
+          "turn:",
+          "turns:"
+        ],
+        "font-src": ["'self'", "customprotocol:", "asset:", "data:"],
+        "form-action": ["'self'"],
+        "frame-ancestors": ["'none'"],
+        "img-src": ["'self'", "customprotocol:", "asset:", "data:", "blob:"],
+        "manifest-src": ["'self'"],
+        "media-src": ["'self'", "customprotocol:", "asset:", "data:", "blob:"],
+        "object-src": ["'none'"],
+        "script-src": ["'self'"],
+        "style-src": ["'self'", "'unsafe-inline'"],
+        "worker-src": ["'self'", "blob:"]
+      }
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "createUpdaterArtifacts": false,
+    "category": "CardGame",
+    "copyright": "Copyright © 2026 Braedon Saunders",
+    "homepage": "https://github.com/braedonsaunders/parlour",
+    "shortDescription": "Cozy card games for friends and solo play.",
+    "longDescription": "Parlour is a cozy collection of polished card games for friends and solo play.",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "macOS": {
+      "minimumSystemVersion": "13.3",
+      "signingIdentity": "-"
+    },
+    "linux": {
+      "appimage": {
+        "bundleMediaFramework": true
+      }
+    },
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser"
+      }
+    }
+  }
+}

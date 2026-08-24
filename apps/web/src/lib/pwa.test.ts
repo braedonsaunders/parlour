@@ -1,6 +1,9 @@
-import { readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { getInstallPlatform, isStandaloneDisplay, isTauriRuntime } from './pwa';
 
 describe('installable offline shell', () => {
   it('declares maskable 192px and 512px PNG icons', () => {
@@ -20,6 +23,26 @@ describe('installable offline shell', () => {
     }
   });
 
+  it('provides standalone landscape metadata and useful app shortcuts', () => {
+    const manifest = JSON.parse(
+      readFileSync(join(process.cwd(), 'public/manifest.webmanifest'), 'utf8'),
+    ) as {
+      display: string;
+      orientation: string;
+      id: string;
+      scope: string;
+      shortcuts: { url: string }[];
+    };
+
+    expect(manifest).toMatchObject({
+      display: 'standalone',
+      orientation: 'landscape',
+      id: '/',
+      scope: '/',
+    });
+    expect(manifest.shortcuts.map((shortcut) => shortcut.url)).toEqual(['/games/', '/join/']);
+  });
+
   it('precaches a dedicated offline document and serves it for failed navigation', () => {
     const worker = readFileSync(join(process.cwd(), 'public/sw.js'), 'utf8');
     expect(worker).toContain("'/offline.html'");
@@ -29,11 +52,53 @@ describe('installable offline shell', () => {
     );
   });
 
-  it('clones cacheable responses before the browser can consume their bodies', () => {
+  it('loads the generated route manifest and activates updates only when requested', () => {
     const worker = readFileSync(join(process.cwd(), 'public/sw.js'), 'utf8');
 
-    expect(worker).toContain('const cacheCopy = response.ok');
-    expect(worker).not.toContain('cache.put(request, response.clone())');
+    expect(worker).toContain("importScripts('/precache-manifest.js')");
+    expect(worker).toContain("event.data?.type === 'SKIP_WAITING'");
+    expect(worker).toContain('`parlour-runtime-${manifest.version}`');
+    expect(worker).not.toContain(
+      "self.addEventListener('install', (event) => {\n  self.skipWaiting",
+    );
+    expect(worker).toContain('const copy = response.clone()');
+  });
+
+  it('precaches routes and lightweight game audio without eagerly caching music', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'parlour-precache-'));
+
+    try {
+      mkdirSync(join(directory, '_next/static'), { recursive: true });
+      mkdirSync(join(directory, 'games'), { recursive: true });
+      mkdirSync(join(directory, 'audio/music'), { recursive: true });
+      mkdirSync(join(directory, 'audio/sfx'), { recursive: true });
+      writeFileSync(join(directory, 'index.html'), '<main>parlour</main>');
+      writeFileSync(join(directory, 'games/index.html'), '<main>games</main>');
+      writeFileSync(join(directory, '_next/static/app.js'), 'console.log("app")');
+      writeFileSync(join(directory, 'audio/music/title.mp3'), 'large soundtrack');
+      writeFileSync(join(directory, 'audio/sfx/deal-card.mp3'), 'lightweight game cue');
+      writeFileSync(join(directory, 'sw.js'), 'worker source');
+
+      execFileSync(process.execPath, [join(process.cwd(), 'scripts/generate-pwa.mjs'), directory]);
+      const generated = readFileSync(join(directory, 'precache-manifest.js'), 'utf8');
+      const initialVersion = generated.match(/"version": "([a-f0-9]{16})"/)?.[1];
+
+      expect(generated).toContain('"/index.html"');
+      expect(generated).toContain('"/games/index.html"');
+      expect(generated).toContain('"/_next/static/app.js"');
+      expect(generated).toContain('"/audio/sfx/deal-card.mp3"');
+      expect(generated).toMatch(/"version": "[a-f0-9]{16}"/);
+      expect(generated).not.toContain('/audio/music/');
+      expect(generated).not.toContain('"/sw.js"');
+
+      writeFileSync(join(directory, 'audio/music/title.mp3'), 'replacement soundtrack');
+      execFileSync(process.execPath, [join(process.cwd(), 'scripts/generate-pwa.mjs'), directory]);
+      const musicUpdate = readFileSync(join(directory, 'precache-manifest.js'), 'utf8');
+      expect(musicUpdate).not.toContain('/audio/music/');
+      expect(musicUpdate).not.toContain(`"version": "${initialVersion}"`);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
   });
 
   it('removes production service workers and parlour caches during development', () => {
@@ -44,5 +109,37 @@ describe('installable offline shell', () => {
     expect(layout).toContain('strategy="beforeInteractive"');
     expect(layout).toContain("key.startsWith('parlour-')");
     expect(layout).toContain("new URL(worker.scriptURL).pathname === '/sw.js'");
+  });
+});
+
+describe('PWA runtime detection', () => {
+  it('recognizes iPad desktop mode and Android browsers', () => {
+    const iPad = {
+      userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)',
+      platform: 'MacIntel',
+      maxTouchPoints: 5,
+    } as Navigator;
+    const android = {
+      userAgent: 'Mozilla/5.0 (Linux; Android 15; Pixel 9)',
+      platform: 'Linux armv8l',
+      maxTouchPoints: 5,
+    } as Navigator;
+
+    expect(getInstallPlatform(iPad)).toBe('ios');
+    expect(getInstallPlatform(android)).toBe('android');
+  });
+
+  it('recognizes installed display modes and desktop wrappers', () => {
+    const standaloneWindow = {
+      matchMedia: () => ({ matches: true }),
+      location: { protocol: 'https:', hostname: 'parlour.app' },
+    } as unknown as Window;
+    const tauriWindow = {
+      matchMedia: () => ({ matches: false }),
+      location: { protocol: 'https:', hostname: 'tauri.localhost' },
+    } as unknown as Window;
+
+    expect(isStandaloneDisplay(standaloneWindow, {} as Navigator)).toBe(true);
+    expect(isTauriRuntime(tauriWindow)).toBe(true);
   });
 });
