@@ -83,22 +83,22 @@ export function useDealPresentation(
   const [landedCueIds, setLandedCueIds] = useState<ReadonlySet<string>>(() => new Set());
 
   useLayoutEffect(() => {
-    // Both early exits below are sync-only derivations (clearing between
-    // plans; marking everything landed under prefers-reduced-motion where no
-    // timer will ever fire), so the effect intentionally sets state directly.
-    /* eslint-disable react-hooks/set-state-in-effect -- sync-only derivations */
+    // State changes ride a microtask so the effect body itself never sets
+    // state synchronously (react-hooks/set-state-in-effect).
     if (!plan) {
-      setLandedCueIds(new Set());
-      return;
+      const clear = window.setTimeout(() => setLandedCueIds(new Set()), 0);
+      return () => window.clearTimeout(clear);
     }
     const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
     if (reduced) {
-      setLandedCueIds(new Set(plan.cues.map(({ id }) => id)));
-      return;
+      // reduced motion skips the choreography entirely; land everything at once
+      const markAll = window.setTimeout(
+        () => setLandedCueIds(new Set(plan.cues.map(({ id }) => id))),
+        0,
+      );
+      return () => window.clearTimeout(markAll);
     }
-    /* eslint-enable react-hooks/set-state-in-effect */
-
-    setLandedCueIds(new Set());
+    const reset = window.setTimeout(() => setLandedCueIds(new Set()), 0);
     const timers = plan.cues.map((cue) =>
       window.setTimeout(() => {
         setLandedCueIds((current) => {
@@ -108,7 +108,10 @@ export function useDealPresentation(
         });
       }, cue.startMs + cue.durationMs),
     );
-    return () => timers.forEach((timer) => window.clearTimeout(timer));
+    return () => {
+      window.clearTimeout(reset);
+      timers.forEach((timer) => window.clearTimeout(timer));
+    };
   }, [fxKey, plan]);
 
   if (!plan) return LIVE_PRESENTATION;

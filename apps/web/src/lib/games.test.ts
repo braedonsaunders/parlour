@@ -4,8 +4,15 @@ import { describe, expect, it } from 'vitest';
 import { GAMES, getGame, getGameMode, isGameId, isGameModeId, modePreset } from './games';
 
 describe('game shelf catalog', () => {
-  it('leads with blitz, then wild, then euchre', () => {
-    expect(GAMES.map((g) => g.id)).toEqual(['blitz', 'wild', 'euchre']);
+  it('leads with blitz and keeps the shelf growing', () => {
+    expect(GAMES.map((g) => g.id)).toEqual([
+      'blitz',
+      'wild',
+      'euchre',
+      'hearts',
+      'gin',
+      'president',
+    ]);
   });
 
   it('every game carries complete presentation data', () => {
@@ -20,10 +27,13 @@ describe('game shelf catalog', () => {
     }
   });
 
-  it('both games are playable and route to their setup screens (M5 exit)', () => {
+  it('all shelf games are playable and route to their setup screens', () => {
     expect(getGame('blitz').href).toBe('/play');
     expect(getGame('wild').href).toBe('/wild');
     expect(getGame('euchre').href).toBe('/euchre');
+    expect(getGame('hearts').href).toBe('/hearts');
+    expect(getGame('gin').href).toBe('/gin');
+    expect(getGame('president').href).toBe('/president');
   });
 
   it('getGame resolves known ids and throws on unknown ones', () => {

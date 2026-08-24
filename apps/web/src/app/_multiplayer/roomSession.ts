@@ -23,11 +23,29 @@ import {
   type EuchreState,
 } from '@parlour/game-euchre';
 import {
+  presidentConfig,
+  presidentGame,
+  type PresidentRules,
+  type PresidentState,
+} from '@parlour/game-president';
+import {
   wildpileConfig,
   wildpileGame,
   type WildpileRules,
   type WildpileState,
 } from '@parlour/game-wildpile';
+import {
+  heartsConfigSchema,
+  heartsGame,
+  type HeartsRules,
+  type HeartsState,
+} from '@parlour/game-hearts';
+import {
+  createGinMatchDef,
+  ginConfigSchema,
+  type GinConfig,
+  type GinMatchState,
+} from '@parlour/game-gin';
 import {
   EngineAuthority,
   P2PTransport,
@@ -50,8 +68,9 @@ import {
 import { botTurnKey, botTurns } from './botSeats';
 import { NostrSignaling, type RoomAnnouncement } from '@/lib/multiplayer/NostrSignaling';
 import { validateRoomCode } from '@/lib/rooms/code';
+import { hasValidSeatCount, seatRangeFor } from '@/lib/rooms/seatRange';
 
-export type MultiplayerGameId = 'blitz' | 'wildpile' | 'euchre';
+export type MultiplayerGameId = 'blitz' | 'wildpile' | 'euchre' | 'hearts' | 'gin' | 'president';
 
 /** What the room badge shows about privacy — see lib/multiplayer/veil. */
 export type MultiplayerSecurity = {
@@ -74,7 +93,10 @@ export type MultiplayerSecurity = {
 export type MultiplayerGameSession =
   | GameSession<BlitzState, BlitzConfig>
   | GameSession<WildpileState, WildpileRules>
-  | GameSession<EuchreState, EuchreRules>;
+  | GameSession<EuchreState, EuchreRules>
+  | GameSession<HeartsState, HeartsRules>
+  | GameSession<GinMatchState, GinConfig>
+  | GameSession<PresidentState, PresidentRules>;
 
 export type MultiplayerProfile = {
   name: string;
@@ -189,9 +211,10 @@ export class MultiplayerRoomSession {
   };
 
   async create(options: CreateRoomOptions): Promise<RoomHandle> {
-    if (options.seats < 2 || options.seats > 4) throw new Error('rooms require 2–4 seats');
-    if (options.gameId === 'euchre' && options.seats !== 4) {
-      throw new Error('euchre rooms require exactly four seats');
+    const gameId = options.gameId ?? 'blitz';
+    if (!hasValidSeatCount(gameId, options.seats)) {
+      const { min, max } = seatRangeFor(gameId);
+      throw new Error(`rooms require ${min}–${max} seats for ${gameId}`);
     }
     const settings = resolveRoomSettings({
       gameId: options.gameId ?? 'blitz',
@@ -913,6 +936,14 @@ export function blitzMultiplayerSession(
     : null;
 }
 
+export function ginMultiplayerSession(
+  snapshot: MultiplayerRoomSnapshot,
+): GameSession<GinMatchState, GinConfig> | null {
+  return snapshot.gameId === 'gin'
+    ? (snapshot.session as GameSession<GinMatchState, GinConfig> | null)
+    : null;
+}
+
 export function wildMultiplayerSession(
   snapshot: MultiplayerRoomSnapshot,
 ): GameSession<WildpileState, WildpileRules> | null {
@@ -929,6 +960,22 @@ export function euchreMultiplayerSession(
     : null;
 }
 
+export function heartsMultiplayerSession(
+  snapshot: MultiplayerRoomSnapshot,
+): GameSession<HeartsState, HeartsRules> | null {
+  return snapshot.gameId === 'hearts'
+    ? (snapshot.session as GameSession<HeartsState, HeartsRules> | null)
+    : null;
+}
+
+export function presidentMultiplayerSession(
+  snapshot: MultiplayerRoomSnapshot,
+): GameSession<PresidentState, PresidentRules> | null {
+  return snapshot.gameId === 'president'
+    ? (snapshot.session as GameSession<PresidentState, PresidentRules> | null)
+    : null;
+}
+
 function stateHolds(state: unknown, handle: string): boolean {
   return stateContainsCardId(state, handle);
 }
@@ -936,7 +983,11 @@ function stateHolds(state: unknown, handle: string): boolean {
 /** The game pack a room's settings name. */
 function gameDefFor(settings: RoomSettings) {
   if (settings.gameId === 'euchre') return createEuchreDef();
-  return settings.gameId === 'wildpile' ? wildpileGame : createBlitzDef();
+  if (settings.gameId === 'hearts') return heartsGame;
+  if (settings.gameId === 'gin') return createGinMatchDef();
+  if (settings.gameId === 'wildpile') return wildpileGame;
+  if (settings.gameId === 'president') return presidentGame;
+  return createBlitzDef();
 }
 
 /**
@@ -967,8 +1018,9 @@ async function waitForVeilKeys(room: VeilRoom): Promise<void> {
 }
 
 function resolveRoomSettings(settings: RoomSettings): RoomSettings {
-  if (!Number.isInteger(settings.seats) || settings.seats < 2 || settings.seats > 4) {
-    throw new Error('rooms require 2–4 seats');
+  if (!hasValidSeatCount(settings.gameId, settings.seats)) {
+    const { min, max } = seatRangeFor(settings.gameId);
+    throw new Error(`rooms require ${min}–${max} seats for ${settings.gameId}`);
   }
   const security: RoomSecurity = settings.security === 'veil' ? 'veil' : 'open';
   if (settings.gameId === 'blitz') {
@@ -988,11 +1040,34 @@ function resolveRoomSettings(settings: RoomSettings): RoomSettings {
     };
   }
   if (settings.gameId === 'euchre') {
-    if (settings.seats !== 4) throw new Error('euchre rooms require exactly four seats');
     return {
       gameId: 'euchre',
       seats: settings.seats,
       config: euchreConfig.resolve(settings.config as Partial<EuchreRules>),
+      security,
+    };
+  }
+  if (settings.gameId === 'hearts') {
+    return {
+      gameId: 'hearts',
+      seats: settings.seats,
+      config: heartsConfigSchema.resolve(settings.config as Partial<HeartsRules>),
+      security,
+    };
+  }
+  if (settings.gameId === 'gin') {
+    return {
+      gameId: 'gin',
+      seats: settings.seats,
+      config: ginConfigSchema.resolve(settings.config as Partial<GinConfig>),
+      security,
+    };
+  }
+  if (settings.gameId === 'president') {
+    return {
+      gameId: 'president',
+      seats: settings.seats,
+      config: presidentConfig.resolve(settings.config as Partial<PresidentRules>),
       security,
     };
   }
@@ -1012,38 +1087,45 @@ function createRoomRuntime(
   const veiled = settings.security === 'veil' && deckOrder !== undefined;
   const veil = veiled ? { veiled: true, deckOrder } : {};
   const runtimeSettings: RoomSettings = veiled ? settings : { ...settings, security: 'open' };
+  const seatsRange = seatRangeFor(settings.gameId);
+  const common = { settings: runtimeSettings, onSeatBot, seatsRange };
   if (settings.gameId === 'euchre') {
     const def = createEuchreDef();
     const config = settings.config as EuchreRules;
-    const session = createSession(def, {
-      seed,
-      config,
-      seats: settings.seats,
-      ...veil,
-    });
-    const authority = new EngineAuthority({
-      def,
-      session,
-      settings: runtimeSettings,
-      onSeatBot,
-    });
+    const session = createSession(def, { seed, config, seats: settings.seats, ...veil });
+    const authority = new EngineAuthority({ def, session, ...common });
+    return { session, authority };
+  }
+  if (settings.gameId === 'hearts') {
+    const config = settings.config as HeartsRules;
+    const session = createSession(heartsGame, { seed, config, seats: settings.seats, ...veil });
+    const authority = new EngineAuthority({ def: heartsGame, session, ...common });
+    return { session, authority };
+  }
+  if (settings.gameId === 'gin') {
+    const def = createGinMatchDef();
+    const config = settings.config as GinConfig;
+    const session = createSession(def, { seed, config, seats: settings.seats, ...veil });
+    const authority = new EngineAuthority({ def, session, ...common });
     return { session, authority };
   }
   if (settings.gameId === 'wildpile') {
     const config = settings.config as WildpileRules;
     const session = createSession(wildpileGame, { seed, config, seats: settings.seats, ...veil });
-    const authority = new EngineAuthority({
-      def: wildpileGame,
-      session,
-      settings: runtimeSettings,
-      onSeatBot,
-    });
+    const authority = new EngineAuthority({ def: wildpileGame, session, ...common });
+    return { session, authority };
+  }
+
+  if (settings.gameId === 'president') {
+    const config = settings.config as PresidentRules;
+    const session = createSession(presidentGame, { seed, config, seats: settings.seats, ...veil });
+    const authority = new EngineAuthority({ def: presidentGame, session, ...common });
     return { session, authority };
   }
 
   const def = createBlitzDef();
   const config = settings.config as BlitzConfig;
   const session = createSession(def, { seed, config, seats: settings.seats, ...veil });
-  const authority = new EngineAuthority({ def, session, settings: runtimeSettings, onSeatBot });
+  const authority = new EngineAuthority({ def, session, ...common });
   return { session, authority };
 }
