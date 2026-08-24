@@ -12,6 +12,7 @@ import { VEIL_ELEMENT_BYTES } from './sra';
 import type { VeilLayerEntry, VeilShare } from './ceremony';
 import type { SignedVeilEntry, VeilRoundHeader } from './transcript';
 import type { RecoveryPackage } from './recovery';
+import type { VeilRecycleEntry } from './session';
 
 const MAX_SEATS = 8;
 const MAX_DECK = 256;
@@ -137,9 +138,26 @@ function isSignedEntry(value: unknown): value is SignedVeilEntry {
     isHex(value.previous, HASH_HEX) &&
     isHex(value.hash, HASH_HEX) &&
     isBoundedString(value.signature, MAX_SIGNATURE) &&
-    // The only entry payload Veil carries today is a ceremony layer; anything
-    // else is rejected rather than passed through as opaque JSON.
-    (value.kind !== 'ceremony.layer' || isVeilLayerEntry(value.payload))
+    ((value.kind === 'ceremony.layer' && isVeilLayerEntry(value.payload)) ||
+      (value.kind === 'ceremony.recycle' && isVeilRecycleEntry(value.payload)))
+  );
+}
+
+function isVeilRecycleEntry(value: unknown): value is VeilRecycleEntry {
+  return (
+    isRecord(value) &&
+    hasOnlyKeys(value, ['epoch', 'cards', 'participants']) &&
+    isIndex(value.epoch, 64) &&
+    Array.isArray(value.cards) &&
+    value.cards.length > 0 &&
+    value.cards.length <= MAX_DECK &&
+    value.cards.every((card) => isBoundedString(card, MAX_ID)) &&
+    new Set(value.cards as string[]).size === value.cards.length &&
+    Array.isArray(value.participants) &&
+    value.participants.length > 0 &&
+    value.participants.length <= MAX_SEATS &&
+    value.participants.every((seat) => isIndex(seat, MAX_SEATS - 1)) &&
+    new Set(value.participants as number[]).size === value.participants.length
   );
 }
 

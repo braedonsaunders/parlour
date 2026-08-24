@@ -61,7 +61,7 @@ export class EngineAuthority<S, C extends RuleValues> implements AuthorityAdapte
     const outcome = sessionApply(this.def, session, action.seat, action.move, action.payload, {
       atMs,
       reveals: action.reveals,
-      conceals: action.conceals,
+      recycle: action.recycle,
     });
     if (outcome.rejected) throw new Error(outcome.rejected.message);
     const events = outcome.events.map((event) => ({ ...event, ts: timestamp }));

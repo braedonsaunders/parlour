@@ -121,6 +121,35 @@ describe('the ceremony over a mesh', () => {
     expect(decks[1]).toEqual(decks[0]);
     expect(decks[2]).toEqual(decks[0]);
   });
+
+  it('re-veils a spent pile with the surviving seats and publishes no face-to-handle map', async () => {
+    const mesh = new Mesh(3);
+    await mesh.openRound();
+    await mesh.runCeremony();
+    const cards = def.veil!.deck(CONFIG).cardIds.slice(0, 6);
+
+    await mesh.rooms[0]!.startRecycle(1, cards, [0, 2]);
+    await mesh.settle();
+    expect(await mesh.rooms[2]!.advanceCeremony(1)).toBe(true);
+    await mesh.settle();
+
+    for (const session of mesh.sessions) {
+      expect(session.progress(1)).toMatchObject({ laid: 2, seats: 2, ready: true });
+      expect(session.participantsFor(1)).toEqual([0, 2]);
+    }
+    const declaration = mesh.traffic.find(
+      (packet) =>
+        packet.message.type === 'veil.entry' && packet.message.entry.kind === 'ceremony.recycle',
+    );
+    expect(declaration?.message).toMatchObject({
+      entry: { payload: { epoch: 1, cards, participants: [0, 2] } },
+    });
+    expect(JSON.stringify(declaration)).not.toContain('v#');
+
+    const pending = mesh.rooms[0]!.open(1, 0, 'private');
+    for (let round = 0; round < 20; round++) await mesh.settle();
+    await expect(pending).resolves.toBeTypeOf('string');
+  });
 });
 
 describe('opening a card over a mesh', () => {
@@ -161,6 +190,19 @@ describe('opening a card over a mesh', () => {
       dealt.push(await mesh.open(position % 3, position));
     }
     expect(new Set(dealt).size).toBe(6);
+  });
+
+  it('keeps simultaneous private openings isolated by requester and position', async () => {
+    const mesh = new Mesh(2);
+    await mesh.openRound();
+    await mesh.runCeremony();
+
+    const first = mesh.rooms[0]!.open(0, 0, 'private');
+    const second = mesh.rooms[1]!.open(0, 3, 'private');
+    for (let round = 0; round < 20; round++) await mesh.settle();
+
+    await expect(first).resolves.toBeTypeOf('string');
+    await expect(second).resolves.toBeTypeOf('string');
   });
 
   it('records a receipt for every hop it took part in', async () => {

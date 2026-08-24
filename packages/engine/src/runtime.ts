@@ -1,10 +1,10 @@
 import { makeRng } from './rng';
 import {
-  applyConceals,
   applyReveals,
-  validateConceals,
+  recycleSettled,
+  validateRecycle,
   validateReveals,
-  type CardConcealment,
+  type CardRecycle,
   type CardReveal,
 } from './veil';
 import {
@@ -122,7 +122,7 @@ interface StepInput {
   injected?: boolean;
   atMs?: number;
   reveals?: readonly CardReveal[];
-  conceals?: readonly CardConcealment[];
+  recycle?: CardRecycle;
 }
 
 interface Cursor<S> {
@@ -147,15 +147,19 @@ function applyStep<S, C extends RuleValues>(
   const seat = input.seat ?? -1;
   // Veil openings land before the move, so the reducer that follows sees real
   // card ids and every existing rule keeps working unchanged.
-  const opened = applyConceals(
-    applyReveals(cursor.state, input.reveals ?? []),
-    input.conceals ?? [],
-  );
+  const opened = applyReveals(cursor.state, input.reveals ?? []);
   const state = move.apply(opened, seat, input.payload, {
     rng: eventRng(seed, seq),
     fx,
     event: input.atMs === undefined ? { seq } : { seq, atMs: input.atMs },
+    recycle: input.recycle,
   });
+  // A recycle is only honest if the reducer actually swapped the pile: fail
+  // loudly rather than play on with a board the audit will reject.
+  if (input.recycle) {
+    const fault = recycleSettled(state, input.recycle);
+    if (fault) throw new Error(`${def.id}: ${fault.message}`);
+  }
 
   const event: AppliedEvent = {
     seq,
@@ -170,8 +174,8 @@ function applyStep<S, C extends RuleValues>(
   if (input.reveals && input.reveals.length > 0) {
     event.reveals = input.reveals.map(([handle, card]) => [handle, card] as const);
   }
-  if (input.conceals && input.conceals.length > 0) {
-    event.conceals = input.conceals.map(([card, handle]) => [card, handle] as const);
+  if (input.recycle) {
+    event.recycle = { retire: [...input.recycle.retire], issue: [...input.recycle.issue] };
   }
 
   cursor.state = state;
@@ -248,9 +252,9 @@ function revealRejection<S, C extends RuleValues>(
   def: GameDef<S, C>,
   session: GameSession<S, C>,
   reveals: readonly CardReveal[],
-  conceals: readonly CardConcealment[],
+  recycle: CardRecycle | undefined,
 ): ApplyOutcome<S, C> | null {
-  if (reveals.length === 0 && conceals.length === 0) return null;
+  if (reveals.length === 0 && !recycle) return null;
   if (!session.veiled) {
     return rejection(session, 'not-veiled', 'this room is not running the Veil protocol');
   }
@@ -266,12 +270,13 @@ function revealRejection<S, C extends RuleValues>(
   }
   const fault = validateReveals(session.state, reveals);
   if (fault) return rejection(session, fault.code, fault.message);
-  const concealFault = validateConceals(
+  if (!recycle) return null;
+  const recycleFault = validateRecycle(
     applyReveals(session.state, reveals),
-    conceals,
+    recycle,
     deck.cardIds.length,
   );
-  return concealFault ? rejection(session, concealFault.code, concealFault.message) : null;
+  return recycleFault ? rejection(session, recycleFault.code, recycleFault.message) : null;
 }
 
 function timingError(log: readonly AppliedEvent[], meta: Readonly<ApplyMeta>): RuleError | null {
@@ -325,12 +330,11 @@ export function sessionApply<S, C extends RuleValues>(
   if (invalidTiming) return rejection(session, invalidTiming.code, invalidTiming.message);
 
   const reveals = meta.reveals ?? [];
-  const conceals = meta.conceals ?? [];
-  const revealFault = revealRejection(def, session, reveals, conceals);
+  const revealFault = revealRejection(def, session, reveals, meta.recycle);
   if (revealFault) return revealFault;
   // Legality and validation run against the *opened* board: a veiled hand only
   // becomes legal to play once its handle has been resolved to a real card.
-  const opened = applyConceals(applyReveals(session.state, reveals), conceals);
+  const opened = applyReveals(session.state, reveals);
 
   const legal = legalMovesForSeat(def, opened, session.phase, seat);
   const match = legal.find((m) => m.id === moveId);
@@ -343,7 +347,7 @@ export function sessionApply<S, C extends RuleValues>(
   }
 
   const effectivePayload = payload === undefined ? match.payload : payload;
-  const verdict = move.validate(opened, seat, effectivePayload);
+  const verdict = move.validate(opened, seat, effectivePayload, { recycle: meta.recycle });
   if (verdict !== true) {
     return { events: [], fx: [], session, rejected: verdict as RuleError };
   }
@@ -370,6 +374,7 @@ export function sessionApply<S, C extends RuleValues>(
       atMs: meta.atMs,
       reveals,
       conceals,
+      recycle: meta.recycle,
     },
     fx,
   );
@@ -419,11 +424,10 @@ export function sessionInject<S, C extends RuleValues>(
   const invalidTiming = timingError(session.log, meta);
   if (invalidTiming) return rejection(session, invalidTiming.code, invalidTiming.message);
   const reveals = meta.reveals ?? [];
-  const conceals = meta.conceals ?? [];
-  const revealFault = revealRejection(def, session, reveals, conceals);
+  const revealFault = revealRejection(def, session, reveals, meta.recycle);
   if (revealFault) return revealFault;
   const verdict = def.flow.canInject(
-    applyConceals(applyReveals(session.state, reveals), conceals),
+    applyReveals(session.state, reveals),
     session.phase,
     moveId,
     payload,
@@ -455,7 +459,7 @@ export function sessionInject<S, C extends RuleValues>(
       injected: true,
       atMs: meta.atMs,
       reveals,
-      conceals,
+      recycle: meta.recycle,
     },
     fx,
   );
@@ -530,7 +534,7 @@ export function replaySession<S, C extends RuleValues>(
         injected: logged.injected === true,
         atMs: logged.atMs,
         reveals: logged.reveals,
-        conceals: logged.conceals,
+        recycle: logged.recycle,
       },
       fx,
     );
