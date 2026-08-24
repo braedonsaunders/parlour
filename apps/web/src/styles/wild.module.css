@@ -441,6 +441,155 @@
   border-color: rgba(235, 120, 175, 0.9);
 }
 
+/* --- pickup counter -------------------------------------------------------- */
+
+.pickupLayer {
+  position: absolute;
+  inset: 0;
+  z-index: 27;
+  display: grid;
+  /* Below the piles, not over them: the stock is where the cards are coming
+     from, so covering it hides the very thing being counted. */
+  align-items: end;
+  justify-items: center;
+  padding-bottom: 24%;
+  pointer-events: none;
+}
+
+.pickup {
+  display: grid;
+  justify-items: center;
+  gap: 0.24rem;
+  padding: 0.85rem 1.6rem;
+  border: 3px solid rgba(240, 150, 120, 0.85);
+  border-radius: 1.2rem;
+  background: linear-gradient(180deg, rgba(46, 20, 24, 0.96), rgba(14, 22, 28, 0.96));
+  box-shadow:
+    0 18px 40px -16px rgba(2, 8, 12, 0.95),
+    0 0 30px -6px rgba(240, 150, 120, 0.45);
+  text-align: center;
+}
+
+.pickup[data-reason='caught'] {
+  border-color: rgba(235, 120, 175, 0.9);
+}
+
+.pickup[data-reason='challenge'] {
+  border-color: rgba(160, 210, 240, 0.9);
+}
+
+/* Landing on you is the version that has to hurt. */
+.pickup[data-mine] {
+  border-width: 4px;
+  animation: pickupJolt 0.5s ease-out;
+}
+
+.pickupWho {
+  color: rgba(243, 231, 212, 0.72);
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.pickupCount {
+  display: block;
+  font-family: var(--font-display), sans-serif;
+  font-size: clamp(2.2rem, 7vw, 3.4rem);
+  font-weight: 800;
+  line-height: 1;
+  color: #fff3dc;
+  text-shadow: 0 3px 0 rgba(6, 16, 22, 0.55);
+}
+
+/* One pip per card, filling in as each one lands. */
+.pickupTrack {
+  display: flex;
+  gap: 0.24rem;
+  margin-top: 0.15rem;
+}
+
+.pickupTrack i {
+  width: 0.5rem;
+  height: 0.72rem;
+  border-radius: 0.12rem;
+  border: 1px solid rgba(255, 246, 228, 0.4);
+  background: rgba(255, 246, 228, 0.12);
+  transition:
+    background 160ms ease,
+    transform 160ms var(--ease-pop);
+}
+
+.pickupTrack i[data-landed] {
+  background: #f0966f;
+  border-color: rgba(255, 246, 228, 0.9);
+  transform: translateY(-2px);
+}
+
+.pickupProgress {
+  color: rgba(243, 231, 212, 0.66);
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+@keyframes pickupJolt {
+  0% {
+    transform: scale(1) rotate(0deg);
+  }
+  25% {
+    transform: scale(1.06) rotate(-1.2deg);
+  }
+  55% {
+    transform: scale(0.99) rotate(0.8deg);
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+/* --- Draw Four challenge --------------------------------------------------- */
+
+.challengePrompt {
+  position: absolute;
+  left: 50%;
+  bottom: 27%;
+  z-index: 28;
+  display: grid;
+  justify-items: center;
+  gap: 0.5rem;
+  width: min(24rem, 88vw);
+  padding: 0.9rem 1.1rem;
+  transform: translateX(-50%);
+  text-align: center;
+}
+
+.challengePrompt strong {
+  font-family: var(--font-display), sans-serif;
+  font-size: 0.98rem;
+  font-weight: 800;
+  color: #fff3dc;
+}
+
+.challengePrompt small {
+  color: rgba(214, 226, 232, 0.72);
+  font-size: 0.72rem;
+  line-height: 1.4;
+}
+
+.challengeActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.challengeButton {
+  background: linear-gradient(180deg, #d67ba0, #8c2e64);
+  border-color: rgba(255, 226, 240, 0.75);
+}
+
 /* --- draw + last-card affordances ----------------------------------------- */
 
 .stockPile[data-can-draw='true'] {
@@ -508,7 +657,8 @@
 
 @media (prefers-reduced-motion: reduce) {
   .stockPile[data-can-draw='true'],
-  .lastCardButton {
+  .lastCardButton,
+  .pickup[data-mine] {
     animation: none;
   }
 }

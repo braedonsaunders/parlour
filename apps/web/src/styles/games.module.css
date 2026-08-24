@@ -145,30 +145,39 @@
   justify-content: center;
   font-size: 1.2rem;
   box-shadow: 0 8px 20px -10px rgba(6, 16, 22, 0.9);
+  /* Colours come from the pack's catalog entry; only the fan geometry is here. */
+  background: linear-gradient(180deg, var(--art-from, #d95763), var(--art-to, #a3372c));
   animation: wild-bob 2.8s ease-in-out infinite;
 }
 
 .wildCard:nth-child(1) {
-  background: linear-gradient(180deg, #d95763, #a3372c);
   transform: translateX(-2.9rem) rotate(-14deg);
 }
 
 .wildCard:nth-child(2) {
-  background: linear-gradient(180deg, #e2b049, #b07a1c);
   transform: translateX(-1rem) rotate(-4deg);
   animation-delay: 0.2s;
 }
 
 .wildCard:nth-child(3) {
-  background: linear-gradient(180deg, #5fae7b, #2f6b48);
   transform: translateX(0.9rem) rotate(5deg);
   animation-delay: 0.4s;
 }
 
 .wildCard:nth-child(4) {
-  background: linear-gradient(180deg, #4ba1ba, #25586e);
   transform: translateX(2.8rem) rotate(15deg);
   animation-delay: 0.6s;
+}
+
+/* A three-card fan sits centred rather than leaving a gap where the fourth was. */
+.wildCard:nth-child(1):nth-last-child(3) {
+  transform: translateX(-2rem) rotate(-12deg);
+}
+.wildCard:nth-child(2):nth-last-child(2) {
+  transform: translateX(0) rotate(0deg);
+}
+.wildCard:nth-child(3):nth-last-child(1) {
+  transform: translateX(2rem) rotate(12deg);
 }
 
 @keyframes wild-bob {
@@ -208,42 +217,21 @@
   opacity: 0.7;
 }
 
-/* --- president: the climbing crown --------------------------------------- */
+/* --- rules button on a tile ------------------------------------------------ */
 
-.presCard {
-  position: absolute;
-  left: 50%;
-  top: 58%;
-  width: 3rem;
-  height: 4.2rem;
-  margin: -2.1rem 0 0 -1.5rem;
-  border-radius: 14%;
-  border: 3px solid rgba(255, 244, 226, 0.85);
-  color: #fff4e2;
-  font-family: var(--font-display), sans-serif;
-  font-weight: 800;
+/* Tiles are buttons, so the rules control sits beside one rather than inside
+   it. The wrapper takes over as the carousel's flex item and shrink-wraps the
+   tile, which keeps its own width rule (and the phone override) intact. */
+.tileWrap {
+  position: relative;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.15rem;
-  box-shadow: 0 8px 20px -10px rgba(6, 16, 22, 0.9);
-  animation: wild-bob 2.8s ease-in-out infinite;
+  flex: none;
+  scroll-snap-align: center;
 }
 
-.presCard:nth-child(1) {
-  background: linear-gradient(180deg, #7c5cb4, #45306e);
-  transform: translateX(-2rem) rotate(-12deg);
-}
-
-.presCard:nth-child(2) {
-  background: linear-gradient(180deg, #d9a441, #a06a14);
-  transform: translateX(0) rotate(-2deg) translateY(-0.35rem);
-  animation-delay: 0.2s;
-  z-index: 1;
-}
-
-.presCard:nth-child(3) {
-  background: linear-gradient(180deg, #b34a67, #74263f);
-  transform: translateX(2rem) rotate(10deg);
-  animation-delay: 0.4s;
+.tileHelp {
+  position: absolute;
+  z-index: 3;
+  top: 0.7rem;
+  right: 0.7rem;
 }

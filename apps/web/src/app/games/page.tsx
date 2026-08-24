@@ -2,7 +2,9 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { GAMES, type GameDef, type GamePreviewKind } from '@/lib/games';
+import { GameArt } from '@/components/GameArt';
+import { HowToPlayButton } from '@/components/HowToPlay';
+import { GAMES, type GameCatalogEntry } from '@/lib/games';
 import modeStyles from '@/styles/modes.module.css';
 import gameStyles from '@/styles/games.module.css';
 
@@ -46,65 +48,47 @@ export default function GameSelectPage() {
   );
 }
 
-function GameTile({ def, onSelect }: { def: GameDef; onSelect?: () => void }) {
+function GameTile({ def, onSelect }: { def: GameCatalogEntry; onSelect?: () => void }) {
   const shelved = !onSelect;
   return (
-    <button
-      type="button"
-      aria-disabled={shelved}
-      data-shelved={shelved}
-      data-testid={`game-${def.id}`}
-      onClick={onSelect}
-      className={`${modeStyles.tile} ${gameStyles.tile}`}
-      style={{
-        ['--tile-accent' as string]: def.accent,
-        ['--tile-accent-soft' as string]: `${def.accent}44`,
-        ['--tile-shade' as string]: def.shade,
-      }}
-    >
-      {shelved && <span className={gameStyles.soonRibbon}>Soon</span>}
-      <Preview kind={def.preview} />
-      <span className={modeStyles.tagline}>{def.tagline}</span>
-      <h2 className={modeStyles.modeName}>
-        {def.name} <span className="text-base font-bold text-dusk-100/80">· {def.subtitle}</span>
-      </h2>
-      <span className={modeStyles.facts}>
-        {def.facts.map((fact) => (
-          <span key={fact} className={modeStyles.fact}>
-            {fact}
-          </span>
-        ))}
-      </span>
-      <p className={modeStyles.description}>{def.description}</p>
-    </button>
-  );
-}
-
-function Preview({ kind }: { kind: GamePreviewKind }) {
-  return (
-    <span className={modeStyles.preview}>
-      {kind === 'blitz-fan' && (
-        <>
-          <span className={gameStyles.fanCard}>A♠</span>
-          <span className={gameStyles.fanCard}>31</span>
-          <span className={gameStyles.fanCard}>K♠</span>
-        </>
-      )}
-      {kind === 'wild-fan' && (
-        <>
-          <span className={gameStyles.wildCard}>7</span>
-          <span className={gameStyles.wildCard}>⤺</span>
-          <span className={gameStyles.wildCard}>⊘</span>
-          <span className={gameStyles.wildCard}>+4</span>
-        </>
-      )}
-      {kind === 'president-fan' && (
-        <>
-          <span className={gameStyles.presCard}>3</span>
-          <span className={gameStyles.presCard}>♛</span>
-          <span className={gameStyles.presCard}>2</span>
-        </>
-      )}
-    </span>
+    // The rules button is a sibling of the tile, not a child: a tile is itself
+    // a button, and nesting one inside another is invalid and unclickable.
+    <div className={gameStyles.tileWrap}>
+      <HowToPlayButton
+        doc={def.howToPlay}
+        title={def.name}
+        subtitle={def.subtitle}
+        variant="chip"
+        className={gameStyles.tileHelp}
+      />
+      <button
+        type="button"
+        aria-disabled={shelved}
+        data-shelved={shelved}
+        data-testid={`game-${def.id}`}
+        onClick={onSelect}
+        className={`${modeStyles.tile} ${gameStyles.tile}`}
+        style={{
+          ['--tile-accent' as string]: def.accent,
+          ['--tile-accent-soft' as string]: `${def.accent}44`,
+          ['--tile-shade' as string]: def.shade,
+        }}
+      >
+        {shelved && <span className={gameStyles.soonRibbon}>Soon</span>}
+        <GameArt cards={def.art} />
+        <span className={modeStyles.tagline}>{def.tagline}</span>
+        <h2 className={modeStyles.modeName}>
+          {def.name} <span className="text-base font-bold text-dusk-100/80">· {def.subtitle}</span>
+        </h2>
+        <span className={modeStyles.facts}>
+          {def.facts.map((fact) => (
+            <span key={fact} className={modeStyles.fact}>
+              {fact}
+            </span>
+          ))}
+        </span>
+        <p className={modeStyles.description}>{def.description}</p>
+      </button>
+    </div>
   );
 }
