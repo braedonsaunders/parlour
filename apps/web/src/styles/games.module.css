@@ -1,23 +1,298 @@
-/* Game-shelf tile previews — structural tile/carousel classes come from
-   modes.module.css; only the per-game artwork lives here. */
+/* Game library layout + per-game shelf art. The shared mode tile remains the
+   visual chassis, while this page controls density and responsive browsing. */
+
+.page {
+  display: flex;
+  min-height: 100dvh;
+  flex-direction: column;
+  overflow-x: clip;
+  padding-bottom: max(1.25rem, env(safe-area-inset-bottom));
+}
+
+.header {
+  display: grid;
+  width: min(88rem, calc(100% - 3rem));
+  grid-template-columns: minmax(13rem, 1fr) auto minmax(13rem, 1fr);
+  align-items: center;
+  gap: 1.25rem;
+  margin-inline: auto;
+  padding-top: max(1.25rem, env(safe-area-inset-top));
+}
+
+.backLink {
+  width: max-content;
+  justify-self: start;
+  transition:
+    color var(--dur-tap) ease,
+    transform var(--dur-tap) var(--ease-pop);
+}
+
+.backLink:hover {
+  transform: translateX(-2px);
+}
+
+.heading {
+  text-align: center;
+}
+
+.eyebrow {
+  display: block;
+  margin-bottom: 0.1rem;
+  color: rgba(215, 237, 242, 0.68);
+  font-family: var(--font-display), sans-serif;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+}
+
+.search {
+  display: flex;
+  width: min(100%, 20rem);
+  height: 2.75rem;
+  align-items: center;
+  justify-self: end;
+  gap: 0.55rem;
+  padding: 0.25rem 0.4rem 0.25rem 0.8rem;
+  border: 1px solid rgba(175, 218, 228, 0.26);
+  border-radius: var(--radius-pill);
+  background: linear-gradient(180deg, rgba(36, 74, 92, 0.82), rgba(21, 40, 51, 0.88));
+  box-shadow:
+    inset 0 1px 0 rgba(215, 237, 242, 0.12),
+    0 12px 28px -18px rgba(6, 16, 22, 0.9);
+  backdrop-filter: blur(12px);
+  transition:
+    border-color var(--dur-tap) ease,
+    box-shadow var(--dur-tap) ease;
+}
+
+.search:focus-within {
+  border-color: rgba(255, 217, 160, 0.72);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 244, 226, 0.18),
+    0 0 0 3px rgba(242, 176, 106, 0.16),
+    0 16px 32px -18px rgba(6, 16, 22, 0.9);
+}
+
+.searchIcon {
+  width: 1.05rem;
+  flex: none;
+  fill: none;
+  stroke: rgba(215, 237, 242, 0.72);
+  stroke-linecap: round;
+  stroke-width: 2;
+}
+
+.searchInput {
+  min-width: 0;
+  flex: 1;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--ink);
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.searchInput::placeholder {
+  color: rgba(215, 237, 242, 0.55);
+}
+
+.searchInput::-webkit-search-cancel-button {
+  appearance: none;
+}
+
+.searchClear {
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  flex: none;
+  place-items: center;
+  border-radius: 50%;
+  color: rgba(215, 237, 242, 0.78);
+  font-family: var(--font-body), sans-serif;
+  font-size: 1.35rem;
+  line-height: 1;
+  transition:
+    color var(--dur-tap) ease,
+    background var(--dur-tap) ease,
+    transform var(--dur-tap) var(--ease-pop);
+}
+
+.searchClear:hover {
+  background: rgba(215, 237, 242, 0.1);
+  color: var(--ink);
+  transform: scale(1.06);
+}
+
+.searchClear:focus-visible {
+  outline: 2px solid var(--hearth-core);
+  outline-offset: 1px;
+}
+
+.library {
+  width: min(88rem, calc(100% - 3rem));
+  margin: 1rem auto 0;
+  padding: 0.9rem;
+  border: 1px solid rgba(175, 218, 228, 0.14);
+  border-radius: calc(var(--radius-fat) + 0.35rem);
+  background: linear-gradient(180deg, rgba(21, 40, 51, 0.42), rgba(20, 34, 47, 0.58));
+  box-shadow:
+    inset 0 1px 0 rgba(215, 237, 242, 0.08),
+    0 28px 64px -32px rgba(6, 16, 22, 0.9);
+  backdrop-filter: blur(8px);
+}
+
+.libraryBar {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.05rem 0.35rem 0.75rem;
+}
+
+.libraryTitle {
+  color: var(--ink);
+  font-family: var(--font-display), sans-serif;
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.libraryCopy {
+  margin-top: 0.05rem;
+  color: rgba(215, 237, 242, 0.64);
+  font-size: 0.75rem;
+}
+
+.resultCount {
+  flex: none;
+  color: rgba(215, 237, 242, 0.7);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.gameGrid {
+  display: grid;
+  grid-auto-flow: row;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.9rem;
+}
+
+.gameGrid .tileWrap {
+  width: 100%;
+  min-width: 0;
+}
+
+.gameGrid .tile {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  flex-direction: column;
+  padding: 0.82rem 0.9rem 0.9rem;
+}
+
+.tileArt > span {
+  height: 5.4rem;
+  margin-bottom: 0.58rem;
+}
+
+.gameGrid .tileTagline {
+  font-size: 0.68rem;
+  letter-spacing: 0.07em;
+}
+
+.gameGrid .tileTitle {
+  margin-top: 0.04rem;
+  font-size: 1.32rem;
+  line-height: 1.08;
+}
+
+.tileSubtitle {
+  display: block;
+  margin-top: 0.13rem;
+  color: rgba(215, 237, 242, 0.65);
+  font-family: var(--font-body), sans-serif;
+  font-size: 0.73rem;
+  font-weight: 700;
+}
+
+.gameGrid .tileFacts {
+  gap: 0.25rem;
+  margin-top: 0.45rem;
+}
+
+.gameGrid .tileFacts > span {
+  padding: 0.12rem 0.44rem;
+  font-size: 0.64rem;
+}
+
+.gameGrid .tileDescription {
+  display: -webkit-box;
+  margin-top: auto;
+  padding-top: 0.48rem;
+  overflow: hidden;
+  color: rgba(215, 237, 242, 0.74);
+  font-size: 0.75rem;
+  line-height: 1.35;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.emptyState {
+  display: flex;
+  min-height: 22rem;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 0.45rem;
+  padding: 2rem;
+  border: 2px dashed rgba(175, 218, 228, 0.24);
+  border-radius: var(--radius-fat);
+  background: rgba(21, 40, 51, 0.3);
+  color: rgba(215, 237, 242, 0.72);
+  text-align: center;
+}
+
+.emptyState h2 {
+  color: var(--ink);
+  font-family: var(--font-display), sans-serif;
+  font-size: 1.15rem;
+  font-weight: 800;
+}
+
+.emptyState p {
+  margin-bottom: 0.55rem;
+  font-size: 0.82rem;
+}
+
+.emptyMark {
+  color: var(--hearth-glow);
+  font-family: var(--font-display), sans-serif;
+  font-size: 2.4rem;
+  text-shadow: var(--shadow-glow);
+}
+
+.shelfNote {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.65rem;
+  margin: 0.85rem auto 0;
+  padding-inline: 1.5rem;
+  color: rgba(215, 237, 242, 0.58);
+  font-size: 0.74rem;
+  text-align: center;
+}
+
+.shelfNote strong {
+  color: rgba(215, 237, 242, 0.76);
+}
 
 .tile {
   overflow: hidden;
-}
-
-/* On phones the shelf pages one full-width card at a time; the shared
-   carousel's snap + gutter padding does the rest. Descendant selectors beat
-   modes.module.css's fixed 21rem tile width regardless of bundle order. */
-@media (max-width: 640px) {
-  .shelf {
-    scroll-snap-type: x mandatory;
-  }
-
-  /* Just narrower than the gutters so the next card peeks in as a scroll hint. */
-  .shelf .tile,
-  .shelf .shelfHint {
-    width: calc(100vw - 4.5rem);
-  }
 }
 
 .tile[data-shelved='true'] {
@@ -190,29 +465,9 @@
   }
 }
 
-/* --- more-games shelf hint ------------------------------------------------ */
-
-.shelfHint {
-  flex: none;
-  width: 15rem;
-  scroll-snap-align: center;
-  align-self: stretch;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 0.6rem;
-  border-radius: var(--radius-fat);
-  border: 2px dashed rgba(175, 218, 228, 0.28);
-  background: rgba(21, 40, 51, 0.35);
-  color: rgba(215, 237, 242, 0.6);
-  text-align: center;
-  padding: 1.25rem;
-}
-
 .shelfHintMark {
   font-family: var(--font-display), sans-serif;
-  font-size: 2rem;
+  font-size: 1rem;
   font-weight: 800;
   opacity: 0.7;
 }
@@ -220,8 +475,7 @@
 /* --- rules button on a tile ------------------------------------------------ */
 
 /* Tiles are buttons, so the rules control sits beside one rather than inside
-   it. The wrapper takes over as the carousel's flex item and shrink-wraps the
-   tile, which keeps its own width rule (and the phone override) intact. */
+   it. The wrapper positions that sibling and lets the tile fill its grid cell. */
 .tileWrap {
   position: relative;
   display: flex;
@@ -234,4 +488,82 @@
   z-index: 3;
   top: 0.7rem;
   right: 0.7rem;
+}
+
+@media (max-width: 1120px) {
+  .gameGrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 820px) {
+  .header {
+    grid-template-columns: auto 1fr;
+  }
+
+  .heading {
+    justify-self: end;
+    text-align: right;
+  }
+
+  .search {
+    width: 100%;
+    grid-column: 1 / -1;
+  }
+
+  .gameGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Phones use the document's natural vertical scroll so every game is visible
+   in reading order and a larger catalog simply makes the page longer. */
+@media (max-width: 640px) {
+  .header,
+  .library {
+    width: calc(100% - 2rem);
+  }
+
+  .header {
+    gap: 0.75rem;
+  }
+
+  .heading h1 {
+    font-size: 1.2rem;
+  }
+
+  .eyebrow {
+    font-size: 0.58rem;
+  }
+
+  .library {
+    padding-inline: 0.75rem;
+  }
+
+  .libraryBar {
+    padding-inline: 0.15rem;
+  }
+
+  .libraryCopy {
+    display: none;
+  }
+
+  .gameGrid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.8rem;
+  }
+
+  .gameGrid .tileWrap {
+    width: 100%;
+  }
+
+  .emptyState {
+    min-height: 20rem;
+    margin: 0 0.9rem 0.9rem;
+  }
+
+  .shelfNote {
+    margin-top: 0.65rem;
+  }
 }
