@@ -71,6 +71,8 @@ export interface VeilEpoch {
   layers: VeilLayerEntry[];
   /** first veil-handle index this epoch's positions map to */
   handleBase: number;
+  /** seats that contributed a layer to this epoch, in ceremony order */
+  participants: readonly number[];
 }
 
 export function roundIdFor(roomCode: string, seed: number, epoch: number): string {
@@ -92,8 +94,15 @@ export async function openEpoch(
   roundId: string,
   cards: readonly string[],
   handleBase: number,
+  participants: readonly number[] = [],
 ): Promise<VeilEpoch> {
   if (new Set(cards).size !== cards.length) throw new Error('epoch cards must be distinct');
+  if (
+    participants.some((seat) => !Number.isInteger(seat) || seat < 0) ||
+    new Set(participants).size !== participants.length
+  ) {
+    throw new Error('epoch participants must be distinct seats');
+  }
   return {
     epoch,
     cards: [...cards],
@@ -101,6 +110,7 @@ export async function openEpoch(
     deck: null,
     layers: [],
     handleBase,
+    participants: [...participants],
   };
 }
 
@@ -193,9 +203,24 @@ export function checkLayer(
 }
 
 /** Applies a checked layer, and closes the epoch once every seat has gone. */
-export function acceptLayer(epoch: VeilEpoch, entry: VeilLayerEntry, seats: number): VeilEpoch {
+export function acceptLayer(
+  epoch: VeilEpoch,
+  entry: VeilLayerEntry,
+  seatsOrParticipants: number | readonly number[],
+): VeilEpoch {
+  const participants =
+    epoch.participants.length > 0
+      ? epoch.participants
+      : typeof seatsOrParticipants === 'number'
+        ? Array.from({ length: seatsOrParticipants }, (_, seat) => seat)
+        : seatsOrParticipants;
   const layers = [...epoch.layers, entry];
-  return { ...epoch, layers, deck: layers.length === seats ? [...entry.deck] : null };
+  return {
+    ...epoch,
+    participants: [...participants],
+    layers,
+    deck: layers.length === participants.length ? [...entry.deck] : null,
+  };
 }
 
 /** Removes this seat's layer from one position — its share of the decryption. */

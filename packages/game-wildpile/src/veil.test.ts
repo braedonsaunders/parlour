@@ -193,6 +193,33 @@ describe('veiled jump-in', () => {
     const open = createSession(wildpileGame, { seed: 91, config: jumpy, seats: 3 });
     expect((open.state as WildpileState).veiled).toBe(false);
   });
+
+  it('draws from the fresh hidden order after a public discard is re-veiled', () => {
+    const { session } = veiled();
+    const retired = ['blue-2-0', 'green-3-0'];
+    const base = wildpileGame.veil!.deck(defaults).cardIds.length;
+    const issue = [`v#${base}`, `v#${base + 1}`];
+    const spent = {
+      ...session,
+      state: {
+        ...(session.state as WildpileState),
+        stock: [],
+        discard: [STARTER, ...retired],
+      },
+    };
+
+    expect(sessionApply(wildpileGame, spent, 0, 'draw').rejected?.code).toBe('stock-not-reveiled');
+    const outcome = sessionApply(wildpileGame, spent, 0, 'draw', undefined, {
+      recycle: { retire: retired, issue },
+    });
+    const state = outcome.session.state as WildpileState;
+
+    expect(outcome.rejected).toBeUndefined();
+    expect(state.discard).toEqual([STARTER]);
+    expect(state.stock).toEqual([issue[1]]);
+    expect(state.hands[0]).toContain(issue[0]);
+    expect(outcome.events[0]?.recycle).toEqual({ retire: retired, issue });
+  });
 });
 
 describe('veiled replay', () => {

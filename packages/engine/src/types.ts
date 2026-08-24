@@ -8,7 +8,7 @@
  * no new Date(), no Math.random. Randomness ONLY via Rng.
  */
 
-import type { VeilSupport } from './veil';
+import type { CardRecycle, VeilSupport } from './veil';
 
 export type SeatId = number;
 export type CardId = string;
@@ -101,6 +101,12 @@ export interface MoveCtx {
     seq: number;
     atMs?: number;
   };
+  /**
+   * Present when this move is re-veiling a spent pile. `issue` is the new,
+   * secret order the reducer must install; `retire` names the cards it is
+   * replacing. Nothing pairs the two — that mapping is what stays hidden.
+   */
+  recycle?: CardRecycle;
 }
 
 /** Replay-relevant metadata supplied by the transport authority. */
@@ -115,14 +121,21 @@ export interface ApplyMeta {
    */
   reveals?: readonly (readonly [CardId, CardId])[];
   /**
-   * Cards going back under the veil before this move — a recycled discard pile
-   * handed to a fresh shuffle ceremony. Applied after `reveals`.
+   * A spent pile going back under the veil: public cards retired, fresh handles
+   * issued in the order a new shuffle ceremony produced. The move places them;
+   * the runtime checks the exchange conserved the deck.
    */
-  conceals?: readonly (readonly [CardId, CardId])[];
+  recycle?: CardRecycle;
+}
+
+/** Replay metadata a move may need while deciding whether an action is valid. */
+export interface MoveValidationCtx {
+  /** Present when the authority has completed a fresh Veil epoch for this move. */
+  recycle?: CardRecycle;
 }
 
 export interface Move<S> {
-  validate(state: S, seat: SeatId, payload: unknown): true | RuleError;
+  validate(state: S, seat: SeatId, payload: unknown, ctx?: MoveValidationCtx): true | RuleError;
   apply(state: S, seat: SeatId, payload: unknown, ctx: MoveCtx): S;
 }
 
@@ -226,8 +239,8 @@ export interface AppliedEvent {
    * log: replay re-applies them in order, so a veiled round replays exactly.
    */
   reveals?: readonly (readonly [CardId, CardId])[];
-  /** Cards re-veiled before this event's move (stock recycle). Replayed in order. */
-  conceals?: readonly (readonly [CardId, CardId])[];
+  /** The stock recycle this event performed. Replayed exactly, so the new order holds. */
+  recycle?: CardRecycle;
   hash?: string;
 }
 
