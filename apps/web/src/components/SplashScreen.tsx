@@ -26,6 +26,8 @@ type BurstSuit = {
   peak: string;
 };
 
+type SplashPhase = 'shown' | 'leaving' | 'gone';
+
 function makeBurst(count: number): BurstSuit[] {
   const rnd = seededRandom(0x5b1a5);
   return Array.from({ length: count }, (_, i) => {
@@ -58,12 +60,27 @@ let shouldShowThisLoad: boolean | null = null;
 export function SplashScreen() {
   preload('/parlour-logo-splash.svg', { as: 'image' });
   const pathname = usePathname();
-  const [phase, setPhase] = useState<'shown' | 'leaving' | 'gone'>('shown');
-  const timers = useRef<number[]>([]);
+  const [phase, setPhase] = useState<SplashPhase>('shown');
+  const phaseRef = useRef<SplashPhase>('shown');
+  const holdTimer = useRef<number | null>(null);
+  const fadeTimer = useRef<number | null>(null);
 
   const dismiss = useCallback(() => {
-    setPhase((current) => (current === 'shown' ? 'leaving' : current));
-    timers.current.push(window.setTimeout(() => setPhase('gone'), FADE_MS));
+    if (phaseRef.current !== 'shown') return;
+
+    phaseRef.current = 'leaving';
+    setPhase('leaving');
+
+    if (holdTimer.current !== null) {
+      window.clearTimeout(holdTimer.current);
+      holdTimer.current = null;
+    }
+
+    fadeTimer.current = window.setTimeout(() => {
+      phaseRef.current = 'gone';
+      fadeTimer.current = null;
+      setPhase('gone');
+    }, FADE_MS);
   }, []);
 
   useEffect(() => {
@@ -75,13 +92,18 @@ export function SplashScreen() {
     }
 
     if (!shouldShowThisLoad) {
-      const raf = window.requestAnimationFrame(() => setPhase('gone'));
+      const raf = window.requestAnimationFrame(() => {
+        phaseRef.current = 'gone';
+        setPhase('gone');
+      });
       return () => window.cancelAnimationFrame(raf);
     }
 
-    timers.current.push(window.setTimeout(dismiss, HOLD_MS));
-    const pending = timers.current;
-    return () => pending.forEach((t) => window.clearTimeout(t));
+    holdTimer.current = window.setTimeout(dismiss, HOLD_MS);
+    return () => {
+      if (holdTimer.current !== null) window.clearTimeout(holdTimer.current);
+      if (fadeTimer.current !== null) window.clearTimeout(fadeTimer.current);
+    };
   }, [dismiss]);
 
   if (pathname !== '/' || phase === 'gone') return null;
@@ -89,9 +111,6 @@ export function SplashScreen() {
   return (
     <div
       className={phase === 'leaving' ? `${s.overlay} ${s.leaving}` : s.overlay}
-      onClick={dismiss}
-      role="presentation"
-      aria-hidden="true"
       data-testid="splash-screen"
     >
       <div className={s.rays} />
@@ -121,7 +140,15 @@ export function SplashScreen() {
       {/* eslint-disable-next-line @next/next/no-img-element -- static asset with baked-in SVG animation; next/image would proxy it needlessly */}
       <img className={s.logo} src="/parlour-logo-splash.svg" alt="" draggable={false} />
       <div className={s.vignette} />
-      <span className={s.hint}>tap to continue</span>
+      <span className={s.hint}>click or tap to continue</span>
+      <button
+        type="button"
+        className={s.dismissTarget}
+        aria-label="Continue to Parlour"
+        onPointerDown={dismiss}
+        onClick={dismiss}
+        data-testid="splash-screen-dismiss"
+      />
     </div>
   );
 }
