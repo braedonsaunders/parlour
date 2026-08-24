@@ -14,7 +14,36 @@ export const FX_TIMING = {
   maxBurstMs: 1200,
 } as const;
 
-export type Zone = 'stock' | 'discard' | 'peg' | `hand:${number}` | `seat:${number}`;
+/**
+ * Where a card can fly from or to.
+ *
+ * Most zones are shared furniture. Two are addressed by position because the
+ * game puts cards in fixed slots rather than one heap:
+ *
+ * - `board:N` is the Nth community card — the row a hold'em table deals face up
+ *   in the middle. It belongs to no seat, which is what separates it from
+ *   `seat:N`.
+ * - `discard:S:P` is seat S's own discard pile P. Games with one shared discard
+ *   keep using the bare `discard`; a game where every seat has several needs to
+ *   say which, or a flight lands on somebody else's furniture.
+ * - `centre:N` is the Nth shared build pile, and `payoff:S` seat S's face-up
+ *   payoff card — both from Spite & Malice, where the whole game is cards
+ *   moving between named piles rather than a hand and a heap.
+ * - `table` is Scopa's shared face-up spread, which is one zone however many
+ *   cards are lying in it.
+ */
+export type Zone =
+  | 'stock'
+  | 'discard'
+  | 'peg'
+  | `hand:${number}`
+  | `seat:${number}`
+  | `board:${number}`
+  | `discard:${number}:${number}`
+  | 'table'
+  | 'centre'
+  | `centre:${number}`
+  | `payoff:${number}`;
 
 type BaseCue = {
   id: string;
@@ -97,7 +126,13 @@ function zoneField(event: FxEvent, field: string): Zone {
     value === 'discard' ||
     value === 'peg' ||
     /^hand:\d+$/.test(value) ||
-    /^seat:\d+$/.test(value)
+    /^seat:\d+$/.test(value) ||
+    /^board:\d+$/.test(value) ||
+    /^discard:\d+:\d+$/.test(value) ||
+    value === 'table' ||
+    value === 'centre' ||
+    /^centre:\d+$/.test(value) ||
+    /^payoff:\d+$/.test(value)
   ) {
     return value as Zone;
   }

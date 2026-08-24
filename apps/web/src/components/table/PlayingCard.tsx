@@ -10,8 +10,23 @@ const SUITS: Record<string, { glyph: string; name: string }> = {
 
 const RANKS = ['?', 'A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
 
+/**
+ * A face supplied by a game pack, for decks the shared parser cannot read.
+ *
+ * `parseCard` assumes the standard `S1`..`C13` ids, so a pack with its own deck
+ * — Spite's four-colour cards, say — would otherwise render as the raw id with
+ * its first character eaten. Passing the pack's own `DeckDef.faces` entry keeps
+ * the card component shared without teaching it every deck on the shelf.
+ */
+export type CardFaceHint = {
+  short: string;
+  label: string;
+  color?: string;
+};
+
 export type PlayingCardProps = {
   card?: string;
+  face?: CardFaceHint;
   faceDown?: boolean;
   compact?: boolean;
   disabled?: boolean;
@@ -23,6 +38,7 @@ export type PlayingCardProps = {
 
 export function PlayingCard({
   card,
+  face,
   faceDown = false,
   compact = false,
   disabled = false,
@@ -30,7 +46,7 @@ export function PlayingCard({
   onClick,
   actionLabel = 'Discard',
 }: PlayingCardProps) {
-  const parsed = card ? parseCard(card) : null;
+  const parsed = face ? faceToParsed(face) : card ? parseCard(card) : null;
   const className = [
     styles.card,
     compact ? styles.cardCompact : '',
@@ -39,7 +55,10 @@ export function PlayingCard({
   ]
     .filter(Boolean)
     .join(' ');
-  const style = { '--card-rotation': `${rotation}deg` } as CSSProperties;
+  const style = {
+    '--card-rotation': `${rotation}deg`,
+    ...(parsed?.ink ? { '--card-ink': parsed.ink, color: parsed.ink } : {}),
+  } as CSSProperties;
 
   if (onClick) {
     return (
@@ -69,7 +88,31 @@ export function PlayingCard({
   );
 }
 
-type ParsedCard = { rank: string; glyph: string; red: boolean; label: string };
+type ParsedCard = { rank: string; glyph: string; red: boolean; label: string; ink?: string };
+
+/**
+ * Ink for a pack's own colour names. A four-colour deck has no suits to lean
+ * on, so the pip is a plain dot and the colour is the whole distinction —
+ * which means it has to actually be the colour.
+ */
+const PACK_INK: Readonly<Record<string, string>> = {
+  red: '#c2593f',
+  yellow: '#e0a33f',
+  green: '#4f9d6e',
+  blue: '#4b8fba',
+};
+
+function faceToParsed(face: CardFaceHint): ParsedCard {
+  return {
+    rank: face.short,
+    glyph: face.color ? '●' : '✦',
+    // `red` drives the shared red-suit class; a pack colour is painted from
+    // `ink` instead, so this stays false for non-standard decks.
+    red: false,
+    ink: face.color ? PACK_INK[face.color] : undefined,
+    label: face.label,
+  };
+}
 
 function parseCard(card: string): ParsedCard {
   const suit = SUITS[card[0] ?? ''];
