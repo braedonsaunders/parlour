@@ -3,7 +3,13 @@
 @tailwind utilities;
 
 :root {
-  --app-height: 100dvh;
+  /* Standalone iOS disagrees with itself about how tall the window is: the
+     viewport units can stop above the home indicator while `window.innerHeight`
+     reports the whole screen, and which one is short varies by version. JS
+     publishes its measurement here and every consumer takes the taller of the
+     two, so a full-bleed layer can never end up shorter than the real window. */
+  --app-window-height: 0px;
+  --app-height: max(100dvh, var(--app-window-height));
   --parlour-bg: #152833;
   --parlour-amber: #e29349;
   --parlour-teal: #2f86a1;
@@ -39,15 +45,9 @@
 
 @media (display-mode: standalone), (display-mode: fullscreen) {
   :root {
-    --app-height: 100lvh;
-  }
-}
-
-@supports (-webkit-touch-callout: none) {
-  @media (display-mode: standalone), (display-mode: fullscreen) {
-    :root {
-      --app-height: -webkit-fill-available;
-    }
+    /* Installed apps have no collapsing browser chrome, so the large viewport is
+       the honest floor; `dvh` is the one that shrinks under iOS's status bar. */
+    --app-height: max(100lvh, var(--app-window-height));
   }
 }
 

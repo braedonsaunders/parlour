@@ -1,9 +1,7 @@
 .overlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: var(--app-height);
+  inset: 0;
+  min-height: var(--app-height);
   z-index: 60;
   display: grid;
   place-items: center;

@@ -1,10 +1,11 @@
 .stage {
   position: fixed;
-  top: 0;
-  left: 0;
+  /* Insets cover the viewport as the browser sees it; the min-height covers the
+     window as JS measures it. Over-constraining drops `bottom`, so the scene
+     spills past the fold rather than leaving a bare strip under it. */
+  inset: 0;
+  min-height: var(--app-height);
   z-index: 0;
-  width: 100%;
-  height: var(--app-height);
   overflow: hidden;
   pointer-events: none;
   background: #0a161e;
