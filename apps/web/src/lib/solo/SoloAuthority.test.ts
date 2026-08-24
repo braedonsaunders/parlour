@@ -36,6 +36,46 @@ function expectAccepted<TSnapshot>(outcome: SoloDispatch<TSnapshot>) {
   return seen;
 }
 
+function playHeartsToRoundOver(seed = 31) {
+  const hearts = new HeartsTransport({
+    mode: 'classic',
+    seed,
+    player: { name: 'You', avatarId: 'ember' },
+  });
+  let guard = 0;
+  while (hearts.getSnapshot().status === 'playing') {
+    if (guard++ >= 20_000) throw new Error('hearts hand did not finish within 20k actions');
+    if (!hearts.humanPending()) {
+      hearts.playBotsUntilHuman();
+      continue;
+    }
+    const snapshot = hearts.getSnapshot();
+    if (snapshot.hand.state.passing && snapshot.hand.state.selections[0] === null) {
+      const hand = [...(snapshot.hand.state.hands[0] ?? [])].sort();
+      const passed = hearts.dispatch('passCards', { cards: [hand[0]!, hand[1]!, hand[2]!] });
+      if (passed.rejected) throw new Error(passed.rejected.message);
+      continue;
+    }
+    const card = hearts
+      .legalMovesForSeat(0)
+      .filter((move) => move.id === 'playCard')
+      .map((move) => (move.payload as { card: string }).card)
+      .sort(
+        (left, right) => Number.parseInt(left.slice(1), 10) - Number.parseInt(right.slice(1), 10),
+      )[0];
+    if (!card) {
+      hearts.playBotsUntilHuman();
+      if (hearts.getSnapshot().status === 'playing' && hearts.getSnapshot().hand.state.handOver) {
+        break;
+      }
+      continue;
+    }
+    const played = hearts.dispatch('playCard', { card });
+    if (played.rejected) throw new Error(played.rejected.message);
+  }
+  return hearts;
+}
+
 function expectRejected<TSnapshot>(
   outcome: SoloDispatch<TSnapshot>,
   code: string,
@@ -174,6 +214,23 @@ describe('SoloAuthority contract', () => {
       }
     });
 
+    it('returns an empty events list from startNextHand, matching the old public outcome', () => {
+      const hearts = playHeartsToRoundOver();
+      expect(hearts.getSnapshot().status).toBe('round-over');
+      const next = hearts.startNextHand();
+      expect(next.rejected).toBeNull();
+      expect(next.events).toEqual([]);
+      expect(next.snapshot.status).toBe('playing');
+      expect(next.snapshot.round).toBe(2);
+    });
+
+    it('exits the Hearts bot loop cleanly once the hand is over', () => {
+      const hearts = playHeartsToRoundOver();
+      expect(hearts.getSnapshot().status).toBe('round-over');
+      expect(hearts.playBotsUntilHuman()).toEqual([]);
+      expect(hearts.getSnapshot().status).toBe('round-over');
+    });
+
     it('lets Cribbage schedule the house from legalMoves, not phase.actor alone', () => {
       const cribbage = new CribbageTransport({
         mode: 'classic-pub',
@@ -242,6 +299,7 @@ describe('SoloAuthority contract', () => {
           apply: adaptSessionApply(ratscrewGame, () => ({ atMs: clock.stamp() })),
           inject: adaptSessionInject(ratscrewGame, () => ({ atMs: clock.stamp() })),
           isPlaying: (live) => live.status === 'playing',
+          bufferRecentFx: true,
         },
         session,
       );
@@ -266,6 +324,29 @@ describe('SoloAuthority contract', () => {
       expect(authority.drainRecentFx().map((event) => event.kind)).toEqual(
         flipped.fx.map((event) => event.kind),
       );
+    });
+
+    it('does not buffer recent fx unless the spec opts in', () => {
+      const nowMs = 1_000_000;
+      const clock = createAuthorityClock({ now: () => nowMs, step: 'tick' });
+      const session = createSession(ratscrewGame, {
+        seed: 77,
+        config: ratscrewGame.configSchema.resolve({ slapWindowMs: 400 }),
+        seats: 2,
+      });
+      const authority = new SoloAuthority(
+        {
+          snapshot: (live) => ({ log: live.log.length }),
+          apply: adaptSessionApply(ratscrewGame, () => ({ atMs: clock.stamp() })),
+          isPlaying: (live) => live.status === 'playing',
+        },
+        session,
+      );
+
+      const flipped = authority.dispatch('flip');
+      expectAccepted(flipped);
+      expect(flipped.fx.length).toBeGreaterThan(0);
+      expect(authority.drainRecentFx()).toEqual([]);
     });
   });
 });

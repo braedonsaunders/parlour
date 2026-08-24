@@ -108,10 +108,10 @@ export class LocalTransport {
         }),
         apply: adaptSessionApply(this.def),
         isPlaying: (live) => live.status === 'playing' && this.matchWinner === null,
-        blockDispatch: () =>
+        ended: () =>
           this.matchWinner !== null
             ? { code: 'match-ended', message: 'the match has ended' }
-            : null,
+            : { code: 'round-over', message: 'the round is over — deal the next one' },
         afterApply: ({ live, fx }) => {
           if (live.status === 'ended') this.scoreRound(live, fx);
         },

@@ -161,7 +161,7 @@ export class HeartsTransport {
     }
     return this.authority.accept({
       live: outcome.session,
-      events: outcome.events,
+      events: [],
       fx: outcome.fx,
       rejected: outcome.rejected,
     });

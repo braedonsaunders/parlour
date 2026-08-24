@@ -89,6 +89,12 @@ export interface SoloAuthoritySpec<TLive, TSnapshot, TView = never> {
   blockDispatch?(live: TLive): RuleError | null;
   /** Rejection used when `isPlaying` is false. */
   ended?: RuleError | ((live: TLive) => RuleError);
+  /**
+   * Buffer published fx for `drainRecentFx`. Default off — only Rat Screw's
+   * real-time page pulls a batch off the clock; turn-based tables read `fx`
+   * from the dispatch they already hold.
+   */
+  bufferRecentFx?: boolean;
   afterApply?(ctx: {
     live: TLive;
     events: AppliedEvent[];
@@ -149,7 +155,7 @@ export class SoloAuthority<TLive, TSnapshot, TView = never> {
     return this.applyMove(this.humanSeat, move, payload);
   }
 
-  applyMove(seat: number, move: string, payload?: unknown): SoloDispatch<TSnapshot> {
+  private applyMove(seat: number, move: string, payload?: unknown): SoloDispatch<TSnapshot> {
     return this.commit(this.spec.apply(this.live, seat, move, payload), { soft: true });
   }
 
@@ -175,8 +181,8 @@ export class SoloAuthority<TLive, TSnapshot, TView = never> {
     return { events: [], fx: [], rejected: { code, message }, snapshot: this.getSnapshot() };
   }
 
-  publish(outcome: SoloDispatch<TSnapshot>): SoloDispatch<TSnapshot> {
-    if (outcome.fx.length > 0) this.recentFx.push(...outcome.fx);
+  private publish(outcome: SoloDispatch<TSnapshot>): SoloDispatch<TSnapshot> {
+    if (this.spec.bufferRecentFx && outcome.fx.length > 0) this.recentFx.push(...outcome.fx);
     for (const listener of this.listeners) listener(outcome);
     return outcome;
   }

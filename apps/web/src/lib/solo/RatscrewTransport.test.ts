@@ -45,6 +45,17 @@ describe('ratscrew solo transport (virtual clock)', () => {
     b.dispose();
   });
 
+  it('opts into recentFx buffering so the real-time page can drain a batch', () => {
+    const transport = make();
+    const flipped = transport.dispatch('flip');
+    expect(flipped.rejected).toBeNull();
+    expect(transport.drainRecentFx().map((event) => event.kind)).toEqual(
+      flipped.fx.map((event) => event.kind),
+    );
+    expect(transport.drainRecentFx()).toEqual([]);
+    transport.dispose();
+  });
+
   it('bots flip on their own reflexes while the human waits', () => {
     const transport = make();
     const before = transport.getSnapshot().session.log.length;

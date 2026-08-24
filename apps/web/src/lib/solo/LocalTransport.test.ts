@@ -55,6 +55,31 @@ describe('LocalTransport M2 acceptance', () => {
     expect(transport.getSnapshot().session.log).toHaveLength(0);
   });
 
+  it('rejects a between-round dispatch as round-over, not match-ended', () => {
+    const transport = new LocalTransport({
+      mode: 'classic',
+      seats: 2,
+      botTier: 1,
+      seed: 8,
+      player: { name: 'You', avatarId: 'ember' },
+    });
+
+    expect(transport.dispatch('knock').rejected).toBeNull();
+    transport.playBotsUntilHuman();
+
+    const snapshot = transport.getSnapshot();
+    expect(snapshot.session.status).toBe('ended');
+    expect(snapshot.matchWinner).toBeNull();
+
+    const blocked = transport.dispatch('draw.stock');
+    expect(blocked).toEqual({
+      events: [],
+      fx: [],
+      rejected: { code: 'round-over', message: 'the round is over — deal the next one' },
+      snapshot: transport.getSnapshot(),
+    });
+  });
+
   it('tracks a human knock once when the round resolves', () => {
     const transport = new LocalTransport({
       mode: 'classic',

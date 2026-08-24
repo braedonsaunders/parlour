@@ -112,6 +112,7 @@ export class RatscrewTransport {
         apply: adaptSessionApply(ratscrewGame, meta),
         inject: adaptSessionInject(ratscrewGame, meta),
         isPlaying: (live) => live.status === 'playing',
+        bufferRecentFx: true,
         afterApply: () => {
           this.observeBoard();
         },
