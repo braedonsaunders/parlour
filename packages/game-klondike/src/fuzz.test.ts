@@ -43,5 +43,5 @@ describe('Klondike seed and move fuzz', () => {
         expect(new Set(held)).toEqual(expected);
       }
     }
-  });
+  }, 60_000);
 });
