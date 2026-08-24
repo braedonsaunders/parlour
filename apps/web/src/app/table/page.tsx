@@ -59,7 +59,6 @@ function SoloTablePage() {
 function ActiveMultiplayerTable({ room }: { room: MultiplayerRoomSession }) {
   const router = useRouter();
   const snapshot = useSyncExternalStore(room.subscribe, room.getSnapshot, room.getSnapshot);
-  const [selectedCard, setSelectedCard] = useState<string | null>(null);
   const [localError, setLocalError] = useState<string | null>(null);
 
   const dispatch = useCallback(
@@ -67,7 +66,6 @@ function ActiveMultiplayerTable({ room }: { room: MultiplayerRoomSession }) {
       try {
         room.send(move, payload);
         setLocalError(null);
-        setSelectedCard(null);
       } catch (error) {
         setLocalError(error instanceof Error ? error.message : 'The move could not be sent.');
       }
@@ -87,10 +85,8 @@ function ActiveMultiplayerTable({ room }: { room: MultiplayerRoomSession }) {
       view={view}
       fx={snapshot.fx}
       fxKey={snapshot.fxKey}
-      selectedCard={selectedCard}
       busy={busy}
       error={localError ?? snapshot.error}
-      onSelectCard={setSelectedCard}
       onDraw={(source) => dispatch(`draw.${source}`)}
       onDiscard={(card) => dispatch('discard', { card })}
       onKnock={() => dispatch('knock')}
