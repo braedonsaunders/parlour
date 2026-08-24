@@ -72,7 +72,13 @@ describe('playerView redaction', () => {
 });
 
 describe('veil support', () => {
-  it('does not advertise Veil — spadesGame.veil is undefined', () => {
-    expect(spadesGame.veil).toBeUndefined();
+  it('advertises a deck, a hand size and its own redeal move', () => {
+    expect(spadesGame.veil).toBeDefined();
+    expect(spadesGame.veil!.redealMove).toBe('nextHand');
+    expect(spadesGame.veil!.deck(spadesConfig.defaults()).cardIds).toHaveLength(52);
+    // Thirteen cards a seat and nothing turned face up, so the whole deck is
+    // dealt from the ceremony with no public setup opening first.
+    expect(spadesGame.veil!.publicSetupFrom(4, spadesConfig.defaults())).toBe(52);
+    expect(spadesGame.veil!.publicSetupReady([], 4, spadesConfig.defaults())).toBe(true);
   });
 });

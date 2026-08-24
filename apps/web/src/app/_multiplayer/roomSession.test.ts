@@ -6,8 +6,9 @@ import {
   makeRng,
   stateHash,
 } from '@parlour/engine';
-import { type BlitzConfig, type BlitzState } from '@parlour/game-blitz';
+import { createBlitzDef, type BlitzConfig, type BlitzState } from '@parlour/game-blitz';
 import {
+  createCribbageDef,
   cribbageConfigSchema,
   type CribbageConfig,
   type CribbageState,
@@ -19,10 +20,21 @@ import {
   type EuchreRules,
   type EuchreState,
 } from '@parlour/game-euchre';
-import { ginConfigSchema, type GinConfig, type GinMatchState } from '@parlour/game-gin';
-import { presidentConfig, type PresidentRules, type PresidentState } from '@parlour/game-president';
+import {
+  createGinMatchDef,
+  ginConfigSchema,
+  type GinConfig,
+  type GinMatchState,
+} from '@parlour/game-gin';
+import {
+  presidentConfig,
+  presidentGame,
+  type PresidentRules,
+  type PresidentState,
+} from '@parlour/game-president';
 import {
   ratscrewConfigSchema,
+  ratscrewGame,
   type RatscrewConfig,
   type RatscrewState,
 } from '@parlour/game-ratscrew';
@@ -32,8 +44,14 @@ import {
   type SpadesRules,
   type SpadesState,
 } from '@parlour/game-spades';
+import { heartsGame } from '@parlour/game-hearts';
 import { spadesModeForRules } from '@/lib/spades/modes';
-import { wildpileConfig, type WildpileRules, type WildpileState } from '@parlour/game-wildpile';
+import {
+  wildpileConfig,
+  wildpileGame,
+  type WildpileRules,
+  type WildpileState,
+} from '@parlour/game-wildpile';
 import { afterEach, describe, expect, it } from 'vitest';
 import { EngineAuthority } from '@/lib/multiplayer';
 import { NostrSignaling, type SignalPayload } from '@/lib/multiplayer/NostrSignaling';
@@ -283,55 +301,29 @@ describe('multiplayer route composition', () => {
     );
   });
 
-  // The point of the collaborative deal: the player who opens the table does
-  // not decide the deck. Both rooms below are opened by a host with the same
-  // seed, so if the host's number still chose the shuffle they would deal
-  // identically. Spades is the subject because its pack has no veil block, so
-  // its rooms run in the open — a veiled room gets this from the ceremony.
-  it('deals an open room from every seat’s share, not the host’s number', async () => {
-    async function dealtSeed(tag: string): Promise<number | undefined> {
-      const broker = new MockSignalingBroker();
-      const rtc = new MockRtcNetwork();
-      const peers = Array.from(
-        { length: 4 },
-        (_, seat) =>
-          new MultiplayerRoomSession(
-            { name: `P${seat}`, avatarId: 'ember', profileId: `${tag}-${seat}` },
-            {
-              signaling: broker.signaling(`${tag}-peer-${seat}`),
-              peerConnection: rtc.factory(`${tag}-rtc-${seat}`),
-              seed: 1234,
-            },
-          ),
-      );
-      sessions.push(...peers);
-      const host = peers[0]!;
-      const room = await host.create({ gameId: 'spades', seats: 4 });
-      for (let seat = 1; seat < 4; seat++) {
-        await peers[seat]!.join(room.code);
-        await eventually(() => expect(peers[seat]!.getSnapshot().localSeat).toBe(seat), 200, 5);
-      }
-      await host.start();
-      // Every peer plays the deal the shares agreed on, and none complains.
-      await eventually(
-        () => expect(peers[3]!.getSnapshot().session?.seed).toBe(host.getSnapshot().session?.seed),
-        200,
-        5,
-      );
-      for (const peer of peers) expect(peer.getSnapshot().error).toBeNull();
-      return host.getSnapshot().session?.seed;
+  /**
+   * Every shipped game is veiled, so every room takes its unpredictability from
+   * the ceremony. The collaborative deal is the floor underneath that — what an
+   * open room does when a pack ships no veil block — and it is covered where it
+   * lives, in dealSeed.test.ts. What matters here is that no game is left on a
+   * different path.
+   */
+  it('runs every room game veiled, with none left in the open tier', () => {
+    const packs = {
+      blitz: createBlitzDef(),
+      cribbage: createCribbageDef(),
+      wildpile: wildpileGame,
+      ratscrew: ratscrewGame,
+      euchre: createEuchreDef(),
+      hearts: heartsGame,
+      gin: createGinMatchDef(),
+      president: presidentGame,
+      spades: createSpadesDef(),
+    };
+    for (const [gameId, def] of Object.entries(packs)) {
+      expect(def.veil, `${gameId} should ship a veil block`).toBeDefined();
     }
-
-    const first = await dealtSeed('mix-a');
-    const second = await dealtSeed('mix-b');
-    expect(first).not.toBe(1234);
-    expect(first).not.toBe(second);
-    for (const seed of [first, second]) {
-      expect(Number.isSafeInteger(seed)).toBe(true);
-      expect(seed).toBeGreaterThanOrEqual(0);
-      expect(seed).toBeLessThanOrEqual(0xffff_ffff);
-    }
-  }, 120_000);
+  });
 
   // Regression: room seeds came off `Uint32Array` through `| 0`, so half of
   // them were negative — and the wire bounds a snapshot seed to 0…0xffffffff.
@@ -1421,13 +1413,15 @@ describe('spades rooms on the shared stack', () => {
 
   // Engine v1 Veil is gone. Saying so out loud beats quietly downgrading a
   // player who explicitly asked for cryptographic play.
-  // Nobody asks for a tier any more, so there is nothing to refuse: a game
-  // without a veil block simply runs in the open, and the badge says so.
-  it('runs spades in the open because its pack has no veil block', () => {
-    expect(createSpadesDef().veil).toBeUndefined();
+  // Nobody asks for a tier any more, and every shipped game now ships a veil
+  // block — spades was the last one without. So every room is a veiled room,
+  // and no game is left on a different path.
+  it('runs spades veiled like every other game', () => {
+    expect(createSpadesDef().veil).toBeDefined();
+    expect(createSpadesDef().veil!.redealMove).toBe('nextHand');
   });
 
-  it('resolves an open spades room as open, with the pack defaults filled in', async () => {
+  it('resolves a spades room as veiled, with the pack defaults filled in', async () => {
     const host = new MultiplayerRoomSession(
       { name: 'Host', avatarId: 'ember', profileId: 'spades-open' },
       {
@@ -1439,7 +1433,8 @@ describe('spades rooms on the shared stack', () => {
     sessions.push(host);
     await host.create({ gameId: 'spades', seats: 4 });
     const settings = host.getSnapshot().settings!;
-    expect(settings.security).toBe('open');
+    // Spades ships a veil block now, so its rooms are veiled like the rest.
+    expect(settings.security).toBe('veil');
     expect(settings.seats).toBe(4);
     expect(settings.config).toMatchObject({ targetScore: 500, nil: true, bags: true });
   });
@@ -1485,7 +1480,7 @@ describe('spades rooms on the shared stack', () => {
     expect(session.config.bags).toBe(false);
   });
 
-  it('advertises an open room and never claims a veil tier', async () => {
+  it('advertises the veiled tier it actually runs', async () => {
     const host = new MultiplayerRoomSession(
       { name: 'Host', avatarId: 'ember', profileId: 'spades-badge' },
       {
@@ -1497,8 +1492,10 @@ describe('spades rooms on the shared stack', () => {
     sessions.push(host);
     await host.create({ gameId: 'spades', seats: 4 });
     const security = host.getSnapshot().security;
-    expect(security.tier).toBe('open');
-    // The badge copy the lobby renders must not imply hidden hands.
-    expect(`${security.label} ${security.detail}`.toLowerCase()).not.toContain('veil');
+    expect(security.tier).toBe('veil');
+    // The badge has to state the tier in force. It once said "open" for spades
+    // because the pack had no veil block; claiming either one the room is not
+    // running is the failure this guards.
+    expect(`${security.label} ${security.detail}`.toLowerCase()).not.toContain('fair deal');
   });
 });

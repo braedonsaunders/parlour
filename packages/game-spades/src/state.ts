@@ -41,6 +41,15 @@ export interface HandSummary {
 export interface SpadesState {
   rules: SpadesRules;
   /**
+   * True when the hands are veil handles rather than faces.
+   *
+   * The rules that depend on what a seat *holds* cannot be checked against
+   * handles, so they change shape rather than pretending: following suit is
+   * audited after the match instead of enforced live, and leading spades early
+   * needs the hand opened as a claim. See docs/VEILED-DECK-PROTOCOL.md.
+   */
+  veiled: boolean;
+  /**
    * Set when a completed hand leaves the teams tied at or above target.
    * Stays set for the rest of the match: any later unequal score ends it,
    * even if both totals drop back below the posted target.
