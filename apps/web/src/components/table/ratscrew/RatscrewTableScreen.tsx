@@ -234,7 +234,7 @@ function Seat({
     <motion.div
       layout
       data-seat={player.seat}
-      className={`${tableStyles.seat} ${tableStyles[`seat${player.seat}`]} ${active ? tableStyles.seatActive : ''}`}
+      className={`${tableStyles.seat} ${tableStyles[`seat${player.seat}`]} ${player.isLocal ? styles.seatLocal : ''} ${active ? tableStyles.seatActive : ''}`}
       style={style}
       animate={active ? { scale: [1, 1.06, 1.02] } : { scale: 1 }}
       transition={{ duration: 0.24, ease: [0.34, 1.56, 0.64, 1] }}

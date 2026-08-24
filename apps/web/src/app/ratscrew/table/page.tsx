@@ -92,10 +92,6 @@ function LiveRatscrewTable({ transport }: { transport: RatscrewTransport }) {
     return unsubscribe;
   }, [transport]);
 
-  useEffect(() => {
-    return () => transport.dispose();
-  }, [transport]);
-
   const snapshot = transport.getSnapshot();
 
   const reportAndLeave = useCallback(() => {

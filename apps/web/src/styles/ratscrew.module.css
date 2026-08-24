@@ -1,5 +1,17 @@
 /* Rat Screw table chrome — sits on top of the shared table.module.css stage. */
 
+/*
+ * The shared stage hides seat 0 because Wild/Blitz players see themselves as
+ * the hand rail. Rat Screw has no visible hand — your stack is face-down like
+ * everyone else's — so the local plaque shows, parked clear of the buttons.
+ */
+.seatLocal {
+  visibility: visible;
+  left: 4.5%;
+  bottom: 1.6rem;
+  translate: none;
+}
+
 .centerPile {
   position: relative;
   display: grid;
