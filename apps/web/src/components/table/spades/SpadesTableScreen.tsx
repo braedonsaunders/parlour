@@ -2,6 +2,7 @@
 
 import {
   useCallback,
+  useEffect,
   useRef,
   useState,
   type CSSProperties,
@@ -311,23 +312,61 @@ function Seat({
  */
 function LastHandSummary({ view }: { view: SpadesTableView }) {
   const summary = view.lastHand;
+  const summaryHandNo = summary?.handNo ?? null;
+  const [expanded, setExpanded] = useState(true);
+
+  useEffect(() => {
+    if (summaryHandNo === null || typeof window.matchMedia !== 'function') return;
+    const compact = window.matchMedia(
+      '(max-width: 900px), (orientation: landscape) and (max-height: 560px)',
+    );
+    const followViewport = () => setExpanded(!compact.matches);
+    followViewport();
+    if (typeof compact.addEventListener === 'function') {
+      compact.addEventListener('change', followViewport);
+      return () => compact.removeEventListener('change', followViewport);
+    }
+    compact.addListener?.(followViewport);
+    return () => compact.removeListener?.(followViewport);
+  }, [summaryHandNo]);
+
   if (!summary) return null;
   return (
     <section
       className={styles.lastHand}
       data-testid="spades-last-hand"
+      data-expanded={expanded}
       aria-label={`Hand ${summary.handNo} scoring`}
       role="status"
     >
       <header className={styles.lastHandHead}>
-        <strong>Hand {summary.handNo}</strong>
+        <button
+          type="button"
+          className={styles.lastHandToggle}
+          data-testid="spades-last-hand-toggle"
+          aria-expanded={expanded}
+          onClick={() => setExpanded((value) => !value)}
+        >
+          <strong>Hand {summary.handNo}</strong>
+          <span className={styles.lastHandCompact} aria-hidden="true">
+            {summary.teams
+              .map(
+                (team) =>
+                  `${team.team === view.localSeat % 2 ? 'us' : 'them'} ${team.delta >= 0 ? '+' : ''}${team.delta}`,
+              )
+              .join(' · ')}
+          </span>
+          <span className={styles.lastHandChevron} aria-hidden="true">
+            {expanded ? '−' : '+'}
+          </span>
+        </button>
         {view.overtime && (
           <em className={styles.overtimeFlag} data-testid="spades-overtime">
             level at {view.targetScore} — playing on
           </em>
         )}
       </header>
-      <ul className={styles.lastHandRows}>
+      <ul className={styles.lastHandRows} hidden={!expanded}>
         {summary.teams.map((team) => (
           <li
             key={team.team}

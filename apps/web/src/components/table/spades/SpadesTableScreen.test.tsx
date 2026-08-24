@@ -699,6 +699,35 @@ describe('SpadesTableScreen last-hand summary', () => {
     expect(them).toContain('261');
   });
 
+  it('keeps a compact score summary while letting players collapse and reopen the ledger', () => {
+    act(() =>
+      root.render(
+        createElement(SpadesTableScreen, {
+          view: makeView({ lastHand: SUMMARY as never }),
+          fx: [],
+          fxKey: 'toggle',
+        }),
+      ),
+    );
+    const panel = container.querySelector('[data-testid="spades-last-hand"]')!;
+    const toggle = container.querySelector<HTMLButtonElement>(
+      '[data-testid="spades-last-hand-toggle"]',
+    )!;
+    const rows = panel.querySelector('ul')!;
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+    expect(toggle.textContent).toContain('us -160');
+    expect(toggle.textContent).toContain('them +61');
+
+    act(() => toggle.click());
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    expect(panel.getAttribute('data-expanded')).toBe('false');
+    expect(rows.hidden).toBe(true);
+
+    act(() => toggle.click());
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+    expect(rows.hidden).toBe(false);
+  });
+
   it('renders nothing before the first hand is scored', () => {
     act(() =>
       root.render(createElement(SpadesTableScreen, { view: makeView(), fx: [], fxKey: 'k' })),
