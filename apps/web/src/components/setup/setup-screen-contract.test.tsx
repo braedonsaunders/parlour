@@ -4,10 +4,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import modeStyles from '@/styles/modes.module.css';
 import BlitzSetupPage from '@/app/play/page';
 import CribbageSetupPage from '@/app/cribbage/page';
+import EightsSetupPage from '@/app/eights/page';
 import EuchreSetupPage from '@/app/euchre/page';
 import GinSetupPage from '@/app/gin/page';
 import HeartsSetupPage from '@/app/hearts/page';
 import KlondikeSetupPage from '@/app/klondike/page';
+import OhHellSetupPage from '@/app/ohhell/page';
+import PokerSetupPage from '@/app/poker/page';
+import ScopaSetupPage from '@/app/scopa/page';
+import SpiteSetupPage from '@/app/spite/page';
 import PresidentSetupPage from '@/app/president/page';
 import RatscrewSetupPage from '@/app/ratscrew/page';
 import SpadesSetupPage from '@/app/spades/page';
@@ -35,13 +40,18 @@ vi.mock('@/lib/transitions/runTableWipe', () => ({
 const SETUP_PAGES: readonly [string, ComponentType][] = [
   ['Blitz', BlitzSetupPage],
   ['Cribbage', CribbageSetupPage],
+  ['Crazy Eights', EightsSetupPage],
   ['Euchre', EuchreSetupPage],
   ['Gin', GinSetupPage],
   ['Hearts', HeartsSetupPage],
   ['Klondike', KlondikeSetupPage],
+  ['Oh Hell', OhHellSetupPage],
+  ['Poker', PokerSetupPage],
   ['President', PresidentSetupPage],
   ['Rat Screw', RatscrewSetupPage],
+  ['Scopa', ScopaSetupPage],
   ['Spades', SpadesSetupPage],
+  ['Spite & Malice', SpiteSetupPage],
   ['Wild', WildSetupPage],
 ];
 

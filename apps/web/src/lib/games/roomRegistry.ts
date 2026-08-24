@@ -56,6 +56,12 @@ import {
   type RatscrewState,
 } from '@parlour/game-ratscrew';
 import {
+  createEightsDef,
+  eightsConfig,
+  type EightsRules,
+  type EightsState,
+} from '@parlour/game-eights';
+import {
   cribbageConfigSchema,
   createCribbageDef,
   type CribbageConfig,
@@ -93,6 +99,7 @@ export type MultiplayerGameId =
   | 'blitz'
   | 'cribbage'
   | 'wildpile'
+  | 'eights'
   | 'ratscrew'
   | 'euchre'
   | 'hearts'
@@ -105,6 +112,7 @@ export type MultiplayerGameSession =
   | GameSession<BlitzState, BlitzConfig>
   | GameSession<CribbageState, CribbageConfig>
   | GameSession<WildpileState, WildpileRules>
+  | GameSession<EightsState, EightsRules>
   | GameSession<RatscrewState, RatscrewConfig>
   | GameSession<EuchreState, EuchreRules>
   | GameSession<HeartsState, HeartsRules>
@@ -306,6 +314,15 @@ const ROOM_GAMES: readonly RoomGameEntry[] = [
     def: () => wildpileGame,
     configSchema: wildpileConfig,
     recycleOn: 'draw',
+  }),
+  defineRoomGame<EightsState, EightsRules>({
+    gameId: 'eights',
+    def: createEightsDef,
+    configSchema: eightsConfig,
+    // A round is scored from the face value of every hand left on the table, so
+    // a veiled room could not settle one without opening every hand anyway.
+    veilRefusal:
+      'Crazy Eights friend rooms use open replay — scoring a round needs every hand face up',
   }),
   defineRoomGame<RatscrewState, RatscrewConfig>({
     gameId: 'ratscrew',

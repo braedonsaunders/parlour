@@ -5,7 +5,12 @@ import type { FxEvent } from '@parlour/engine';
 import { ohhellHowToPlay } from '@parlour/game-ohhell';
 import { useMatchTension } from '@/lib/audio/tension';
 import { OHHELL_MATCH_PACE_MS } from '@/lib/ohhell/modes';
-import { SUIT_GLYPHS, cardBadge, type OhHellSeatView, type OhHellTableView } from '@/lib/ohhell/view';
+import {
+  SUIT_GLYPHS,
+  cardBadge,
+  type OhHellSeatView,
+  type OhHellTableView,
+} from '@/lib/ohhell/view';
 import { useMusicMood } from '@/stores/audio';
 import { useProfileStore } from '@/stores/profile';
 import { useDealPresentation } from '@/lib/table/deal-presentation';
@@ -95,7 +100,11 @@ export function OhHellTableScreen(props: OhHellTableScreenProps) {
       <TablePlayfield
         label="Oh Hell table"
         seatCount={view.players.length}
-        feltMark={<span className={styles.feltMark}>{view.trumpSuit ? SUIT_GLYPHS[view.trumpSuit] : '♠'}</span>}
+        feltMark={
+          <span className={styles.feltMark}>
+            {view.trumpSuit ? SUIT_GLYPHS[view.trumpSuit] : '♠'}
+          </span>
+        }
       >
         <div className={styles.seatRing}>
           {others.map((player, index) => (
@@ -169,7 +178,12 @@ export function OhHellTableScreen(props: OhHellTableScreenProps) {
       )}
 
       <TableActionRail>
-        <Decision view={view} busy={props.busy} onBid={props.onBid} onChooseTrump={props.onChooseTrump} />
+        <Decision
+          view={view}
+          busy={props.busy}
+          onBid={props.onBid}
+          onChooseTrump={props.onChooseTrump}
+        />
       </TableActionRail>
 
       <TableMenu
@@ -182,15 +196,7 @@ export function OhHellTableScreen(props: OhHellTableScreenProps) {
   );
 }
 
-function OpponentSeat({
-  player,
-  slot,
-  of,
-}: {
-  player: OhHellSeatView;
-  slot: number;
-  of: number;
-}) {
+function OpponentSeat({ player, slot, of }: { player: OhHellSeatView; slot: number; of: number }) {
   const style = {
     ['--seat-slot' as string]: String(slot),
     ['--seat-of' as string]: String(of),

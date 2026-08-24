@@ -19,6 +19,7 @@ import {
   type EuchreRules,
   type EuchreState,
 } from '@parlour/game-euchre';
+import { eightsConfig, type EightsRules, type EightsState } from '@parlour/game-eights';
 import { ginConfigSchema, type GinConfig, type GinMatchState } from '@parlour/game-gin';
 import { presidentConfig, type PresidentRules, type PresidentState } from '@parlour/game-president';
 import {
@@ -351,7 +352,11 @@ describe('multiplayer route composition', () => {
     );
     const guest = new MultiplayerRoomSession(
       { name: 'Guest', avatarId: 'cobalt', profileId: 'seed-guest' },
-      { signaling: broker.signaling('seed-guest-peer'), peerConnection: rtc.factory('seed-guest'), seed: 7 },
+      {
+        signaling: broker.signaling('seed-guest-peer'),
+        peerConnection: rtc.factory('seed-guest'),
+        seed: 7,
+      },
     );
     sessions.push(host, guest);
 
@@ -378,11 +383,19 @@ describe('multiplayer route composition', () => {
     const rtc = new MockRtcNetwork();
     const host = new MultiplayerRoomSession(
       { name: 'Host', avatarId: 'ember', profileId: 'stage-host' },
-      { signaling: broker.signaling('stage-host-peer'), peerConnection: rtc.factory('stage-host'), seed: 42 },
+      {
+        signaling: broker.signaling('stage-host-peer'),
+        peerConnection: rtc.factory('stage-host'),
+        seed: 42,
+      },
     );
     const guest = new MultiplayerRoomSession(
       { name: 'Guest', avatarId: 'cobalt', profileId: 'stage-guest' },
-      { signaling: broker.signaling('stage-guest-peer'), peerConnection: rtc.factory('stage-guest'), seed: 7 },
+      {
+        signaling: broker.signaling('stage-guest-peer'),
+        peerConnection: rtc.factory('stage-guest'),
+        seed: 7,
+      },
     );
     sessions.push(host, guest);
 
@@ -1176,6 +1189,111 @@ describe('president rooms on the shared stack', () => {
     await expect(host.create({ gameId: 'president', seats: 9 })).rejects.toThrow(/4–8 seats/);
     // blitz keeps its own 2–4 ring
     await expect(host.create({ gameId: 'blitz', seats: 6 })).rejects.toThrow(/2–4 seats/);
+  });
+});
+
+describe('crazy eights rooms on the shared stack', () => {
+  const sessions: MultiplayerRoomSession[] = [];
+
+  afterEach(() => sessions.splice(0).forEach((session) => session.close()));
+
+  it('deals a four-seat eights room and keeps every peer on the same log and hash', async () => {
+    const broker = new MockSignalingBroker();
+    const rtc = new MockRtcNetwork();
+    const profiles = [
+      { name: 'Host', avatarId: 'ember', profileId: 'eights-host' },
+      { name: 'Guest', avatarId: 'juniper', profileId: 'eights-guest' },
+      { name: 'Third', avatarId: 'cobalt', profileId: 'eights-third' },
+      { name: 'Fourth', avatarId: 'plum', profileId: 'eights-fourth' },
+    ];
+    const peers = profiles.map((profile, index) => {
+      const session = new MultiplayerRoomSession(profile, {
+        signaling: broker.signaling(`eights-peer-${index}`),
+        peerConnection: rtc.factory(`peer-${index}`),
+        seed: index === 0 ? 1808 : 3,
+      });
+      sessions.push(session);
+      return { session, profile };
+    });
+    const host = peers[0]!;
+
+    const room = await host.session.create({
+      gameId: 'eights',
+      seats: 4,
+      config: applyPreset(eightsConfig, 'house'),
+    });
+    for (const peer of peers.slice(1)) {
+      await peer.session.join(room.code);
+    }
+    await eventually(() => {
+      expect(peers.every((peer, index) => peer.session.getSnapshot().localSeat === index)).toBe(
+        true,
+      );
+    });
+
+    expect(host.session.getSnapshot()).toMatchObject({ gameId: 'eights' });
+    const dealt = multiplayerSession<EightsState, EightsRules>(
+      host.session.getSnapshot(),
+      'eights',
+    )!;
+    expect(dealt.state.round.hands.flat()).toHaveLength(28);
+    expect(
+      dealt.state.round.hands.flat().length +
+        dealt.state.round.stock.length +
+        dealt.state.round.discard.length,
+    ).toBe(52);
+
+    for (let step = 0; step < 12; step++) {
+      const live = multiplayerSession<EightsState, EightsRules>(
+        host.session.getSnapshot(),
+        'eights',
+      )!;
+      if (live.status !== 'playing') break;
+      const baseline = live.log.length;
+      const actor = live.phase.actor;
+      expect(actor).not.toBeNull();
+      const legal = live.def.flow.legalMovesFor?.(live.state, live.phase, actor!) ?? [];
+      expect(legal.length).toBeGreaterThan(0);
+      const move = legal[0]!;
+      peers[actor!]!.session.send(move.id, move.payload);
+
+      await eventually(() => {
+        const lengths = peers.map(
+          (peer) =>
+            multiplayerSession<EightsState, EightsRules>(peer.session.getSnapshot(), 'eights')!.log
+              .length,
+        );
+        expect(Math.min(...lengths)).toBeGreaterThan(baseline);
+        expect(new Set(lengths).size).toBe(1);
+      });
+      const hashes = peers.map((peer) =>
+        stateHash(
+          multiplayerSession<EightsState, EightsRules>(peer.session.getSnapshot(), 'eights')!.state,
+        ),
+      );
+      expect(new Set(hashes).size).toBe(1);
+    }
+  });
+
+  it('states the eights ring and refuses a veiled table out loud', async () => {
+    const broker = new MockSignalingBroker();
+    const rtc = new MockRtcNetwork();
+    const host = new MultiplayerRoomSession(
+      { name: 'Host', avatarId: 'ember', profileId: 'eights-cap' },
+      {
+        signaling: broker.signaling('eights-cap-peer'),
+        peerConnection: rtc.factory('host'),
+        seed: 1,
+      },
+    );
+    sessions.push(host);
+    await expect(host.create({ gameId: 'eights', seats: 1 })).rejects.toThrow(/2–6 seats/);
+    await expect(host.create({ gameId: 'eights', seats: 7 })).rejects.toThrow(/2–6 seats/);
+    // A round is priced from every hand's face value, so a veiled table would
+    // have to open them all anyway. Say so rather than quietly downgrading.
+    await expect(host.create({ gameId: 'eights', seats: 4, security: 'veil' })).rejects.toThrow(
+      /open replay/,
+    );
   });
 });
 

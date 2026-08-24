@@ -35,7 +35,7 @@ defineRoomGame<MyState, MyRules>({
   veilRefusal: 'why this game cannot run a veiled room',
   seatsRefusal: { seats: 2, message: 'MyGame rooms need exactly two seats' },
   roomConfig: (config) => ({ ...config, someRoomOnlyNarrowing: 1 }),
-  recycleOn: 'draw',   // the move that can exhaust the stock under Veil
+  recycleOn: 'draw', // the move that can exhaust the stock under Veil
 });
 ```
 
@@ -50,14 +50,19 @@ this one object.
 
 ```tsx
 export const myTablePack = defineTablePack<Snapshot, Dispatch, Transport, State, Rules>({
-  id: 'mygame',        // route segment: /mygame, /mygame/table, /mygame/create
-  gameId: 'mygame',    // the engine def id a room announces
+  id: 'mygame', // route segment: /mygame, /mygame/table, /mygame/create
+  gameId: 'mygame', // the engine def id a room announces
 
-  useSoloDeal() { /* read the setup store, return {create, deps} */ },
+  useSoloDeal() {
+    /* read the setup store, return {create, deps} */
+  },
   useSoloDriver: turnBasedDriver({ round, botPaceMs }),
 
-  renderPending, renderSolo, soloReport,
-  renderRoom,   roomReport,
+  renderPending,
+  renderSolo,
+  soloReport,
+  renderRoom,
+  roomReport,
 });
 ```
 
@@ -87,21 +92,48 @@ The screens themselves stay per-game on purpose. `onBid`/`onBidNil` and
 `onPass`/`onPlayCard` are the table's own vocabulary, and flattening them into a
 shared prop shape would cost more than it saved.
 
-## 5. Translate the chrome
+## 5. The small registries
+
+None of these is per-game logic; each is a total record that a new game has to
+appear in, and most of them fail the build (or a test) until it does. Listed
+because "one registry entry and one table pack" is true of the _interesting_
+work and quietly untrue of these.
+
+| File                                                    | What it answers                                                       |
+| ------------------------------------------------------- | --------------------------------------------------------------------- |
+| `apps/web/package.json`                                 | the workspace dependency on the new pack                              |
+| `lib/rooms/seatRange.ts`                                | how wide the room's seat ring is                                      |
+| `lib/rooms/tableRoute.ts`                               | where a joined guest lands (total record — a miss is a compile error) |
+| `lib/transitions/tableWipe.ts`                          | which routes get the felt wipe on the way in                          |
+| `stores/matchFlow.ts`                                   | the podium's mode-id union                                            |
+| `lib/audio/sfx.ts`                                      | the game's SFX pack, plus its entry in the registration list          |
+| `lib/audio/game-cues.ts`                                | which engine fx map to which sounds                                   |
+| `lib/audio/assets.test.ts`                              | `REQUIRED_SOUNDS`, in registration order                              |
+| `components/table/shell/table-screen-contract.test.tsx` | one case per shipped table screen                                     |
+| `components/setup/setup-screen-contract.test.tsx`       | one entry per shipped setup page                                      |
+
+A game with no bespoke audio still needs a pack: point its namespaced ids at
+existing files the way Spades and Crazy Eights do. `validatePack` only requires
+the namespace, and sharing a file between two ids is deliberate and safe.
+
+## 6. Translate the chrome
 
 Any new player-facing string goes in `apps/web/src/lib/i18n/messages/en.ts`.
 `Messages` is derived from that file, so every other locale stops compiling
 until it has the key too — a locale ships complete or not at all.
 
-## 6. Translate the game's own copy
+## 7. Translate the game's own copy
 
-The pack keeps its English. Each language carries an *overlay* keyed to it, in
+The pack keeps its English. Each language carries an _overlay_ keyed to it, in
 `apps/web/src/lib/i18n/gameContent/<locale>/<game>.ts`:
 
 ```ts
 export const mygameEs: GameCopy = {
-  name: '…', subtitle: '…', tagline: '…', description: '…',
-  facts: ['…', '…', '…'],                    // same length as the pack's
+  name: '…',
+  subtitle: '…',
+  tagline: '…',
+  description: '…',
+  facts: ['…', '…', '…'], // same length as the pack's
   howToPlay: { summary: '…', objective: '…', sections: [/* same order & count */] },
   modes: { classic: { name: '…', tagline: '…', description: '…', facts: [/* … */] } },
   fields: { myToggle: { label: '…', help: '…' } },

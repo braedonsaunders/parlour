@@ -59,7 +59,12 @@ export default function OhHellSetupPage() {
       <SetupActions
         busy={starting}
         actions={[
-          { label: 'Play solo', busyLabel: 'Cutting for the deal…', onClick: startSolo, testId: 'deal-me-in' },
+          {
+            label: 'Play solo',
+            busyLabel: 'Cutting for the deal…',
+            onClick: startSolo,
+            testId: 'deal-me-in',
+          },
         ]}
         note="Bid exactly what you will take. Friend rooms for Oh Hell are not open yet."
       />

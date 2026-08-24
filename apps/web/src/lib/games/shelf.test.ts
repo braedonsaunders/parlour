@@ -16,6 +16,7 @@ describe('game shelf catalog', () => {
       'blitz',
       'cribbage',
       'wild',
+      'eights',
       'ratscrew',
       'euchre',
       'spades',

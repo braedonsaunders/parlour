@@ -394,6 +394,18 @@ export const EIGHTS_SFX_PACK: SfxPack = {
 };
 
 const packs = new Map<string, SfxPack>();
+
+/**
+ * The set of sound ids a pack is allowed to name, built once per pack.
+ *
+ * The cue check runs on every burst of effects a table plays, and it was
+ * rebuilding the pack's entire manifest — the shared Foley layer concatenated
+ * with the game's, de-duplicated — and a Set over it each time, for a list that
+ * is fixed the moment the pack is registered. Registering or unregistering a
+ * pack drops its entry, so the guard stays exactly as strict as it was.
+ */
+const declaredSounds = new Map<string, ReadonlySet<string>>();
+
 for (const pack of [
   PARLOUR_SFX_PACK,
   BLITZ_SFX_PACK,
@@ -416,10 +428,12 @@ for (const pack of [
 export function registerSfxPack(pack: SfxPack): void {
   validatePack(pack);
   packs.set(pack.id, pack);
+  declaredSounds.delete(pack.id);
 }
 
 export function unregisterSfxPack(id: string): void {
   if (id !== PARLOUR_SFX_PACK.id) packs.delete(id);
+  declaredSounds.delete(id);
 }
 
 export function getSfxPack(id: string | null | undefined): SfxPack | undefined {
@@ -446,6 +460,14 @@ export function allSfxSoundDefs(): SoundDef[] {
   return uniqueSounds([...packs.values()].flatMap((pack) => pack.sounds));
 }
 
+function soundIdsForPack(packId: string): ReadonlySet<string> {
+  const cached = declaredSounds.get(packId);
+  if (cached) return cached;
+  const ids = new Set(soundDefsForSfxPack(packId).map((definition) => definition.id));
+  declaredSounds.set(packId, ids);
+  return ids;
+}
+
 /** Layer shared card Foley with the selected game's namespaced event mapping. */
 export function soundCuesForFx(fx: readonly FxEvent[], packId: string): SoundCue[] {
   const selected = getSfxPack(packId);
@@ -454,7 +476,7 @@ export function soundCuesForFx(fx: readonly FxEvent[], packId: string): SoundCue
   const shared = PARLOUR_SFX_PACK.cuesForFx?.(fx) ?? [];
   const game = selected.id === PARLOUR_SFX_PACK.id ? [] : (selected.cuesForFx?.(fx) ?? []);
   const cues = [...shared, ...game];
-  const available = new Set(soundDefsForSfxPack(packId).map((definition) => definition.id));
+  const available = soundIdsForPack(packId);
 
   for (const cue of cues) {
     if (!available.has(cue.id)) {

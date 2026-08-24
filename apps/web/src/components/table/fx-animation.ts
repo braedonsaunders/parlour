@@ -16,9 +16,16 @@ import styles from '@/styles/table.module.css';
  */
 
 export function useTableAudio(fx: readonly FxEvent[], fxKey: string | number, sfxPackId: string) {
+  // The pack is registered once. It used to be re-registered on every burst,
+  // which rebuilt the pack's whole sound manifest — the shared Foley layer
+  // concatenated with the game's, de-duplicated — several times a second for a
+  // set of definitions that cannot change while the table is open.
+  useEffect(() => {
+    getAudioManager().preload(soundDefsForSfxPack(sfxPackId));
+  }, [sfxPackId]);
+
   useEffect(() => {
     const audio = getAudioManager();
-    audio.preload(soundDefsForSfxPack(sfxPackId));
     const timers = soundCuesForFx(fx, sfxPackId).map((cue) =>
       window.setTimeout(() => audio.play(cue.id, { rate: cue.rate }), cue.atMs),
     );
@@ -59,6 +66,18 @@ export function useFxAnimation(
     }
 
     const bounds = root.getBoundingClientRect();
+    // One walk of the fx layer instead of a selector scan per cue. A stacked
+    // pickup plans a dozen cues, and each `querySelector` was a fresh descent
+    // of the whole table.
+    const elements = new Map<string, HTMLElement>();
+    for (const node of root.querySelectorAll<HTMLElement>('[data-fx-cue]')) {
+      const id = node.dataset.fxCue;
+      if (id !== undefined && !elements.has(id)) elements.set(id, node);
+    }
+    // Zones are fixed for the length of one burst — every card in a ten-card
+    // pickup flies from the same stock pile — so each is measured once.
+    const cache: FlightCache = { zones: new Map(), faceWidths: new Map() };
+
     const context = gsap.context(() => {
       const timeline = gsap.timeline();
       // Planning a cue measures the table (bounding boxes, computed transforms,
@@ -69,7 +88,7 @@ export function useFxAnimation(
       // every cue has been measured.
       const angleWrites: Array<[HTMLElement, string]> = [];
       for (const cue of cues) {
-        const element = root.querySelector<HTMLElement>(`[data-fx-cue="${cue.id}"]`);
+        const element = elements.get(cue.id);
         if (!element) continue;
         const start = cue.startMs / 1000;
         if (
@@ -94,11 +113,11 @@ export function useFxAnimation(
             cue.from.startsWith('hand:');
           const from =
             leaveFromFan || seatIntoFan
-              ? flightPoint(cue.from, root, bounds, cueCard, element)
-              : zonePoint(cue.from, root, bounds);
+              ? flightPoint(cue.from, root, bounds, cueCard, element, cache)
+              : zonePoint(cue.from, root, bounds, cache);
           const to = seatIntoFan
-            ? flightPoint(cue.to, root, bounds, cueCard, element)
-            : zonePoint(cue.to, root, bounds);
+            ? flightPoint(cue.to, root, bounds, cueCard, element, cache)
+            : zonePoint(cue.to, root, bounds, cache);
           const card = element.querySelector<HTMLElement>('[data-flight-card]') ?? element;
           const trail = element.querySelector<HTMLElement>(`.${styles.cardTrail}`);
           const glint = element.querySelector<HTMLElement>(`.${styles.cardGlint}`);
@@ -283,7 +302,7 @@ export function useFxAnimation(
             );
           }
         } else {
-          const point = zonePoint(`seat:${cue.seat}`, root, bounds);
+          const point = zonePoint(`seat:${cue.seat}`, root, bounds, cache);
           timeline
             .set(element, { x: point.x, y: point.y, autoAlpha: 0, scale: 0.4 }, start)
             .to(element, { autoAlpha: 1, scale: 1.1, duration: 0.2, ease: 'back.out(2)' }, start)
@@ -311,11 +330,38 @@ export type FlightPoint = {
 };
 
 /**
+ * Per-burst memo for measurements that cannot change while one burst is being
+ * planned.
+ *
+ * Ten cards leaving the same pickup all fly from the same stock pile, and every
+ * card in a fan is the same width — but each cue was re-finding and
+ * re-measuring both. Optional so the exported helpers keep working uncached for
+ * the other tables that call them one cue at a time.
+ */
+export type FlightCache = {
+  zones: Map<string, FlightPoint>;
+  faceWidths: Map<string, number>;
+};
+
+/**
  * Annotated as a `FlightPoint` (whose extra fields are all optional) so that
  * `cond ? flightPoint(...) : zonePoint(...)` collapses to one type instead of
  * a union that has no `handoff`/`rotate`/`scale` on half its arms.
  */
-export function zonePoint(zone: Zone, root: HTMLElement, bounds: DOMRect): FlightPoint {
+export function zonePoint(
+  zone: Zone,
+  root: HTMLElement,
+  bounds: DOMRect,
+  cache?: FlightCache,
+): FlightPoint {
+  const cached = cache?.zones.get(zone);
+  if (cached) return cached;
+  const point = measureZone(zone, root, bounds);
+  cache?.zones.set(zone, point);
+  return point;
+}
+
+function measureZone(zone: Zone, root: HTMLElement, bounds: DOMRect): FlightPoint {
   const anchor =
     root.querySelector<HTMLElement>(`[data-zone="${zone}"]`) ??
     (zone.includes(':')
@@ -364,25 +410,26 @@ export function flightPoint(
   bounds: DOMRect,
   card?: string,
   flyer?: HTMLElement,
+  cache?: FlightCache,
 ): FlightPoint {
   if (card && zone.startsWith('hand:')) {
     const zoneRoot = root.querySelector<HTMLElement>(`[data-zone="${zone}"]`);
-    if (!zoneRoot) return zonePoint(zone, root, bounds);
+    if (!zoneRoot) return zonePoint(zone, root, bounds, cache);
     const slot = findFlightSlot(zoneRoot, card);
     const visual = slot?.querySelector<HTMLElement>('[data-hand-fan]') ?? slot;
     if (visual) {
       const rect = visual.getBoundingClientRect();
       if (rect.width > 0 || rect.height > 0) {
-        const face = visual.querySelector<HTMLElement>(':scope > *');
         const flyerFace = flyer?.querySelector<HTMLElement>('[data-flight-card] > *');
+        const faceWidth = fanFaceWidth(zone, visual, cache);
         const scale =
-          face && flyerFace && flyerFace.offsetWidth > 0
-            ? face.offsetWidth / flyerFace.offsetWidth
+          faceWidth > 0 && flyerFace && flyerFace.offsetWidth > 0
+            ? faceWidth / flyerFace.offsetWidth
             : 1;
         return {
           x: rect.left + rect.width / 2 - bounds.left,
           y: rect.top + rect.height / 2 - bounds.top,
-          rotate: elementRotationDeg(visual),
+          rotate: fanSlotRotationDeg(zoneRoot, slot),
           scale,
           handoff: true,
         };
@@ -391,7 +438,38 @@ export function flightPoint(
     const predicted = predictedFanSlot(zoneRoot, bounds, card, flyer);
     if (predicted) return predicted;
   }
-  return zonePoint(zone, root, bounds);
+  return zonePoint(zone, root, bounds, cache);
+}
+
+/** Every card in a fan is the same width, so one of them can answer for all. */
+function fanFaceWidth(zone: Zone, visual: HTMLElement, cache?: FlightCache): number {
+  const cached = cache?.faceWidths.get(zone);
+  if (cached !== undefined) return cached;
+  const width = visual.querySelector<HTMLElement>(':scope > *')?.offsetWidth ?? 0;
+  cache?.faceWidths.set(zone, width);
+  return width;
+}
+
+/**
+ * The angle of the fan slot a card is flying into.
+ *
+ * This used to read the slot's computed transform back out and decode it into a
+ * matrix — a style resolution and a `DOMMatrix` per flight, and ten of them for
+ * a stacked pickup. But the fan's angle is not something the DOM knows better
+ * than we do: the stylesheet derives it from `--fan-index` and the hand's card
+ * count, both of which the rail publishes. Recomputing it is the same
+ * expression the CSS applies, so a settled fan gives an identical answer.
+ *
+ * Mid-transition the two differ, because the read saw where the slot had got to
+ * and this returns where it is going. That is the better target of the two: the
+ * flight and the fan's re-flow finish within a frame or so of each other, and a
+ * card should land at the angle it is going to rest at.
+ */
+function fanSlotRotationDeg(rail: HTMLElement, slot: HTMLElement | null): number {
+  const fanIndex = Number.parseFloat(slot?.dataset.fanIndex ?? '');
+  const fanCount = Number.parseFloat(rail.dataset.fanCount ?? '');
+  if (!Number.isFinite(fanIndex) || !Number.isFinite(fanCount) || fanCount <= 0) return 0;
+  return fanIndex * Math.min(6, 24 / fanCount);
 }
 
 /** Where a card will sit once the fan opens a gap for it. */
@@ -440,13 +518,6 @@ function findFlightSlot(root: HTMLElement, card: string): HTMLElement | null {
 function cssEscape(value: string): string {
   if (typeof CSS !== 'undefined' && typeof CSS.escape === 'function') return CSS.escape(value);
   return value.replace(/"/g, '\\"');
-}
-
-function elementRotationDeg(el: HTMLElement): number {
-  const transform = getComputedStyle(el).transform;
-  if (!transform || transform === 'none') return 0;
-  const matrix = new DOMMatrix(transform);
-  return (Math.atan2(matrix.m21, matrix.m11) * 180) / Math.PI;
 }
 
 export function discardRotation(card: string, index: number) {

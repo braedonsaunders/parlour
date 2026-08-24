@@ -32,6 +32,14 @@ branches at all. See [ADDING-A-GAME.md](ADDING-A-GAME.md).
 | 5        | Big Two / Tien Len  | Extends President combinatorics; large underserved audience                                           | Combo ranking beyond sets                                    |
 | 6        | Durak               | Attack/defend shape the shelf does not have                                                           | New flow; 2–6 seats                                          |
 
+Shipped since this list was written:
+
+- **Crazy Eights** — shipped as `@parlour/game-eights`, not as the Wild preset this
+  list once parked it as. A real 52-card pack has suits and ranks; Wild's deck
+  has four colours and no courts, so a preset could only have been a costume.
+  The pack carries the match layer inside its own `GameDef` (the Gin shape), so
+  the race to a score replays in a friend room as one session.
+
 Parked, not next:
 
 - **Texas Hold'em** — what Veil wants, but the casino frame fights the cozy
@@ -39,7 +47,6 @@ Parked, not next:
   (chips, blinds, side pots).
 - **Bridge** — bidding systems are a research project.
 - **Canasta** — two-deck meld complexity, long sessions.
-- **Crazy Eights** — a Wild preset, not a package.
 
 Sources: [Hearts](https://en.boardgamearena.com/gamepanel?game=hearts),
 [Cribbage](https://en.boardgamearena.com/gamepanel?game=cribbage),

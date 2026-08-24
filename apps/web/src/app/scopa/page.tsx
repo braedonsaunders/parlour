@@ -57,7 +57,12 @@ export default function ScopaSetupPage() {
       <SetupActions
         busy={starting}
         actions={[
-          { label: 'Play solo', busyLabel: 'Laying out the table…', onClick: startSolo, testId: 'deal-me-in' },
+          {
+            label: 'Play solo',
+            busyLabel: 'Laying out the table…',
+            onClick: startSolo,
+            testId: 'deal-me-in',
+          },
         ]}
         note="Clear the table to score a scopa. Friend rooms for Scopa are not open yet."
       />

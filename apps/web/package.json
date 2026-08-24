@@ -23,6 +23,7 @@
     "@parlour/engine": "workspace:*",
     "@parlour/game-blitz": "workspace:*",
     "@parlour/game-cribbage": "workspace:*",
+    "@parlour/game-eights": "workspace:*",
     "@parlour/game-euchre": "workspace:*",
     "@parlour/game-gin": "workspace:*",
     "@parlour/game-hearts": "workspace:*",

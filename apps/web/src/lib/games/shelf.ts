@@ -1,6 +1,7 @@
 import { modePreset, type GameCatalogEntry, type GameMode, type RuleValues } from '@parlour/engine';
 import { blitzCatalog } from '@parlour/game-blitz';
 import { cribbageCatalog } from '@parlour/game-cribbage';
+import { eightsCatalog } from '@parlour/game-eights';
 import { euchreCatalog } from '@parlour/game-euchre';
 import { ginCatalog } from '@parlour/game-gin';
 import { heartsCatalog } from '@parlour/game-hearts';
@@ -46,6 +47,7 @@ export type GameId =
   | 'blitz'
   | 'cribbage'
   | 'wild'
+  | 'eights'
   | 'ratscrew'
   | 'euchre'
   | 'hearts'
@@ -62,6 +64,7 @@ const SHELF: readonly GameCatalogEntry[] = [
   shelfEntry(blitzCatalog),
   shelfEntry(cribbageCatalog),
   shelfEntry(wildpileCatalog),
+  shelfEntry(eightsCatalog),
   shelfEntry(ratscrewCatalog),
   shelfEntry(euchreCatalog),
   shelfEntry(spadesCatalog),

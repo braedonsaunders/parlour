@@ -320,14 +320,28 @@ function cueFor(event: FxEvent, index: number): FxCue | null {
 }
 
 /**
+ * One burst of effects is planned four separate times per turn — by the fx
+ * layer, by the arrival provider's inbound and outbound passes, and by the deal
+ * presentation — always from the same array, always producing the same cues.
+ * Planning is pure, so the second through fourth callers can have the first
+ * one's answer. Keyed weakly on the array the engine handed us, so a burst that
+ * is no longer on screen is not kept alive by having once been animated.
+ */
+const planned = new WeakMap<readonly FxEvent[], FxCue[]>();
+
+/**
  * Converts engine presentation hints into renderer-ready cues. No game state is
  * inspected here: if the engine did not emit an effect, the table stays still.
  */
 export function buildFxTimeline(events: readonly FxEvent[]): FxCue[] {
-  return events
+  const cached = planned.get(events);
+  if (cached) return cached;
+  const cues = events
     .map(cueFor)
     .filter((cue): cue is FxCue => cue !== null)
     .sort((a, b) => a.startMs - b.startMs);
+  planned.set(events, cues);
+  return cues;
 }
 
 /**

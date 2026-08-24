@@ -1,0 +1,400 @@
+/* Crazy Eights table furniture: the suit the pile is asking for, the action
+   calls, the suit chooser, and the round-end scoresheet. */
+
+/* Above the pile's "Your turn" whisper, which sits just over the stock. */
+.tableBadges {
+  position: absolute;
+  left: 50%;
+  top: 24%;
+  z-index: 6;
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.suitChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.75rem;
+  border-radius: 999px;
+  border: 2px solid rgba(255, 250, 240, 0.5);
+  background: rgba(9, 20, 26, 0.72);
+  color: #f3e7d4;
+  font-family: var(--font-display), sans-serif;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.suitChip i {
+  font-size: 1.05rem;
+  font-style: normal;
+  line-height: 1;
+  color: var(--eights-suit, #f3e7d4);
+}
+
+.directionChip {
+  composes: suitChip;
+  gap: 0.3rem;
+  line-height: 1;
+}
+
+.directionChip[data-direction='-1'] {
+  border-color: rgba(160, 210, 240, 0.8);
+  color: #cfe9f8;
+}
+
+.drawChip {
+  composes: suitChip;
+  border-color: rgba(240, 150, 120, 0.8);
+  color: #ffcf9e;
+}
+
+/* --- piles ---------------------------------------------------------------- */
+
+.stockPile[data-can-draw='true'] {
+  animation: stockBeckon 1.6s ease-in-out infinite;
+}
+
+@keyframes stockBeckon {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+.drawHint {
+  position: absolute;
+  left: 50%;
+  bottom: -1.5rem;
+  translate: -50% 0;
+  padding: 0.14rem 0.5rem;
+  border-radius: 999px;
+  background: rgba(9, 20, 26, 0.8);
+  color: rgba(255, 237, 207, 0.9);
+  font-family: var(--font-display), sans-serif;
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* --- seat furniture ------------------------------------------------------- */
+
+.cardCount {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 0.15rem;
+  padding: 0.1rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(9, 20, 26, 0.65);
+  color: #f3e7d4;
+  font-family: var(--font-display), sans-serif;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.cardCount b {
+  color: #ffe3ab;
+}
+
+.cardCount[data-low='true'] {
+  background: rgba(178, 60, 51, 0.88);
+  color: #ffe9e2;
+}
+
+.dealerPip {
+  font-size: 0.6rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  opacity: 0.75;
+}
+
+.seatStamp {
+  position: absolute;
+  z-index: 8;
+  left: 50%;
+  top: 0.4rem;
+  translate: -50% 0;
+  padding: 0.24rem 0.7rem;
+  border: 2px solid rgba(255, 246, 228, 0.92);
+  border-radius: 0.5rem;
+  background: rgba(178, 60, 51, 0.95);
+  color: #fff6e4;
+  box-shadow: 0 8px 20px -8px rgba(4, 12, 18, 0.9);
+  font-family: var(--font-display), sans-serif;
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.seatStamp[data-stamp='out'] {
+  background: rgba(61, 127, 86, 0.95);
+}
+
+/* --- action calls --------------------------------------------------------- */
+
+.announcer {
+  position: absolute;
+  left: 50%;
+  top: 17%;
+  z-index: 26;
+  display: grid;
+  gap: 0.4rem;
+  justify-items: center;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.announcement {
+  display: grid;
+  justify-items: center;
+  gap: 0.1rem;
+  padding: 0.45rem 1.15rem;
+  border: 2px solid rgba(255, 246, 228, 0.55);
+  border-radius: 0.9rem;
+  background: linear-gradient(180deg, rgba(20, 40, 50, 0.94), rgba(9, 20, 26, 0.94));
+  box-shadow: 0 14px 30px -14px rgba(2, 8, 12, 0.95);
+  text-align: center;
+}
+
+.announcement strong {
+  font-family: var(--font-display), sans-serif;
+  font-size: clamp(1.15rem, 3.2vw, 1.75rem);
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  line-height: 1;
+  text-transform: uppercase;
+  color: #fff3dc;
+  text-shadow: 0 2px 0 rgba(6, 16, 22, 0.6);
+}
+
+.announcement small {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: rgba(243, 231, 212, 0.72);
+}
+
+.announcement[data-announcement='reverse'] {
+  border-color: rgba(120, 200, 235, 0.85);
+}
+.announcement[data-announcement='skip'] {
+  border-color: rgba(240, 150, 120, 0.85);
+}
+.announcement[data-announcement='draw-stack'] {
+  border-color: rgba(255, 195, 110, 0.9);
+}
+.announcement[data-announcement='out'] {
+  border-color: rgba(140, 235, 175, 0.9);
+}
+.announcement[data-announcement='blocked'] {
+  border-color: rgba(180, 180, 200, 0.8);
+}
+
+/* --- the suit call -------------------------------------------------------- */
+
+.chooser {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  display: grid;
+  place-items: center;
+  background: rgba(6, 14, 19, 0.55);
+  backdrop-filter: blur(3px);
+}
+
+.chooserPanel {
+  display: grid;
+  gap: 0.9rem;
+  justify-items: center;
+  padding: 1.3rem 1.6rem;
+  text-align: center;
+}
+
+.suitRow {
+  display: flex;
+  gap: 0.7rem;
+}
+
+.suitButton {
+  display: grid;
+  place-items: center;
+  width: clamp(3.4rem, 7vw, 4.6rem);
+  aspect-ratio: 1;
+  border-radius: 1rem;
+  border: 3px solid rgba(255, 250, 240, 0.85);
+  background: linear-gradient(180deg, #fdf6e6, #e8dcc4);
+  color: var(--eights-suit, #22303a);
+  box-shadow: 0 10px 18px -8px rgba(3, 11, 15, 0.8);
+  cursor: pointer;
+  font-size: clamp(1.6rem, 3.6vw, 2.3rem);
+  line-height: 1;
+  transition: transform 140ms var(--ease-pop);
+}
+
+.suitButton:hover,
+.suitButton:focus-visible {
+  transform: translateY(-4px) scale(1.06);
+}
+
+.passBanner {
+  position: absolute;
+  left: 50%;
+  bottom: 30%;
+  z-index: 31;
+  display: flex;
+  gap: 0.8rem;
+  align-items: center;
+  transform: translateX(-50%);
+  padding: 0.55rem 0.9rem;
+}
+
+.actionRail.actionRail {
+  z-index: 32;
+}
+
+/* --- the scoresheet between deals ----------------------------------------- */
+
+.roundEnd {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  background: rgb(8 10 16 / 0.62);
+  backdrop-filter: blur(4px);
+}
+
+.sheet {
+  width: min(92vw, 32rem);
+  max-height: 86vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  padding: 1.15rem 1.25rem 1.05rem;
+}
+
+.stampRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.stamp {
+  font-family: var(--font-display), sans-serif;
+  font-size: 1.55rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  color: var(--hearth-50);
+}
+
+.stamp[data-reason='shed'] {
+  color: #7fd694;
+  text-shadow: 0 0 18px rgb(95 174 110 / 0.55);
+}
+
+.stamp[data-reason='blocked'] {
+  color: #e2b049;
+  text-shadow: 0 0 16px rgb(226 176 73 / 0.45);
+}
+
+.points {
+  font-family: var(--font-display), sans-serif;
+  font-size: 1.2rem;
+  font-weight: 900;
+  color: var(--hearth-100);
+}
+
+.scoreTable {
+  display: grid;
+  gap: 0.3rem;
+}
+
+.scoreRow {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 0.7rem;
+  align-items: baseline;
+  padding: 0.32rem 0.5rem;
+  border-radius: 0.5rem;
+  background: rgb(255 255 255 / 0.03);
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--dusk-100);
+}
+
+.scoreRow[data-winner='true'] {
+  background: rgb(95 174 110 / 0.18);
+  color: var(--hearth-50);
+}
+
+.scoreRow b {
+  font-family: var(--font-display), sans-serif;
+  font-weight: 900;
+  color: var(--hearth-50);
+}
+
+.scoreRow small {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--dusk-200);
+}
+
+.readyRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding-top: 0.55rem;
+  border-top: 1px solid rgb(255 255 255 / 0.09);
+}
+
+.waiting {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--dusk-200);
+}
+
+.scoreLine {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.3rem;
+  margin-top: 0.1rem;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--dusk-100);
+}
+
+.scoreLine b {
+  font-family: var(--font-display), sans-serif;
+  font-size: 0.85rem;
+  font-weight: 900;
+  letter-spacing: 0;
+  color: var(--hearth-50);
+}
+
+.scoreLine small {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--dusk-200);
+}

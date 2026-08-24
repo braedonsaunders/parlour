@@ -3,6 +3,7 @@ import { Fx, type FxEvent } from '@parlour/engine';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CribbageTableView } from '@/lib/cribbage/view';
+import type { EightsTableView } from '@/lib/eights/view';
 import type { EuchreTableView } from '@/lib/euchre/view';
 import type { GinTableView } from '@/lib/gin/view';
 import type { HeartsTableView } from '@/lib/hearts/view';
@@ -16,6 +17,7 @@ import { KlondikeTransport } from '@/lib/solo/KlondikeTransport';
 import tableStyles from '@/styles/table.module.css';
 import { TableScreen, type TableView } from '../TableScreen';
 import { CribbageTableScreen } from '../cribbage/CribbageTableScreen';
+import { EightsTableScreen } from '../eights/EightsTableScreen';
 import { EuchreTableScreen } from '../euchre/EuchreTableScreen';
 import { GinTableScreen } from '../gin/GinTableScreen';
 import { HeartsTableScreen } from '../hearts/HeartsTableScreen';
@@ -405,6 +407,42 @@ const WILD_VIEW: WildTableView = {
   },
 };
 
+const EIGHTS_VIEW: EightsTableView = {
+  players: [0, 1, 2].map((seat) => ({
+    seat,
+    name: seat === 0 ? 'You' : `Seat ${seat}`,
+    avatarId: seat === 0 ? 'ember' : 'slate',
+    handCount: 7,
+    isLocal: seat === 0,
+    isBot: seat !== 0,
+    score: 0,
+    roundsWon: 0,
+    dealer: seat === 0,
+  })),
+  localSeat: 0,
+  activeSeat: 0,
+  roundNumber: 1,
+  targetScore: 100,
+  stockCount: 30,
+  discard: ['D5'],
+  activeSuit: 'D',
+  direction: 1,
+  pendingDraw: 0,
+  phaseLabel: 'house · round 1',
+  hand: ['D9', 'H8', 'S12', 'C1'],
+  drawnCard: null,
+  decision: 'play',
+  legal: {
+    playCards: ['D9', 'H8'],
+    draw: true,
+    pass: false,
+    chooseSuit: false,
+    ready: false,
+  },
+  roundEnd: null,
+  matchOver: false,
+};
+
 const SCREENS: readonly ScreenCase[] = [
   {
     name: 'blitz',
@@ -515,6 +553,18 @@ const SCREENS: readonly ScreenCase[] = [
     loadingCopy: 'Shuffling the stacks…',
     dealState: false,
     gameText: 'ratscrew',
+  },
+  {
+    name: 'eights',
+    Screen: EightsTableScreen as ComponentType<never>,
+    view: EIGHTS_VIEW,
+    eyebrow: 'Crazy Eights',
+    playfield: 'Crazy Eights table',
+    feltMark: '8',
+    errorHeadline: 'The table lost the thread.',
+    loadingCopy: 'Shuffling the pack…',
+    dealState: true,
+    gameText: 'eights',
   },
   {
     name: 'wild',

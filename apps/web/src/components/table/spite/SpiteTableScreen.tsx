@@ -298,7 +298,11 @@ function OpponentSeat({ player }: { player: SpiteSeatView }) {
         )}
         {player.discardTops.map((top, pile) => (
           <span key={pile} className={styles.seatDiscard}>
-            {top ? <PlayingCard card={top} face={spiteFace(top)} compact /> : <span className={styles.discardEmpty} />}
+            {top ? (
+              <PlayingCard card={top} face={spiteFace(top)} compact />
+            ) : (
+              <span className={styles.discardEmpty} />
+            )}
           </span>
         ))}
       </div>

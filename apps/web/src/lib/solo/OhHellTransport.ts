@@ -65,10 +65,7 @@ export class OhHellTransport {
     this.cast = castFor(tier, seats - 1);
 
     const policies = new Map(
-      this.cast.map((member, index) => [
-        index + 1,
-        makePersonaBot(member.personaId),
-      ]),
+      this.cast.map((member, index) => [index + 1, makePersonaBot(member.personaId)]),
     );
 
     const match = createMatch(this.def, {
@@ -106,8 +103,7 @@ export class OhHellTransport {
           legalMoves: (live, seat) => this.legalMovesOn(live, seat),
           playerView: (live, seat) => this.def.game.playerView(live.round.state, seat),
           policy: (seat) => policies.get(seat) ?? makePersonaBot(PERSONAS[0]!.id),
-          rngFork: (live) =>
-            `round:${live.roundIndex}:event:${live.round.log.length}`,
+          rngFork: (live) => `round:${live.roundIndex}:event:${live.round.log.length}`,
           untilHumanGuard: 500,
         },
       },

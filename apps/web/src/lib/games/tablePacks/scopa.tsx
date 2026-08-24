@@ -57,9 +57,7 @@ export const scopaTablePack = defineTablePack<
         fxKey={fxKey}
         busy={!view.yourTurn}
         error={error}
-        onPlay={(card, take) =>
-          dispatch('playCard', take.length > 0 ? { card, take } : { card })
-        }
+        onPlay={(card, take) => dispatch('playCard', take.length > 0 ? { card, take } : { card })}
         onQuit={quit}
       />
     );

@@ -92,6 +92,11 @@ export function HandRailCard({
 }
 
 /** A cards-only fan; player HUD and controls belong in the table's side gutters. */
+/** The rail and card widths a fan step is computed from. Only the viewport moves these. */
+type FanGeometry = { width: number; cardWidth: number };
+
+const NO_GEOMETRY: FanGeometry = { width: 0, cardWidth: 0 };
+
 export function HandRail({
   count,
   zone,
@@ -103,34 +108,54 @@ export function HandRail({
 }: HandRailProps) {
   const receiving = useFanReceiving();
   const railRef = useRef<HTMLDivElement>(null);
-  const [step, setStep] = useState(0);
+  const [geometry, setGeometry] = useState<FanGeometry>(NO_GEOMETRY);
 
-  const updateStep = useCallback(() => {
+  // What the fan step needs from the DOM is the rail's width and one card's
+  // width, and neither of those depends on how many cards are in the hand —
+  // every card sits at the same absolutely-positioned box, and the fan spread
+  // is a transform on the card's inner wrapper. Measuring on every count change
+  // meant a querySelector, two forced layout reads and a rebuilt ResizeObserver
+  // every time a card was played or drawn, several times a second during a
+  // stacked pickup, to recompute a number from two values that had not moved.
+  //
+  // So the measurement is keyed to the thing that actually changes it — the
+  // viewport — and the count is applied arithmetically during render.
+  const measure = useCallback(() => {
     const rail = railRef.current;
-    const firstCard = rail?.querySelector<HTMLElement>('[data-hand-card]');
-    if (!rail || !firstCard) {
-      setStep(0);
-      return;
-    }
-    const next = calculateFanStep(rail.clientWidth, firstCard.offsetWidth, count);
-    setStep((current) => (Math.abs(current - next) < 0.25 ? current : next));
-  }, [count]);
+    if (!rail) return;
+    const firstCard = rail.querySelector<HTMLElement>('[data-hand-card]');
+    const next: FanGeometry = {
+      width: rail.clientWidth,
+      cardWidth: firstCard?.offsetWidth ?? 0,
+    };
+    setGeometry((current) =>
+      Math.abs(current.width - next.width) < 0.5 &&
+      Math.abs(current.cardWidth - next.cardWidth) < 0.5
+        ? current
+        : next,
+    );
+  }, []);
 
   useLayoutEffect(() => {
     const rail = railRef.current;
     if (!rail) return;
-    updateStep();
-    window.addEventListener('resize', updateStep, { passive: true });
-    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(updateStep);
+    measure();
+    window.addEventListener('resize', measure, { passive: true });
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
     observer?.observe(rail);
-    const firstCard = rail.querySelector<HTMLElement>('[data-hand-card]');
-    if (firstCard) observer?.observe(firstCard);
     return () => {
-      window.removeEventListener('resize', updateStep);
+      window.removeEventListener('resize', measure);
       observer?.disconnect();
     };
-  }, [count, updateStep]);
+  }, [measure]);
 
+  // A rail that mounted empty has no card to measure, so the first hand to
+  // arrive — and only the first — earns one extra measurement.
+  useLayoutEffect(() => {
+    if (count > 0 && geometry.cardWidth === 0) measure();
+  }, [count, geometry.cardWidth, measure]);
+
+  const step = calculateFanStep(geometry.width, geometry.cardWidth, count);
   const fanN = Math.max(count, 1);
   return (
     <div
@@ -149,6 +174,11 @@ export function HandRail({
       data-receiving={receiving || undefined}
       data-fan-plan={fanPlan?.join(',') || undefined}
       data-fan-lift={liftCard || undefined}
+      // The fan's spread is a pure function of this count, published so a card
+      // in flight can work out the angle of the slot it is aiming at by
+      // arithmetic rather than by reading a computed transform back out of the
+      // DOM — which meant a `getComputedStyle` and a matrix decode per flight.
+      data-fan-count={fanN}
       aria-label={label}
     >
       <div className={styles.handTrack}>{children}</div>
