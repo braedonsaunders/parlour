@@ -1,4 +1,7 @@
-import type { ReactNode, RefObject } from 'react';
+'use client';
+
+import { useEffect, type ReactNode, type RefObject } from 'react';
+import { keepScreenAwake } from '@/lib/wake-lock';
 import styles from '@/styles/table.module.css';
 import type { DealStateAttr } from './dealState';
 
@@ -13,6 +16,10 @@ export type TableShellProps = {
 
 /** The `<main>` chassis shared by every table screen. */
 export function TableShell({ rootRef, className, dealState, children }: TableShellProps) {
+  // Scoped to the shell rather than the app: a table earns the battery, a menu
+  // does not. Leaving the table unmounts this and hands the screen back.
+  useEffect(() => keepScreenAwake(), []);
+
   return (
     <main
       ref={rootRef}

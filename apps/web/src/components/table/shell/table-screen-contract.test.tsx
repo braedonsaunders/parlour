@@ -532,6 +532,18 @@ const SCREENS: readonly ScreenCase[] = [
 
 type GameWindow = Window & { render_game_to_text?: () => string };
 
+/** Stands in for the platform's screen wake lock, which jsdom has no notion of. */
+function stubWakeLock() {
+  const release = vi.fn(async () => {});
+  const request = vi.fn(async () => ({
+    release,
+    addEventListener: () => {},
+    removeEventListener: () => {},
+  }));
+  Object.defineProperty(navigator, 'wakeLock', { configurable: true, value: { request } });
+  return { request, release };
+}
+
 describe('table shell contract across every shipped screen', () => {
   let container: HTMLDivElement;
   let root: Root;
@@ -551,10 +563,29 @@ describe('table shell contract across every shipped screen', () => {
     vi.useRealTimers();
     container.remove();
     delete (window as GameWindow).render_game_to_text;
+    Reflect.deleteProperty(navigator, 'wakeLock');
   });
 
   const render = (entry: ScreenCase, props: Record<string, unknown>) =>
     act(() => root.render(createElement(entry.Screen, props as never)));
+
+  it.each(SCREENS.map((entry) => [entry.name, entry] as const))(
+    '%s holds the screen awake while it is open and releases it on the way out',
+    async (_name, entry) => {
+      const wakeLock = stubWakeLock();
+
+      render(entry, { view: entry.view, fx: [], fxKey: 0 });
+      await act(async () => {});
+
+      expect(wakeLock.request).toHaveBeenCalledWith('screen');
+
+      // Leaving the table tears the screen down without disposing the root the
+      // shared afterEach still unmounts.
+      await act(async () => root.render(null));
+
+      expect(wakeLock.release).toHaveBeenCalledTimes(1);
+    },
+  );
 
   it.each(SCREENS.map((entry) => [entry.name, entry] as const))(
     '%s keeps the shared root, HUD and menu chassis',
