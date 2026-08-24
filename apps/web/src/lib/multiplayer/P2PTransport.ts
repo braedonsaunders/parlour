@@ -4,6 +4,8 @@ import { HEARTBEAT_INTERVAL_MS, MultiplayerState, validatePresenceSnapshot } fro
 import { validateEmote } from './emotes';
 import { DuplicateActionError } from './EngineAuthority';
 import { dispatchWireData, type PeerDescriptor, type WireMessage } from './wireSchema';
+import type { SeatId } from '@parlour/engine';
+import type { VeilMessage } from './veil/wire';
 import type {
   AppliedPacket,
   AuthorityAdapter,
@@ -68,6 +70,7 @@ export class P2PTransport implements Transport {
   private readonly snapshotListeners = new Set<(notification: SnapshotNotification) => void>();
   private readonly presenceListeners = new Set<(event: PresenceEvent) => void>();
   private readonly emoteListeners = new Set<(peerId: string, emote: Emote) => void>();
+  private readonly veilListeners = new Set<(peerId: string, message: VeilMessage) => void>();
   private readonly lastReceivedEmote = new Map<string, number>();
   private resilience?: MultiplayerState;
   private roomCode?: string;
@@ -172,6 +175,46 @@ export class P2PTransport implements Transport {
   onEmote(callback: (peerId: string, emote: Emote) => void): () => void {
     this.emoteListeners.add(callback);
     return () => this.emoteListeners.delete(callback);
+  }
+
+  /**
+   * Veil traffic rides the same mesh as everything else. `to` addresses one
+   * peer for a private peel; null broadcasts a ceremony step to the room.
+   */
+  sendVeil(message: VeilMessage, to: string | null = null): void {
+    this.assertReady();
+    const envelope: WireMessage = { type: 'veil', to, message };
+    if (to === null) this.broadcast(envelope);
+    else this.sendTo(to, envelope);
+  }
+
+  onVeil(callback: (peerId: string, message: VeilMessage) => void): () => void {
+    this.veilListeners.add(callback);
+    return () => this.veilListeners.delete(callback);
+  }
+
+  /** Seat/peer lookup the Veil ceremony needs to address a single seat. */
+  peerIdForSeat(seat: SeatId): string | null {
+    const occupant = this.resilience?.seats.get(seat);
+    return occupant && !occupant.bot ? occupant.peerId : null;
+  }
+
+  seatForPeerId(peerId: string): SeatId | null {
+    return this.resilience ? this.seatForPeer(peerId) : null;
+  }
+
+  /**
+   * Host-only: replaces the room's starting position for everyone.
+   *
+   * The Veil ceremony cannot run until every seat is present, so a veiled room
+   * sits in the lobby on a placeholder deal and swaps in the real one once the
+   * shuffle closes. Peers accept an unsolicited snapshot only while their own
+   * log is still empty, so this can never rewrite a round in progress.
+   */
+  publishSnapshot(): void {
+    this.assertReady();
+    if (!this.isHost()) throw new Error('only the host may publish a starting position');
+    this.broadcast({ type: 'sync.snapshot', snapshot: this.exportMigration() });
   }
 
   close(): void {
@@ -333,19 +376,34 @@ export class P2PTransport implements Transport {
         if (this.isHost())
           this.sendTo(peerId, { type: 'sync.snapshot', snapshot: this.exportMigration() });
         return;
-      case 'sync.snapshot':
-        if (peerId === this.resilience?.hostId && this.pendingResync) {
-          await this.importMigration(message.snapshot);
-          const snapshot = this.authority.exportSnapshot();
-          this.pendingResync = false;
-          this.emitSnapshot({ kind: 'snapshot', reason: 'divergence', snapshot });
-        }
+      case 'sync.snapshot': {
+        if (peerId !== this.resilience?.hostId) return;
+        // Either we asked for it, or the host is publishing the opening
+        // position — which is only allowed before a single move has landed.
+        const opening = !this.pendingResync;
+        if (opening && this.authority.exportSnapshot().log.length > 0) return;
+        await this.importMigration(message.snapshot);
+        const snapshot = this.authority.exportSnapshot();
+        this.pendingResync = false;
+        this.emitSnapshot({
+          kind: 'snapshot',
+          reason: opening ? 'opening' : 'divergence',
+          snapshot,
+        });
         return;
+      }
       case 'host.changed':
         this.resilience!.expireAndElect(this.now());
         if (peerId !== message.hostId || message.hostId !== this.resilience!.hostId) return;
         await this.importMigration(message.snapshot);
         this.emitPresence({ kind: 'host.changed', hostId: message.hostId });
+        return;
+      case 'veil':
+        // A peel addressed to another seat is not ours to look at, even though
+        // the mesh delivered it.
+        if (message.to === null || message.to === this.signaling.publicKey) {
+          for (const listener of this.veilListeners) listener(peerId, message.message);
+        }
         return;
       case 'emote': {
         const verdict = validateEmote(

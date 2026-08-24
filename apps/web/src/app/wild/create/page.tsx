@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { RoomLobby } from '@/components/multiplayer/RoomLobby';
+import { SecurityBadge } from '@/components/multiplayer/TableSecurity';
 import { useProfileStore } from '@/stores/profile';
 import { useWildSetupStore, wildRulesFor } from '@/stores/wildSetup';
 import {
@@ -107,10 +108,13 @@ function ActiveWildLobby({
           connected: seat.connected,
         }))}
         onStart={() => {
-          session.start();
-          onStarted();
+          void session
+            .start()
+            .then(onStarted)
+            .catch(() => undefined);
         }}
       />
+      <SecurityBadge security={snapshot.security} />
       <p className="max-w-xl text-center text-sm text-dusk-100/80">
         This {capacity}-seat pile starts when every chair is filled. Share the code with{' '}
         {capacity === 2 ? 'one friend' : `${capacity - 1} friends`}.

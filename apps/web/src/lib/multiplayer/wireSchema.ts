@@ -1,5 +1,6 @@
 import type { AppliedEvent, FxEvent, SeatId } from '@parlour/engine';
 import { EMOTES } from './emotes';
+import { isVeilMessage, type VeilMessage } from './veil/wire';
 import type {
   AppliedPacket,
   Emote,
@@ -28,6 +29,7 @@ const MAX_SEQUENCE = 1_000_000;
 const MAX_TIMESTAMP = 8_640_000_000_000_000;
 const MAX_FX_OFFSET = 60_000;
 const MAX_CONFIG_NUMBER = 1_000_000;
+const MAX_DECK_ORDER = 256;
 
 export type PeerDescriptor = { peerId: string; profile: PlayerProfile };
 
@@ -48,7 +50,13 @@ export type WireMessage =
   | { type: 'host.changed'; hostId: string; snapshot: MigrationSnapshot }
   | { type: 'sync.request'; expectedSeq: number }
   | { type: 'sync.snapshot'; snapshot: MigrationSnapshot }
-  | { type: 'emote'; emote: Emote };
+  | { type: 'emote'; emote: Emote }
+  /**
+   * Parlour Veil traffic: the shuffle ceremony, private peels and the
+   * match-end disclosure. Validated by the veil schema before it reaches any
+   * cryptography — see veil/wire.ts.
+   */
+  | { type: 'veil'; to: string | null; message: VeilMessage };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -183,11 +191,13 @@ function isPresenceSnapshot(value: unknown, maxSeats: number): value is Presence
 function isPlayerAction(value: unknown): value is PlayerAction {
   return (
     isRecord(value) &&
-    hasOnlyKeys(value, ['id', 'seat', 'move'], ['payload']) &&
+    hasOnlyKeys(value, ['id', 'seat', 'move'], ['payload', 'reveals', 'conceals']) &&
     isBoundedString(value.id) &&
     isSeat(value.seat) &&
     isBoundedString(value.move, MAX_LABEL_LENGTH) &&
-    (!Object.hasOwn(value, 'payload') || isJsonValue(value.payload))
+    (!Object.hasOwn(value, 'payload') || isJsonValue(value.payload)) &&
+    (!Object.hasOwn(value, 'reveals') || isCardMapping(value.reveals)) &&
+    (!Object.hasOwn(value, 'conceals') || isCardMapping(value.conceals))
   );
 }
 
@@ -197,7 +207,7 @@ function isAppliedEvent(value: unknown): value is AppliedEvent {
     hasOnlyKeys(
       value,
       ['seq', 'seat', 'move'],
-      ['payload', 'ts', 'atMs', 'automatic', 'injected', 'hash'],
+      ['payload', 'ts', 'atMs', 'automatic', 'injected', 'reveals', 'conceals', 'hash'],
     ) &&
     isBoundedInteger(value.seq, MAX_SEQUENCE) &&
     (value.seat === null || isSeat(value.seat)) &&
@@ -207,7 +217,30 @@ function isAppliedEvent(value: unknown): value is AppliedEvent {
     (!Object.hasOwn(value, 'atMs') || isBoundedInteger(value.atMs, MAX_TIMESTAMP)) &&
     (!Object.hasOwn(value, 'automatic') || typeof value.automatic === 'boolean') &&
     (!Object.hasOwn(value, 'injected') || typeof value.injected === 'boolean') &&
+    (!Object.hasOwn(value, 'reveals') || isCardMapping(value.reveals)) &&
+    (!Object.hasOwn(value, 'conceals') || isCardMapping(value.conceals)) &&
     (!Object.hasOwn(value, 'hash') || isBoundedString(value.hash, MAX_HASH_LENGTH))
+  );
+}
+
+/**
+ * Veil openings and re-veilings ride on the event. Each is a pair of card ids
+ * and there can never be more than a deck's worth in one move, so the bound is
+ * the deck, not whatever the sender claims.
+ */
+function isCardMapping(value: unknown): value is Array<[string, string]> {
+  return (
+    Array.isArray(value) &&
+    value.length > 0 &&
+    value.length <= MAX_DECK_ORDER &&
+    value.every(
+      (pair) =>
+        Array.isArray(pair) &&
+        pair.length === 2 &&
+        isBoundedString(pair[0], MAX_LABEL_LENGTH) &&
+        isBoundedString(pair[1], MAX_LABEL_LENGTH),
+    ) &&
+    new Set(value.map((pair) => (pair as string[])[0])).size === value.length
   );
 }
 
@@ -224,7 +257,8 @@ function isFxEvent(value: unknown): value is FxEvent {
 function isRoomSettings(value: unknown): boolean {
   if (
     !isRecord(value) ||
-    !hasOnlyKeys(value, ['gameId', 'seats', 'config']) ||
+    !hasOnlyKeys(value, ['gameId', 'seats', 'config'], ['security']) ||
+    (Object.hasOwn(value, 'security') && value.security !== 'open' && value.security !== 'veil') ||
     !isBoundedString(value.gameId, MAX_LABEL_LENGTH) ||
     !Number.isInteger(value.seats) ||
     (value.seats as number) < 2 ||
@@ -249,10 +283,26 @@ function isRoomSettings(value: unknown): boolean {
   );
 }
 
+/** A ceremony deck order: distinct, bounded card ids, one per deck position. */
+function isDeckOrder(value: unknown): value is string[] {
+  return (
+    Array.isArray(value) &&
+    value.length > 0 &&
+    value.length <= MAX_DECK_ORDER &&
+    value.every((card) => isBoundedString(card, MAX_LABEL_LENGTH)) &&
+    new Set(value as string[]).size === value.length
+  );
+}
+
 function isReplaySnapshot(value: unknown): value is ReplaySnapshot {
   if (
     !isRecord(value) ||
-    !hasOnlyKeys(value, ['seed', 'log', 'acceptedActions', 'stateHash', 'settings']) ||
+    !hasOnlyKeys(
+      value,
+      ['seed', 'log', 'acceptedActions', 'stateHash', 'settings'],
+      ['deckOrder'],
+    ) ||
+    (Object.hasOwn(value, 'deckOrder') && !isDeckOrder(value.deckOrder)) ||
     !isBoundedInteger(value.seed, 0xffff_ffff) ||
     !Array.isArray(value.log) ||
     value.log.length > MAX_SNAPSHOT_EVENTS ||
@@ -361,6 +411,12 @@ function isWireMessage(value: unknown): value is WireMessage {
         hasOnlyKeys(value, ['type', 'emote']) &&
         typeof value.emote === 'string' &&
         EMOTES.includes(value.emote as Emote)
+      );
+    case 'veil':
+      return (
+        hasOnlyKeys(value, ['type', 'to', 'message']) &&
+        (value.to === null || isBoundedString(value.to)) &&
+        isVeilMessage(value.message)
       );
     default:
       return false;
