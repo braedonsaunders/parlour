@@ -64,7 +64,11 @@ type HeartsMatchSession = MatchSession<HeartsState, HeartsRules, HeartsMatchStat
  */
 export class HeartsTransport {
   private readonly matchDef = createHeartsMatchDef();
-  private readonly options: { mode: HeartsModeId; seed: number; player: { name: string; avatarId: string } };
+  private readonly options: {
+    mode: HeartsModeId;
+    seed: number;
+    player: { name: string; avatarId: string };
+  };
   private session: HeartsMatchSession;
 
   constructor(options: {
@@ -77,9 +81,7 @@ export class HeartsTransport {
     this.options = options;
     this.session = createMatch(this.matchDef, {
       seed: options.seed | 0,
-      config:
-        options.config ??
-        applyPreset(heartsConfigSchema, options.mode),
+      config: options.config ?? applyPreset(heartsConfigSchema, options.mode),
       seats: 4,
     }).session;
   }

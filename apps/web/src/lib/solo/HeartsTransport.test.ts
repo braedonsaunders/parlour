@@ -134,9 +134,7 @@ describe('heartsTableView', () => {
       const hand = [...(snapshot.hand.state.hands[seat] ?? [])].sort();
       const cards = [hand[0]!, hand[1]!, hand[2]!];
       const outcome =
-        seat === 0
-          ? transport.dispatch('passCards', { cards })
-          : transport.playBotTurn();
+        seat === 0 ? transport.dispatch('passCards', { cards }) : transport.playBotTurn();
       if (outcome.rejected) throw new Error(outcome.rejected.code);
       snapshot = transport.getSnapshot();
     }

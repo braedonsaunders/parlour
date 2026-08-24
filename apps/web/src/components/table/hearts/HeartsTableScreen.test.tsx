@@ -12,7 +12,7 @@ function makeView(overrides: Partial<HeartsTableView> = {}): HeartsTableView {
     localSeat: 0,
     players: [0, 1, 2, 3].map((seat) => ({
       seat,
-      name: seat === 0 ? 'You' : ['Rose', 'Flint', 'Dove'][seat - 1] ?? `Seat ${seat}`,
+      name: seat === 0 ? 'You' : (['Rose', 'Flint', 'Dove'][seat - 1] ?? `Seat ${seat}`),
       avatarId: seat === 0 ? 'ember' : 'slate',
       handCount: 13,
       score: 0,
@@ -137,9 +137,7 @@ describe('HeartsTableScreen', () => {
 
   it('exposes render_game_to_text for browser verification', () => {
     const view = makeView();
-    act(() =>
-      root.render(createElement(HeartsTableScreen, { view, fx: [], fxKey: 'k4' })),
-    );
+    act(() => root.render(createElement(HeartsTableScreen, { view, fx: [], fxKey: 'k4' })));
     const rendered = JSON.parse(
       (window as unknown as { render_game_to_text: () => string }).render_game_to_text(),
     );
@@ -164,9 +162,7 @@ describe('HeartsTableScreen', () => {
         at: 120,
       },
     ];
-    act(() =>
-      root.render(createElement(HeartsTableScreen, { view, fx, fxKey: 'k5' })),
-    );
+    act(() => root.render(createElement(HeartsTableScreen, { view, fx, fxKey: 'k5' })));
     expect(container.querySelectorAll('[data-fx-cue]')).toHaveLength(2);
     void Fx.DealCard;
     void ({} as LegalMove);

@@ -36,10 +36,18 @@
 }
 
 @media (max-width: 720px) {
-  .trickSlot0 { --trick-y: 64px; }
-  .trickSlot1 { --trick-x: -84px; }
-  .trickSlot2 { --trick-y: -64px; }
-  .trickSlot3 { --trick-x: 84px; }
+  .trickSlot0 {
+    --trick-y: 64px;
+  }
+  .trickSlot1 {
+    --trick-x: -84px;
+  }
+  .trickSlot2 {
+    --trick-y: -64px;
+  }
+  .trickSlot3 {
+    --trick-x: 84px;
+  }
 }
 
 .scoreChip {
@@ -166,11 +174,7 @@
 }
 
 .handEndRow[data-winner='true'] {
-  background: linear-gradient(
-    120deg,
-    rgba(255, 178, 122, 0.18),
-    rgba(217, 106, 58, 0.12)
-  );
+  background: linear-gradient(120deg, rgba(255, 178, 122, 0.18), rgba(217, 106, 58, 0.12));
   outline: 1px solid rgba(255, 190, 140, 0.35);
 }
 

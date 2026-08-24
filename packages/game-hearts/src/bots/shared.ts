@@ -10,7 +10,8 @@ import type { HeartsState } from '../state';
 
 export function legalPlayCards(legal: readonly LegalMove[]): CardId[] {
   return legal.flatMap((move) =>
-    move.id === 'playCard' && typeof (move.payload as { card?: unknown } | undefined)?.card === 'string'
+    move.id === 'playCard' &&
+    typeof (move.payload as { card?: unknown } | undefined)?.card === 'string'
       ? [(move.payload as { card: string }).card]
       : [],
   );
@@ -37,16 +38,18 @@ export function choosePassCards(
   const scored = hand
     .map((card) => ({
       card,
-      score:
-        passDanger(card, state.rules) +
-        (tier >= 3 ? voidBonus(hand, card) : 0),
+      score: passDanger(card, state.rules) + (tier >= 3 ? voidBonus(hand, card) : 0),
     }))
     .sort((a, b) => b.score - a.score);
   return scored.slice(0, size).map((entry) => entry.card);
 }
 
 /** Highest card that stays under the current winner; null when everything wins. */
-export function duckUnder(hand: readonly CardId[], ledSuit: string, winningRank: number): CardId | null {
+export function duckUnder(
+  hand: readonly CardId[],
+  ledSuit: string,
+  winningRank: number,
+): CardId | null {
   const followers = hand.filter((card) => suitOfCard(card) === ledSuit);
   const safe = followers.filter((card) => rankOf(card) < winningRank);
   if (safe.length === 0) return null;
@@ -78,7 +81,8 @@ export function dumpOrder(hand: readonly CardId[], state: HeartsState): CardId[]
 function discardUrgency(card: CardId, state: HeartsState): number {
   let urgency = rankOf(card);
   if (card === QUEEN_SPADES) urgency += 100;
-  else if (suitOfCard(card) === 'spades' && rankOf(card) >= 13 && queenStillOut(state)) urgency += 40;
+  else if (suitOfCard(card) === 'spades' && rankOf(card) >= 13 && queenStillOut(state))
+    urgency += 40;
   if (isHeart(card)) urgency += rankOf(card) * 2 + 8;
   if (state.rules.jackDiamonds && card === 'D11') urgency -= 50; // keep the bonus
   return urgency;
@@ -199,7 +203,10 @@ export function pointsTakenBy(state: HeartsState, seat: SeatId): number {
 }
 
 export function totalPointsTaken(state: HeartsState): number {
-  return state.taken.reduce((sum, pile) => sum + pile.reduce((acc, card) => acc + cardWorth(card), 0), 0);
+  return state.taken.reduce(
+    (sum, pile) => sum + pile.reduce((acc, card) => acc + cardWorth(card), 0),
+    0,
+  );
 }
 
 function cardWorth(card: CardId): number {

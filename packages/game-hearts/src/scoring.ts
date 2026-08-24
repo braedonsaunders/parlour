@@ -9,9 +9,7 @@ export function rawHandPoints(
   taken: readonly (readonly string[])[],
   jackDiamonds: boolean,
 ): number[] {
-  return taken.map((cards) =>
-    cards.reduce((sum, card) => sum + cardPoints(card, jackDiamonds), 0),
-  );
+  return taken.map((cards) => cards.reduce((sum, card) => sum + cardPoints(card, jackDiamonds), 0));
 }
 
 export function heartsTaken(taken: readonly (readonly string[])[]): number[] {
@@ -28,7 +26,10 @@ export function tookQueenOfSpades(taken: readonly (readonly string[])[]): boolea
  */
 export function moonShooterOf(taken: readonly (readonly string[])[]): SeatId | null {
   const shooters = taken
-    .map((cards, seat) => ({ seat, all: cards.filter(isHeart).length === 13 && cards.includes(QUEEN_SPADES) }))
+    .map((cards, seat) => ({
+      seat,
+      all: cards.filter(isHeart).length === 13 && cards.includes(QUEEN_SPADES),
+    }))
     .filter((entry) => entry.all)
     .map((entry) => entry.seat);
   return shooters.length > 0 ? shooters[0]! : null;

@@ -1,14 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { runBotGame } from '@parlour/engine';
 import { heartsConfigSchema } from './config';
-import {
-  HEARTS_BOTS,
-  HEARTS_PERSONAS,
-  easyBot,
-  hardBot,
-  heartsPersona,
-  mediumBot,
-} from './bots';
+import { HEARTS_BOTS, HEARTS_PERSONAS, easyBot, hardBot, heartsPersona, mediumBot } from './bots';
 import { heartsGame } from './game';
 
 const defaults = () => heartsConfigSchema.defaults();
@@ -20,7 +13,12 @@ function policiesFor(ids: readonly string[]) {
 describe('bot roster', () => {
   it('ships three tiers and named personas', () => {
     expect(HEARTS_BOTS.map((bot) => bot.tier)).toEqual([1, 2, 3]);
-    expect(HEARTS_PERSONAS.map((persona) => persona.id).sort()).toEqual(['ash', 'dove', 'flint', 'rose']);
+    expect(HEARTS_PERSONAS.map((persona) => persona.id).sort()).toEqual([
+      'ash',
+      'dove',
+      'flint',
+      'rose',
+    ]);
     expect(easyBot.tier).toBe(1);
     expect(mediumBot.tier).toBe(2);
     expect(hardBot.tier).toBe(3);
@@ -63,9 +61,9 @@ describe('bots play complete hands', () => {
         maxEvents: 400,
       });
       expect(record.events).toBeLessThan(400);
-      expect(record.result!.reason === 'hand-complete' || record.result!.reason === 'moon-shot').toBe(
-        true,
-      );
+      expect(
+        record.result!.reason === 'hand-complete' || record.result!.reason === 'moon-shot',
+      ).toBe(true);
     }
   });
 

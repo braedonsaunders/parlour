@@ -48,7 +48,7 @@ function policiesFor(seatTiers: readonly number[]) {
 }
 
 function labelsFor(seatTiers: readonly number[]) {
-  return seatTiers.map((tier) => TIER_LABELS[tier] ?? "Careful");
+  return seatTiers.map((tier) => TIER_LABELS[tier] ?? 'Careful');
 }
 
 /** All four personas, one per seat, rotated per game. */
@@ -66,11 +66,18 @@ function personaLabelsFor(gameIndex: number) {
   );
 }
 
-function winRates(records: readonly SimulationRecord[], labelForSeat: (record: SimulationRecord, seat: number) => string): WinRateRow[] {
+function winRates(
+  records: readonly SimulationRecord[],
+  labelForSeat: (record: SimulationRecord, seat: number) => string,
+): WinRateRow[] {
   return aggregateWinRates(records, labelForSeat);
 }
 
-export function runBalanceGates(opts: { games: number; baseSeed?: number; thresholds?: Partial<Thresholds> }): GateReport {
+export function runBalanceGates(opts: {
+  games: number;
+  baseSeed?: number;
+  thresholds?: Partial<Thresholds>;
+}): GateReport {
   const games = Math.max(0, Math.floor(opts.games));
   const baseSeed = opts.baseSeed ?? 20_260_823;
   const thresholds = { ...DEFAULT_THRESHOLDS, ...opts.thresholds };

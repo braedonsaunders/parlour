@@ -6,12 +6,19 @@ import { isActingSeat, type FxEvent } from '@parlour/engine';
 import type { HeartsModeId } from '@/lib/hearts/modes';
 import { heartsModeForRules } from '@/lib/hearts/modes';
 import { heartsTableView } from '@/lib/hearts/view';
-import { HeartsTransport, type HeartsDispatch, type HeartsSnapshot } from '@/lib/solo/HeartsTransport';
+import {
+  HeartsTransport,
+  type HeartsDispatch,
+  type HeartsSnapshot,
+} from '@/lib/solo/HeartsTransport';
 import { botKey, buildMatchRecord, friendKey, useHistoryStore } from '@/stores/history';
 import { useMatchFlowStore } from '@/stores/matchFlow';
 import { useProfileStore } from '@/stores/profile';
 import { heartsRulesFor, useHeartsSetupStore } from '@/stores/heartsSetup';
-import { HeartsTableScreen, type HeartsHandEndInfo } from '@/components/table/hearts/HeartsTableScreen';
+import {
+  HeartsTableScreen,
+  type HeartsHandEndInfo,
+} from '@/components/table/hearts/HeartsTableScreen';
 import {
   clearActiveMultiplayerSession,
   getActiveMultiplayerSession,

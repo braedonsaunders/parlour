@@ -29,7 +29,9 @@ export const PASS_ROTATION_PLAIN = ['left', 'right', 'across'] as const;
 /** Deal N of a match passes this way. Hand 1 is left, then right, across, hold. */
 export function passDirectionFor(handIndex: number, holdHand: boolean): PassDirection {
   const rotation = holdHand ? PASS_ROTATION_WITH_HOLD : PASS_ROTATION_PLAIN;
-  return rotation[((handIndex % rotation.length) + rotation.length) % rotation.length] as PassDirection;
+  return rotation[
+    ((handIndex % rotation.length) + rotation.length) % rotation.length
+  ] as PassDirection;
 }
 
 /** Seat offset each direction sends cards by (clockwise seat numbering). */

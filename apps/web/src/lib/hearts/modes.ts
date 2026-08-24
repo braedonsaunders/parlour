@@ -5,10 +5,7 @@ import type { HeartsRules } from '@parlour/game-hearts';
 /** The registry's Hearts modes, in pack order (classic · quickcut · cutthroat). */
 export const HEARTS_MODES: readonly GameMode[] = gameModes('hearts');
 
-export type HeartsModeId =
-  | 'classic'
-  | 'quickcut'
-  | 'cutthroat';
+export type HeartsModeId = 'classic' | 'quickcut' | 'cutthroat';
 
 const BY_ID = new Map(HEARTS_MODES.map((mode) => [mode.id, mode]));
 

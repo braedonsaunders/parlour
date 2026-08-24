@@ -47,8 +47,7 @@ describe('replay determinism', () => {
       const acting = session.phase.actors ?? [session.phase.actor!];
       for (const seat of acting) {
         if (session.status !== 'playing') break;
-        const legal =
-          heartsGame.flow.legalMovesFor?.(session.state, session.phase, seat) ?? [];
+        const legal = heartsGame.flow.legalMovesFor?.(session.state, session.phase, seat) ?? [];
         if (legal.length === 0) continue;
         const move = legal[rng.int(legal.length)]!;
         const outcome = sessionApply(heartsGame, session, seat, move.id, move.payload);

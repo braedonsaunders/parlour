@@ -43,9 +43,9 @@ console.log(`parlour ${GAME_ID} bot simulation — ${args.games} games per phase
 console.log(
   `gates: Sharp ≥ ${(DEFAULT_THRESHOLDS.hardVsEasyMin * 100).toFixed(0)}% · Harmless ≤ ${(
     DEFAULT_THRESHOLDS.easyVsHardMax * 100
-  ).toFixed(0)}% · persona band ${(
-    DEFAULT_THRESHOLDS.personaBandMin * 100
-  ).toFixed(0)}–${(DEFAULT_THRESHOLDS.personaBandMax * 100).toFixed(0)}%`,
+  ).toFixed(0)}% · persona band ${(DEFAULT_THRESHOLDS.personaBandMin * 100).toFixed(
+    0,
+  )}–${(DEFAULT_THRESHOLDS.personaBandMax * 100).toFixed(0)}%`,
 );
 
 const t0 = Date.now();
@@ -63,8 +63,7 @@ console.log('');
 console.log('gate 2 — persona band');
 for (const row of report.personas.rows) {
   const flag =
-    row.winRate < report.thresholds.personaBandMin ||
-    row.winRate > report.thresholds.personaBandMax
+    row.winRate < report.thresholds.personaBandMin || row.winRate > report.thresholds.personaBandMax
       ? ' ✗'
       : '';
   console.log(

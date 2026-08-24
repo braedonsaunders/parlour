@@ -5,7 +5,9 @@ import { heartsGame } from './game';
 describe('balance gates', () => {
   it('exposes calibrated thresholds', () => {
     expect(DEFAULT_THRESHOLDS.hardVsEasyMin).toBeGreaterThan(0.25);
-    expect(DEFAULT_THRESHOLDS.easyVsHardMax).toBeLessThan(1 - DEFAULT_THRESHOLDS.hardVsEasyMin + 0.05);
+    expect(DEFAULT_THRESHOLDS.easyVsHardMax).toBeLessThan(
+      1 - DEFAULT_THRESHOLDS.hardVsEasyMin + 0.05,
+    );
     expect(DEFAULT_THRESHOLDS.personaBandMin).toBeLessThan(0.2);
     expect(DEFAULT_THRESHOLDS.personaBandMax).toBeGreaterThan(0.3);
   });

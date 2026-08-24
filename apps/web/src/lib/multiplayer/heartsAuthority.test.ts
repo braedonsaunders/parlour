@@ -103,7 +103,12 @@ describe('hearts multiplayer authority', () => {
     const guest = makeAuthority(4_100);
     const state = host.getSession().state;
     const hand = [...(state.hands[0] ?? [])].sort();
-    const packet = host.apply({ id: 'a0', seat: 0, move: 'passCards', payload: { cards: [hand[0], hand[1], hand[2]] } });
+    const packet = host.apply({
+      id: 'a0',
+      seat: 0,
+      move: 'passCards',
+      payload: { cards: [hand[0], hand[1], hand[2]] },
+    });
     // a packet claiming a seq the guest has not reached is refused, not guessed
     const guestBefore = stateHash(guest.getSession().state);
     const forged: AppliedPacket = { ...packet, events: [{ ...packet.events[0]!, seq: 5 }] };

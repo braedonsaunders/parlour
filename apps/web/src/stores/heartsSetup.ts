@@ -1,8 +1,5 @@
 import { applyPreset } from '@parlour/engine';
-import {
-  heartsConfigSchema,
-  type HeartsRules,
-} from '@parlour/game-hearts';
+import { heartsConfigSchema, type HeartsRules } from '@parlour/game-hearts';
 import { create } from 'zustand';
 import { getGameMode, modePreset } from '@/lib/games';
 import { isHeartsModeId, type HeartsModeId } from '@/lib/hearts/modes';

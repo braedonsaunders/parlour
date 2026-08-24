@@ -19,10 +19,7 @@ export {
   MOON_POINTS,
 } from './scoring';
 export { createHeartsMatchDef, heartsMatchConfig, type HeartsMatchState } from './match';
-export {
-  auditFollowSuit,
-  reconstructHands,
-} from './audit';
+export { auditFollowSuit, reconstructHands } from './audit';
 export { heartsHowToPlay } from './howto';
 export { heartsCatalog } from './catalog';
 export {
