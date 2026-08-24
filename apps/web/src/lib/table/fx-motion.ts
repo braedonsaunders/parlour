@@ -24,6 +24,7 @@ type BaseCue = {
 
 export type FxCue =
   | (BaseCue & { type: 'deal'; card: string; from: Zone; to: Zone })
+  | (BaseCue & { type: 'flip'; card: string; from: 'stock'; to: 'discard' })
   | (BaseCue & { type: 'draw'; card: string; from: Zone; to: `hand:${number}`; seat: number })
   | (BaseCue & {
       type: 'discard';
@@ -63,6 +64,15 @@ function numberField(event: FxEvent, field: string): number {
   return value;
 }
 
+function durationField(event: FxEvent, fallback: number): number {
+  const value = payloadOf(event).dur;
+  if (value === undefined) return fallback;
+  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
+    throw new Error(`${event.kind} fx requires a positive dur`);
+  }
+  return Math.min(value, FX_TIMING.maxBurstMs);
+}
+
 function zoneField(event: FxEvent, field: string): Zone {
   const value = stringField(event, field);
   if (
@@ -91,7 +101,16 @@ function cueFor(event: FxEvent, index: number): FxCue | null {
         card: stringField(event, 'card'),
         from: zoneField(event, 'from'),
         to: zoneField(event, 'to'),
-        durationMs: FX_TIMING.cardFlightMs,
+        durationMs: durationField(event, FX_TIMING.cardFlightMs),
+      };
+    case Fx.FlipCard:
+      return {
+        ...base,
+        type: 'flip',
+        card: stringField(event, 'card'),
+        from: 'stock',
+        to: 'discard',
+        durationMs: durationField(event, FX_TIMING.cardFlightMs),
       };
     case Fx.DrawCard: {
       const seat = numberField(event, 'seat');

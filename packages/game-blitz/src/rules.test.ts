@@ -218,8 +218,26 @@ describe('blitz round flow', () => {
     expect(session.state.discard).toHaveLength(1);
     expect(session.state.stock).toHaveLength(52 - 12 - 1);
     expect(session.phase).toMatchObject({ phase: 'turn', actor: 0 });
-    expect(session.setupFx?.filter((e) => e.kind === Fx.DealCard)).toHaveLength(12);
-    expect(session.setupFx?.some((e) => e.kind === Fx.FlipCard)).toBe(true);
+    const dealFx = session.setupFx?.filter((event) => event.kind === Fx.DealCard) ?? [];
+    expect(dealFx).toHaveLength(12);
+    expect(dealFx.map(({ at }) => at)).toEqual([
+      0, 70, 140, 210, 280, 350, 420, 490, 560, 630, 700, 770,
+    ]);
+    expect(dealFx.map(({ payload }) => (payload as { to: string }).to)).toEqual([
+      'hand:0',
+      'hand:1',
+      'hand:2',
+      'hand:3',
+      'hand:0',
+      'hand:1',
+      'hand:2',
+      'hand:3',
+      'hand:0',
+      'hand:1',
+      'hand:2',
+      'hand:3',
+    ]);
+    expect(session.setupFx?.find((event) => event.kind === Fx.FlipCard)?.at).toBe(840);
   });
 
   it('draw then discard cycles to the next seat with ordered fx', () => {

@@ -12,6 +12,7 @@ import {
 import type { SeatInfo } from '@/lib/seats';
 import { getAvatar } from '@/lib/avatars';
 import { getAudioManager } from '@/lib/audio/AudioManager';
+import { BLITZ_SFX, PARLOUR_SFX } from '@/lib/audio/sfx';
 import { AvatarBadge } from '@/components/AvatarBadge';
 import { useProfileStore } from '@/stores/profile';
 import styles from '@/styles/celebrate.module.css';
@@ -97,12 +98,12 @@ function RoundEndChoreography({ fx, seats, livesBySeat, onNextRound }: RoundEndO
     }
 
     const audio = getAudioManager();
-    if (plan.kind === 'knock') audio.play('knock.thud');
-    if (plan.kind === 'blitz') audio.play('blitz.fanfare');
+    if (plan.kind === 'knock') audio.play(BLITZ_SFX.knock);
+    if (plan.kind === 'blitz') audio.play(BLITZ_SFX.fanfare);
 
     for (const reveal of plan.reveals) {
       schedule(() => {
-        audio.play('card.snap');
+        audio.play(PARLOUR_SFX.cardFlip);
         setProgress((p) =>
           p.revealed.some((r) => r.seat === reveal.seat)
             ? p
@@ -112,13 +113,13 @@ function RoundEndChoreography({ fx, seats, livesBySeat, onNextRound }: RoundEndO
     }
 
     schedule(() => {
-      if (plan.kind !== 'blitz') audio.play('turn.tick');
+      if (plan.kind !== 'blitz') audio.play(PARLOUR_SFX.turnReady);
       setProgress((p) => ({ ...p, banner: true }));
     }, plan.bannerAtMs);
 
     for (const loss of plan.chipLosses) {
       schedule(() => {
-        audio.play('chip.clink');
+        audio.play(BLITZ_SFX.lifeLoss);
         setProgress((p) =>
           p.losses.some((l) => l.seat === loss.seat) ? p : { ...p, losses: [...p.losses, loss] },
         );

@@ -1,8 +1,12 @@
 # parlour audio suite
 
-These sounds are original procedural assets generated for parlour. Run
-`pnpm --filter @parlour/web generate:audio` to reproduce every WAV from the
-seeded synthesis script. No third-party recordings or samples are used.
+The game SFX in `audio/sfx/` are generated with ElevenLabs Sound Effects v2 from
+the production prompts in `apps/web/scripts/generate-sfx.mjs`. To regenerate the
+library, put `ELEVENLABS_API_KEY` in the ignored root `.env.local`, then run
+`pnpm --filter @parlour/web generate:sfx`. Existing files are skipped unless the
+command is passed `--force`. The script uses ffmpeg to loudness-master every file
+at 44.1 kHz with event-specific targets and safe true-peak headroom.
 
-Music tracks live in `audio/music/` (see `docs/music/SUNO-PROMPTS.md` for the
-generation pack); `parlour-ambience.wav` doubles as the built-in fallback track.
+`parlour-ambience.wav` is an original seeded procedural fallback; regenerate it
+with `pnpm --filter @parlour/web generate:ambience`. Music tracks live in
+`audio/music/` and are documented in `docs/music/SUNO-PROMPTS.md`.

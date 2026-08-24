@@ -4,20 +4,29 @@ import { describe, expect, it } from 'vitest';
 import { SOUND_MANIFEST } from './manifest';
 
 const REQUIRED_SOUNDS = [
-  'card.slide',
-  'card.snap',
-  'deal.riffle',
-  'knock.thud',
+  'parlour.card.draw.stock',
+  'parlour.card.draw.discard',
+  'parlour.card.discard.flight',
+  'parlour.card.land',
+  'parlour.card.flip',
+  'parlour.deal.card',
+  'parlour.stock.shuffle',
+  'parlour.turn.ready',
+  'parlour.ui.press',
+  'parlour.match.win',
+  'parlour.match.lose',
+  'blitz.knock',
   'blitz.fanfare',
-  'chip.clink',
-  'turn.tick',
-  'ui.pop',
-  'win.jingle',
-  'lose.sting',
+  'blitz.life.loss',
+  'wildpile.wild.surge',
+  'wildpile.reverse',
+  'wildpile.skip',
+  'wildpile.draw-stack',
+  'wildpile.color',
 ] as const;
 
 describe('production audio suite', () => {
-  it('ships every required sound as a valid non-empty WAV', () => {
+  it('ships every required sound as a valid non-empty MP3', () => {
     const byId = new Map(SOUND_MANIFEST.map((sound) => [sound.id, sound]));
 
     for (const id of REQUIRED_SOUNDS) {
@@ -25,10 +34,13 @@ describe('production audio suite', () => {
       expect(sound, `${id} is declared`).toBeDefined();
       const path = join(process.cwd(), 'public', sound!.src);
       expect(statSync(path).size, `${id} is not an empty placeholder`).toBeGreaterThan(1_000);
-      const header = readFileSync(path).subarray(0, 12);
-      expect(header.subarray(0, 4).toString()).toBe('RIFF');
-      expect(header.subarray(8, 12).toString()).toBe('WAVE');
+      const header = readFileSync(path).subarray(0, 3);
+      const hasId3 = header.toString() === 'ID3';
+      const hasFrameSync = header[0] === 0xff && (header[1]! & 0xe0) === 0xe0;
+      expect(hasId3 || hasFrameSync, `${id} is not MPEG audio`).toBe(true);
     }
+
+    expect(SOUND_MANIFEST.map((sound) => sound.id)).toEqual(REQUIRED_SOUNDS);
   });
 
   it('reserves every manifest slot for SFX; music lives in the music manifest', () => {

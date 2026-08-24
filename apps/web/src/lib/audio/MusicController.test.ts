@@ -182,8 +182,63 @@ describe('MusicController', () => {
     expect(FakeHowl.instances.length).toBe(voiceCountBefore + 1);
 
     vi.advanceTimersByTime(1000);
-    const retired = howlFor('music-campfire-1.mp3')!;
-    expect(retired.stopped || retired.unloaded).toBe(true);
+    const retired = howlFor('music-campfire-1.mp3');
+    expect(retired?.stopped || retired?.unloaded).toBe(true);
+  });
+
+  it('switches to the title theme in the menu and back at the table', () => {
+    const controller = new MusicController(makeManager());
+    controller.play();
+    expect(controller.getState().trackId).toBe('campfire-1');
+
+    controller.setMenu(true);
+    expect(controller.getState().trackId).toBe('title-1');
+    expect(howlFor('music-title.mp3')).toBeDefined();
+
+    // Single-song playlist wraps on itself.
+    howlFor('music-title.mp3')?.emit('end');
+    expect(controller.getState().trackId).toBe('title-1');
+
+    controller.setMenu(false);
+    expect(controller.getState().trackId).toBe('campfire-1');
+  });
+
+  it('keeps menu context idle-safe but applies it on the next play', () => {
+    const controller = new MusicController(makeManager());
+    controller.setMenu(true);
+    expect(controller.getState()).toMatchObject({ status: 'idle', trackId: null });
+
+    controller.play();
+    expect(controller.getState().trackId).toBe('title-1');
+  });
+
+  it('does not start game music from a background change while on a menu', () => {
+    const controller = new MusicController(makeManager());
+    controller.setMenu(true);
+    controller.play();
+    expect(controller.getState().trackId).toBe('title-1');
+
+    controller.setScene('casino');
+    expect(controller.getState().trackId).toBe('title-1');
+
+    // The pick is armed: entering the table swaps straight into the casino set.
+    controller.setMenu(false);
+    expect(controller.getState().trackId).toBe('casino-1');
+  });
+
+  it('exposes the built-in tense pack as a selectable soundtrack', () => {
+    const controller = new MusicController(makeManager());
+    controller.setScene('casino');
+    controller.play();
+    expect(controller.getState().trackId).toBe('casino-1');
+
+    controller.setPack('tense');
+    expect(controller.getState().packId).toBe('tense');
+    expect(controller.getState().trackId).toBe('tense-1');
+    expect(howlFor('music-tense.mp3')).toBeDefined();
+
+    controller.next();
+    expect(controller.getState().trackId).toBe('tense-1');
   });
 
   it('keeps a scene change idle-safe but applies it on the next play', () => {

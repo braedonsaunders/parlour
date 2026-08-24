@@ -421,7 +421,11 @@ export const wildpileGame: GameDef<WildpileState, WildpileRules> = {
         const card = shuffled[cursor++];
         if (!card) throw new Error('wildpile deck exhausted during deal');
         hands[seat]?.push(card);
-        fx.emit(Fx.DealCard, { card, from: 'stock', to: `hand:${seat}`, dur: 180 }, cursor * 70);
+        fx.emit(
+          Fx.DealCard,
+          { card, from: 'stock', to: `hand:${seat}`, dur: 180 },
+          (cursor - 1) * 70,
+        );
       }
     }
     const starterIndex = shuffled.findIndex(

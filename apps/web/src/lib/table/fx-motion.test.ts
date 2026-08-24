@@ -46,4 +46,23 @@ describe('table fx timeline', () => {
 
     expect(timeline.map(({ type }) => type)).toEqual(['knock', 'blitz']);
   });
+
+  it('turns the setup starter flip into a face-up stock-to-discard flight', () => {
+    const [flip] = buildFxTimeline([
+      {
+        kind: Fx.FlipCard,
+        payload: { card: 'D3', from: 'stock', to: 'discard', dur: 220 },
+        at: 840,
+      },
+    ]);
+
+    expect(flip).toMatchObject({
+      type: 'flip',
+      card: 'D3',
+      from: 'stock',
+      to: 'discard',
+      startMs: 840,
+      durationMs: 220,
+    });
+  });
 });

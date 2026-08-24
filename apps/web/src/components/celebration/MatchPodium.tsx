@@ -5,6 +5,7 @@ import gsap from 'gsap';
 import type { MatchSnapshot } from '@/stores/matchFlow';
 import { derivePodium } from '@/lib/match/podium';
 import { getAudioManager } from '@/lib/audio/AudioManager';
+import { PARLOUR_SFX } from '@/lib/audio/sfx';
 import { AvatarBadge } from '@/components/AvatarBadge';
 import styles from '@/styles/podium.module.css';
 
@@ -63,7 +64,7 @@ export function MatchPodium({ snapshot }: { snapshot: MatchSnapshot }) {
   const audio = getAudioManager();
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      audio.play(localWon ? 'win.jingle' : 'lose.sting');
+      audio.play(localWon ? PARLOUR_SFX.matchWin : PARLOUR_SFX.matchLose);
     }, 350);
     return () => window.clearTimeout(timer);
   }, [audio, localWon]);

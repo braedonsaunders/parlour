@@ -4,8 +4,10 @@ import { describe, expect, it } from 'vitest';
 import {
   BASE_PACK_ID,
   FALLBACK_TRACK,
+  MENU_PLAYLIST,
   MUSIC_TRACKS,
   PARLOUR_PACK,
+  TENSE_PACK,
   getMusicPack,
   getMusicTrack,
   listMusicPacks,
@@ -42,12 +44,41 @@ describe('music library', () => {
     expect(FALLBACK_TRACK.loop).toBe(true);
   });
 
-  it('resolves lookups across songs and fallback', () => {
-    expect(MUSIC_TRACKS.length).toBeGreaterThanOrEqual(9);
+  it('resolves lookups across songs, packs, menu theme, and fallback', () => {
+    expect(MUSIC_TRACKS.length).toBe(11);
     expect(getMusicTrack('campfire-1')?.title).toBe('Ember Watch');
+    expect(getMusicTrack('title-1')?.src).toContain('music-title.mp3');
+    expect(getMusicTrack('tense-1')?.src).toContain('music-tense.mp3');
     expect(getMusicTrack('nope')).toBeUndefined();
   });
+
+  it('ships every declared track as a valid non-empty MP3', () => {
+    expect(MUSIC_TRACKS.length).toBeGreaterThan(0);
+    for (const song of MUSIC_TRACKS) {
+      const path = join(process.cwd(), 'public', song.src);
+      expect(statSync(path).size, `${song.id} is not an empty placeholder`).toBeGreaterThan(50_000);
+      const header = readFileSync(path);
+      const hasId3 = header.subarray(0, 3).toString() === 'ID3';
+      const hasFrameSync = header[0] === 0xff && (header[1]! & 0xe0) === 0xe0;
+      expect(hasId3 || hasFrameSync, `${song.id} is not an MPEG audio file`).toBe(true);
+    }
+  });
+
+  it('provides a menu theme on the base pack and a built-in tense pack', () => {
+    expect(PARLOUR_PACK.menu).toEqual(MENU_PLAYLIST);
+    expect(menuPlaylistSrc()).toContain('/audio/music/music-title.mp3');
+    expect(getMusicPack(TENSE_PACK.id)).toBe(TENSE_PACK);
+    expect(listMusicPacks().map((pack) => pack.id)).toContain('tense');
+
+    for (const scene of SCENE_IDS) {
+      expect(playlistForPack(TENSE_PACK, scene)[0]?.src).toContain('music-tense.mp3');
+    }
+  });
 });
+
+function menuPlaylistSrc(): string {
+  return MENU_PLAYLIST[0]?.src ?? '';
+}
 
 describe('music pack registry', () => {
   it('registers the parlour base pack and lists it first', () => {

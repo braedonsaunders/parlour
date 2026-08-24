@@ -75,6 +75,18 @@ export const PARLOUR_PACK: MusicPack = {
     casino: CASINO_PLAYLIST,
     snug: SNUG_PLAYLIST,
   },
+  menu: MENU_PLAYLIST,
+};
+
+/** Tense table moments — pickable soundtrack; games can switch to it mid-match. */
+export const TENSE_PACK: MusicPack = {
+  id: 'tense',
+  label: 'Tense',
+  playlists: {
+    campfire: TENSE_PLAYLIST,
+    casino: TENSE_PLAYLIST,
+    snug: TENSE_PLAYLIST,
+  },
 };
 
 /** Plays when a playlist has no working songs (e.g. before Suno files land). */
@@ -86,7 +98,10 @@ export const FALLBACK_TRACK: MusicTrack = {
   loop: true,
 };
 
-const packs = new Map<string, MusicPack>([[PARLOUR_PACK.id, PARLOUR_PACK]]);
+const packs = new Map<string, MusicPack>([
+  [PARLOUR_PACK.id, PARLOUR_PACK],
+  [TENSE_PACK.id, TENSE_PACK],
+]);
 
 /** Games call this (client-side) to contribute their own soundtracks. */
 export function registerMusicPack(pack: MusicPack): void {
@@ -115,6 +130,8 @@ export function getMusicTrack(id: string | null | undefined): MusicTrack | undef
       const found = list?.find((candidate) => candidate.id === id);
       if (found) return found;
     }
+    const menuHit = pack.menu?.find((candidate) => candidate.id === id);
+    if (menuHit) return menuHit;
   }
   return undefined;
 }
@@ -130,4 +147,10 @@ export function playlistForPack(pack: MusicPack | undefined, scene: SceneId): Mu
   const own = pack?.playlists[scene];
   if (own && own.length > 0) return [...own];
   return tracksForScene(scene);
+}
+
+/** Menu-theme playlist for a pack, resolved against the parlour base. */
+export function menuForPack(pack: MusicPack | undefined): MusicTrack[] {
+  if (pack?.menu && pack.menu.length > 0) return [...pack.menu];
+  return [...MENU_PLAYLIST];
 }

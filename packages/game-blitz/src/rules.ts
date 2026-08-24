@@ -20,6 +20,7 @@ import type { BlitzState, RoundOutcome } from './state';
 
 const DECK = stdDeck();
 export const HAND_SIZE = 3;
+const DEAL_STAGGER_MS = 70;
 
 // ---------------------------------------------------------------------------
 // shared helpers
@@ -266,13 +267,27 @@ export function createBlitzDef(options: BlitzDefOptions = {}): GameDef<BlitzStat
       for (let seat = 0; seat < seats; seat++) {
         const hand = ids.slice(cursor, cursor + HAND_SIZE);
         cursor += HAND_SIZE;
-        for (const card of hand) {
-          fx.emit(Fx.DealCard, { card, from: 'stock', to: `hand:${seat}` });
-        }
         hands.push(hand);
       }
+      let dealIndex = 0;
+      for (let cardIndex = 0; cardIndex < HAND_SIZE; cardIndex++) {
+        for (let seat = 0; seat < seats; seat++) {
+          const card = hands[seat]?.[cardIndex];
+          if (!card) continue;
+          fx.emit(
+            Fx.DealCard,
+            { card, from: 'stock', to: `hand:${seat}`, dur: 180 },
+            dealIndex * DEAL_STAGGER_MS,
+          );
+          dealIndex += 1;
+        }
+      }
       const flipped = ids[cursor] as CardId;
-      fx.emit(Fx.FlipCard, { card: flipped, target: 'discard' });
+      fx.emit(
+        Fx.FlipCard,
+        { card: flipped, from: 'stock', to: 'discard', dur: 180 },
+        dealIndex * DEAL_STAGGER_MS,
+      );
 
       const state: BlitzState = {
         rules: config,

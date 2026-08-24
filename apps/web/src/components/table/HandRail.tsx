@@ -14,6 +14,7 @@ export type HandRailProps = {
   count: number;
   zone: string;
   label: string;
+  dealState?: 'dealing' | 'complete';
   accessory?: ReactNode;
   children: ReactNode;
 };
@@ -26,7 +27,7 @@ export function calculateFanStep(width: number, cardWidth: number, count: number
 }
 
 /** A centered UNO-style fan that compresses to keep every card inside the table rail. */
-export function HandRail({ count, zone, label, accessory, children }: HandRailProps) {
+export function HandRail({ count, zone, label, dealState, accessory, children }: HandRailProps) {
   const railRef = useRef<HTMLDivElement>(null);
   const [step, setStep] = useState(0);
 
@@ -69,6 +70,7 @@ export function HandRail({ count, zone, label, accessory, children }: HandRailPr
         } as CSSProperties
       }
       data-zone={zone}
+      data-deal-state={dealState}
       aria-label={label}
     >
       {accessory}

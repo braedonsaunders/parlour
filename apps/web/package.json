@@ -8,7 +8,9 @@
     "start": "next start",
     "type-check": "tsc --noEmit",
     "test": "vitest run",
-    "generate:audio": "node scripts/generate-audio.mjs"
+    "generate:audio": "pnpm run generate:ambience && pnpm run generate:sfx",
+    "generate:ambience": "node scripts/generate-ambience.mjs",
+    "generate:sfx": "node --env-file=../../.env.local scripts/generate-sfx.mjs"
   },
   "dependencies": {
     "@parlour/engine": "workspace:*",

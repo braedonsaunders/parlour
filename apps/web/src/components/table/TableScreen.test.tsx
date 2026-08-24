@@ -32,6 +32,10 @@ describe('TableScreen owner hand', () => {
   let root: Root;
 
   beforeEach(() => {
+    Object.defineProperty(window, 'matchMedia', {
+      configurable: true,
+      value: () => ({ matches: false }),
+    });
     container = document.createElement('div');
     document.body.append(container);
     root = createRoot(container);
@@ -39,7 +43,74 @@ describe('TableScreen owner hand', () => {
 
   afterEach(() => {
     act(() => root.unmount());
+    vi.useRealTimers();
     container.remove();
+  });
+
+  it('reveals the hand and opponent backs only when each dealt card lands', () => {
+    vi.useFakeTimers();
+    const view: TableView = {
+      ...VIEW,
+      players: [
+        VIEW.players[0]!,
+        {
+          seat: 1,
+          name: 'Juniper',
+          avatarId: 'juniper',
+          hand: [],
+          handCount: 1,
+          lives: 3,
+          isBot: true,
+        },
+      ],
+    };
+    const fx = [
+      { kind: Fx.DealCard, payload: { card: 'H1', from: 'stock', to: 'hand:0' }, at: 0 },
+      { kind: Fx.DealCard, payload: { card: 'C5', from: 'stock', to: 'hand:1' }, at: 70 },
+      { kind: Fx.DealCard, payload: { card: 'S2', from: 'stock', to: 'hand:0' }, at: 140 },
+      {
+        kind: Fx.FlipCard,
+        payload: { card: 'D3', from: 'stock', to: 'discard' },
+        at: 210,
+      },
+    ];
+
+    act(() => root.render(createElement(TableScreen, { view, fx, fxKey: 'deal' })));
+
+    expect(container.querySelectorAll('[data-hand-card]')).toHaveLength(0);
+    expect(container.querySelector('[aria-label="0 hidden cards"]')).not.toBeNull();
+    expect(container.querySelector('[data-table-screen]')?.getAttribute('data-deal-state')).toBe(
+      'dealing',
+    );
+    expect(container.querySelector('[data-zone="stock"]')?.getAttribute('aria-label')).toContain(
+      '44 cards remain',
+    );
+    expect(
+      container.querySelector('[data-zone="discard"] [aria-label="3 of diamonds"]'),
+    ).toBeNull();
+
+    act(() => vi.advanceTimersByTime(180));
+    expect(container.querySelectorAll('[data-hand-card]')).toHaveLength(1);
+    expect(container.querySelector('[data-zone="stock"]')?.getAttribute('aria-label')).toContain(
+      '43 cards remain',
+    );
+
+    act(() => vi.advanceTimersByTime(70));
+    expect(container.querySelector('[aria-label="1 hidden cards"]')).not.toBeNull();
+
+    act(() => vi.advanceTimersByTime(70));
+    expect(container.querySelectorAll('[data-hand-card]')).toHaveLength(2);
+
+    act(() => vi.advanceTimersByTime(70));
+    expect(container.querySelector('[data-table-screen]')?.getAttribute('data-deal-state')).toBe(
+      'complete',
+    );
+    expect(
+      container.querySelector('[data-zone="discard"] [aria-label="3 of diamonds"]'),
+    ).not.toBeNull();
+    expect(container.querySelector('[data-zone="stock"]')?.getAttribute('aria-label')).toContain(
+      '40 cards remain',
+    );
   });
 
   it('discards a legal card directly on click without a separate discard control', () => {
@@ -81,6 +152,16 @@ describe('TableScreen owner hand', () => {
 
     expect(container.querySelector('[data-local-turn="false"]')).not.toBeNull();
     expect(container.textContent).not.toContain('Your turn');
+  });
+
+  it('shows the local player life chips beside their hand', () => {
+    act(() => {
+      root.render(createElement(TableScreen, { view: VIEW, fx: [], fxKey: 0 }));
+    });
+
+    const ownerLives = container.querySelector('[aria-label="My lives: 3"]');
+    expect(ownerLives).not.toBeNull();
+    expect(ownerLives?.querySelectorAll('i')).toHaveLength(3);
   });
 
   it('shows the newest discard on top when the pile contains more than three cards', () => {

@@ -4,6 +4,8 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties, type RefObjec
 import { type FxEvent } from '@parlour/engine';
 import { AnimatePresence, motion } from 'motion/react';
 import { getAvatar } from '@/lib/avatars';
+import { BLITZ_SFX_PACK } from '@/lib/audio/sfx';
+import { type DealPresentation, useDealPresentation } from '@/lib/table/deal-presentation';
 import { buildFxTimeline, type FxCue } from '@/lib/table/fx-motion';
 import { ownerCurrentCount } from '@/lib/table/owner-count';
 import { discardRotation, useFxAnimation, useTableAudio } from './fx-animation';
@@ -56,7 +58,8 @@ export function TableScreen(props: TableScreenProps) {
   const { view, error } = props;
   const rootRef = useRef<HTMLElement>(null);
   const [menuOpen, setMenuOpen] = useState(false);
-  useTableAudio(props.fx, props.fxKey);
+  const deal = useDealPresentation(props.fx, props.fxKey);
+  useTableAudio(props.fx, props.fxKey, BLITZ_SFX_PACK.id);
 
   useEffect(() => {
     const gameWindow = window as Window & { render_game_to_text?: () => string };
@@ -64,13 +67,16 @@ export function TableScreen(props: TableScreenProps) {
       JSON.stringify({
         coordinateSystem: 'CSS pixels; origin is top-left, x grows right, y grows down',
         game: 'blitz',
-        status: error ? 'error' : view ? 'ready' : 'loading',
+        status: error ? 'error' : view ? (deal.dealing ? 'dealing' : 'ready') : 'loading',
         error,
         activeSeat: view?.activeSeat ?? null,
-        stockCount: view?.stockCount ?? null,
-        discardTop: view?.discard.at(-1) ?? null,
-        hand: view?.players.find(({ isLocal }) => isLocal)?.hand ?? [],
-        legal: view?.legal ?? null,
+        stockCount: view ? view.stockCount + deal.pendingStockCards : null,
+        discardTop: view && deal.discardReady ? view.discard.at(-1) : null,
+        hand: (() => {
+          const player = view?.players.find(({ isLocal }) => isLocal);
+          return player ? deal.visibleCards(player.hand, player.seat) : [];
+        })(),
+        legal: deal.dealing ? null : (view?.legal ?? null),
         activeFx: props.fx.map(({ kind, at }) => ({ kind, at: at ?? 0 })),
       });
     gameWindow.render_game_to_text = renderGameToText;
@@ -79,7 +85,7 @@ export function TableScreen(props: TableScreenProps) {
         delete gameWindow.render_game_to_text;
       }
     };
-  }, [error, props.fx, view]);
+  }, [deal, error, props.fx, view]);
 
   if (error) {
     return (
@@ -103,8 +109,16 @@ export function TableScreen(props: TableScreenProps) {
     );
   }
 
+  const tableBusy = (props.busy ?? false) || deal.dealing;
+  const localSeat = view.players.find(({ isLocal }) => isLocal)?.seat ?? 0;
+
   return (
-    <main ref={rootRef} className={styles.screen} data-table-screen>
+    <main
+      ref={rootRef}
+      className={styles.screen}
+      data-table-screen
+      data-deal-state={deal.sequence ? (deal.complete ? 'complete' : 'dealing') : undefined}
+    >
       <header className={styles.hud}>
         <div className="pill-soft">
           <span className={styles.eyebrow}>Blitz</span>
@@ -126,18 +140,29 @@ export function TableScreen(props: TableScreenProps) {
           31
         </div>
         {view.players.map((player) => (
-          <Seat key={player.seat} player={player} active={view.activeSeat === player.seat} />
+          <Seat
+            key={player.seat}
+            player={player}
+            active={view.activeSeat === player.seat}
+            displayCount={deal.visibleCount(player.seat, player.handCount ?? player.hand.length)}
+          />
         ))}
-        <Piles view={view} busy={props.busy ?? false} onDraw={props.onDraw} />
-        <LocalHand {...props} view={view} />
-        <FxLayer fx={props.fx} fxKey={props.fxKey} rootRef={rootRef} players={view.players} />
+        <Piles view={view} busy={tableBusy} onDraw={props.onDraw} deal={deal} />
+        <LocalHand {...props} view={view} busy={tableBusy} deal={deal} />
+        <FxLayer
+          fx={props.fx}
+          fxKey={props.fxKey}
+          rootRef={rootRef}
+          players={view.players}
+          localSeat={localSeat}
+        />
       </section>
 
       <div className={styles.actionRail}>
         <button
           type="button"
           className="btn-fat"
-          disabled={!view.legal.knock || props.busy}
+          disabled={!view.legal.knock || tableBusy}
           onClick={props.onKnock}
         >
           Knock
@@ -156,9 +181,17 @@ export function TableScreen(props: TableScreenProps) {
   );
 }
 
-function Seat({ player, active }: { player: TablePlayer; active: boolean }) {
+function Seat({
+  player,
+  active,
+  displayCount,
+}: {
+  player: TablePlayer;
+  active: boolean;
+  displayCount: number;
+}) {
   const avatar = getAvatar(player.avatarId);
-  const count = player.handCount ?? player.hand.length;
+  const count = displayCount;
   const visibleCards = Math.min(count, 5);
   const fanStep = visibleCards > 1 ? 22 / (visibleCards - 1) : 0;
   const style = { '--seat-accent': avatar.accent, '--seat-shade': avatar.shade } as CSSProperties;
@@ -193,11 +226,13 @@ function Seat({ player, active }: { player: TablePlayer; active: boolean }) {
         <strong>{player.name}</strong>
         {player.isBot && <small>bot</small>}
       </div>
-      <div className={styles.lifeRow} aria-label={`${player.lives} lives`}>
-        {Array.from({ length: player.lives }, (_, index) => (
-          <i key={index} />
-        ))}
-      </div>
+      {!player.isLocal && (
+        <div className={styles.lifeRow} aria-label={`${player.lives} lives`}>
+          {Array.from({ length: player.lives }, (_, index) => (
+            <i key={index} />
+          ))}
+        </div>
+      )}
     </motion.div>
   );
 }
@@ -206,12 +241,15 @@ function Piles({
   view,
   busy,
   onDraw,
+  deal,
 }: {
   view: TableView;
   busy: boolean;
   onDraw?: TableScreenProps['onDraw'];
+  deal: DealPresentation;
 }) {
-  const visibleDiscard = view.discard.slice(0, 3).reverse();
+  const visibleDiscard = (deal.discardReady ? view.discard : []).slice(0, 3).reverse();
+  const stockCount = view.stockCount + deal.pendingStockCards;
   return (
     <div className={styles.piles} data-local-turn={!busy}>
       {!busy && (
@@ -225,10 +263,10 @@ function Piles({
         className={styles.pileButton}
         disabled={!view.legal.drawStock || busy}
         onClick={() => onDraw?.('stock')}
-        aria-label={`Draw from stock, ${view.stockCount} cards remain`}
+        aria-label={`Draw from stock, ${stockCount} cards remain`}
       >
         <PlayingCard faceDown />
-        <span className={styles.pileCount}>{view.stockCount}</span>
+        <span className={styles.pileCount}>{stockCount}</span>
       </button>
       <button
         type="button"
@@ -250,26 +288,36 @@ function Piles({
   );
 }
 
-function LocalHand(props: TableScreenProps & { view: TableView }) {
+function LocalHand(props: TableScreenProps & { view: TableView; deal: DealPresentation }) {
   const player = props.view.players.find(({ isLocal }) => isLocal);
   if (!player) return null;
+  const visibleHand = props.deal.visibleCards(player.hand, player.seat);
   const canChoose = props.view.legal.discardCards.length > 0 && !props.busy;
-  const currentCount = ownerCurrentCount(props.view.players);
+  const currentCount = ownerCurrentCount([{ hand: visibleHand, isLocal: true }]);
   return (
     <HandRail
-      count={player.hand.length}
+      count={visibleHand.length}
       zone={`hand:${player.seat}`}
       label="Your hand"
+      dealState={props.deal.sequence ? (props.deal.complete ? 'complete' : 'dealing') : undefined}
       accessory={
-        <output className={styles.ownerCount} aria-label={`My current count: ${currentCount ?? 0}`}>
+        <output className={styles.ownerCount}>
           <span>My count</span>
-          <strong>{currentCount ?? 0}</strong>
+          <strong aria-label={`My current count: ${currentCount ?? 0}`}>{currentCount ?? 0}</strong>
+          <span className={styles.ownerLives} aria-label={`My lives: ${player.lives}`}>
+            <b aria-hidden="true">Lives</b>
+            <span className={styles.ownerLifePips} aria-hidden="true">
+              {Array.from({ length: player.lives }, (_, index) => (
+                <i key={index} />
+              ))}
+            </span>
+          </span>
         </output>
       }
     >
       <AnimatePresence initial={false} mode="popLayout">
-        {player.hand.map((card, index) => {
-          const fanIndex = index - (player.hand.length - 1) / 2;
+        {visibleHand.map((card, index) => {
+          const fanIndex = index - (visibleHand.length - 1) / 2;
           const playable = canChoose && props.view.legal.discardCards.includes(card);
           return (
             <motion.div
@@ -305,11 +353,13 @@ function FxLayer({
   fxKey,
   rootRef,
   players,
+  localSeat,
 }: {
   fx: readonly FxEvent[];
   fxKey: string | number;
   rootRef: RefObject<HTMLElement | null>;
   players: readonly TablePlayer[];
+  localSeat: number;
 }) {
   const planned = useMemo(() => {
     try {
@@ -328,19 +378,30 @@ function FxLayer({
     <div className={styles.fxLayer} aria-live="polite">
       {planned.error && <div className={styles.fxError}>Animation skipped: {planned.error}</div>}
       {planned.cues.map((cue) => (
-        <Cue key={`${fxKey}:${cue.id}`} cue={cue} players={players} />
+        <Cue key={`${fxKey}:${cue.id}`} cue={cue} players={players} localSeat={localSeat} />
       ))}
     </div>
   );
 }
 
-function Cue({ cue, players }: { cue: FxCue; players: readonly TablePlayer[] }) {
-  if (cue.type === 'deal' || cue.type === 'draw' || cue.type === 'discard') {
+function Cue({
+  cue,
+  players,
+  localSeat,
+}: {
+  cue: FxCue;
+  players: readonly TablePlayer[];
+  localSeat: number;
+}) {
+  if (cue.type === 'deal' || cue.type === 'flip' || cue.type === 'draw' || cue.type === 'discard') {
     return (
       <div data-fx-cue={cue.id} data-card-flight className={styles.flyingCard}>
         <i className={styles.cardTrail} />
         <span data-flight-card className={styles.flightCardVisual}>
-          <PlayingCard card={cue.card} faceDown={cue.type === 'deal' && cue.to !== 'hand:0'} />
+          <PlayingCard
+            card={cue.card}
+            faceDown={cue.type === 'deal' && cue.to !== `hand:${localSeat}`}
+          />
         </span>
         <i className={styles.cardGlint} />
       </div>

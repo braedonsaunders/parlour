@@ -4,7 +4,7 @@ import { useEffect, type RefObject } from 'react';
 import { type FxEvent } from '@parlour/engine';
 import { gsap } from 'gsap';
 import { getAudioManager } from '@/lib/audio/AudioManager';
-import { soundCuesForFx } from '@/lib/audio/cues';
+import { soundCuesForFx, soundDefsForSfxPack } from '@/lib/audio/sfx';
 import { FX_TIMING, type FxCue, type Zone } from '@/lib/table/fx-motion';
 import styles from '@/styles/table.module.css';
 
@@ -14,14 +14,15 @@ import styles from '@/styles/table.module.css';
  * has to render its own cards.
  */
 
-export function useTableAudio(fx: readonly FxEvent[], fxKey: string | number) {
+export function useTableAudio(fx: readonly FxEvent[], fxKey: string | number, sfxPackId: string) {
   useEffect(() => {
     const audio = getAudioManager();
-    const timers = soundCuesForFx(fx).map((cue) =>
+    audio.preload(soundDefsForSfxPack(sfxPackId));
+    const timers = soundCuesForFx(fx, sfxPackId).map((cue) =>
       window.setTimeout(() => audio.play(cue.id, { rate: cue.rate }), cue.atMs),
     );
     return () => timers.forEach((timer) => window.clearTimeout(timer));
-  }, [fx, fxKey]);
+  }, [fx, fxKey, sfxPackId]);
 }
 
 export function useFxAnimation(
@@ -32,7 +33,7 @@ export function useFxAnimation(
   useEffect(() => {
     const root = rootRef.current;
     if (!root || cues.length === 0) return;
-    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
     const bounds = root.getBoundingClientRect();
     const context = gsap.context(() => {
       const timeline = gsap.timeline();
@@ -46,7 +47,12 @@ export function useFxAnimation(
             .set(element, { autoAlpha: 0 }, start + 0.01);
           continue;
         }
-        if (cue.type === 'deal' || cue.type === 'draw' || cue.type === 'discard') {
+        if (
+          cue.type === 'deal' ||
+          cue.type === 'flip' ||
+          cue.type === 'draw' ||
+          cue.type === 'discard'
+        ) {
           const from = zonePoint(cue.from, root, bounds);
           const to = zonePoint(cue.to, root, bounds);
           const card = element.querySelector<HTMLElement>('[data-flight-card]') ?? element;
@@ -67,7 +73,17 @@ export function useFxAnimation(
           element.style.setProperty('--flight-angle', `${Math.atan2(dy, dx)}rad`);
           timeline
             .set(element, { x: from.x, y: from.y, autoAlpha: 1 }, start)
-            .set(card, { rotate: direction * -7, scale: 1, scaleX: 1, scaleY: 1 }, start)
+            .set(
+              card,
+              {
+                rotate: direction * -7,
+                rotateY: cue.type === 'flip' ? -88 : 0,
+                scale: 1,
+                scaleX: 1,
+                scaleY: 1,
+              },
+              start,
+            )
             .to(
               element,
               {
@@ -127,6 +143,17 @@ export function useFxAnimation(
               start + flightDuration + settleDuration * 0.42,
             )
             .set(element, { autoAlpha: 0 }, start + flightDuration + settleDuration);
+          if (cue.type === 'flip') {
+            timeline.to(
+              card,
+              {
+                rotateY: 0,
+                duration: flightDuration * 0.5,
+                ease: 'back.out(1.7)',
+              },
+              start + flightDuration * 0.45,
+            );
+          }
         } else if (cue.type === 'knock' || cue.type === 'blitz') {
           timeline
             .fromTo(

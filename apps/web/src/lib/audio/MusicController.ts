@@ -7,6 +7,7 @@ import {
   getMusicPack,
   getMusicTrack,
   listMusicPacks,
+  menuForPack,
   playlistForPack,
 } from '@/lib/audio/music';
 import { getAudioManager } from '@/lib/audio/AudioManager';
@@ -60,6 +61,7 @@ export class MusicController {
   private pausedByMute = false;
   private history: string[] = [];
   private scene: SceneId = DEFAULT_SCENE;
+  private inMenu = false;
   private transitionGeneration = 0;
 
   constructor(manager: MusicManagerPort) {
@@ -149,12 +151,12 @@ export class MusicController {
     this.notify();
   }
 
-  /** Background changes swap to that scene's playlist (crossfading if playing). */
+  /** Background changes swap playlists at the table; on menus they only arm the pick. */
   setScene(scene: SceneId): void {
     if (scene === this.scene) return;
     this.scene = scene;
     this.history = [];
-    if (!this.wantPlaying || this.state.status === 'idle') return;
+    if (this.inMenu || !this.wantPlaying || this.state.status === 'idle') return;
 
     const head = this.playablePlaylist()[0];
     if (!head || head.id === this.state.trackId) return;
@@ -176,6 +178,18 @@ export class MusicController {
     if (head) this.start(head.id, false);
   }
 
+  /** Menu routes swap to the pack's title theme; table routes use scene playlists. */
+  setMenu(active: boolean): void {
+    if (active === this.inMenu) return;
+    this.inMenu = active;
+    this.history = [];
+    if (!this.wantPlaying || this.state.status === 'idle') return;
+
+    const head = this.playablePlaylist()[0];
+    if (!head || head.id === this.state.trackId) return;
+    this.start(head.id, false);
+  }
+
   listPacks() {
     return listMusicPacks();
   }
@@ -194,9 +208,8 @@ export class MusicController {
 
   private playablePlaylist() {
     const pack = getMusicPack(this.state.packId);
-    const list = playlistForPack(pack, this.scene).filter(
-      (track) => !this.voices.get(track.id)?.failed,
-    );
+    const pool = this.inMenu ? menuForPack(pack) : playlistForPack(pack, this.scene);
+    const list = pool.filter((track) => !this.voices.get(track.id)?.failed);
     if (list.length > 0) return list;
     const fallbackFailed = this.voices.get(FALLBACK_TRACK.id)?.failed;
     return fallbackFailed ? [] : [FALLBACK_TRACK];

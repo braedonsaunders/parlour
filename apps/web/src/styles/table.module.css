@@ -181,6 +181,7 @@
   margin-inline: -1.16rem;
   transform: rotate(var(--card-rotation));
   transform-origin: 50% 135%;
+  animation: dealtCardSettle 240ms var(--ease-pop) both;
 }
 
 .seat1 .opponentCards {
@@ -299,6 +300,11 @@
   inset: 0;
   z-index: 1;
   pointer-events: none;
+  transform-origin: 50% 82%;
+}
+
+.localHand[data-deal-state='complete'] .handTrack {
+  animation: dealFanBloom 360ms var(--ease-pop) both;
 }
 
 .ownerCount {
@@ -333,6 +339,39 @@
   margin-top: 0.18rem;
   font-size: 1.75rem;
   text-shadow: 0 2px 0 rgba(0, 0, 0, 0.32);
+}
+
+.ownerLives {
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  width: 100%;
+  margin-top: 0.38rem;
+  padding-top: 0.36rem;
+  border-top: 1px solid rgba(255, 224, 173, 0.3);
+}
+
+.ownerLives b {
+  font-size: 0.56rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.ownerLifePips {
+  display: flex !important;
+  gap: 0.2rem;
+}
+
+.ownerLifePips i {
+  width: 0.58rem;
+  aspect-ratio: 1;
+  border: 2px solid #a65b28;
+  border-radius: 50%;
+  background: var(--hearth-core);
+  box-shadow:
+    inset 0 1px white,
+    0 2px 4px rgba(0, 0, 0, 0.4);
 }
 
 .handCard {
@@ -526,6 +565,8 @@ button.card:not(:disabled):hover {
   display: block;
   line-height: 0;
   filter: drop-shadow(0 16px 18px rgba(3, 11, 15, 0.48));
+  perspective: 800px;
+  transform-style: preserve-3d;
   will-change: transform;
 }
 .flightCardVisual .card {
@@ -767,10 +808,48 @@ button.card:not(:disabled):hover {
   }
 }
 
+@keyframes dealtCardSettle {
+  0% {
+    opacity: 0;
+    scale: 0.94;
+    translate: 0 -0.7rem;
+  }
+  62% {
+    opacity: 1;
+    scale: 1.045;
+    translate: 0 0.12rem;
+  }
+  100% {
+    opacity: 1;
+    scale: 1;
+    translate: 0 0;
+  }
+}
+
+@keyframes dealFanBloom {
+  0% {
+    scale: 0.97 1.02;
+    translate: 0 0.25rem;
+  }
+  58% {
+    scale: 1.035 0.985;
+    translate: 0 -0.12rem;
+  }
+  100% {
+    scale: 1;
+    translate: 0 0;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .piles[data-local-turn='true']::before {
     animation: none;
     opacity: 0.86;
+  }
+
+  .opponentCards > *,
+  .localHand[data-deal-state='complete'] .handTrack {
+    animation: none;
   }
 }
 @keyframes ripple {

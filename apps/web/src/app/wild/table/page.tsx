@@ -171,7 +171,7 @@ function ActiveMultiplayerWildTable({ room }: { room: MultiplayerRoomSession }) 
       onDraw={() => dispatch('draw')}
       onChooseColor={(color: WildpileColor) => dispatch('chooseColor', { color })}
       onDeclineJump={() => dispatch('declineJump')}
-      onMenu={() => {
+      onQuit={() => {
         room.close();
         clearActiveMultiplayerSession();
         router.push('/wild');
@@ -277,7 +277,7 @@ function ActiveWildTable({ transport }: { transport: WildTransport }) {
       onDraw={() => dispatch('draw')}
       onChooseColor={(color: WildpileColor) => dispatch('chooseColor', { color })}
       onDeclineJump={() => dispatch('declineJump')}
-      onMenu={() => router.push('/wild')}
+      onQuit={() => router.push('/wild')}
     />
   );
 }
