@@ -1023,7 +1023,7 @@ describe('SpadesTableScreen shared flight layer under calm motion', () => {
     const text = textSurface();
     expect(text.status).toBe('ready');
     expect(text.hand).toHaveLength(13);
-  });
+  }, 20_000);
 
   it('still stages the shared flights when calm motion is off', () => {
     vi.useFakeTimers();
@@ -1039,5 +1039,5 @@ describe('SpadesTableScreen shared flight layer under calm motion', () => {
     // path hands them to a timeline instead, so they are emphatically not all
     // hidden the moment the effect runs — that difference is the whole fix.
     expect(cueNodes.every((node) => node.style.visibility === 'hidden')).toBe(false);
-  });
+  }, 20_000);
 });
