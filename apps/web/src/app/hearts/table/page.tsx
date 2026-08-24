@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from '
 import { useRouter } from 'next/navigation';
 import { isActingSeat } from '@parlour/engine';
 import type { HeartsModeId } from '@/lib/hearts/modes';
+import { usePodiumHandoff } from '@/lib/table/usePodiumHandoff';
 import { heartsModeForRules } from '@/lib/hearts/modes';
 import { heartsTableView } from '@/lib/hearts/view';
 import { useSoloTable } from '@/lib/table/useSoloTable';
@@ -70,6 +71,7 @@ function ActiveSoloHeartsTable({ transport }: { transport: HeartsTransport }) {
   const router = useRouter();
   const setLastMatch = useMatchFlowStore((state) => state.setLastMatch);
   const registerPlayAgain = useMatchFlowStore((state) => state.registerPlayAgain);
+  const handOffToPodium = usePodiumHandoff();
   const recordResult = useProfileStore((state) => state.recordResult);
   const recordMatch = useHistoryStore((state) => state.recordMatch);
   const reportedMatch = useRef<HeartsTransport | null>(null);
@@ -118,8 +120,7 @@ function ActiveSoloHeartsTable({ transport }: { transport: HeartsTransport }) {
       localSeat: 0,
     });
     registerPlayAgain(() => router.push('/hearts/table'));
-    const timer = window.setTimeout(() => router.push('/match-end'), 900);
-    return () => window.clearTimeout(timer);
+    handOffToPodium(900, () => router.push('/match-end'));
   }, [recordMatch, recordResult, registerPlayAgain, router, setLastMatch, snapshot, transport]);
 
   const legal =
@@ -166,6 +167,7 @@ function ActiveMultiplayerHeartsTable({ room }: { room: MultiplayerRoomSession }
   const router = useRouter();
   const setLastMatch = useMatchFlowStore((state) => state.setLastMatch);
   const registerPlayAgain = useMatchFlowStore((state) => state.registerPlayAgain);
+  const handOffToPodium = usePodiumHandoff();
   const recordResult = useProfileStore((state) => state.recordResult);
   const recordMatch = useHistoryStore((state) => state.recordMatch);
   const reportedMatch = useRef(false);
@@ -222,12 +224,11 @@ function ActiveMultiplayerHeartsTable({ room }: { room: MultiplayerRoomSession }
     registerPlayAgain(() => {
       router.push('/hearts/create');
     });
-    const timer = window.setTimeout(() => {
+    handOffToPodium(900, () => {
       room.close();
       clearActiveMultiplayerSession();
       router.push('/match-end');
-    }, 900);
-    return () => window.clearTimeout(timer);
+    });
   }, [
     localSeat,
     recordMatch,

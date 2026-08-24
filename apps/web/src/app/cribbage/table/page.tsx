@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { type MatchResult } from '@parlour/engine';
 import { CribbageTableScreen } from '@/components/table/cribbage/CribbageTableScreen';
 import { cribbageModeForRules } from '@/lib/cribbage/modes';
+import { usePodiumHandoff } from '@/lib/table/usePodiumHandoff';
 import { cribbageTableView, type CribbageSnapshotLike } from '@/lib/cribbage/view';
 import { CribbageTransport } from '@/lib/solo/CribbageTransport';
 import { useSoloTable } from '@/lib/table/useSoloTable';
@@ -64,6 +65,7 @@ function ActiveSoloTable({ transport }: { transport: CribbageTransport }) {
   const router = useRouter();
   const setLastMatch = useMatchFlowStore((state) => state.setLastMatch);
   const registerPlayAgain = useMatchFlowStore((state) => state.registerPlayAgain);
+  const handOffToPodium = usePodiumHandoff();
   const recordResult = useProfileStore((state) => state.recordResult);
   const recordMatch = useHistoryStore((state) => state.recordMatch);
   const reported = useRef(false);
@@ -102,8 +104,7 @@ function ActiveSoloTable({ transport }: { transport: CribbageTransport }) {
     if (record) recordMatch(record);
     setLastMatch({ id, result, seats, game: 'cribbage', mode: snapshot.mode, localSeat });
     registerPlayAgain(() => router.push('/cribbage'));
-    const timer = window.setTimeout(() => router.push('/match-end'), 950);
-    return () => window.clearTimeout(timer);
+    handOffToPodium(950, () => router.push('/match-end'));
   }, [recordMatch, recordResult, registerPlayAgain, router, setLastMatch, snapshot]);
 
   const legal = transport.legalMoves(0);
@@ -129,6 +130,7 @@ function MultiplayerTable({ room }: { room: MultiplayerRoomSession }) {
   const router = useRouter();
   const setLastMatch = useMatchFlowStore((state) => state.setLastMatch);
   const registerPlayAgain = useMatchFlowStore((state) => state.registerPlayAgain);
+  const handOffToPodium = usePodiumHandoff();
   const recordResult = useProfileStore((state) => state.recordResult);
   const recordMatch = useHistoryStore((state) => state.recordMatch);
   const snapshot = useSyncExternalStore(room.subscribe, room.getSnapshot, room.getSnapshot);
@@ -175,12 +177,11 @@ function MultiplayerTable({ room }: { room: MultiplayerRoomSession }) {
     if (record) recordMatch(record);
     setLastMatch({ id, result, seats, game: 'cribbage', mode, localSeat });
     registerPlayAgain(() => router.push('/cribbage/create'));
-    const timer = window.setTimeout(() => {
+    handOffToPodium(950, () => {
       room.close();
       clearActiveMultiplayerSession();
       router.push('/match-end');
-    }, 950);
-    return () => window.clearTimeout(timer);
+    });
   }, [
     localSeat,
     recordMatch,

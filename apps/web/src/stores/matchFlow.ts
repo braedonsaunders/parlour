@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { createJSONStorage, persist } from 'zustand/middleware';
 import type { MatchResult } from '@parlour/engine';
 import type { EuchreModeId } from '@/lib/euchre/modes';
 import type { GameId } from '@/lib/games';
@@ -49,9 +50,48 @@ type MatchFlowState = {
   registerPlayAgain: (handler: (() => void) | null) => void;
 };
 
-export const useMatchFlowStore = create<MatchFlowState>()((set) => ({
-  lastMatch: null,
-  playAgain: null,
-  setLastMatch: (lastMatch) => set({ lastMatch }),
-  registerPlayAgain: (playAgain) => set({ playAgain }),
-}));
+export const MATCH_FLOW_STORAGE_KEY = 'parlour.matchflow.v1';
+
+/** Prerender has no session storage; persistence starts in the browser. */
+const noStorage: Storage = {
+  length: 0,
+  clear: () => {},
+  getItem: () => null,
+  key: () => null,
+  removeItem: () => {},
+  setItem: () => {},
+};
+
+/**
+ * The finished match outlives the document.
+ *
+ * The table hands the podium its snapshot through this store and then routes to
+ * `/match-end`. That is a soft navigation in the happy path, but it is not the
+ * only way the podium gets rendered: a hard navigation, an iOS tab discard
+ * under memory pressure, a service-worker refresh or a plain pull-to-refresh
+ * all reload the document — and an in-memory store loses the match, so the
+ * player who just won is told "No match on record".
+ *
+ * Session storage is the right scope: it survives a reload of this tab, and it
+ * does not leak a stale podium into tomorrow's cold start. `playAgain` is a
+ * closure over the table's router and cannot be serialised, so it stays in
+ * memory and the podium falls back to the game's own route when it is gone.
+ */
+export const useMatchFlowStore = create<MatchFlowState>()(
+  persist(
+    (set) => ({
+      lastMatch: null,
+      playAgain: null,
+      setLastMatch: (lastMatch) => set({ lastMatch }),
+      registerPlayAgain: (playAgain) => set({ playAgain }),
+    }),
+    {
+      name: MATCH_FLOW_STORAGE_KEY,
+      version: 1,
+      storage: createJSONStorage(() =>
+        typeof window === 'undefined' ? noStorage : window.sessionStorage,
+      ),
+      partialize: (state) => ({ lastMatch: state.lastMatch }),
+    },
+  ),
+);

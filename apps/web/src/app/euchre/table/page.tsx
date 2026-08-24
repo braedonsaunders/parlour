@@ -6,6 +6,7 @@ import { type LegalMove } from '@parlour/engine';
 import type { EuchreSuit } from '@parlour/game-euchre';
 import { EuchreTableScreen } from '@/components/table/euchre/EuchreTableScreen';
 import { EuchreTransport, type EuchreSnapshot } from '@/lib/solo/EuchreTransport';
+import { usePodiumHandoff } from '@/lib/table/usePodiumHandoff';
 import { euchreModeForRules } from '@/lib/euchre/modes';
 import { euchreTableView, type EuchreTableView } from '@/lib/euchre/view';
 import { useSoloTable } from '@/lib/table/useSoloTable';
@@ -67,6 +68,7 @@ function ActiveSoloEuchreTable({ transport }: { transport: EuchreTransport }) {
   const router = useRouter();
   const setLastMatch = useMatchFlowStore((state) => state.setLastMatch);
   const registerPlayAgain = useMatchFlowStore((state) => state.registerPlayAgain);
+  const handOffToPodium = usePodiumHandoff();
   const recordResult = useProfileStore((state) => state.recordResult);
   const recordMatch = useHistoryStore((state) => state.recordMatch);
   const reportedMatch = useRef<EuchreTransport | null>(null);
@@ -114,8 +116,7 @@ function ActiveSoloEuchreTable({ transport }: { transport: EuchreTransport }) {
       localSeat: 0,
     });
     registerPlayAgain(() => router.push('/euchre/table'));
-    const timer = window.setTimeout(() => router.push('/match-end'), 900);
-    return () => window.clearTimeout(timer);
+    handOffToPodium(900, () => router.push('/match-end'));
   }, [recordMatch, recordResult, registerPlayAgain, router, setLastMatch, snapshot, transport]);
 
   const view = euchreTableView(snapshot, transport.legalMoves());
@@ -152,6 +153,7 @@ function ActiveMultiplayerEuchreTable({ room }: { room: MultiplayerRoomSession }
   const router = useRouter();
   const setLastMatch = useMatchFlowStore((state) => state.setLastMatch);
   const registerPlayAgain = useMatchFlowStore((state) => state.registerPlayAgain);
+  const handOffToPodium = usePodiumHandoff();
   const recordResult = useProfileStore((state) => state.recordResult);
   const recordMatch = useHistoryStore((state) => state.recordMatch);
   const snapshot = useSyncExternalStore(room.subscribe, room.getSnapshot, room.getSnapshot);
@@ -209,12 +211,11 @@ function ActiveMultiplayerEuchreTable({ room }: { room: MultiplayerRoomSession }
     registerPlayAgain(() => {
       router.push('/euchre/create');
     });
-    const timer = window.setTimeout(() => {
+    handOffToPodium(900, () => {
       room.close();
       clearActiveMultiplayerSession();
       router.push('/match-end');
-    }, 900);
-    return () => window.clearTimeout(timer);
+    });
   }, [
     localSeat,
     recordMatch,

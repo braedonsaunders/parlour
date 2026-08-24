@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { type LegalMove } from '@parlour/engine';
 import { SpadesTableScreen } from '@/components/table/spades/SpadesTableScreen';
 import { SpadesTransport, type SpadesSnapshot } from '@/lib/solo/SpadesTransport';
+import { usePodiumHandoff } from '@/lib/table/usePodiumHandoff';
 import { spadesModeForRules } from '@/lib/spades/modes';
 import { spadesTableView, type SpadesTableView } from '@/lib/spades/view';
 import { useSoloTable } from '@/lib/table/useSoloTable';
@@ -66,6 +67,7 @@ function ActiveSoloSpadesTable({ transport }: { transport: SpadesTransport }) {
   const router = useRouter();
   const setLastMatch = useMatchFlowStore((state) => state.setLastMatch);
   const registerPlayAgain = useMatchFlowStore((state) => state.registerPlayAgain);
+  const handOffToPodium = usePodiumHandoff();
   const recordResult = useProfileStore((state) => state.recordResult);
   const recordMatch = useHistoryStore((state) => state.recordMatch);
   const reportedMatch = useRef<SpadesTransport | null>(null);
@@ -114,8 +116,7 @@ function ActiveSoloSpadesTable({ transport }: { transport: SpadesTransport }) {
       localSeat: 0,
     });
     registerPlayAgain(() => router.push('/spades/table'));
-    const timer = window.setTimeout(() => router.push('/match-end'), 900);
-    return () => window.clearTimeout(timer);
+    handOffToPodium(900, () => router.push('/match-end'));
   }, [recordMatch, recordResult, registerPlayAgain, router, setLastMatch, snapshot, transport]);
 
   const view = spadesTableView(snapshot, transport.legalMoves());
@@ -143,6 +144,7 @@ function ActiveMultiplayerSpadesTable({ room }: { room: MultiplayerRoomSession }
   const router = useRouter();
   const setLastMatch = useMatchFlowStore((state) => state.setLastMatch);
   const registerPlayAgain = useMatchFlowStore((state) => state.registerPlayAgain);
+  const handOffToPodium = usePodiumHandoff();
   const recordResult = useProfileStore((state) => state.recordResult);
   const recordMatch = useHistoryStore((state) => state.recordMatch);
   const snapshot = useSyncExternalStore(room.subscribe, room.getSnapshot, room.getSnapshot);
@@ -205,12 +207,11 @@ function ActiveMultiplayerSpadesTable({ room }: { room: MultiplayerRoomSession }
       setSetupMode(mode);
       router.push('/spades/create');
     });
-    const timer = window.setTimeout(() => {
+    handOffToPodium(900, () => {
       room.close();
       clearActiveMultiplayerSession();
       router.push('/match-end');
-    }, 900);
-    return () => window.clearTimeout(timer);
+    });
   }, [
     localSeat,
     recordMatch,

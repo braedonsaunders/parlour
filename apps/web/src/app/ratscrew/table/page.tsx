@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import type { FxEvent } from '@parlour/engine';
 import { RatscrewTableScreen } from '@/components/table/ratscrew/RatscrewTableScreen';
 import { RatscrewTransport, type RatscrewSnapshot } from '@/lib/solo/RatscrewTransport';
+import { usePodiumHandoff } from '@/lib/table/usePodiumHandoff';
 import { SLAP_GRACE_MS } from '@parlour/game-ratscrew';
 import { ratscrewModeForRules } from '@/lib/ratscrew/modes';
 import { ratscrewTableView } from '@/lib/ratscrew/view';
@@ -73,6 +74,7 @@ function LiveRatscrewTable({ transport }: { transport: RatscrewTransport }) {
   const router = useRouter();
   const setLastMatch = useMatchFlowStore((state) => state.setLastMatch);
   const registerPlayAgain = useMatchFlowStore((state) => state.registerPlayAgain);
+  const handOffToPodium = usePodiumHandoff();
   const recordResult = useProfileStore((state) => state.recordResult);
   const recordMatch = useHistoryStore((state) => state.recordMatch);
   const [, setTick] = useState(0);
@@ -127,8 +129,7 @@ function LiveRatscrewTable({ transport }: { transport: RatscrewTransport }) {
       localSeat: 0,
     });
     registerPlayAgain(() => router.push('/ratscrew/table'));
-    const timer = window.setTimeout(() => router.push('/match-end'), 900);
-    return () => window.clearTimeout(timer);
+    handOffToPodium(900, () => router.push('/match-end'));
   }, [recordMatch, recordResult, registerPlayAgain, router, setLastMatch, snapshot]);
 
   useEffect(() => {
@@ -164,6 +165,7 @@ function ActiveMultiplayerRatscrewTable({ room }: { room: MultiplayerRoomSession
   const router = useRouter();
   const setLastMatch = useMatchFlowStore((state) => state.setLastMatch);
   const registerPlayAgain = useMatchFlowStore((state) => state.registerPlayAgain);
+  const handOffToPodium = usePodiumHandoff();
   const recordResult = useProfileStore((state) => state.recordResult);
   const recordMatch = useHistoryStore((state) => state.recordMatch);
   const snapshot = useSyncExternalStore(room.subscribe, room.getSnapshot, room.getSnapshot);
@@ -247,12 +249,11 @@ function ActiveMultiplayerRatscrewTable({ room }: { room: MultiplayerRoomSession
     registerPlayAgain(() => {
       router.push('/ratscrew/create');
     });
-    const timer = window.setTimeout(() => {
+    handOffToPodium(900, () => {
       room.close();
       clearActiveMultiplayerSession();
       router.push('/match-end');
-    }, 900);
-    return () => window.clearTimeout(timer);
+    });
   }, [
     localSeat,
     recordMatch,

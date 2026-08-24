@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import type { GameSession } from '@parlour/engine';
 import { PresidentTableScreen } from '@/components/table/president/PresidentTableScreen';
 import { PresidentTransport, type PresidentSnapshot } from '@/lib/solo/PresidentTransport';
+import { usePodiumHandoff } from '@/lib/table/usePodiumHandoff';
 import { presidentModeForRules } from '@/lib/president/modes';
 import { presidentTableView } from '@/lib/president/view';
 import { useSoloTable } from '@/lib/table/useSoloTable';
@@ -66,6 +67,7 @@ function ActiveMultiplayerPresidentTable({ room }: { room: MultiplayerRoomSessio
   const router = useRouter();
   const setLastMatch = useMatchFlowStore((state) => state.setLastMatch);
   const registerPlayAgain = useMatchFlowStore((state) => state.registerPlayAgain);
+  const handOffToPodium = usePodiumHandoff();
   const recordResult = useProfileStore((state) => state.recordResult);
   const recordMatch = useHistoryStore((state) => state.recordMatch);
   const snapshot = useSyncExternalStore(room.subscribe, room.getSnapshot, room.getSnapshot);
@@ -122,12 +124,11 @@ function ActiveMultiplayerPresidentTable({ room }: { room: MultiplayerRoomSessio
     registerPlayAgain(() => {
       router.push('/president/create');
     });
-    const timer = window.setTimeout(() => {
+    handOffToPodium(1400, () => {
       room.close();
       clearActiveMultiplayerSession();
       router.push('/match-end');
-    }, 1400);
-    return () => window.clearTimeout(timer);
+    });
   }, [
     localSeat,
     recordMatch,
@@ -209,6 +210,7 @@ function ActivePresidentTable({ transport }: { transport: PresidentTransport }) 
   const router = useRouter();
   const setLastMatch = useMatchFlowStore((state) => state.setLastMatch);
   const registerPlayAgain = useMatchFlowStore((state) => state.registerPlayAgain);
+  const handOffToPodium = usePodiumHandoff();
   const recordResult = useProfileStore((state) => state.recordResult);
   const recordMatch = useHistoryStore((state) => state.recordMatch);
   const reportedMatch = useRef<PresidentTransport | null>(null);
@@ -256,8 +258,7 @@ function ActivePresidentTable({ transport }: { transport: PresidentTransport }) 
       localSeat: 0,
     });
     registerPlayAgain(() => router.push('/president/table'));
-    const timer = window.setTimeout(() => router.push('/match-end'), 1400);
-    return () => window.clearTimeout(timer);
+    handOffToPodium(1400, () => router.push('/match-end'));
   }, [recordMatch, recordResult, registerPlayAgain, router, setLastMatch, snapshot, transport]);
 
   const actingLocally =

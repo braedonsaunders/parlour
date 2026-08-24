@@ -10,6 +10,7 @@ import {
 } from '@parlour/game-wildpile';
 import { WildTableScreen } from '@/components/table/wild/WildTableScreen';
 import { useSoloTable } from '@/lib/table/useSoloTable';
+import { usePodiumHandoff } from '@/lib/table/usePodiumHandoff';
 import { WildTransport, type WildSnapshot } from '@/lib/solo/WildTransport';
 import { wildModeForRules } from '@/lib/wild/modes';
 import { wildTableView } from '@/lib/wild/view';
@@ -78,6 +79,7 @@ function ActiveMultiplayerWildTable({ room }: { room: MultiplayerRoomSession }) 
   const recordMatch = useHistoryStore((state) => state.recordMatch);
   const snapshot = useSyncExternalStore(room.subscribe, room.getSnapshot, room.getSnapshot);
   const reportedMatch = useRef(false);
+  const handOffToPodium = usePodiumHandoff();
   const [startedAtMs] = useState(() => Date.now());
   const [localError, setLocalError] = useState<string | null>(null);
   const session = multiplayerSession<WildpileState, WildpileRules>(snapshot, 'wildpile');
@@ -167,12 +169,11 @@ function ActiveMultiplayerWildTable({ room }: { room: MultiplayerRoomSession }) 
     registerPlayAgain(() => {
       router.push('/wild/create');
     });
-    const timer = window.setTimeout(() => {
+    handOffToPodium(900, () => {
       room.close();
       clearActiveMultiplayerSession();
       router.push('/match-end');
-    }, 900);
-    return () => window.clearTimeout(timer);
+    });
   }, [
     localSeat,
     recordMatch,
@@ -250,13 +251,17 @@ function ActiveWildTable({ transport }: { transport: WildTransport }) {
   const recordResult = useProfileStore((state) => state.recordResult);
   const recordMatch = useHistoryStore((state) => state.recordMatch);
   const reportedMatch = useRef<WildTransport | null>(null);
+  const handOffToPodium = usePodiumHandoff();
   const botPaceMs = useCallback(
     (current: WildSnapshot) =>
       current.session.phase.phase === 'play' ? 480 + (current.session.phase.actor ?? 0) * 90 : 240,
     [],
   );
+  // `round` feeds the bot-turn effect's dependency list, so an inline arrow
+  // re-armed the bot's think timer on every render of this table.
+  const round = useCallback((current: WildSnapshot) => current.session, []);
   const { snapshot, fx, fxKey, error, dispatch, accept } = useSoloTable(transport, {
-    round: (current) => current.session,
+    round,
     botPaceMs,
   });
   useEffect(() => {
@@ -319,8 +324,7 @@ function ActiveWildTable({ transport }: { transport: WildTransport }) {
       localSeat: 0,
     });
     registerPlayAgain(() => router.push('/wild/table'));
-    const timer = window.setTimeout(() => router.push('/match-end'), 900);
-    return () => window.clearTimeout(timer);
+    handOffToPodium(900, () => router.push('/match-end'));
   }, [recordMatch, recordResult, registerPlayAgain, router, setLastMatch, snapshot, transport]);
 
   const view = wildTableView(snapshot, transport.legalMoves());

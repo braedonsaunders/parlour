@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { useRouter } from 'next/navigation';
 import type { GinModeId } from '@/lib/gin/modes';
+import { usePodiumHandoff } from '@/lib/table/usePodiumHandoff';
 import { GinTableScreen } from '@/components/table/gin/GinTableScreen';
 import { GinTransport, type GinSnapshot } from '@/lib/solo/GinTransport';
 import { ginTableView } from '@/lib/gin/view';
@@ -61,6 +62,7 @@ function SoloGinTable({ transport }: { transport: GinTransport }) {
   const router = useRouter();
   const setLastMatch = useMatchFlowStore((state) => state.setLastMatch);
   const registerPlayAgain = useMatchFlowStore((state) => state.registerPlayAgain);
+  const handOffToPodium = usePodiumHandoff();
   const recordResult = useProfileStore((state) => state.recordResult);
   const recordMatch = useHistoryStore((state) => state.recordMatch);
   const reportedMatch = useRef<GinTransport | null>(null);
@@ -105,8 +107,7 @@ function SoloGinTable({ transport }: { transport: GinTransport }) {
       localSeat: 0,
     });
     registerPlayAgain(() => router.push('/gin/table'));
-    const timer = window.setTimeout(() => router.push('/match-end'), 900);
-    return () => window.clearTimeout(timer);
+    handOffToPodium(900, () => router.push('/match-end'));
   }, [recordMatch, recordResult, registerPlayAgain, router, setLastMatch, snapshot, transport]);
 
   const view = ginTableView(snapshot, transport.legalMoves());
@@ -134,6 +135,7 @@ function ActiveMultiplayerGinTable({ room }: { room: MultiplayerRoomSession }) {
   const router = useRouter();
   const setLastMatch = useMatchFlowStore((state) => state.setLastMatch);
   const registerPlayAgain = useMatchFlowStore((state) => state.registerPlayAgain);
+  const handOffToPodium = usePodiumHandoff();
   const recordResult = useProfileStore((state) => state.recordResult);
   const recordMatch = useHistoryStore((state) => state.recordMatch);
   const snapshot = useSyncExternalStore(room.subscribe, room.getSnapshot, room.getSnapshot);
@@ -189,12 +191,11 @@ function ActiveMultiplayerGinTable({ room }: { room: MultiplayerRoomSession }) {
     registerPlayAgain(() => {
       router.push('/gin/create');
     });
-    const timer = window.setTimeout(() => {
+    handOffToPodium(900, () => {
       room.close();
       clearActiveMultiplayerSession();
       router.push('/match-end');
-    }, 900);
-    return () => window.clearTimeout(timer);
+    });
   }, [
     localSeat,
     recordMatch,
