@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { useRouter } from 'next/navigation';
 import { Fx, type FxEvent, type MatchResult } from '@parlour/engine';
 import { RoundEndOverlay } from '@/components/celebration/RoundEndOverlay';
@@ -9,8 +9,25 @@ import { LocalTransport, type LocalDispatch, type SoloSnapshot } from '@/lib/sol
 import { useMatchFlowStore } from '@/stores/matchFlow';
 import { useProfileStore } from '@/stores/profile';
 import { useSetupStore } from '@/stores/setup';
+import {
+  clearActiveMultiplayerSession,
+  getActiveMultiplayerSession,
+  subscribeActiveMultiplayerSession,
+  type MultiplayerRoomSession,
+  type MultiplayerRoomSnapshot,
+} from '../_multiplayer/roomSession';
 
-export default function SoloTablePage() {
+export default function TablePage() {
+  const multiplayer = useSyncExternalStore(
+    subscribeActiveMultiplayerSession,
+    getActiveMultiplayerSession,
+    () => null,
+  );
+  if (multiplayer) return <ActiveMultiplayerTable room={multiplayer} />;
+  return <SoloTablePage />;
+}
+
+function SoloTablePage() {
   const mode = useSetupStore((state) => state.mode);
   const seats = useSetupStore((state) => state.seats);
   const botTier = useSetupStore((state) => state.botTier);
@@ -37,6 +54,90 @@ export default function SoloTablePage() {
 
   if (!transport) return <TableScreen view={null} fx={[]} fxKey="loading" />;
   return <ActiveSoloTable transport={transport} />;
+}
+
+function ActiveMultiplayerTable({ room }: { room: MultiplayerRoomSession }) {
+  const router = useRouter();
+  const snapshot = useSyncExternalStore(room.subscribe, room.getSnapshot, room.getSnapshot);
+  const [selectedCard, setSelectedCard] = useState<string | null>(null);
+  const [localError, setLocalError] = useState<string | null>(null);
+
+  const dispatch = useCallback(
+    (move: string, payload?: unknown) => {
+      try {
+        room.send(move, payload);
+        setLocalError(null);
+        setSelectedCard(null);
+      } catch (error) {
+        setLocalError(error instanceof Error ? error.message : 'The move could not be sent.');
+      }
+    },
+    [room],
+  );
+
+  const view = multiplayerTableView(snapshot);
+  const busy =
+    !snapshot.session ||
+    snapshot.localSeat === null ||
+    snapshot.session.status !== 'playing' ||
+    snapshot.session.phase.actor !== snapshot.localSeat;
+
+  return (
+    <TableScreen
+      view={view}
+      fx={snapshot.fx}
+      fxKey={snapshot.fxKey}
+      selectedCard={selectedCard}
+      busy={busy}
+      error={localError ?? snapshot.error}
+      onSelectCard={setSelectedCard}
+      onDraw={(source) => dispatch(`draw.${source}`)}
+      onDiscard={(card) => dispatch('discard', { card })}
+      onKnock={() => dispatch('knock')}
+      onMenu={() => {
+        room.close();
+        clearActiveMultiplayerSession();
+        router.push('/');
+      }}
+    />
+  );
+}
+
+function multiplayerTableView(snapshot: MultiplayerRoomSnapshot): TableView | null {
+  const session = snapshot.session;
+  const localSeat = snapshot.localSeat;
+  if (!session || localSeat === null) return null;
+  const isLocalTurn = session.status === 'playing' && session.phase.actor === localSeat;
+  const legal = isLocalTurn ? session.def.flow.legalMoves(session.state, session.phase) : [];
+  const moveIds = new Set(legal.map((move) => move.id));
+  const discardCards = legal.flatMap((move) =>
+    move.id === 'discard' &&
+    typeof (move.payload as { card?: unknown } | undefined)?.card === 'string'
+      ? [(move.payload as { card: string }).card]
+      : [],
+  );
+  return {
+    players: snapshot.seats.map((player) => ({
+      seat: player.seat,
+      name: player.name,
+      avatarId: player.avatarId,
+      hand: player.seat === localSeat ? (session.state.hands[player.seat] ?? []) : [],
+      handCount: session.state.hands[player.seat]?.length ?? 0,
+      lives: 3,
+      isLocal: player.seat === localSeat,
+      isBot: player.bot,
+    })),
+    activeSeat: session.phase.actor,
+    stockCount: session.state.stock.length,
+    discard: session.state.discard,
+    phaseLabel: `friend room ${snapshot.room?.code ?? ''}`,
+    legal: {
+      drawStock: moveIds.has('draw.stock'),
+      drawDiscard: moveIds.has('draw.discard'),
+      discardCards,
+      knock: moveIds.has('knock'),
+    },
+  };
 }
 
 function ActiveSoloTable({ transport }: { transport: LocalTransport }) {
