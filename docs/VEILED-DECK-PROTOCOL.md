@@ -27,9 +27,10 @@ reconnect trade-off.
 **Players are not asked to choose between them, and no longer choose at all.**
 The tier picker is gone and so is the room option behind it: `tierFor` reads the
 tier off the game pack. A pack that ships a `veil` block hides hands, so its
-rooms do — eight of the nine room games — and one that does not plays the open
-tier with the collaborative deal below. Spades is the exception until its pack
-gets a veil block, which is game work rather than a flag.
+rooms do; one that does not plays the open tier with the collaborative deal
+below. **Every shipped game ships a veil block**, so every room is a veiled
+room and no game is left on a different path. The open tier is the floor for a
+future pack that has little or nothing to hide.
 
 Deriving rather than announcing the tier also means a joining peer computes the
 same answer as the host from the same game id, so a forged announcement cannot
@@ -320,12 +321,18 @@ A 52-card ceremony is `seats × 52` modular exponentiations at 2048 bits — on 
 order of a second or two of work, which is why the lobby shows ceremony
 progress. Each hidden card costs one `seats - 1` hop chain.
 
-The shuffle yields to the event loop every few elements. A whole deck in one
-uninterrupted run starves the heartbeat timer, and a seat that misses enough
-heartbeats is declared gone — so a table could lose a player to its own shuffle.
-Yielding costs a few milliseconds and buys the timers back; it does not make the
-ceremony faster, and moving the group arithmetic into a worker is still the
-answer for jank on a slow phone.
+**The arithmetic runs on a worker.** A deck of modular exponentiations on the
+main thread blocks animation, input and the heartbeat timer — and a seat that
+misses enough heartbeats is declared gone, so a table could lose a player to its
+own shuffle. `shuffleClient` posts each layer to a shared worker and the ceremony
+awaits the answer.
+
+Two properties matter more than the speed. The worker and the fallback run the
+*same* pure job, so they cannot shuffle differently — a layer that differed
+between paths would fail its own commitment check and wedge the round. And a
+worker that cannot be created, dies or reports an error is not fatal: the job
+runs in-thread instead, chunked so the timers still turn. Losing the worker
+costs smoothness, never the round.
 
 ## Implementation slices
 

@@ -25,11 +25,11 @@ import {
   decryptElement,
   generateLayerKey,
   randomPermutation,
-  shuffleLayerAsync,
   type VeilCodebook,
   type VeilLayerKey,
 } from './sra';
 import { hashTagged } from './hash';
+import { shuffleOffThread } from './shuffleClient';
 
 /** One seat's contribution to one epoch, broadcast as a transcript entry. */
 export interface VeilLayerEntry {
@@ -159,10 +159,15 @@ export async function layShuffleLayer(
 ): Promise<LayerResult> {
   if (input.length !== epoch.cards.length) throw new Error('shuffle input is the wrong size');
   const secret = deriveLayerSecret(epoch, random);
-  // Chunked: a whole deck of modular exponentiations in one run starves the
-  // heartbeat timer, and a table should not lose a seat to its own shuffle.
-  const shuffled = await shuffleLayerAsync(input.map(elementFromHex), secret.key, secret.order);
-  const deck = shuffled.map(elementToHex);
+  // Off the main thread: a whole deck of modular exponentiations blocks
+  // everything, including the heartbeat timer, and a table should not lose a
+  // seat to its own shuffle. Falls back to a chunked in-thread run where there
+  // is no worker to be had — see shuffleClient.
+  const deck = await shuffleOffThread({
+    deck: input,
+    e: secret.key.e.toString(16),
+    order: secret.order,
+  });
   return {
     entry: { epoch: epoch.epoch, seat, deck, commitment: await commitLayer(secret) },
     secret,
