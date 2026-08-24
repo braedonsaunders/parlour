@@ -1,9 +1,13 @@
 import { applyPreset } from '@parlour/engine';
 import { heartsConfigSchema, type HeartsRules } from '@parlour/game-hearts';
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 import { getGameMode, modePreset } from '@/lib/games';
 import { isHeartsModeId, type HeartsModeId } from '@/lib/hearts/modes';
 import { clampBotTier, type BotTier } from '@/stores/setup';
+import { setupPersistence, storedOverrides } from '@/stores/setupPersistence';
+
+export const HEARTS_SETUP_STORAGE_KEY = 'parlour.hearts.setup.v1';
 
 export type HeartsSetupState = {
   mode: HeartsModeId;
@@ -29,14 +33,25 @@ export function heartsRulesFor(mode: HeartsModeId, overrides: Partial<HeartsRule
  * game-hearts' schema; this records which preset is selected and which knobs
  * the host has turned since. Hearts seats exactly four, so there is no picker.
  */
-export const useHeartsSetupStore = create<HeartsSetupState>()((set) => ({
-  mode: 'classic',
-  botTier: 2,
-  overrides: {},
-  // Switching preset drops per-knob overrides: the tile you picked is the table.
-  setMode: (mode) => set(isHeartsModeId(mode) ? { mode, overrides: {} } : {}),
-  setBotTier: (tier) => set({ botTier: clampBotTier(tier) }),
-  setRule: (key, value) =>
-    set((state) => ({ overrides: { ...state.overrides, [key]: value } as Partial<HeartsRules> })),
-  resetRules: () => set({ overrides: {} }),
-}));
+export const useHeartsSetupStore = create<HeartsSetupState>()(
+  persist(
+    (set) => ({
+      mode: 'classic',
+      botTier: 2,
+      overrides: {},
+      // Switching preset drops per-knob overrides: the tile you picked is the table.
+      setMode: (mode) => set(isHeartsModeId(mode) ? { mode, overrides: {} } : {}),
+      setBotTier: (tier) => set({ botTier: clampBotTier(tier) }),
+      setRule: (key, value) =>
+        set((state) => ({
+          overrides: { ...state.overrides, [key]: value } as Partial<HeartsRules>,
+        })),
+      resetRules: () => set({ overrides: {} }),
+    }),
+    setupPersistence<HeartsSetupState>(HEARTS_SETUP_STORAGE_KEY, (stored) => ({
+      mode: isHeartsModeId(stored.mode) ? stored.mode : 'classic',
+      botTier: clampBotTier(Number(stored.botTier)),
+      overrides: storedOverrides<HeartsRules>(stored.overrides),
+    })),
+  ),
+);

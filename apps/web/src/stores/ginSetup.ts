@@ -1,9 +1,13 @@
 import { applyPreset } from '@parlour/engine';
 import { ginConfigSchema, type GinConfig } from '@parlour/game-gin';
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 import { getGameMode, modePreset } from '@/lib/games';
 import { isGinModeId, type GinModeId } from '@/lib/gin/modes';
-import type { BotTier } from '@/stores/setup';
+import { clampBotTier, type BotTier } from '@/stores/setup';
+import { setupPersistence, storedOverrides } from '@/stores/setupPersistence';
+
+export const GIN_SETUP_STORAGE_KEY = 'parlour.gin.setup.v1';
 
 export type GinSetupState = {
   mode: GinModeId;
@@ -24,16 +28,26 @@ export function ginRulesFor(mode: GinModeId, overrides: Partial<GinConfig>): Gin
 }
 
 /** Gin session setup — UI state only; rule values come from game-gin's schema. */
-export const useGinSetupStore = create<GinSetupState>()((set) => ({
-  mode: 'classic',
-  botTier: 2,
-  overrides: {},
-  setMode: (mode) => {
-    if (isGinModeId(mode)) set({ mode, overrides: {} });
-  },
-  setBotTier: (tier) => {
-    if (tier === 1 || tier === 2 || tier === 3) set({ botTier: tier });
-  },
-  setRule: (key, value) => set((state) => ({ overrides: { ...state.overrides, [key]: value } })),
-  resetRules: () => set({ overrides: {} }),
-}));
+export const useGinSetupStore = create<GinSetupState>()(
+  persist(
+    (set) => ({
+      mode: 'classic',
+      botTier: 2,
+      overrides: {},
+      setMode: (mode) => {
+        if (isGinModeId(mode)) set({ mode, overrides: {} });
+      },
+      setBotTier: (tier) => {
+        if (tier === 1 || tier === 2 || tier === 3) set({ botTier: tier });
+      },
+      setRule: (key, value) =>
+        set((state) => ({ overrides: { ...state.overrides, [key]: value } })),
+      resetRules: () => set({ overrides: {} }),
+    }),
+    setupPersistence<GinSetupState>(GIN_SETUP_STORAGE_KEY, (stored) => ({
+      mode: isGinModeId(stored.mode) ? stored.mode : 'classic',
+      botTier: clampBotTier(Number(stored.botTier)),
+      overrides: storedOverrides<GinConfig>(stored.overrides),
+    })),
+  ),
+);
