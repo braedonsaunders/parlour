@@ -11,7 +11,7 @@ import { wildTableView } from '@/lib/wild/view';
 import { botKey, buildMatchRecord, friendKey, useHistoryStore } from '@/stores/history';
 import { useMatchFlowStore } from '@/stores/matchFlow';
 import { useProfileStore } from '@/stores/profile';
-import { useWildSetupStore } from '@/stores/wildSetup';
+import { useWildSetupStore, wildRulesFor } from '@/stores/wildSetup';
 import {
   clearActiveMultiplayerSession,
   getActiveMultiplayerSession,
@@ -35,9 +35,12 @@ export default function WildTablePage() {
 function SoloWildTablePage() {
   const mode = useWildSetupStore((state) => state.mode);
   const seats = useWildSetupStore((state) => state.seats);
+  const overrides = useWildSetupStore((state) => state.overrides);
   const name = useProfileStore((state) => state.name);
   const avatarId = useProfileStore((state) => state.avatarId);
   const [transport, setTransport] = useState<WildTransport | null>(null);
+  const rules = wildRulesFor(mode, overrides);
+  const rulesKey = JSON.stringify(rules);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -47,11 +50,14 @@ function SoloWildTablePage() {
           seats,
           seed: Date.now() | 0,
           player: { name, avatarId },
+          rules: JSON.parse(rulesKey) as typeof rules,
         }),
       );
     }, 0);
     return () => window.clearTimeout(timer);
-  }, [avatarId, mode, name, seats]);
+    // rulesKey stands in for the rules object so a fresh identity per render
+    // does not re-deal the table.
+  }, [avatarId, mode, name, seats, rulesKey]);
 
   if (!transport) return <WildTableScreen view={null} fx={[]} fxKey="loading" />;
   return <ActiveWildTable transport={transport} />;
@@ -173,6 +179,9 @@ function ActiveMultiplayerWildTable({ room }: { room: MultiplayerRoomSession }) 
       onDraw={() => dispatch('draw')}
       onChooseColor={(color: WildpileColor) => dispatch('chooseColor', { color })}
       onDeclineJump={() => dispatch('declineJump')}
+      onCallLastCard={() => dispatch('callLastCard')}
+      onChooseTarget={(seat: number) => dispatch('chooseTarget', { seat })}
+      onPass={() => dispatch('pass')}
       onQuit={() => {
         room.close();
         clearActiveMultiplayerSession();
@@ -282,6 +291,9 @@ function ActiveWildTable({ transport }: { transport: WildTransport }) {
       onDraw={() => dispatch('draw')}
       onChooseColor={(color: WildpileColor) => dispatch('chooseColor', { color })}
       onDeclineJump={() => dispatch('declineJump')}
+      onCallLastCard={() => dispatch('callLastCard')}
+      onChooseTarget={(seat: number) => dispatch('chooseTarget', { seat })}
+      onPass={() => dispatch('pass')}
       onQuit={() => router.push('/wild')}
     />
   );

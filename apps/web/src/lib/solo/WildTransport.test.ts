@@ -19,7 +19,8 @@ describe('WildTransport M5 acceptance', () => {
       expect(initial.players.slice(1).every((player) => player.isBot)).toBe(true);
       expect(initial.session.state.hands.every((hand) => hand.length === 7)).toBe(true);
       expect(initial.session.state.rules).toMatchObject({
-        stacking: mode === 'party',
+        stackDrawTwo: mode === 'party',
+        stackDrawFour: mode === 'party',
         jumpIn: mode === 'party',
       });
       expect(initial.session.setupFx?.some((event) => event.kind === Fx.DealCard)).toBe(true);

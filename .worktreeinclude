@@ -1,0 +1,17 @@
+# Untracked files bb copies from the source checkout into every new worktree.
+# gitignore syntax: one pattern per line, # for comments, ! to negate.
+#
+# These are deliberately untracked (see .gitignore) so they stay out of the
+# public repo, but build threads still need them in every worktree.
+
+AGENTS.md
+CLAUDE.md
+BUILD-SPEC.md
+progress.md
+docs/
+research/
+
+packages/*/README.md
+apps/web/public/audio/README.md
+
+.env.local
