@@ -36,7 +36,14 @@ import {
 import { createIdentity, type VeilIdentity } from './signing';
 import { VeilTranscript, type VeilRoundHeader } from './transcript';
 import { auditRound, type AuditReport, type VeilAuditState } from './audit';
-import { recoveryPolicyFor, type RecoveryPolicy } from './recovery';
+import {
+  packageRecovery,
+  recoverLayer,
+  recoveryPolicyFor,
+  type RecoveryFault,
+  type RecoveryPackage,
+  type RecoveryPolicy,
+} from './recovery';
 
 export interface VeilSessionOptions {
   roomCode: string;
@@ -65,6 +72,10 @@ export interface VeilDealPlan {
   publicSetup: readonly CardId[];
 }
 
+function recoveryKey(seat: SeatId, epoch: number): string {
+  return `${seat}:${epoch}`;
+}
+
 export class VeilSession {
   private identity: VeilIdentity | null = null;
   private transcript: VeilTranscript | null = null;
@@ -75,6 +86,12 @@ export class VeilSession {
   private readonly known = new Map<CardId, CardId>();
   /** every opening the room performed, for the audit */
   private readonly openings: { epoch: number; position: number; card: CardId }[] = [];
+  /** sealed layers other seats published, keyed `seat:epoch` */
+  private readonly sealed = new Map<string, RecoveryPackage>();
+  /** this seat's share of another seat's recovery key, keyed `seat:epoch` */
+  private readonly heldShares = new Map<string, string>();
+  /** layers this room reconstructed for a seat that left, keyed `seat:epoch` */
+  private readonly recovered = new Map<string, VeilLayerSecret>();
   private nextHandleBase = 0;
   private auditState: VeilAuditState = 'veiled';
 
@@ -151,6 +168,15 @@ export class VeilSession {
 
   epochAt(epoch: number): VeilEpoch | null {
     return this.epochs.get(epoch) ?? null;
+  }
+
+  /**
+   * Every deck epoch this round has opened. A recycled stock starts a new one,
+   * and a departed seat's layer has to be rebuilt for all of them — recovering
+   * only the opening epoch would leave the reshuffled stock unopenable.
+   */
+  liveEpochs(): number[] {
+    return [...this.epochs.keys()].sort((a, b) => a - b);
   }
 
   progress(epoch = 0): VeilCeremonyProgress {
@@ -288,6 +314,107 @@ export class VeilSession {
 
   transcriptRef(): VeilTranscript | null {
     return this.transcript;
+  }
+
+  // -------------------------------------------------------------------------
+  // Disconnect recovery
+  // -------------------------------------------------------------------------
+
+  /**
+   * Seals this seat's layer for an epoch and splits the sealing key across the
+   * other seats. Returns one package per holder, each carrying only that
+   * holder's share — the sealed blob is identical and safe to repeat, the
+   * shares are not. Returns an empty list when the room does not recover.
+   */
+  async sealRecovery(
+    epoch: number,
+    holders: readonly SeatId[],
+  ): Promise<{ holder: SeatId; pack: RecoveryPackage }[]> {
+    const secret = this.secrets.get(epoch);
+    if (!secret || this.recovery.mode === 'none' || holders.length === 0) return [];
+    const pack = await packageRecovery(
+      secret,
+      this.options.seat,
+      this.recovery,
+      [...holders],
+      this.options.random ?? randomBytes,
+    );
+    if (!pack) return [];
+    return pack.shares.map((share) => ({
+      holder: share.holder,
+      pack: { ...pack, shares: [share] },
+    }));
+  }
+
+  /** Files a sealed layer and the one share of it addressed to this seat. */
+  acceptRecovery(pack: RecoveryPackage): void {
+    const key = recoveryKey(pack.seat, pack.epoch);
+    this.sealed.set(key, { ...pack, shares: [] });
+    const mine = pack.shares.find((share) => share.holder === this.options.seat);
+    if (mine) this.heldShares.set(key, mine.share);
+  }
+
+  /** The share this seat holds of another seat's layer, if it was given one. */
+  shareOfLayer(seat: SeatId, epoch: number): string | null {
+    return this.heldShares.get(recoveryKey(seat, epoch)) ?? null;
+  }
+
+  /**
+   * Rebuilds a departed seat's layer from a quorum of shares.
+   *
+   * This is the moment that seat's privacy ends for the round: whoever holds
+   * the reconstructed layer can peel every card it was dealt. It is only ever
+   * run for a seat that has actually gone, and {@link recoveredSeats} keeps the
+   * fact visible rather than letting it pass silently.
+   */
+  async recover(
+    seat: SeatId,
+    epoch: number,
+    offered: readonly string[],
+  ): Promise<VeilLayerSecret | RecoveryFault> {
+    if (seat === this.options.seat) {
+      return { code: 'below-threshold', message: 'a seat does not recover its own layer' };
+    }
+    const pack = this.sealed.get(recoveryKey(seat, epoch));
+    if (!pack) {
+      return { code: 'tampered', message: `seat ${seat} never published a sealed layer` };
+    }
+    const result = await recoverLayer(pack, offered, this.recovery);
+    if ('code' in result) return result;
+    if (result.epoch !== epoch) {
+      return { code: 'tampered', message: 'the recovered layer belongs to another epoch' };
+    }
+    this.recovered.set(recoveryKey(seat, epoch), result);
+    return result;
+  }
+
+  /** True when this seat can stand in for `seat` on the peel chain. */
+  canCoverSeat(seat: SeatId, epoch: number): boolean {
+    return seat === this.options.seat
+      ? this.secrets.has(epoch)
+      : this.recovered.has(recoveryKey(seat, epoch));
+  }
+
+  /**
+   * A share computed on another seat's behalf, using a layer this room
+   * recovered. Refuses for any seat whose layer is still that seat's own.
+   */
+  shareAs(seat: SeatId, epoch: number, position: number, locked: string): VeilShare | null {
+    if (seat === this.options.seat) return this.share(epoch, position, locked);
+    const current = this.epochs.get(epoch);
+    const secret = this.recovered.get(recoveryKey(seat, epoch));
+    if (!current || !secret) return null;
+    return shareFor(current, secret, position, locked, seat);
+  }
+
+  /**
+   * Seats whose layer this client has reconstructed. Their hands are no longer
+   * private for the rest of the round, and the room badge says so.
+   */
+  recoveredSeats(): SeatId[] {
+    const seats = new Set<SeatId>();
+    for (const key of this.recovered.keys()) seats.add(Number(key.split(':')[0]));
+    return [...seats].sort((a, b) => a - b);
   }
 
   /** This seat's secrets, for the match-end disclosure. */

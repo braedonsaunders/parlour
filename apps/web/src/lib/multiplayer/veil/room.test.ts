@@ -202,7 +202,7 @@ describe('opening a card over a mesh', () => {
       { ...mesh['linkFor'](0), peerIdForSeat: () => null },
       3,
     );
-    await expect(room.open(0, 0, 'private')).rejects.toThrow(/not connected/);
+    await expect(room.open(0, 0, 'private')).rejects.toThrow(/has not been recovered yet/);
   });
 });
 

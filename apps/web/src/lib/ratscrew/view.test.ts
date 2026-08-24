@@ -1,16 +1,14 @@
-import { createFx } from '@parlour/engine';
-import { applyPreset, createSession } from '@parlour/engine';
+import { applyPreset, createFx, createSession } from '@parlour/engine';
 import { describe, expect, it } from 'vitest';
-import { ratscrewGame } from '@parlour/game-ratscrew';
+import { ratscrewGame, type RatscrewConfig } from '@parlour/game-ratscrew';
 import {
   RATSCREW_MODES,
-  getRatscrewMode,
   isRatscrewModeId,
   ratscrewModeForRules,
 } from './modes';
 import { ratscrewTableView, slapPatternLabel } from './view';
 
-function snapshotFor(seats: number, config: Parameters<typeof createSession>[1]['config']) {
+function snapshotFor(seats: number, config: RatscrewConfig) {
   const session = createSession(ratscrewGame, { seed: 7, config, seats });
   const players = Array.from({ length: seats }, (_, seat) => ({
     seat,
@@ -105,7 +103,7 @@ describe('rat screw mode catalog', () => {
   it('classifies rule sets back into modes', () => {
     expect(isRatscrewModeId('classic')).toBe(true);
     expect(isRatscrewModeId('nope')).toBe(false);
-    expect(getRatscrewMode('quick-reflex').facts.length).toBeGreaterThan(0);
+    expect(RATSCREW_MODES.find((mode) => mode.id === 'quick-reflex')?.facts.length).toBeGreaterThan(0);
     const schema = ratscrewGame.configSchema;
     expect(ratscrewModeForRules(schema.resolve({}))).toBe('classic');
     expect(ratscrewModeForRules(schema.resolve({ slapWindowMs: 700 }))).toBe('quick-reflex');

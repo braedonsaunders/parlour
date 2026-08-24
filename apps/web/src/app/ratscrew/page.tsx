@@ -3,13 +3,21 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import {
+  ratscrewConfigSchema,
+  ratscrewHowToPlay,
+} from '@parlour/game-ratscrew';
+import { GameArt } from '@/components/GameArt';
+import { getGame } from '@/lib/games';
+import { HowToPlayButton } from '@/components/HowToPlay';
+import { RuleSettings } from '@/components/settings/RuleSettings';
 import { useCenteredCarousel } from '@/hooks/useCenteredCarousel';
-import { RATSCREW_MODES, type RatscrewModeDef } from '@/lib/ratscrew/modes';
-import { useRatscrewSetupStore } from '@/stores/ratscrewSetup';
+import { RATSCREW_MODES } from '@/lib/ratscrew/modes';
+import { useRatscrewSetupStore, ratscrewRulesFor } from '@/stores/ratscrewSetup';
 import styles from '@/styles/modes.module.css';
 import gameStyles from '@/styles/games.module.css';
 
-const SEAT_OPTIONS = [2, 3, 4] as const;
+const SEAT_OPTIONS = getGame('ratscrew').seats;
 
 export default function RatscrewSetupPage() {
   const router = useRouter();
@@ -17,6 +25,9 @@ export default function RatscrewSetupPage() {
   const seats = useRatscrewSetupStore((s) => s.seats);
   const setMode = useRatscrewSetupStore((s) => s.setMode);
   const setSeats = useRatscrewSetupStore((s) => s.setSeats);
+  const overrides = useRatscrewSetupStore((s) => s.overrides);
+  const setRule = useRatscrewSetupStore((s) => s.setRule);
+  const resetRules = useRatscrewSetupStore((s) => s.resetRules);
   const [starting, setStarting] = useState(false);
   const carouselRef = useCenteredCarousel(mode);
 
@@ -38,7 +49,11 @@ export default function RatscrewSetupPage() {
         <h1 className="font-display text-xl font-extrabold tracking-tight text-hearth-50">
           Rat Screw <span className="text-dusk-100/80">· hands on the pile</span>
         </h1>
-        <span className="w-16" aria-hidden="true" />
+        <HowToPlayButton
+          doc={ratscrewHowToPlay}
+          title="Rat Screw"
+          subtitle="the slap game"
+        />
       </header>
 
       <div
@@ -87,6 +102,14 @@ export default function RatscrewSetupPage() {
           </div>
         </div>
 
+        <RuleSettings
+          schema={ratscrewConfigSchema}
+          values={ratscrewRulesFor(mode, overrides)}
+          onChange={setRule}
+          onReset={resetRules}
+          label="Advanced options"
+        />
+
         <div className="mx-auto flex w-full max-w-xl flex-wrap justify-center gap-3">
           <button
             type="button"
@@ -124,39 +147,44 @@ function ModeTile({
   selected,
   onSelect,
 }: {
-  def: RatscrewModeDef;
+  def: (typeof RATSCREW_MODES)[number];
   selected: boolean;
   onSelect: () => void;
 }) {
   return (
-    <button
-      type="button"
-      role="radio"
-      aria-checked={selected}
-      data-selected={selected}
-      onClick={onSelect}
-      className={styles.tile}
-      style={{
-        ['--tile-accent' as string]: def.accent,
-        ['--tile-accent-soft' as string]: `${def.accent}44`,
-      }}
-    >
-      <span className={styles.tileGlow} />
-      <span className={styles.preview}>
-        <span className={gameStyles.fanCard}>7♦</span>
-        <span className={gameStyles.fanCard}>{def.id === 'classic' ? '7♣' : 'K♥'}</span>
-        <span className={gameStyles.fanCard}>{def.id === 'slaphappy' ? 'Q♠' : 'SLAP!'}</span>
-      </span>
-      <span className={styles.tagline}>{def.tagline}</span>
-      <h2 className={styles.modeName}>{def.name}</h2>
-      <span className={styles.facts}>
-        {def.facts.map((fact) => (
-          <span key={fact} className={styles.fact}>
-            {fact}
-          </span>
-        ))}
-      </span>
-      <p className={styles.description}>{def.description}</p>
-    </button>
+    <div className={gameStyles.tileWrap}>
+      <HowToPlayButton
+        doc={ratscrewHowToPlay}
+        title={def.name}
+        subtitle={`Rat Screw · ${def.tagline}`}
+        variant="chip"
+        className={gameStyles.tileHelp}
+      />
+      <button
+        type="button"
+        role="radio"
+        aria-checked={selected}
+        data-selected={selected}
+        onClick={onSelect}
+        className={styles.tile}
+        style={{
+          ['--tile-accent' as string]: def.accent,
+          ['--tile-accent-soft' as string]: `${def.accent}44`,
+        }}
+      >
+        <span className={styles.tileGlow} />
+        <GameArt cards={def.art} motif={def.motif} />
+        <span className={styles.tagline}>{def.tagline}</span>
+        <h2 className={styles.modeName}>{def.name}</h2>
+        <span className={styles.facts}>
+          {def.facts.map((fact) => (
+            <span key={fact} className={styles.fact}>
+              {fact}
+            </span>
+          ))}
+        </span>
+        <p className={styles.description}>{def.description}</p>
+      </button>
+    </div>
   );
 }

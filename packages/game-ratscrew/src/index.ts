@@ -11,6 +11,7 @@ export {
   type SlapPattern,
 } from './patterns';
 export { ratscrewHowToPlay } from './howto';
+export { ratscrewCatalog } from './catalog';
 export {
   RATSCREW_PERSONAS,
   PERSONA_BY_TIER,

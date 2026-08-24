@@ -11,6 +11,7 @@ import { ownerCurrentCount } from '@/lib/table/owner-count';
 import { discardRotation, useFxAnimation, useTableAudio } from './fx-animation';
 import { HandRail, HandRailCard } from './HandRail';
 import { PlayingCard } from './PlayingCard';
+import { blitzHowToPlay } from '@parlour/game-blitz';
 import { TableMenu } from './TableMenu';
 import { AvatarBadge } from '@/components/AvatarBadge';
 import styles from '@/styles/table.module.css';
@@ -172,6 +173,7 @@ export function TableScreen(props: TableScreenProps) {
       <TableMenu
         open={menuOpen}
         onClose={() => setMenuOpen(false)}
+        howToPlay={{ doc: blitzHowToPlay, title: 'Blitz', subtitle: 'the 31 game' }}
         onQuit={() => {
           setMenuOpen(false);
           props.onQuit?.();

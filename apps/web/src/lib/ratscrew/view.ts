@@ -4,7 +4,7 @@ import type {
   RatscrewState,
   RatscrewWindow,
 } from '@parlour/game-ratscrew';
-import { getRatscrewMode, type RatscrewModeId } from '@/lib/ratscrew/modes';
+import { ratscrewModeForRules, type RatscrewModeId } from '@/lib/ratscrew/modes';
 
 export interface RatscrewSeatView {
   seat: number;
@@ -103,7 +103,7 @@ export function ratscrewTableView(
     window: windowView(state.window, state.rules),
     challenge: state.challenge ? { ...state.challenge } : null,
     phaseLabel: phaseLabel(state),
-    mode: getRatscrewMode(snapshot.mode).id,
+    mode: snapshot.mode ?? ratscrewModeForRules(state.rules),
     status: snapshot.session.status,
     winnerSeat: snapshot.session.result?.winner ?? null,
     decision: canFlip ? 'flip' : canSlap ? 'slap' : null,

@@ -1,7 +1,8 @@
 import { applyPreset } from '@parlour/engine';
 import { wildpileConfig, type WildpileRules } from '@parlour/game-wildpile';
 import { create } from 'zustand';
-import type { WildModeId } from '@/lib/wild/modes';
+import { getGameMode, modePreset } from '@/lib/games';
+import { isWildModeId, type WildModeId } from '@/lib/wild/modes';
 import type { SeatCount } from '@/stores/setup';
 
 export type WildSetupState = {
@@ -9,7 +10,8 @@ export type WildSetupState = {
   seats: SeatCount;
   /** Per-key overrides layered on top of the selected mode's preset. */
   overrides: Partial<WildpileRules>;
-  setMode: (mode: WildModeId) => void;
+  /** Takes the registry's string ids; anything unknown is ignored. */
+  setMode: (mode: string) => void;
   setSeats: (seats: number) => void;
   setRule: (key: string, value: WildpileRules[string]) => void;
   resetRules: () => void;
@@ -22,7 +24,11 @@ function clampSeats(value: number): SeatCount {
 
 /** The rules a table will actually deal with: mode preset + any overrides. */
 export function wildRulesFor(mode: WildModeId, overrides: Partial<WildpileRules>): WildpileRules {
-  return wildpileConfig.resolve({ ...applyPreset(wildpileConfig, mode), ...overrides });
+  // The mode names its own preset in the pack's catalog; a mode that names
+  // none simply starts from the schema defaults.
+  const preset = modePreset(getGameMode('wild', mode));
+  const base = preset ? applyPreset(wildpileConfig, preset) : wildpileConfig.defaults();
+  return wildpileConfig.resolve({ ...base, ...overrides });
 }
 
 /**
@@ -35,7 +41,7 @@ export const useWildSetupStore = create<WildSetupState>()((set) => ({
   seats: 4,
   overrides: {},
   // Switching preset drops per-knob overrides: the tile you picked is the table.
-  setMode: (mode) => set({ mode, overrides: {} }),
+  setMode: (mode) => set(isWildModeId(mode) ? { mode, overrides: {} } : {}),
   setSeats: (seats) => set({ seats: clampSeats(seats) }),
   setRule: (key, value) =>
     set((state) => ({ overrides: { ...state.overrides, [key]: value } as Partial<WildpileRules> })),
