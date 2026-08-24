@@ -9,11 +9,26 @@ import { useMatchTension } from '@/lib/audio/tension';
 import { RATSCREW_MATCH_PACE_MS } from '@/lib/ratscrew/modes';
 import { slapPatternLabel, type RatscrewTableView } from '@/lib/ratscrew/view';
 import { useMusicMood } from '@/stores/audio';
-import { buildFxTimeline, type FxCue } from '@/lib/table/fx-motion';
+import { type FxCue } from '@/lib/table/fx-motion';
 import { useDealPresentation } from '@/lib/table/deal-presentation';
-import { useFxAnimation, useTableAudio } from '../fx-animation';
+import { useTableAudio } from '../fx-animation';
 import { TableMenu } from '../TableMenu';
 import { PlayingCard } from '../PlayingCard';
+import {
+  SeatNameplate,
+  TableActionRail,
+  TableCardFlight,
+  TableErrorScreen,
+  TableFxLayer,
+  TableHud,
+  TableLoadingScreen,
+  TablePlayfield,
+  TableShell,
+  TableTitlePill,
+  TableTurnPop,
+  useGameTextSurface,
+  useTableMenu,
+} from '../shell';
 import { AvatarBadge } from '@/components/AvatarBadge';
 import tableStyles from '@/styles/table.module.css';
 import styles from '@/styles/ratscrew.module.css';
@@ -33,7 +48,7 @@ export type RatscrewTableScreenProps = {
 export function RatscrewTableScreen(props: RatscrewTableScreenProps) {
   const { view, error } = props;
   const rootRef = useRef<HTMLElement>(null);
-  const [menuOpen, setMenuOpen] = useState(false);
+  const menu = useTableMenu(props.onQuit);
   const deal = useDealPresentation(props.fx, props.fxKey);
   useTableAudio(props.fx, props.fxKey, RATSCREW_SFX_PACK.id);
 
@@ -45,76 +60,37 @@ export function RatscrewTableScreen(props: RatscrewTableScreenProps) {
   });
   useMusicMood(tense || racing ? 'tense' : null);
 
-  useEffect(() => {
-    const gameWindow = window as Window & { render_game_to_text?: () => string };
-    const renderGameToText = () =>
-      JSON.stringify({
-        game: 'ratscrew',
-        status: error ? 'error' : view ? (view.status === 'ended' ? 'ended' : 'ready') : 'loading',
-        error,
-        localSeat: view?.localSeat ?? null,
-        turnSeat: view?.turnSeat ?? null,
-        centerTop: view?.center[0] ?? null,
-        centerCount: view?.centerCount ?? null,
-        window: view?.window?.pattern ?? null,
-        challenge: view?.challenge ?? null,
-        myStack: view?.players.find((p) => p.isLocal)?.stackCount ?? null,
-        dealing: deal.dealing,
-        canFlip: !deal.dealing && (view?.legal.flip ?? false),
-        canSlap: !deal.dealing && (view?.legal.slap ?? false),
-      });
-    gameWindow.render_game_to_text = renderGameToText;
-    return () => {
-      if (gameWindow.render_game_to_text === renderGameToText) {
-        delete gameWindow.render_game_to_text;
-      }
-    };
-  }, [deal.dealing, error, view]);
+  useGameTextSurface(() => ({
+    game: 'ratscrew',
+    status: error ? 'error' : view ? (view.status === 'ended' ? 'ended' : 'ready') : 'loading',
+    error,
+    localSeat: view?.localSeat ?? null,
+    turnSeat: view?.turnSeat ?? null,
+    centerTop: view?.center[0] ?? null,
+    centerCount: view?.centerCount ?? null,
+    window: view?.window?.pattern ?? null,
+    challenge: view?.challenge ?? null,
+    myStack: view?.players.find((p) => p.isLocal)?.stackCount ?? null,
+    dealing: deal.dealing,
+    canFlip: !deal.dealing && (view?.legal.flip ?? false),
+    canSlap: !deal.dealing && (view?.legal.slap ?? false),
+  }));
 
   if (error) {
-    return (
-      <main className={tableStyles.screen}>
-        <div className={`${tableStyles.statusPanel} panel-soft`} role="alert">
-          <strong>The table lost the thread.</strong>
-          <span>{error}</span>
-        </div>
-      </main>
-    );
+    return <TableErrorScreen headline="The table lost the thread." message={error} />;
   }
 
   if (!view) {
-    return (
-      <main className={tableStyles.screen} aria-busy="true">
-        <div className={`${tableStyles.statusPanel} panel-soft`}>
-          <span className={tableStyles.loadingPip} />
-          <strong>Shuffling the stacks…</strong>
-        </div>
-      </main>
-    );
+    return <TableLoadingScreen copy="Shuffling the stacks…" />;
   }
 
   return (
-    <main ref={rootRef} className={tableStyles.screen} data-table-screen>
-      <header className={tableStyles.hud}>
-        <div className="pill-soft">
-          <span className={tableStyles.eyebrow}>Rat Screw</span>
-          <strong>{view.phaseLabel}</strong>
-        </div>
-        <button
-          type="button"
-          className={`${tableStyles.menuButton} btn-fat btn-fat--ghost`}
-          aria-label="Table menu"
-          aria-haspopup="dialog"
-          onClick={() => setMenuOpen(true)}
-        >
-          •••
-        </button>
-      </header>
+    <TableShell rootRef={rootRef}>
+      <TableHud onOpenMenu={menu.open}>
+        <TableTitlePill eyebrow="Rat Screw" status={view.phaseLabel} />
+      </TableHud>
 
-      <section className={tableStyles.playfield} aria-label="Rat Screw table">
-        <div className={tableStyles.feltMark} aria-hidden="true">
-          ♣
-        </div>
+      <TablePlayfield label="Rat Screw table" feltMark="♣">
         {view.players.map((player) => (
           <Seat
             key={player.seat}
@@ -178,9 +154,9 @@ export function RatscrewTableScreen(props: RatscrewTableScreenProps) {
 
         <FxLayer fx={props.fx} fxKey={props.fxKey} rootRef={rootRef} />
         <BurstLayer fx={props.fx} fxKey={props.fxKey} rootRef={rootRef} />
-      </section>
+      </TablePlayfield>
 
-      <div className={`${tableStyles.actionRail} ${styles.actionRail}`}>
+      <TableActionRail className={styles.actionRail}>
         <button
           type="button"
           className={`btn-fat ${styles.flipButton}`}
@@ -198,17 +174,10 @@ export function RatscrewTableScreen(props: RatscrewTableScreenProps) {
         >
           SLAP!
         </button>
-      </div>
+      </TableActionRail>
 
-      <TableMenu
-        open={menuOpen}
-        onClose={() => setMenuOpen(false)}
-        onQuit={() => {
-          setMenuOpen(false);
-          props.onQuit?.();
-        }}
-      />
-    </main>
+      <TableMenu open={menu.isOpen} onClose={menu.close} onQuit={menu.quit} />
+    </TableShell>
   );
 }
 
@@ -282,10 +251,7 @@ function Seat({
         size="clamp(3.2rem, 5.6vw, 4.8rem)"
         className={tableStyles.avatar}
       />
-      <div className={tableStyles.nameplate}>
-        <strong>{player.name}</strong>
-        {player.isBot && <small>bot</small>}
-      </div>
+      <SeatNameplate name={player.name} isBot={player.isBot} />
       <span className={styles.stackChip}>
         {challenged ? '⚡ ' : ''}
         {player.isLocal
@@ -328,63 +294,24 @@ function FxLayer({
   fxKey: string | number;
   rootRef: RefObject<HTMLElement | null>;
 }) {
-  const planned = useMemo(() => {
-    try {
-      return { cues: buildFxTimeline(fx), error: null };
-    } catch (caught) {
-      return {
-        cues: [] as FxCue[],
-        error: caught instanceof Error ? caught.message : 'Invalid table effect',
-      };
-    }
-  }, [fx]);
+  return <TableFxLayer fx={fx} fxKey={fxKey} rootRef={rootRef} renderCue={renderRatscrewCue} />;
+}
 
-  useFxAnimation(planned.cues, rootRef, fxKey);
-
-  return (
-    <div className={tableStyles.fxLayer} aria-live="polite">
-      {planned.error && (
-        <div className={tableStyles.fxError}>Animation skipped: {planned.error}</div>
-      )}
-      {planned.cues.map((cue) => {
-        if (
-          cue.type === 'deal' ||
-          cue.type === 'flip' ||
-          cue.type === 'draw' ||
-          cue.type === 'discard'
-        ) {
-          // Every Rat Screw draw stack is private, including the local one.
-          // Only an explicit flip cue reveals its card on the center pile.
-          const faceDown = cue.type === 'deal' || cue.type === 'draw';
-          return (
-            <div
-              key={`${fxKey}:${cue.id}`}
-              data-fx-cue={cue.id}
-              data-card-flight
-              className={tableStyles.flyingCard}
-            >
-              <i className={tableStyles.cardTrail} />
-              <span data-flight-card className={tableStyles.flightCardVisual}>
-                <PlayingCard card={faceDown ? undefined : cue.card} faceDown={faceDown} compact />
-              </span>
-              <i className={tableStyles.cardGlint} />
-            </div>
-          );
-        }
-        if (cue.type === 'turn') {
-          return (
-            <span
-              key={`${fxKey}:${cue.id}`}
-              data-fx-cue={cue.id}
-              data-seat-burst={cue.seat}
-              className={tableStyles.turnPop}
-            />
-          );
-        }
-        return null;
-      })}
-    </div>
-  );
+function renderRatscrewCue(cue: FxCue) {
+  if (cue.type === 'deal' || cue.type === 'flip' || cue.type === 'draw' || cue.type === 'discard') {
+    // Every Rat Screw draw stack is private, including the local one.
+    // Only an explicit flip cue reveals its card on the center pile.
+    const faceDown = cue.type === 'deal' || cue.type === 'draw';
+    return (
+      <TableCardFlight cueId={cue.id}>
+        <PlayingCard card={faceDown ? undefined : cue.card} faceDown={faceDown} compact />
+      </TableCardFlight>
+    );
+  }
+  if (cue.type === 'turn') {
+    return <TableTurnPop cueId={cue.id} seat={cue.seat} />;
+  }
+  return null;
 }
 
 interface Burst {

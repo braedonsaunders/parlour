@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type RefObject } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { orderedHand, type FxEvent } from '@parlour/engine';
 import {
   WILDPILE_COLORS,
@@ -14,7 +14,7 @@ import { WILDPILE_SFX_PACK } from '@/lib/audio/sfx';
 import { useMatchTension } from '@/lib/audio/tension';
 import { useMusicMood } from '@/stores/audio';
 import { type DealPresentation, useDealPresentation } from '@/lib/table/deal-presentation';
-import { buildFxTimeline, type FxCue } from '@/lib/table/fx-motion';
+import { type FxCue } from '@/lib/table/fx-motion';
 import {
   wildAnnouncements,
   type WildAnnouncement,
@@ -24,9 +24,29 @@ import {
 import { useWildPickupCount, wildPickup, type WildPickup } from '@/lib/wild/pickup';
 import { WILD_DROP_EFFECTS } from '@/lib/wild/drop-effects';
 import { CardDropFx } from '../CardDropFx';
-import { discardRotation, useFxAnimation, useTableAudio } from '../fx-animation';
+import { discardRotation, useTableAudio } from '../fx-animation';
 import { HandRail, HandRailCard } from '../HandRail';
 import { TableMenu } from '../TableMenu';
+import {
+  dealStateAttr,
+  OpponentFan,
+  SeatNameplate,
+  StockPile,
+  TableActionRail,
+  TableCardFlight,
+  TableErrorScreen,
+  TableFxLayer,
+  TableHud,
+  TableLoadingScreen,
+  TablePiles,
+  TablePlayfield,
+  TableShell,
+  TableTitlePill,
+  TableTurnIndicator,
+  TableTurnPop,
+  useGameTextSurface,
+  useTableMenu,
+} from '../shell';
 import { WildCard } from './WildCard';
 import { AvatarBadge } from '@/components/AvatarBadge';
 import tableStyles from '@/styles/table.module.css';
@@ -65,7 +85,7 @@ export type WildTableScreenProps = {
 export function WildTableScreen(props: WildTableScreenProps) {
   const { view, error } = props;
   const rootRef = useRef<HTMLElement>(null);
-  const [menuOpen, setMenuOpen] = useState(false);
+  const menu = useTableMenu(props.onQuit);
   const [clockNow, setClockNow] = useState(() => Date.now());
   const deal = useDealPresentation(props.fx, props.fxKey);
   useTableAudio(props.fx, props.fxKey, WILDPILE_SFX_PACK.id);
@@ -101,87 +121,42 @@ export function WildTableScreen(props: WildTableScreenProps) {
     return () => window.clearInterval(timer);
   }, [props.matchEndsAt, view, view?.activeSeat]);
 
-  useEffect(() => {
-    const gameWindow = window as Window & { render_game_to_text?: () => string };
-    const renderGameToText = () =>
-      JSON.stringify({
-        game: 'wild',
-        status: error ? 'error' : view ? (deal.dealing ? 'dealing' : 'ready') : 'loading',
-        error,
-        localSeat: view?.localSeat ?? null,
-        activeSeat: view?.activeSeat ?? null,
-        decision: view?.decision ?? null,
-        matchRemainingSeconds: remainingMs === null ? null : Math.ceil(remainingMs / 1_000),
-        turnDurationSeconds:
-          props.turnDurationMs === undefined ? null : props.turnDurationMs / 1_000,
-        stockCount: view ? view.stockCount + deal.pendingStockCards : null,
-        discardTop: view && deal.discardReady ? view.discard.at(-1) : null,
-        hand: view
-          ? orderedHand(deal.visibleCards(view.hand, view.localSeat), wildpileCatalog.handOrder)
-          : [],
-        playableCards: deal.dealing ? [] : (view?.legal.playCards ?? []),
-      });
-    gameWindow.render_game_to_text = renderGameToText;
-    return () => {
-      if (gameWindow.render_game_to_text === renderGameToText) {
-        delete gameWindow.render_game_to_text;
-      }
-    };
-  }, [deal, error, props.turnDurationMs, remainingMs, view]);
+  useGameTextSurface(() => ({
+    game: 'wild',
+    status: error ? 'error' : view ? (deal.dealing ? 'dealing' : 'ready') : 'loading',
+    error,
+    localSeat: view?.localSeat ?? null,
+    activeSeat: view?.activeSeat ?? null,
+    decision: view?.decision ?? null,
+    matchRemainingSeconds: remainingMs === null ? null : Math.ceil(remainingMs / 1_000),
+    turnDurationSeconds: props.turnDurationMs === undefined ? null : props.turnDurationMs / 1_000,
+    stockCount: view ? view.stockCount + deal.pendingStockCards : null,
+    discardTop: view && deal.discardReady ? view.discard.at(-1) : null,
+    hand: view
+      ? orderedHand(deal.visibleCards(view.hand, view.localSeat), wildpileCatalog.handOrder)
+      : [],
+    playableCards: deal.dealing ? [] : (view?.legal.playCards ?? []),
+  }));
 
   if (error) {
-    return (
-      <main className={tableStyles.screen}>
-        <div className={`${tableStyles.statusPanel} panel-soft`} role="alert">
-          <strong>The table lost the thread.</strong>
-          <span>{error}</span>
-        </div>
-      </main>
-    );
+    return <TableErrorScreen headline="The table lost the thread." message={error} />;
   }
 
   if (!view) {
-    return (
-      <main className={tableStyles.screen} aria-busy="true">
-        <div className={`${tableStyles.statusPanel} panel-soft`}>
-          <span className={tableStyles.loadingPip} />
-          <strong>Shuffling the pile…</strong>
-        </div>
-      </main>
-    );
+    return <TableLoadingScreen copy="Shuffling the pile…" />;
   }
 
   const localBusy = (props.busy ?? false) || deal.dealing;
   const calls = deal.dealing ? [] : wildAnnouncements(props.fx, view.players);
 
   return (
-    <main
-      ref={rootRef}
-      className={tableStyles.screen}
-      data-table-screen
-      data-deal-state={deal.sequence ? (deal.complete ? 'complete' : 'dealing') : undefined}
-    >
-      <header className={tableStyles.hud}>
-        <div className="pill-soft">
-          <span className={tableStyles.eyebrow}>Wild</span>
-          <strong>{view.phaseLabel}</strong>
-        </div>
+    <TableShell rootRef={rootRef} dealState={dealStateAttr(deal)}>
+      <TableHud onOpenMenu={menu.open}>
+        <TableTitlePill eyebrow="Wild" status={view.phaseLabel} />
         {remainingMs !== null && <MatchClock remainingMs={remainingMs} />}
-        <button
-          type="button"
-          className={`${tableStyles.menuButton} btn-fat btn-fat--ghost`}
-          aria-label="Table menu"
-          aria-haspopup="dialog"
-          onClick={() => setMenuOpen(true)}
-        >
-          •••
-        </button>
-      </header>
+      </TableHud>
 
-      <section className={tableStyles.playfield} aria-label="Wild table">
-        <div className={tableStyles.feltMark} aria-hidden="true">
-          W
-        </div>
+      <TablePlayfield label="Wild table" feltMark="W">
         {view.players.map((player) => (
           <Seat
             key={player.seat}
@@ -205,11 +180,11 @@ export function WildTableScreen(props: WildTableScreenProps) {
           />
         )}
         <LocalHand view={view} busy={localBusy} onPlay={props.onPlay} deal={deal} />
-        <WildFxLayer
+        <TableFxLayer
           fx={props.fx}
           fxKey={props.fxKey}
-          localSeat={view.localSeat}
           rootRef={rootRef}
+          renderCue={(cue) => <Cue cue={cue} localSeat={view.localSeat} />}
         />
         <CardDropFx fx={props.fx} fxKey={props.fxKey} packId={WILD_DROP_EFFECTS.id} />
         <PickupCounter pickup={pickup} count={pickupCount} players={view.players} />
@@ -235,11 +210,11 @@ export function WildTableScreen(props: WildTableScreenProps) {
             onAccept={props.onDraw}
           />
         )}
-      </section>
+      </TablePlayfield>
 
       {/* No draw button: the stock pile is the draw, and forced pickups resolve
           themselves. The only rail action left is protecting your last card. */}
-      <div className={tableStyles.actionRail}>
+      <TableActionRail>
         <AnimatePresence initial={false}>
           {view.legal.pass && !localBusy && (
             <motion.button
@@ -284,18 +259,15 @@ export function WildTableScreen(props: WildTableScreenProps) {
             </motion.span>
           )}
         </AnimatePresence>
-      </div>
+      </TableActionRail>
 
       <TableMenu
-        open={menuOpen}
-        onClose={() => setMenuOpen(false)}
+        open={menu.isOpen}
+        onClose={menu.close}
         howToPlay={{ doc: wildpileHowToPlay, title: 'Wild', subtitle: view.phaseLabel }}
-        onQuit={() => {
-          setMenuOpen(false);
-          props.onQuit?.();
-        }}
+        onQuit={menu.quit}
       />
-    </main>
+    </TableShell>
   );
 }
 
@@ -405,8 +377,6 @@ function Seat({
   stamp: WildAnnouncement | null;
 }) {
   const avatar = getAvatar(player.avatarId);
-  const visibleCards = Math.min(displayCount, 5);
-  const fanStep = visibleCards > 1 ? 22 / (visibleCards - 1) : 0;
   const style = { '--seat-accent': avatar.accent, '--seat-shade': avatar.shade } as CSSProperties;
 
   return (
@@ -420,26 +390,19 @@ function Seat({
       transition={{ duration: 0.24, ease: [0.34, 1.56, 0.64, 1] }}
     >
       {!player.isLocal && (
-        <div className={tableStyles.opponentCards} aria-label={`${displayCount} hidden cards`}>
-          {Array.from({ length: visibleCards }, (_, index) => (
-            <WildCard
-              key={index}
-              compact
-              faceDown
-              rotation={(index - (visibleCards - 1) / 2) * fanStep}
-            />
-          ))}
-        </div>
+        <OpponentFan
+          count={displayCount}
+          max={5}
+          spread={22}
+          renderCard={({ rotation }) => <WildCard compact faceDown rotation={rotation} />}
+        />
       )}
       <AvatarBadge
         avatarId={player.avatarId}
         size="clamp(3.2rem, 5.6vw, 4.8rem)"
         className={tableStyles.avatar}
       />
-      <div className={tableStyles.nameplate}>
-        <strong>{player.name}</strong>
-        {player.isBot && <small>bot</small>}
-      </div>
+      <SeatNameplate name={player.name} isBot={player.isBot} />
       <span className={wildStyles.cardCount} data-armed={player.lastCardArmed || undefined}>
         {displayCount} card{displayCount === 1 ? '' : 's'}
         {player.lastCardArmed && <i aria-hidden="true" />}
@@ -553,29 +516,22 @@ function Piles({
   const visibleDiscard = [...(deal.discardReady ? view.discard : [])].reverse();
   const stockCount = view.stockCount + deal.pendingStockCards;
   return (
-    <div className={tableStyles.piles} data-center-piles data-local-turn={!busy}>
-      {!busy && (
-        <span className={tableStyles.turnIndicator} aria-hidden="true">
-          Your turn
-        </span>
-      )}
-      <button
-        type="button"
-        data-zone="stock"
-        className={`${tableStyles.pileButton} ${wildStyles.stockPile}`}
-        data-can-draw={view.legal.draw && !busy}
+    <TablePiles localTurn={!busy} centerPiles>
+      {!busy && <TableTurnIndicator />}
+      <StockPile
+        count={stockCount}
+        className={wildStyles.stockPile}
+        canDraw={view.legal.draw && !busy}
         disabled={!view.legal.draw || busy}
         onClick={onDraw}
-        aria-label={`Draw from stock, ${stockCount} cards remain`}
+        card={<WildCard faceDown />}
       >
-        <WildCard faceDown />
-        <span className={tableStyles.pileCount}>{stockCount}</span>
         {view.legal.draw && !busy && (
           <span className={wildStyles.drawHint} aria-hidden="true">
             Tap to draw
           </span>
         )}
-      </button>
+      </StockPile>
       <div
         data-zone="discard"
         className={`${tableStyles.pileButton} ${tableStyles.discardPile}`}
@@ -585,7 +541,7 @@ function Piles({
           <WildCard key={`${card}:${index}`} card={card} rotation={discardRotation(card, index)} />
         ))}
       </div>
-    </div>
+    </TablePiles>
   );
 }
 
@@ -611,7 +567,7 @@ function LocalHand({
       count={visibleHand.length}
       zone={`hand:${view.localSeat}`}
       label="Your hand"
-      dealState={deal.sequence ? (deal.complete ? 'complete' : 'dealing') : undefined}
+      dealState={dealStateAttr(deal)}
     >
       <AnimatePresence initial={false} mode="popLayout">
         {visibleHand.map((card, index) => {
@@ -828,42 +784,6 @@ function SwapChooser({
   );
 }
 
-function WildFxLayer({
-  fx,
-  fxKey,
-  localSeat,
-  rootRef,
-}: {
-  fx: readonly FxEvent[];
-  fxKey: string | number;
-  localSeat: number;
-  rootRef: RefObject<HTMLElement | null>;
-}) {
-  const planned = useMemo(() => {
-    try {
-      return { cues: buildFxTimeline(fx), error: null };
-    } catch (error) {
-      return {
-        cues: [] as FxCue[],
-        error: error instanceof Error ? error.message : 'Invalid table effect',
-      };
-    }
-  }, [fx]);
-
-  useFxAnimation(planned.cues, rootRef, fxKey);
-
-  return (
-    <div className={tableStyles.fxLayer} aria-live="polite">
-      {planned.error && (
-        <div className={tableStyles.fxError}>Animation skipped: {planned.error}</div>
-      )}
-      {planned.cues.map((cue) => (
-        <Cue key={`${fxKey}:${cue.id}`} cue={cue} localSeat={localSeat} />
-      ))}
-    </div>
-  );
-}
-
 function Cue({ cue, localSeat }: { cue: FxCue; localSeat: number }) {
   if (
     cue.type === 'deal' ||
@@ -877,17 +797,13 @@ function Cue({ cue, localSeat }: { cue: FxCue; localSeat: number }) {
       (cue.type === 'draw' && cue.to !== `hand:${localSeat}`) ||
       (cue.type === 'transfer' && cue.from !== `hand:${localSeat}`);
     return (
-      <div data-fx-cue={cue.id} data-card-flight className={tableStyles.flyingCard}>
-        <i className={tableStyles.cardTrail} />
-        <span data-flight-card className={tableStyles.flightCardVisual}>
-          <WildCard card={cue.card} faceDown={faceDown} />
-        </span>
-        <i className={tableStyles.cardGlint} />
-      </div>
+      <TableCardFlight cueId={cue.id}>
+        <WildCard card={cue.card} faceDown={faceDown} />
+      </TableCardFlight>
     );
   }
   if (cue.type === 'turn') {
-    return <span data-fx-cue={cue.id} data-seat-burst={cue.seat} className={tableStyles.turnPop} />;
+    return <TableTurnPop cueId={cue.id} seat={cue.seat} />;
   }
   return null;
 }

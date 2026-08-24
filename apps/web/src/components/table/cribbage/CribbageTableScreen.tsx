@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type RefObject } from 'react';
+import { useMemo, useRef, useState, type CSSProperties, type RefObject } from 'react';
 import { orderedHand, type FxEvent } from '@parlour/engine';
 import { cribbageCatalog, cribbageHowToPlay } from '@parlour/game-cribbage';
 import { AnimatePresence, motion } from 'motion/react';
@@ -9,11 +9,25 @@ import { getAvatar } from '@/lib/avatars';
 import { CRIBBAGE_SFX_PACK } from '@/lib/audio/sfx';
 import type { CribbageSeatView, CribbageTableView } from '@/lib/cribbage/view';
 import { type DealPresentation, useDealPresentation } from '@/lib/table/deal-presentation';
-import { buildFxTimeline, type FxCue } from '@/lib/table/fx-motion';
-import { useFxAnimation, useTableAudio } from '../fx-animation';
+import { type FxCue } from '@/lib/table/fx-motion';
+import { useTableAudio } from '../fx-animation';
 import { HandRail, HandRailCard } from '../HandRail';
 import { PlayingCard } from '../PlayingCard';
 import { TableMenu } from '../TableMenu';
+import {
+  dealStateAttr,
+  TableActionRail,
+  TableCardFlight,
+  TableErrorScreen,
+  TableFxLayer,
+  TableHud,
+  TableLoadingScreen,
+  TablePlayfield,
+  TableShell,
+  TableTitlePill,
+  useGameTextSurface,
+  useTableMenu,
+} from '../shell';
 import tableStyles from '@/styles/table.module.css';
 import styles from '@/styles/cribbage.module.css';
 
@@ -34,92 +48,51 @@ export interface CribbageTableScreenProps {
 export function CribbageTableScreen(props: CribbageTableScreenProps) {
   const { view, error } = props;
   const rootRef = useRef<HTMLElement>(null);
-  const [menuOpen, setMenuOpen] = useState(false);
+  const menu = useTableMenu(props.onQuit);
   const deal = useDealPresentation(props.fx, props.fxKey);
   useTableAudio(props.fx, props.fxKey, CRIBBAGE_SFX_PACK.id);
 
-  useEffect(() => {
-    const gameWindow = window as Window & { render_game_to_text?: () => string };
-    const renderGameToText = () =>
-      JSON.stringify({
-        coordinateSystem: 'CSS pixels; origin is top-left, x grows right, y grows down',
-        game: 'cribbage',
-        status: error ? 'error' : view ? (deal.dealing ? 'dealing' : 'ready') : 'loading',
-        error,
-        phase: view?.phase ?? null,
-        phaseLabel: view?.phaseLabel ?? null,
-        activeSeat: view?.activeSeat ?? null,
-        dealer: view?.dealer ?? null,
-        scores: view?.players.map((player) => ({
-          seat: player.seat,
-          score: player.score,
-          gamesWon: player.gamesWon,
-          handCount: player.handCount,
-        })),
-        runningCount: view?.runningCount ?? null,
-        starter: view?.starter ?? null,
-        pile: view?.pile ?? [],
-        hand: view
-          ? orderedHand(deal.visibleCards(view.hand, view.localSeat), cribbageCatalog.handOrder)
-          : [],
-        legal: deal.dealing ? null : (view?.legal ?? null),
-        activeFx: props.fx.map(({ kind, at }) => ({ kind, at: at ?? 0 })),
-      });
-    gameWindow.render_game_to_text = renderGameToText;
-    return () => {
-      if (gameWindow.render_game_to_text === renderGameToText) {
-        delete gameWindow.render_game_to_text;
-      }
-    };
-  }, [deal, error, props.fx, view]);
+  useGameTextSurface(() => ({
+    coordinateSystem: 'CSS pixels; origin is top-left, x grows right, y grows down',
+    game: 'cribbage',
+    status: error ? 'error' : view ? (deal.dealing ? 'dealing' : 'ready') : 'loading',
+    error,
+    phase: view?.phase ?? null,
+    phaseLabel: view?.phaseLabel ?? null,
+    activeSeat: view?.activeSeat ?? null,
+    dealer: view?.dealer ?? null,
+    scores: view?.players.map((player) => ({
+      seat: player.seat,
+      score: player.score,
+      gamesWon: player.gamesWon,
+      handCount: player.handCount,
+    })),
+    runningCount: view?.runningCount ?? null,
+    starter: view?.starter ?? null,
+    pile: view?.pile ?? [],
+    hand: view
+      ? orderedHand(deal.visibleCards(view.hand, view.localSeat), cribbageCatalog.handOrder)
+      : [],
+    legal: deal.dealing ? null : (view?.legal ?? null),
+    activeFx: props.fx.map(({ kind, at }) => ({ kind, at: at ?? 0 })),
+  }));
 
   if (error) {
-    return (
-      <main className={tableStyles.screen}>
-        <div className={`${tableStyles.statusPanel} panel-soft`} role="alert">
-          <strong>The cribbage table lost the count.</strong>
-          <span>{error}</span>
-        </div>
-      </main>
-    );
+    return <TableErrorScreen headline="The cribbage table lost the count." message={error} />;
   }
 
   if (!view) {
-    return (
-      <main className={tableStyles.screen} aria-busy="true">
-        <div className={`${tableStyles.statusPanel} panel-soft`}>
-          <span className={tableStyles.loadingPip} />
-          <strong>Drilling the peg holes…</strong>
-        </div>
-      </main>
-    );
+    return <TableLoadingScreen copy="Drilling the peg holes…" />;
   }
 
   const tableBusy = (props.busy ?? false) || deal.dealing;
   return (
-    <main
-      ref={rootRef}
-      className={`${tableStyles.screen} ${styles.screen}`}
-      data-table-screen
-      data-deal-state={deal.sequence ? (deal.complete ? 'complete' : 'dealing') : undefined}
-    >
-      <header className={tableStyles.hud}>
-        <div className="pill-soft">
-          <span className={tableStyles.eyebrow}>Cribbage</span>
-          <strong>{phaseCopy(view)}</strong>
-        </div>
-        <button
-          type="button"
-          className={`${tableStyles.menuButton} btn-fat btn-fat--ghost`}
-          aria-label="Table menu"
-          aria-haspopup="dialog"
-          onClick={() => setMenuOpen(true)}
-        >
-          •••
-        </button>
-      </header>
+    <TableShell rootRef={rootRef} className={styles.screen} dealState={dealStateAttr(deal)}>
+      <TableHud onOpenMenu={menu.open}>
+        <TableTitlePill eyebrow="Cribbage" status={phaseCopy(view)} />
+      </TableHud>
 
-      <section className={tableStyles.playfield} aria-label="Cribbage table">
+      <TablePlayfield label="Cribbage table">
         <div className={styles.feltMonogram} aria-hidden="true">
           121
         </div>
@@ -139,9 +112,9 @@ export function CribbageTableScreen(props: CribbageTableScreenProps) {
           rootRef={rootRef}
           localSeat={view.localSeat}
         />
-      </section>
+      </TablePlayfield>
 
-      <div className={`${tableStyles.actionRail} ${styles.actionRail}`}>
+      <TableActionRail className={styles.actionRail}>
         {view.legal.cut && (
           <button type="button" className="btn-fat" disabled={tableBusy} onClick={props.onCut}>
             Cut the starter
@@ -162,18 +135,15 @@ export function CribbageTableScreen(props: CribbageTableScreenProps) {
             Muggins!
           </button>
         )}
-      </div>
+      </TableActionRail>
 
       <TableMenu
-        open={menuOpen}
-        onClose={() => setMenuOpen(false)}
+        open={menu.isOpen}
+        onClose={menu.close}
         howToPlay={{ doc: cribbageHowToPlay, title: 'Cribbage', subtitle: 'the pegging race' }}
-        onQuit={() => {
-          setMenuOpen(false);
-          props.onQuit?.();
-        }}
+        onQuit={menu.quit}
       />
-    </main>
+    </TableShell>
   );
 }
 
@@ -337,7 +307,7 @@ function LocalHand(
         count={visibleHand.length}
         zone={`hand:${view.localSeat}`}
         label="Your cribbage hand"
-        dealState={props.deal.sequence ? (props.deal.complete ? 'complete' : 'dealing') : undefined}
+        dealState={dealStateAttr(props.deal)}
       >
         <AnimatePresence initial={false} mode="popLayout">
           {visibleHand.map((card, index) => {
@@ -494,27 +464,15 @@ function CribbageFxLayer({
   rootRef: RefObject<HTMLElement | null>;
   localSeat: number;
 }) {
-  const planned = useMemo(() => {
-    try {
-      return { cues: buildFxTimeline(fx), error: null };
-    } catch (error) {
-      return {
-        cues: [] as FxCue[],
-        error: error instanceof Error ? error.message : 'Invalid effect',
-      };
-    }
-  }, [fx]);
-  useFxAnimation(planned.cues, rootRef, fxKey);
   const calls = useMemo(() => cribbageCalls(fx), [fx]);
 
   return (
-    <div className={tableStyles.fxLayer} aria-live="polite">
-      {planned.error && (
-        <div className={tableStyles.fxError}>Animation skipped: {planned.error}</div>
-      )}
-      {planned.cues.map((cue) => (
-        <CribCue key={`${fxKey}:${cue.id}`} cue={cue} localSeat={localSeat} />
-      ))}
+    <TableFxLayer
+      fx={fx}
+      fxKey={fxKey}
+      rootRef={rootRef}
+      renderCue={(cue) => <CribCue cue={cue} localSeat={localSeat} />}
+    >
       {calls.map((call) => (
         <motion.div
           key={`${fxKey}:${call.id}`}
@@ -557,7 +515,7 @@ function CribbageFxLayer({
             ]
           : [],
       )}
-    </div>
+    </TableFxLayer>
   );
 }
 
@@ -572,16 +530,12 @@ function CribCue({ cue, localSeat }: { cue: FxCue; localSeat: number }) {
     cue.type === 'layoff'
   ) {
     return (
-      <div data-fx-cue={cue.id} data-card-flight className={tableStyles.flyingCard}>
-        <i className={tableStyles.cardTrail} />
-        <span data-flight-card className={tableStyles.flightCardVisual}>
-          <PlayingCard
-            card={cue.card}
-            faceDown={cue.type === 'deal' && cue.to !== `hand:${localSeat}`}
-          />
-        </span>
-        <i className={tableStyles.cardGlint} />
-      </div>
+      <TableCardFlight cueId={cue.id}>
+        <PlayingCard
+          card={cue.card}
+          faceDown={cue.type === 'deal' && cue.to !== `hand:${localSeat}`}
+        />
+      </TableCardFlight>
     );
   }
   if (cue.type === 'showdown') {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type RefObject } from 'react';
+import { useRef, useState, type CSSProperties } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { orderedHand, type FxEvent, type MatchResult } from '@parlour/engine';
 import { heartsCatalog } from '@parlour/game-hearts';
@@ -11,11 +11,29 @@ import { useMusicMood } from '@/stores/audio';
 import { HEARTS_HAND_PACE_MS } from '@/lib/hearts/modes';
 import type { HeartsTableView } from '@/lib/hearts/view';
 import { type DealPresentation, useDealPresentation } from '@/lib/table/deal-presentation';
-import { buildFxTimeline, type FxCue } from '@/lib/table/fx-motion';
-import { discardRotation, useFxAnimation, useTableAudio } from '../fx-animation';
+import { type FxCue } from '@/lib/table/fx-motion';
+import { discardRotation, useTableAudio } from '../fx-animation';
 import { HandRail, HandRailCard } from '../HandRail';
 import { TableMenu } from '../TableMenu';
 import { PlayingCard } from '../PlayingCard';
+import {
+  dealStateAttr,
+  OpponentFan,
+  SeatNameplate,
+  TableActionRail,
+  TableCardFlight,
+  TableErrorScreen,
+  TableFxLayer,
+  TableHud,
+  TableLoadingScreen,
+  TablePlayfield,
+  TableShell,
+  TableTitlePill,
+  TableTurnIndicator,
+  TableTurnPop,
+  useGameTextSurface,
+  useTableMenu,
+} from '../shell';
 import { AvatarBadge } from '@/components/AvatarBadge';
 import tableStyles from '@/styles/table.module.css';
 import heartsStyles from '@/styles/hearts.module.css';
@@ -45,7 +63,7 @@ export type HeartsTableScreenProps = {
 export function HeartsTableScreen(props: HeartsTableScreenProps) {
   const { view, error } = props;
   const rootRef = useRef<HTMLElement>(null);
-  const [menuOpen, setMenuOpen] = useState(false);
+  const menu = useTableMenu(props.onQuit);
   // Pass picks are keyed to the fx round: a new deal/wall resets them without
   // an effect (derived state keeps renders cascade-free).
   const [passState, setPassState] = useState<{ key: string; picks: readonly string[] }>({
@@ -72,89 +90,45 @@ export function HeartsTableScreen(props: HeartsTableScreenProps) {
   });
   useMusicMood(tense ? 'tense' : null);
 
-  useEffect(() => {
-    const gameWindow = window as Window & { render_game_to_text?: () => string };
-    const renderGameToText = () =>
-      JSON.stringify({
-        game: 'hearts',
-        status: error ? 'error' : view ? (deal.dealing ? 'dealing' : 'ready') : 'loading',
-        error,
-        localSeat: view?.localSeat ?? null,
-        activeSeat: view?.activeSeat ?? null,
-        decision: view?.decision ?? null,
-        phaseLabel: view?.phaseLabel ?? null,
-        trick: view ? view.trick.map((play) => play.card) : [],
-        ledSuit: view?.ledSuit ?? null,
-        heartsBroken: view?.heartsBroken ?? false,
-        awaitingPass: view?.awaitingPass ?? [],
-        hand: view
-          ? orderedHand(deal.visibleCards(view.hand, view.localSeat), heartsCatalog.handOrder, {
-              jackDiamonds: view.jackDiamonds,
-            })
-          : [],
-        playableCards: deal.dealing ? [] : (view?.playableCards ?? []),
-        scores: view ? Object.fromEntries(view.players.map((p) => [p.seat, p.score])) : {},
-      });
-    gameWindow.render_game_to_text = renderGameToText;
-    return () => {
-      if (gameWindow.render_game_to_text === renderGameToText) {
-        delete gameWindow.render_game_to_text;
-      }
-    };
-  }, [deal, error, view]);
+  useGameTextSurface(() => ({
+    game: 'hearts',
+    status: error ? 'error' : view ? (deal.dealing ? 'dealing' : 'ready') : 'loading',
+    error,
+    localSeat: view?.localSeat ?? null,
+    activeSeat: view?.activeSeat ?? null,
+    decision: view?.decision ?? null,
+    phaseLabel: view?.phaseLabel ?? null,
+    trick: view ? view.trick.map((play) => play.card) : [],
+    ledSuit: view?.ledSuit ?? null,
+    heartsBroken: view?.heartsBroken ?? false,
+    awaitingPass: view?.awaitingPass ?? [],
+    hand: view
+      ? orderedHand(deal.visibleCards(view.hand, view.localSeat), heartsCatalog.handOrder, {
+          jackDiamonds: view.jackDiamonds,
+        })
+      : [],
+    playableCards: deal.dealing ? [] : (view?.playableCards ?? []),
+    scores: view ? Object.fromEntries(view.players.map((p) => [p.seat, p.score])) : {},
+  }));
 
   if (error) {
-    return (
-      <main className={tableStyles.screen}>
-        <div className={`${tableStyles.statusPanel} panel-soft`} role="alert">
-          <strong>The table lost the thread.</strong>
-          <span>{error}</span>
-        </div>
-      </main>
-    );
+    return <TableErrorScreen headline="The table lost the thread." message={error} />;
   }
 
   if (!view) {
-    return (
-      <main className={tableStyles.screen} aria-busy="true">
-        <div className={`${tableStyles.statusPanel} panel-soft`}>
-          <span className={tableStyles.loadingPip} />
-          <strong>Shuffling up…</strong>
-        </div>
-      </main>
-    );
+    return <TableLoadingScreen copy="Shuffling up…" />;
   }
 
   const localBusy = (props.busy ?? false) || deal.dealing;
   const passReady = selectedPass.length === PASS_SIZE;
 
   return (
-    <main
-      ref={rootRef}
-      className={tableStyles.screen}
-      data-table-screen
-      data-deal-state={deal.sequence ? (deal.complete ? 'complete' : 'dealing') : undefined}
-    >
-      <header className={tableStyles.hud}>
-        <div className="pill-soft">
-          <span className={tableStyles.eyebrow}>Hearts</span>
-          <strong>{view.phaseLabel}</strong>
-        </div>
-        <button
-          type="button"
-          className={`${tableStyles.menuButton} btn-fat btn-fat--ghost`}
-          aria-label="Table menu"
-          aria-haspopup="dialog"
-          onClick={() => setMenuOpen(true)}
-        >
-          •••
-        </button>
-      </header>
+    <TableShell rootRef={rootRef} dealState={dealStateAttr(deal)}>
+      <TableHud onOpenMenu={menu.open}>
+        <TableTitlePill eyebrow="Hearts" status={view.phaseLabel} />
+      </TableHud>
 
-      <section className={tableStyles.playfield} aria-label="Hearts table">
-        <div className={tableStyles.feltMark} aria-hidden="true">
-          ♥
-        </div>
+      <TablePlayfield label="Hearts table" feltMark="♥">
         {view.players.map((player) => (
           <Seat
             key={player.seat}
@@ -174,11 +148,11 @@ export function HeartsTableScreen(props: HeartsTableScreenProps) {
           onPlayCard={props.onPlayCard}
           deal={deal}
         />
-        <HeartsFxLayer
+        <TableFxLayer
           fx={props.fx}
           fxKey={props.fxKey}
-          localSeat={view.localSeat}
           rootRef={rootRef}
+          renderCue={(cue) => <Cue cue={cue} localSeat={view.localSeat} />}
         />
         {view.decision === 'pass' && !localBusy && (
           <div
@@ -197,9 +171,9 @@ export function HeartsTableScreen(props: HeartsTableScreenProps) {
             </div>
           </div>
         )}
-      </section>
+      </TablePlayfield>
 
-      <div className={tableStyles.actionRail}>
+      <TableActionRail>
         {view.decision === 'pass' && !localBusy ? (
           <button
             type="button"
@@ -215,28 +189,16 @@ export function HeartsTableScreen(props: HeartsTableScreenProps) {
               : `Pick ${PASS_SIZE - selectedPass.length} more`}
           </button>
         ) : (
-          !localBusy &&
-          view.decision === 'play' && (
-            <span className={tableStyles.turnIndicator} aria-hidden="true">
-              Your turn
-            </span>
-          )
+          !localBusy && view.decision === 'play' && <TableTurnIndicator />
         )}
-      </div>
+      </TableActionRail>
 
       {props.handEnd && (
         <HandEndOverlay info={props.handEnd} players={view.players} onNextHand={props.onNextHand} />
       )}
 
-      <TableMenu
-        open={menuOpen}
-        onClose={() => setMenuOpen(false)}
-        onQuit={() => {
-          setMenuOpen(false);
-          props.onQuit?.();
-        }}
-      />
-    </main>
+      <TableMenu open={menu.isOpen} onClose={menu.close} onQuit={menu.quit} />
+    </TableShell>
   );
 }
 
@@ -252,8 +214,6 @@ function Seat({
   displayCount: number;
 }) {
   const avatar = getAvatar(player.avatarId);
-  const visibleCards = Math.min(displayCount, 6);
-  const fanStep = visibleCards > 1 ? 20 / (visibleCards - 1) : 0;
   const style = { '--seat-accent': avatar.accent, '--seat-shade': avatar.shade } as CSSProperties;
 
   return (
@@ -266,26 +226,19 @@ function Seat({
       transition={{ duration: 0.24, ease: [0.34, 1.56, 0.64, 1] }}
     >
       {!player.isLocal && (
-        <div className={tableStyles.opponentCards} aria-label={`${displayCount} hidden cards`}>
-          {Array.from({ length: visibleCards }, (_, index) => (
-            <PlayingCard
-              key={index}
-              faceDown
-              compact
-              rotation={(index - (visibleCards - 1) / 2) * fanStep}
-            />
-          ))}
-        </div>
+        <OpponentFan
+          count={displayCount}
+          max={6}
+          spread={20}
+          renderCard={({ rotation }) => <PlayingCard faceDown compact rotation={rotation} />}
+        />
       )}
       <AvatarBadge
         avatarId={player.avatarId}
         size="clamp(3rem, 5.4vw, 4.6rem)"
         className={tableStyles.avatar}
       />
-      <div className={tableStyles.nameplate}>
-        <strong>{player.name}</strong>
-        {player.isBot && <small>bot</small>}
-      </div>
+      <SeatNameplate name={player.name} isBot={player.isBot} />
       <span className={heartsStyles.scoreChip} data-score-chip={player.seat}>
         {player.score}
         <small aria-hidden="true">pts</small>
@@ -367,7 +320,7 @@ function LocalHand({
       count={visibleHand.length}
       zone={`hand:${view.localSeat}`}
       label="Your hand"
-      dealState={deal.sequence ? (deal.complete ? 'complete' : 'dealing') : undefined}
+      dealState={dealStateAttr(deal)}
     >
       <AnimatePresence initial={false} mode="popLayout">
         {visibleHand.map((card, index) => {
@@ -395,42 +348,6 @@ function LocalHand({
   );
 }
 
-function HeartsFxLayer({
-  fx,
-  fxKey,
-  localSeat,
-  rootRef,
-}: {
-  fx: readonly FxEvent[];
-  fxKey: string | number;
-  localSeat: number;
-  rootRef: RefObject<HTMLElement | null>;
-}) {
-  const planned = useMemo(() => {
-    try {
-      return { cues: buildFxTimeline(fx), error: null as string | null };
-    } catch (caught) {
-      return {
-        cues: [] as FxCue[],
-        error: caught instanceof Error ? caught.message : 'Invalid table effect',
-      };
-    }
-  }, [fx]);
-
-  useFxAnimation(planned.cues, rootRef, fxKey);
-
-  return (
-    <div className={tableStyles.fxLayer} aria-live="polite">
-      {planned.error && (
-        <div className={tableStyles.fxError}>Animation skipped: {planned.error}</div>
-      )}
-      {planned.cues.map((cue) => (
-        <Cue key={`${fxKey}:${cue.id}`} cue={cue} localSeat={localSeat} />
-      ))}
-    </div>
-  );
-}
-
 function Cue({ cue, localSeat }: { cue: FxCue; localSeat: number }) {
   if (
     cue.type === 'deal' ||
@@ -445,13 +362,9 @@ function Cue({ cue, localSeat }: { cue: FxCue; localSeat: number }) {
       (cue.type === 'draw' && cue.to !== `hand:${localSeat}`) ||
       (cue.type === 'transfer' && cue.to !== `hand:${localSeat}`);
     return (
-      <div data-fx-cue={cue.id} data-card-flight className={tableStyles.flyingCard}>
-        <i className={tableStyles.cardTrail} />
-        <span data-flight-card className={tableStyles.flightCardVisual}>
-          <PlayingCard card={cue.card} faceDown={faceDown} />
-        </span>
-        <i className={tableStyles.cardGlint} />
-      </div>
+      <TableCardFlight cueId={cue.id}>
+        <PlayingCard card={cue.card} faceDown={faceDown} />
+      </TableCardFlight>
     );
   }
   if (cue.type === 'knock') {
@@ -478,7 +391,7 @@ function Cue({ cue, localSeat }: { cue: FxCue; localSeat: number }) {
     );
   }
   if (cue.type === 'turn') {
-    return <span data-fx-cue={cue.id} data-seat-burst={cue.seat} className={tableStyles.turnPop} />;
+    return <TableTurnPop cueId={cue.id} seat={cue.seat} />;
   }
   return null;
 }

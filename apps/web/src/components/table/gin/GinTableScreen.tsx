@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type RefObject } from 'react';
+import { useRef, type CSSProperties } from 'react';
 import { orderedHand, type FxEvent } from '@parlour/engine';
 import { AnimatePresence, motion } from 'motion/react';
 import { ginCatalog, ginHowToPlay } from '@parlour/game-gin';
@@ -11,13 +11,34 @@ import type { GinSeatView, GinTableView } from '@/lib/gin/view';
 import { useMatchTension } from '@/lib/audio/tension';
 import { useMusicMood } from '@/stores/audio';
 import { type DealPresentation, useDealPresentation } from '@/lib/table/deal-presentation';
-import { buildFxTimeline, type FxCue } from '@/lib/table/fx-motion';
+import { type FxCue } from '@/lib/table/fx-motion';
 import styles from '@/styles/table.module.css';
 import ginStyles from '@/styles/gin.module.css';
-import { discardRotation, useFxAnimation, useTableAudio } from '../fx-animation';
+import { discardRotation, useTableAudio } from '../fx-animation';
 import { HandRail, HandRailCard } from '../HandRail';
 import { PlayingCard } from '../PlayingCard';
 import { TableMenu } from '../TableMenu';
+import {
+  dealStateAttr,
+  DiscardPileButton,
+  OpponentFan,
+  SeatNameplate,
+  StockPile,
+  TableActionRail,
+  TableCardFlight,
+  TableErrorScreen,
+  TableFxLayer,
+  TableHud,
+  TableLoadingScreen,
+  TablePiles,
+  TablePlayfield,
+  TableShell,
+  TableTitlePill,
+  TableTurnIndicator,
+  TableTurnPop,
+  useGameTextSurface,
+  useTableMenu,
+} from '../shell';
 import { AvatarBadge } from '@/components/AvatarBadge';
 
 const BURST_LABEL: Record<string, string> = {
@@ -54,7 +75,7 @@ export type GinTableScreenProps = {
 export function GinTableScreen(props: GinTableScreenProps) {
   const { view, error } = props;
   const rootRef = useRef<HTMLElement>(null);
-  const [menuOpen, setMenuOpen] = useState(false);
+  const menu = useTableMenu(props.onQuit);
   const deal = useDealPresentation(props.fx, props.fxKey);
   useTableAudio(props.fx, props.fxKey, GIN_SFX_PACK.id);
 
@@ -66,63 +87,37 @@ export function GinTableScreen(props: GinTableScreenProps) {
   });
   useMusicMood(tense ? 'tense' : null);
 
-  useEffect(() => {
-    const gameWindow = window as Window & { render_game_to_text?: () => string };
-    const renderGameToText = () =>
-      JSON.stringify({
-        coordinateSystem: 'CSS pixels; origin is top-left, x grows right, y grows down',
-        game: 'gin',
-        status: error ? 'error' : view ? (deal.dealing ? 'dealing' : 'ready') : 'loading',
-        error,
-        handNumber: view?.handNumber ?? null,
-        activeSeat: view?.activeSeat ?? null,
-        decision: view?.decision ?? null,
-        stockCount: view ? view.stockCount + deal.pendingStockCards : null,
-        discardTop: view && deal.discardReady ? view.discard.at(-1) : null,
-        hand: (() => {
-          const local = view?.players.find((player) => player.isLocal);
-          return view && local
-            ? orderedHand(deal.visibleCards(view.hand, local.seat), ginCatalog.handOrder)
-            : [];
-        })(),
-        deadwood: deal.dealing ? null : (view?.deadwood ?? null),
-        canKnock: view?.canKnock ?? false,
-        legal: deal.dealing ? null : (view?.legal ?? null),
-        scores: view ? view.players.map((p) => ({ seat: p.seat, score: p.score })) : [],
-        handEnd: view?.handEnd
-          ? { reason: view.handEnd.reason, points: view.handEnd.points }
-          : null,
-        matchOver: view?.matchOver ?? false,
-        activeFx: props.fx.map(({ kind, at }) => ({ kind, at: at ?? 0 })),
-      });
-    gameWindow.render_game_to_text = renderGameToText;
-    return () => {
-      if (gameWindow.render_game_to_text === renderGameToText) {
-        delete gameWindow.render_game_to_text;
-      }
-    };
-  }, [deal, error, props.fx, view]);
+  useGameTextSurface(() => ({
+    coordinateSystem: 'CSS pixels; origin is top-left, x grows right, y grows down',
+    game: 'gin',
+    status: error ? 'error' : view ? (deal.dealing ? 'dealing' : 'ready') : 'loading',
+    error,
+    handNumber: view?.handNumber ?? null,
+    activeSeat: view?.activeSeat ?? null,
+    decision: view?.decision ?? null,
+    stockCount: view ? view.stockCount + deal.pendingStockCards : null,
+    discardTop: view && deal.discardReady ? view.discard.at(-1) : null,
+    hand: (() => {
+      const local = view?.players.find((player) => player.isLocal);
+      return view && local
+        ? orderedHand(deal.visibleCards(view.hand, local.seat), ginCatalog.handOrder)
+        : [];
+    })(),
+    deadwood: deal.dealing ? null : (view?.deadwood ?? null),
+    canKnock: view?.canKnock ?? false,
+    legal: deal.dealing ? null : (view?.legal ?? null),
+    scores: view ? view.players.map((p) => ({ seat: p.seat, score: p.score })) : [],
+    handEnd: view?.handEnd ? { reason: view.handEnd.reason, points: view.handEnd.points } : null,
+    matchOver: view?.matchOver ?? false,
+    activeFx: props.fx.map(({ kind, at }) => ({ kind, at: at ?? 0 })),
+  }));
 
   if (error) {
-    return (
-      <main className={styles.screen}>
-        <div className={`${styles.statusPanel} panel-soft`} role="alert">
-          <strong>The table lost the thread.</strong>
-          <span>{error}</span>
-        </div>
-      </main>
-    );
+    return <TableErrorScreen headline="The table lost the thread." message={error} />;
   }
 
   if (!view) {
-    return (
-      <main className={styles.screen} aria-busy="true">
-        <div className={`${styles.statusPanel} panel-soft`}>
-          <span className={styles.loadingPip} />
-          <strong>Shuffling up…</strong>
-        </div>
-      </main>
-    );
+    return <TableLoadingScreen copy="Shuffling up…" />;
   }
 
   const busy = (props.busy ?? false) || deal.dealing;
@@ -130,36 +125,17 @@ export function GinTableScreen(props: GinTableScreenProps) {
   const meldedSet = new Set(view.meldPreview.flatMap((meld) => meld.cards));
 
   return (
-    <main
-      ref={rootRef}
-      className={styles.screen}
-      data-table-screen
-      data-deal-state={deal.sequence ? (deal.complete ? 'complete' : 'dealing') : undefined}
-    >
-      <header className={styles.hud}>
-        <div className="pill-soft flex items-center gap-2">
-          <span className={styles.eyebrow}>Gin</span>
-          <strong>{view.phaseLabel}</strong>
+    <TableShell rootRef={rootRef} dealState={dealStateAttr(deal)}>
+      <TableHud onOpenMenu={menu.open}>
+        <TableTitlePill eyebrow="Gin" status={view.phaseLabel} className="flex items-center gap-2">
           <span aria-label="Scores" className="text-xs font-bold text-dusk-100/80">
             {view.players.map((player) => `${player.name} ${player.score}`).join(' · ')}
             <span className="text-dusk-200/70"> → {view.matchTarget}</span>
           </span>
-        </div>
-        <button
-          type="button"
-          className={`${styles.menuButton} btn-fat btn-fat--ghost`}
-          aria-label="Table menu"
-          aria-haspopup="dialog"
-          onClick={() => setMenuOpen(true)}
-        >
-          •••
-        </button>
-      </header>
+        </TableTitlePill>
+      </TableHud>
 
-      <section className={styles.playfield} aria-label="Gin table">
-        <div className={styles.feltMark} aria-hidden="true">
-          ♣
-        </div>
+      <TablePlayfield label="Gin table" feltMark="♣">
         {opponent && (
           <Seat
             player={opponent}
@@ -192,16 +168,16 @@ export function GinTableScreen(props: GinTableScreenProps) {
             <strong>{view.handEnd ? '—' : (view.deadwood ?? '—')}</strong>
           </output>
         </div>
-        <GinFxLayer
+        <TableFxLayer
           fx={props.fx}
           fxKey={props.fxKey}
           rootRef={rootRef}
-          localSeat={view.localSeat}
+          renderCue={(cue) => <Cue cue={cue} localSeat={view.localSeat} />}
         />
-      </section>
+      </TablePlayfield>
 
       {!view.handEnd && (
-        <div className={styles.actionRail}>
+        <TableActionRail>
           <button
             type="button"
             className="btn-fat"
@@ -210,7 +186,7 @@ export function GinTableScreen(props: GinTableScreenProps) {
           >
             Knock
           </button>
-        </div>
+        </TableActionRail>
       )}
 
       {view.handEnd && !view.matchOver && (
@@ -222,15 +198,12 @@ export function GinTableScreen(props: GinTableScreenProps) {
       )}
 
       <TableMenu
-        open={menuOpen}
-        onClose={() => setMenuOpen(false)}
+        open={menu.isOpen}
+        onClose={menu.close}
         howToPlay={{ doc: ginHowToPlay, title: 'Gin', subtitle: 'the rummy classic' }}
-        onQuit={() => {
-          setMenuOpen(false);
-          props.onQuit?.();
-        }}
+        onQuit={menu.quit}
       />
-    </main>
+    </TableShell>
   );
 }
 
@@ -244,8 +217,6 @@ function Seat({
   displayCount: number;
 }) {
   const avatar = getAvatar(player.avatarId);
-  const visibleCards = Math.min(displayCount, 6);
-  const fanStep = visibleCards > 1 ? 20 / (visibleCards - 1) : 0;
   const style = { '--seat-accent': avatar.accent, '--seat-shade': avatar.shade } as CSSProperties;
 
   return (
@@ -257,28 +228,26 @@ function Seat({
       animate={active ? { scale: [1, 1.06, 1.02] } : { scale: 1 }}
       transition={{ duration: 0.24, ease: [0.34, 1.56, 0.64, 1] }}
     >
-      <div className={styles.opponentCards} aria-label={`${displayCount} hidden cards`}>
-        {Array.from({ length: visibleCards }, (_, index) => (
-          <PlayingCard
-            key={index}
-            compact
-            faceDown
-            rotation={(index - (visibleCards - 1) / 2) * fanStep}
-          />
-        ))}
-      </div>
+      <OpponentFan
+        count={displayCount}
+        max={6}
+        spread={20}
+        renderCard={({ rotation }) => <PlayingCard compact faceDown rotation={rotation} />}
+      />
       <AvatarBadge
         avatarId={player.avatarId}
         size="clamp(3.2rem, 5.6vw, 4.8rem)"
         className={styles.avatar}
       />
-      <div className={styles.nameplate}>
-        <strong>
-          {player.name}
-          {player.dealer ? ' · dealer' : ''}
-        </strong>
-        {player.isBot && <small>bot</small>}
-      </div>
+      <SeatNameplate
+        name={
+          <>
+            {player.name}
+            {player.dealer ? ' · dealer' : ''}
+          </>
+        }
+        isBot={player.isBot}
+      />
       <span className={tableScoreStyles()} aria-label={`Score ${player.score}`}>
         {player.score}
       </span>
@@ -311,32 +280,20 @@ function Piles({
   const optionLive = view.decision === 'option' && !busy;
   const upcardFace = visibleDiscard.at(-1);
   return (
-    <div className={styles.piles} data-local-turn={!busy && view.decision !== null}>
-      {!busy && view.decision !== null && (
-        <span className={styles.turnIndicator} aria-hidden="true">
-          Your turn
-        </span>
-      )}
-      <button
-        type="button"
-        data-zone="stock"
-        className={styles.pileButton}
+    <TablePiles localTurn={!busy && view.decision !== null}>
+      {!busy && view.decision !== null && <TableTurnIndicator />}
+      <StockPile
+        count={stockCount}
         disabled={!view.legal.drawStock || busy}
         onClick={() => onDraw?.('stock')}
-        aria-label={`Draw from stock, ${stockCount} cards remain`}
-      >
-        <PlayingCard faceDown />
-        <span className={styles.pileCount}>{stockCount}</span>
-      </button>
-      <button
-        type="button"
-        data-zone="discard"
-        className={`${styles.pileButton} ${styles.discardPile}`}
+        card={<PlayingCard faceDown />}
+      />
+      <DiscardPileButton
         disabled={
           optionLive ? false : !view.legal.drawDiscard || busy || visibleDiscard.length === 0
         }
         onClick={() => (optionLive ? onTakeUpcard?.() : onDraw?.('discard'))}
-        aria-label={optionLive ? `Take the ${upcardFace ?? 'upcard'}` : 'Draw from discard'}
+        label={optionLive ? `Take the ${upcardFace ?? 'upcard'}` : 'Draw from discard'}
       >
         {visibleDiscard.map((card, index) => (
           <PlayingCard
@@ -345,7 +302,7 @@ function Piles({
             rotation={discardRotation(card, index)}
           />
         ))}
-      </button>
+      </DiscardPileButton>
       {optionLive && (
         <div
           className={`${ginStyles.optionBanner} panel-soft`}
@@ -361,7 +318,7 @@ function Piles({
           </button>
         </div>
       )}
-    </div>
+    </TablePiles>
   );
 }
 
@@ -388,7 +345,7 @@ function LocalHand({
       count={visibleHand.length}
       zone={`hand:${view.localSeat}`}
       label="Your hand"
-      dealState={deal.sequence ? (deal.complete ? 'complete' : 'dealing') : undefined}
+      dealState={dealStateAttr(deal)}
     >
       <AnimatePresence initial={false} mode="popLayout">
         {visibleHand.map((card, index) => {
@@ -506,66 +463,24 @@ function MeldRow({ melds }: { melds: readonly { kind: string; cards: readonly st
   );
 }
 
-function GinFxLayer({
-  fx,
-  fxKey,
-  rootRef,
-  localSeat,
-}: {
-  fx: readonly FxEvent[];
-  fxKey: string | number;
-  rootRef: RefObject<HTMLElement | null>;
-  localSeat: number;
-}) {
-  const planned = useMemo(() => {
-    try {
-      return { cues: buildFxTimeline(fx), error: null };
-    } catch (error) {
-      return {
-        cues: [] as FxCue[],
-        error: error instanceof Error ? error.message : 'Invalid table effect',
-      };
-    }
-  }, [fx]);
-
-  useFxAnimation(planned.cues, rootRef, fxKey);
-
-  return (
-    <div className={styles.fxLayer} aria-live="polite">
-      {planned.error && <div className={styles.fxError}>Animation skipped: {planned.error}</div>}
-      {planned.cues.map((cue) => (
-        <Cue key={`${fxKey}:${cue.id}`} cue={cue} localSeat={localSeat} />
-      ))}
-    </div>
-  );
-}
-
 function Cue({ cue, localSeat }: { cue: FxCue; localSeat: number }) {
   if (cue.type === 'deal' || cue.type === 'flip' || cue.type === 'draw') {
     const faceDown = cue.type === 'deal' && cue.to !== `hand:${localSeat}` && cue.to !== 'discard';
     return (
-      <div data-fx-cue={cue.id} data-card-flight className={styles.flyingCard}>
-        <i className={styles.cardTrail} />
-        <span data-flight-card className={styles.flightCardVisual}>
-          <PlayingCard
-            card={cue.card}
-            faceDown={faceDown || (cue.type === 'draw' && cue.to !== `hand:${localSeat}`)}
-          />
-        </span>
-        <i className={styles.cardGlint} />
-      </div>
+      <TableCardFlight cueId={cue.id}>
+        <PlayingCard
+          card={cue.card}
+          faceDown={faceDown || (cue.type === 'draw' && cue.to !== `hand:${localSeat}`)}
+        />
+      </TableCardFlight>
     );
   }
 
   if (cue.type === 'discard' || cue.type === 'layoff') {
     return (
-      <div data-fx-cue={cue.id} data-card-flight className={styles.flyingCard}>
-        <i className={styles.cardTrail} />
-        <span data-flight-card className={styles.flightCardVisual}>
-          <PlayingCard card={cue.card} faceDown={false} />
-        </span>
-        <i className={styles.cardGlint} />
-      </div>
+      <TableCardFlight cueId={cue.id}>
+        <PlayingCard card={cue.card} faceDown={false} />
+      </TableCardFlight>
     );
   }
 
@@ -602,7 +517,7 @@ function Cue({ cue, localSeat }: { cue: FxCue; localSeat: number }) {
   }
 
   if (cue.type === 'turn') {
-    return <span data-fx-cue={cue.id} data-seat-burst={cue.seat} className={styles.turnPop} />;
+    return <TableTurnPop cueId={cue.id} seat={cue.seat} />;
   }
   return null;
 }

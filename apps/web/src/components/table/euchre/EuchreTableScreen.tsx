@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type RefObject } from 'react';
+import { useMemo, useRef, useState, type CSSProperties, type RefObject } from 'react';
 import { orderedHand, type FxEvent } from '@parlour/engine';
 import { euchreCatalog, type EuchreSuit } from '@parlour/game-euchre';
 import { AnimatePresence } from 'motion/react';
@@ -10,12 +10,27 @@ import { useMatchTension } from '@/lib/audio/tension';
 import { EUCHRE_MATCH_PACE_MS } from '@/lib/euchre/modes';
 import { useMusicMood } from '@/stores/audio';
 import { type DealPresentation, useDealPresentation } from '@/lib/table/deal-presentation';
-import { buildFxTimeline } from '@/lib/table/fx-motion';
 import { suitName as suitLabel, type EuchreTableView } from '@/lib/euchre/view';
-import { useFxAnimation, useTableAudio } from '../fx-animation';
+import { useTableAudio } from '../fx-animation';
 import { HandRail, HandRailCard } from '../HandRail';
 import { PlayingCard } from '../PlayingCard';
 import { TableMenu } from '../TableMenu';
+import {
+  dealStateAttr,
+  OpponentFan,
+  SeatNameplate,
+  TableCardFlight,
+  TableErrorScreen,
+  TableFxLayer,
+  TableHud,
+  TableLoadingScreen,
+  TablePlayfield,
+  TableShell,
+  TableTitlePill,
+  TableTurnPop,
+  useGameTextSurface,
+  useTableMenu,
+} from '../shell';
 import { AvatarBadge } from '@/components/AvatarBadge';
 import { EUCHRE_SUIT_META, EuchreFxLayer } from './fx-layer';
 import tableStyles from '@/styles/table.module.css';
@@ -44,7 +59,7 @@ export type EuchreTableScreenProps = {
 export function EuchreTableScreen(props: EuchreTableScreenProps) {
   const { view, error } = props;
   const rootRef = useRef<HTMLElement>(null);
-  const [menuOpen, setMenuOpen] = useState(false);
+  const menu = useTableMenu(props.onQuit);
   const [alonePending, setAlonePending] = useState(false);
   const clearAlone = () => setAlonePending(false);
   const deal = useDealPresentation(props.fx, props.fxKey);
@@ -56,92 +71,48 @@ export function EuchreTableScreen(props: EuchreTableScreenProps) {
   });
   useMusicMood(tense ? 'tense' : null);
 
-  useEffect(() => {
-    const gameWindow = window as Window & { render_game_to_text?: () => string };
-    const renderGameToText = () =>
-      JSON.stringify({
-        game: 'euchre',
-        status: error ? 'error' : view ? (deal.dealing ? 'dealing' : 'ready') : 'loading',
-        error,
-        localSeat: view?.localSeat ?? null,
-        activeSeat: view?.activeSeat ?? null,
-        stage: view?.stageLabel ?? null,
-        decision: view?.decision ?? null,
-        trump: view?.trump ?? null,
-        scores: view?.scores ?? null,
-        handNo: view?.handNo ?? null,
-        tricksPlayed: view?.tricksPlayed ?? null,
-        upcard: deal.dealing ? null : (view?.upcard ?? null),
-        hand: view
-          ? orderedHand(deal.visibleCards(view.hand, view.localSeat), euchreCatalog.handOrder, {
-              trump: view.trump,
-            })
-          : [],
-        legalCards: deal.dealing ? [] : (view?.legalCards ?? []),
-      });
-    gameWindow.render_game_to_text = renderGameToText;
-    return () => {
-      if (gameWindow.render_game_to_text === renderGameToText) {
-        delete gameWindow.render_game_to_text;
-      }
-    };
-  }, [deal, error, view]);
+  useGameTextSurface(() => ({
+    game: 'euchre',
+    status: error ? 'error' : view ? (deal.dealing ? 'dealing' : 'ready') : 'loading',
+    error,
+    localSeat: view?.localSeat ?? null,
+    activeSeat: view?.activeSeat ?? null,
+    stage: view?.stageLabel ?? null,
+    decision: view?.decision ?? null,
+    trump: view?.trump ?? null,
+    scores: view?.scores ?? null,
+    handNo: view?.handNo ?? null,
+    tricksPlayed: view?.tricksPlayed ?? null,
+    upcard: deal.dealing ? null : (view?.upcard ?? null),
+    hand: view
+      ? orderedHand(deal.visibleCards(view.hand, view.localSeat), euchreCatalog.handOrder, {
+          trump: view.trump,
+        })
+      : [],
+    legalCards: deal.dealing ? [] : (view?.legalCards ?? []),
+  }));
 
   if (error) {
-    return (
-      <main className={tableStyles.screen}>
-        <div className={`${tableStyles.statusPanel} panel-soft`} role="alert">
-          <strong>The table lost the thread.</strong>
-          <span>{error}</span>
-        </div>
-      </main>
-    );
+    return <TableErrorScreen headline="The table lost the thread." message={error} />;
   }
 
   if (!view) {
-    return (
-      <main className={tableStyles.screen} aria-busy="true">
-        <div className={`${tableStyles.statusPanel} panel-soft`}>
-          <span className={tableStyles.loadingPip} />
-          <strong>Dealing the first hand…</strong>
-        </div>
-      </main>
-    );
+    return <TableLoadingScreen copy="Dealing the first hand…" />;
   }
 
   const localBusy = (props.busy ?? false) || deal.dealing;
   const partner = view.players.find((player) => player.seat === (view.localSeat + 2) % 4);
 
   return (
-    <main
-      ref={rootRef}
-      className={tableStyles.screen}
-      data-table-screen
-      data-deal-state={deal.sequence ? (deal.complete ? 'complete' : 'dealing') : undefined}
-    >
-      <header className={tableStyles.hud}>
+    <TableShell rootRef={rootRef} dealState={dealStateAttr(deal)}>
+      <TableHud onOpenMenu={menu.open}>
         <section className={styles.hudCluster}>
-          <div className="pill-soft">
-            <span className={tableStyles.eyebrow}>Euchre</span>
-            <strong>{view.stageLabel}</strong>
-          </div>
+          <TableTitlePill eyebrow="Euchre" status={view.stageLabel} />
           <TeamScores view={view} />
         </section>
-        <button
-          type="button"
-          className={`${tableStyles.menuButton} btn-fat btn-fat--ghost`}
-          aria-label="Table menu"
-          aria-haspopup="dialog"
-          onClick={() => setMenuOpen(true)}
-        >
-          •••
-        </button>
-      </header>
+      </TableHud>
 
-      <section className={tableStyles.playfield} aria-label="Euchre table">
-        <div className={tableStyles.feltMark} aria-hidden="true">
-          E
-        </div>
+      <TablePlayfield label="Euchre table" feltMark="E">
         {view.trump && (
           <div
             className={styles.trumpBadge}
@@ -208,17 +179,10 @@ export function EuchreTableScreen(props: EuchreTableScreenProps) {
             }}
           />
         )}
-      </section>
+      </TablePlayfield>
 
-      <TableMenu
-        open={menuOpen}
-        onClose={() => setMenuOpen(false)}
-        onQuit={() => {
-          setMenuOpen(false);
-          props.onQuit?.();
-        }}
-      />
-    </main>
+      <TableMenu open={menu.isOpen} onClose={menu.close} onQuit={menu.quit} />
+    </TableShell>
   );
 }
 
@@ -262,8 +226,6 @@ function Seat({
   displayCount: number;
 }) {
   const avatar = getAvatar(player.avatarId);
-  const visibleCards = Math.min(displayCount, 6);
-  const fanStep = visibleCards > 1 ? 22 / (visibleCards - 1) : 0;
   const style = {
     '--seat-accent': avatar.accent,
     '--seat-shade': avatar.shade,
@@ -280,26 +242,19 @@ function Seat({
       data-team={player.team}
     >
       {!player.isLocal && (
-        <div className={tableStyles.opponentCards} aria-label={`${displayCount} hidden cards`}>
-          {Array.from({ length: visibleCards }, (_, index) => (
-            <PlayingCard
-              key={index}
-              faceDown
-              compact
-              rotation={(index - (Math.max(visibleCards, 1) - 1) / 2) * fanStep}
-            />
-          ))}
-        </div>
+        <OpponentFan
+          count={displayCount}
+          max={6}
+          spread={22}
+          renderCard={({ rotation }) => <PlayingCard faceDown compact rotation={rotation} />}
+        />
       )}
       <AvatarBadge
         avatarId={player.avatarId}
         size="clamp(3.2rem, 5.6vw, 4.8rem)"
         className={tableStyles.avatar}
       />
-      <div className={tableStyles.nameplate}>
-        <strong>{player.name}</strong>
-        {player.isBot && <small>bot</small>}
-      </div>
+      <SeatNameplate name={player.name} isBot={player.isBot} />
       {player.isDealer && <span className={styles.dealerChip}>dealer</span>}
       {player.isSittingOut && <small className="sr-only">sitting out</small>}
     </div>
@@ -368,7 +323,7 @@ function LocalHand({
       count={visibleHand.length}
       zone={`hand:${view.localSeat}`}
       label="Your hand"
-      dealState={deal.sequence ? (deal.complete ? 'complete' : 'dealing') : undefined}
+      dealState={dealStateAttr(deal)}
     >
       <AnimatePresence initial={false} mode="popLayout">
         {visibleHand.map((card, index) => {
@@ -517,57 +472,37 @@ function SharedCueLayer({
   localSeat: number;
   rootRef: RefObject<HTMLElement | null>;
 }) {
-  const planned = useMemo(() => buildFxTimeline(fx), [fx]);
-  useFxAnimation(planned, rootRef, fxKey);
   return (
-    <div className={tableStyles.fxLayer} aria-hidden="true">
-      {planned
-        .filter((cue) => cue.type === 'deal' || cue.type === 'flip' || cue.type === 'turn')
-        .map((cue) => {
-          if (cue.type === 'deal') {
-            const faceDown = cue.to !== `hand:${localSeat}` && cue.to !== 'discard';
-            return (
-              <div
-                key={`${fxKey}:${cue.id}`}
-                data-fx-cue={cue.id}
-                className={tableStyles.flyingCard}
-              >
-                <i className={tableStyles.cardTrail} />
-                <span data-flight-card className={tableStyles.flightCardVisual}>
-                  <PlayingCard
-                    card={faceDown ? undefined : cue.card}
-                    faceDown={faceDown && cue.card !== ''}
-                  />
-                </span>
-                <i className={tableStyles.cardGlint} />
-              </div>
-            );
-          }
-          if (cue.type === 'flip') {
-            return (
-              <div
-                key={`${fxKey}:${cue.id}`}
-                data-fx-cue={cue.id}
-                className={tableStyles.flyingCard}
-              >
-                <i className={tableStyles.cardTrail} />
-                <span data-flight-card className={tableStyles.flightCardVisual}>
-                  <PlayingCard card={cue.card} />
-                </span>
-                <i className={tableStyles.cardGlint} />
-              </div>
-            );
-          }
+    <TableFxLayer
+      fx={fx}
+      fxKey={fxKey}
+      rootRef={rootRef}
+      presentation="hidden"
+      renderCue={(cue) => {
+        if (cue.type === 'deal') {
+          const faceDown = cue.to !== `hand:${localSeat}` && cue.to !== 'discard';
           return (
-            <span
-              key={`${fxKey}:${cue.id}`}
-              data-fx-cue={cue.id}
-              data-seat-burst={cue.seat}
-              className={tableStyles.turnPop}
-            />
+            <TableCardFlight cueId={cue.id}>
+              <PlayingCard
+                card={faceDown ? undefined : cue.card}
+                faceDown={faceDown && cue.card !== ''}
+              />
+            </TableCardFlight>
           );
-        })}
-    </div>
+        }
+        if (cue.type === 'flip') {
+          return (
+            <TableCardFlight cueId={cue.id}>
+              <PlayingCard card={cue.card} />
+            </TableCardFlight>
+          );
+        }
+        if (cue.type === 'turn') {
+          return <TableTurnPop cueId={cue.id} seat={cue.seat} />;
+        }
+        return null;
+      }}
+    />
   );
 }
 
