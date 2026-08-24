@@ -37,3 +37,4 @@ export {
   type PersonaDef,
 } from './bots/personas';
 export { runBalanceGates, DEFAULT_THRESHOLDS, type GateReport } from './sim/gates';
+export { euchreCatalog } from './catalog';

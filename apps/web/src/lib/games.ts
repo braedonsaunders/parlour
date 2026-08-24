@@ -1,85 +1,59 @@
-import type { HowToPlayDoc } from '@parlour/engine';
-import { blitzHowToPlay } from '@parlour/game-blitz';
-import { euchreHowToPlay } from '@parlour/game-euchre';
-import { wildpileHowToPlay } from '@parlour/game-wildpile';
-
-export type GameId = 'blitz' | 'wild' | 'euchre';
-
-export type GamePreviewKind = 'blitz-fan' | 'wild-fan' | 'euchre-fan';
-
-export interface GameDef {
-  id: GameId;
-  name: string;
-  subtitle: string;
-  tagline: string;
-  description: string;
-  facts: readonly string[];
-  accent: string;
-  shade: string;
-  preview: GamePreviewKind;
-  /** Route choosing this game leads to; null while the game is still on the shelf. */
-  href: string | null;
-  /** The pack's own instructions, rendered verbatim by the help sheet. */
-  howToPlay: HowToPlayDoc;
-}
+import { modePreset, type GameCatalogEntry, type GameMode } from '@parlour/engine';
+import { blitzCatalog } from '@parlour/game-blitz';
+import { euchreCatalog } from '@parlour/game-euchre';
+import { wildpileCatalog } from '@parlour/game-wildpile';
 
 /**
- * The parlour shelf — every game the engine hosts. Both games support local
- * bots and friend rooms through the shared multiplayer transport.
+ * The parlour shelf.
+ *
+ * Every picker screen — game select, mode select, seat counts, the rules sheet,
+ * and the generated settings panel — reads from this registry, and each entry
+ * is owned by the game pack that it describes. Shipping a new game is:
+ *
+ *   1. export a `GameCatalogEntry` from the pack (copy the shape from
+ *      `packages/game-blitz/src/catalog.ts`), then
+ *   2. add it to `SHELF` below and add its `id` to `GameId`.
+ *
+ * The picker screens themselves need no changes. `GameId` stays an explicit
+ * union because saved match history is keyed on it — a typo there would
+ * silently orphan someone's results rather than fail the build.
  */
-export const GAMES: readonly GameDef[] = [
-  {
-    id: 'blitz',
-    name: 'Blitz',
-    subtitle: 'the 31 game',
-    tagline: 'Chase thirty-one',
-    description:
-      'Draw, swap, and knock your way to 31 in one suit. Three match formats, sly bots, and one very loud celebration.',
-    facts: ['2–4 players', 'classic · fast · timed', 'solo or friends'],
-    accent: '#e29349',
-    shade: '#96471c',
-    preview: 'blitz-fan',
-    href: '/play',
-    howToPlay: blitzHowToPlay,
-  },
-  {
-    id: 'wild',
-    name: 'Wild',
-    subtitle: 'the shedding game',
-    tagline: 'Shed every card',
-    description:
-      'A 108-card riot of skips, reverses, draw-fours and jump-ins. Same warm table, a much louder deck.',
-    facts: ['2–4 players', 'action cards', 'solo or friends'],
-    accent: '#c8566b',
-    shade: '#7c2c3e',
-    preview: 'wild-fan',
-    href: '/wild',
-    howToPlay: wildpileHowToPlay,
-  },
-  {
-    id: 'euchre',
-    name: 'Euchre',
-    subtitle: 'the partner game',
-    tagline: 'Take tricks for your team',
-    description:
-      'Order it up, name your trump, and chase bowers with the player across the table. First team to ten takes the match.',
-    facts: ['4 players · 2v2', 'trick-taking', 'solo or friends'],
-    accent: '#5fae7b',
-    shade: '#2f6b48',
-    preview: 'euchre-fan',
-    href: '/euchre',
-    howToPlay: euchreHowToPlay,
-  },
+export type GameId = 'blitz' | 'wild' | 'euchre';
+
+const SHELF: readonly GameCatalogEntry[] = [
+  blitzCatalog as GameCatalogEntry,
+  wildpileCatalog as GameCatalogEntry,
+  euchreCatalog as GameCatalogEntry,
 ];
 
-const BY_ID = new Map(GAMES.map((game) => [game.id, game]));
+export type { GameCatalogEntry, GameMode };
+export { modePreset };
 
-export function getGame(id: GameId): GameDef {
+export const GAMES = SHELF;
+
+const BY_ID = new Map(SHELF.map((game) => [game.id, game]));
+
+export function getGame(id: string): GameCatalogEntry {
   const game = BY_ID.get(id);
   if (!game) throw new Error(`unknown game id: ${id}`);
   return game;
 }
 
 export function isGameId(value: unknown): value is GameId {
-  return typeof value === 'string' && BY_ID.has(value as GameId);
+  return typeof value === 'string' && BY_ID.has(value);
+}
+
+/** Every mode a game offers, in the order its pack lists them. */
+export function gameModes(id: string): readonly GameMode[] {
+  return getGame(id).modes;
+}
+
+export function getGameMode(gameId: string, modeId: string): GameMode {
+  const mode = getGame(gameId).modes.find((candidate) => candidate.id === modeId);
+  if (!mode) throw new Error(`unknown ${gameId} mode id: ${modeId}`);
+  return mode;
+}
+
+export function isGameModeId(gameId: string, value: unknown): boolean {
+  return typeof value === 'string' && getGame(gameId).modes.some((mode) => mode.id === value);
 }
