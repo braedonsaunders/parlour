@@ -10,7 +10,10 @@ export const blitzHowToPlay: HowToPlayDoc = {
       heading: 'Your turn',
       body: ['You get two actions:'],
       bullets: [
-        { label: 'Draw', text: 'take the top card of the stock, or swipe the top of the discard pile' },
+        {
+          label: 'Draw',
+          text: 'take the top card of the stock, or swipe the top of the discard pile',
+        },
         { label: 'Discard', text: 'slide one card from your hand face-up onto the pile' },
       ],
     },
@@ -40,12 +43,17 @@ export const blitzHowToPlay: HowToPlayDoc = {
       bullets: [
         { label: 'Classic', text: 'lose a life each round loss; last player with lives wins' },
         { label: 'Fast', text: 'single rounds, first-to-N win counter, instant redeals' },
-        { label: 'Timed', text: 'match clock, forced turn timers, most round-wins at the buzzer takes it' },
+        {
+          label: 'Timed',
+          text: 'match clock, forced turn timers, most round-wins at the buzzer takes it',
+        },
       ],
     },
     {
       heading: 'House rules',
-      body: ['Every table can be tuned in room settings — lives, knock penalties, ties, three-of-a-kind, discard locks and turn timers all live there.'],
+      body: [
+        'Every table can be tuned in room settings — lives, knock penalties, ties, three-of-a-kind, discard locks and turn timers all live there.',
+      ],
     },
   ],
 };
