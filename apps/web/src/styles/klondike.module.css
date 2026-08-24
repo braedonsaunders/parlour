@@ -135,11 +135,23 @@ button.pileButton {
   filter: drop-shadow(0 0 12px rgba(117, 225, 204, 0.9));
 }
 
-[data-selected] > :global(.card) {
-  translate: 0 -0.45rem;
+.pileButton > [data-selected='true'],
+.tableauCard[data-selected='true'] {
+  z-index: 40 !important;
+  isolation: isolate;
+}
+
+.pileButton > [data-selected='true'] > button,
+.tableauCard[data-selected='true'] > button {
+  outline: 3px solid #66ffe1;
+  outline-offset: 3px;
+  translate: 0 -0.65rem;
+  scale: 1.04;
   box-shadow:
-    0 0 0 4px #ffe0a1,
-    0 12px 26px rgba(3, 13, 15, 0.62);
+    0 0 0 7px rgba(23, 199, 174, 0.42),
+    0 0 30px 10px rgba(65, 255, 219, 0.72),
+    0 16px 30px rgba(3, 13, 15, 0.72);
+  filter: saturate(1.08) brightness(1.04);
 }
 
 .emptyPile,

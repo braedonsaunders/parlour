@@ -193,6 +193,9 @@ describe('KlondikeTableScreen', () => {
     expect(runButton!.getAttribute('aria-label')).toContain('tableau column');
     act(() => runButton!.click());
     expect(runButton!.getAttribute('aria-pressed')).toBe('true');
+    expect(KLONDIKE_STYLES).toMatch(
+      /\.tableauCard\[data-selected='true'\]\s*>\s*button\s*\{[^}]*outline:\s*3px solid #66ffe1;[^}]*box-shadow:[^}]*rgba\(65, 255, 219, 0\.72\)/s,
+    );
     const target = container.querySelector<HTMLElement>(`[data-zone="${chosen!.target}"]`)!;
     expect(target.getAttribute('data-legal-target')).toBe('true');
     act(() => target.querySelector<HTMLButtonElement>('button')!.click());
