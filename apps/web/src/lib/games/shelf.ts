@@ -5,10 +5,14 @@ import { euchreCatalog } from '@parlour/game-euchre';
 import { ginCatalog } from '@parlour/game-gin';
 import { heartsCatalog } from '@parlour/game-hearts';
 import { klondikeCatalog } from '@parlour/game-klondike';
+import { ohhellCatalog } from '@parlour/game-ohhell';
+import { pokerCatalog } from '@parlour/game-poker';
 import { presidentCatalog } from '@parlour/game-president';
 import { wildpileCatalog } from '@parlour/game-wildpile';
 import { ratscrewCatalog } from '@parlour/game-ratscrew';
+import { scopaCatalog } from '@parlour/game-scopa';
 import { spadesCatalog } from '@parlour/game-spades';
+import { spiteCatalog } from '@parlour/game-spite';
 
 /**
  * Pack catalogs are generic over their rule config. `ConfigSchema<C>` is
@@ -48,6 +52,10 @@ export type GameId =
   | 'gin'
   | 'president'
   | 'spades'
+  | 'poker'
+  | 'ohhell'
+  | 'scopa'
+  | 'spite'
   | 'klondike';
 
 const SHELF: readonly GameCatalogEntry[] = [
@@ -57,6 +65,10 @@ const SHELF: readonly GameCatalogEntry[] = [
   shelfEntry(ratscrewCatalog),
   shelfEntry(euchreCatalog),
   shelfEntry(spadesCatalog),
+  shelfEntry(pokerCatalog),
+  shelfEntry(ohhellCatalog),
+  shelfEntry(scopaCatalog),
+  shelfEntry(spiteCatalog),
   shelfEntry(klondikeCatalog),
   shelfEntry(heartsCatalog),
   shelfEntry(ginCatalog),

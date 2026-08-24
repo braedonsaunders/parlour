@@ -10,9 +10,28 @@ export interface SeatRange {
 
 export const DEFAULT_SEAT_RANGE: SeatRange = { min: 2, max: 4 };
 
+/**
+ * Every ring the app knows, stated once.
+ *
+ * This stays a leaf module with no game imports: the room registry, the P2P
+ * transport, and the engine authority all read it, and two of those are
+ * imported *by* the registry, so sourcing it the other way round would close a
+ * cycle. Games whose ring is the default 2–4 are listed anyway — a reader
+ * should not have to know which omissions are deliberate.
+ */
 const SEAT_RANGES: Readonly<Record<string, SeatRange>> = {
+  blitz: { min: 2, max: 4 },
+  wildpile: { min: 2, max: 4 },
+  ratscrew: { min: 2, max: 4 },
+  hearts: { min: 2, max: 4 },
+  gin: { min: 2, max: 4 },
+  // Cribbage is a two-hander, but its ring stays the shared 2–4 so the room
+  // rejects a third seat with the game's own sentence rather than a bare range.
+  // See `seatsRefusal` in the room registry.
+  cribbage: { min: 2, max: 4 },
   euchre: { min: 4, max: 4 },
   spades: { min: 4, max: 4 },
+  poker: { min: 2, max: 6 },
   president: { min: 4, max: 8 },
 };
 

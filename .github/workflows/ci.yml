@@ -37,6 +37,41 @@ jobs:
       - name: Build
         run: pnpm build
 
+  e2e:
+    name: Browser gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 26
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      # The suite runs against the static export, because the export is what
+      # ships — to the host, into the Tauri shell, and into the service
+      # worker's precache. `next dev` would test something else.
+      - name: Build the export
+        run: pnpm --filter @parlour/web build
+
+      - name: Install browsers
+        run: pnpm --filter @parlour/web exec playwright install --with-deps chromium webkit
+
+      - name: End-to-end
+        run: pnpm --filter @parlour/web test:e2e
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-traces
+          path: output/playwright
+          retention-days: 7
+
   desktop:
     name: Desktop shell gate
     runs-on: ubuntu-22.04

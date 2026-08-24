@@ -8,18 +8,24 @@ The comparable popularity signal below is lifetime games played on Board Game
 Arena, not a claim about total worldwide play. Release age matters, so the
 count is a directional signal rather than a perfect ranking.
 
-## Platform first
+## Platform first — done
 
-Do not start game #9 until the factory tax is paid down. A new `GameDef` still
-needs a table page, a solo transport, and a `roomSession` switch. Until those
-are shared, each title makes the next one more expensive.
+The factory tax has been paid down. A new `GameDef` used to need a hand-written
+table page, a solo transport wrapper, and a new branch in each of five
+`gameId === '…'` chains inside `roomSession.ts` — about **1,400 lines of app
+glue per title**, none of it game logic.
+
+It is now one entry in `lib/games/roomRegistry.ts` and one pack in
+`lib/games/tablePacks/`. The eight table pages are eight lines each; the shared
+`GameTablePage` owns the scaffolding, and `roomSession.ts` holds no per-game
+branches at all. See [ADDING-A-GAME.md](ADDING-A-GAME.md).
 
 ## Build order
 
 | Priority | Game                | Why it is next                                                                                        | New platform work                                            |
 | -------- | ------------------- | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
-| 0        | Platform hardening  | Shared table shell, room registry, honest CI. Makes every later title cheaper.                        | `useGameTable`, registry-driven rooms, no-bail test gate     |
-| 1        | Spades              | Highest remaining US social demand; reuses `@parlour/tricks` and Euchre partnerships                  | Bidding, bags, 4-seat team stats                             |
+| ~~0~~    | ~~Platform~~        | ~~Shared table shell, room registry.~~ Shipped — see above.                                           | —                                                            |
+| ~~1~~    | ~~Spades~~          | ~~Highest remaining US social demand.~~ Shipped.                                                      | —                                                            |
 | 2        | Klondike + FreeCell | One solitaire milestone. Daily seeded deals turn determinism into a user-facing habit and share loop. | Tableau / foundation zones; no multiplayer                   |
 | 3        | Spite & Malice      | Fast 1–4 shedding/building; strong BGA adoption; reuses Wild instincts                                | Multiple decks, shared build piles                           |
 | 4        | Oh Hell! / Wizard   | Bidding trick-takers with a natural multi-round arc                                                   | Varying hand size via `MatchDef.roundConfig`; 5–6 seat table |

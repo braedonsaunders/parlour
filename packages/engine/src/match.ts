@@ -4,6 +4,7 @@ import {
   rngSeedFrom,
   type AppliedEvent,
   type ApplyMeta,
+  type CardId,
   type FxEmitter,
   type FxEvent,
   type GameDef,
@@ -58,6 +59,20 @@ export interface MatchSession<S, C extends RuleValues, MS> {
   history: readonly MatchResult[];
   status: 'playing' | 'round-over' | 'ended';
   result: MatchResult | null;
+  /** true when every round of this match is dealt under Veil */
+  veiled?: boolean;
+  /**
+   * Ceremony deck order per round index, `deckOrders[i]` belonging to round i.
+   * A veiled match cannot open a round it has no order for, because a fresh
+   * shuffle ceremony has to run between deals — see {@link matchNextRound}.
+   */
+  deckOrders: readonly (readonly CardId[] | undefined)[];
+}
+
+/** How a round is opened: veiled matches must supply that round's deck order. */
+export interface RoundDeal {
+  /** ceremony deck order for the round about to be dealt */
+  deckOrder?: readonly CardId[];
 }
 
 export interface MatchOutcome<S, C extends RuleValues, MS> {
@@ -72,6 +87,18 @@ export interface MatchOutcome<S, C extends RuleValues, MS> {
 /** Round seeds derive from the match seed alone, so any peer can replay any round. */
 export function roundSeed(matchSeed: number, roundIndex: number): number {
   return rngSeedFrom(`match:${matchSeed | 0}:round:${roundIndex}`) | 0;
+}
+
+/** Records a round's ceremony order without disturbing the slots around it. */
+function withDeckOrder(
+  orders: readonly (readonly CardId[] | undefined)[],
+  roundIndex: number,
+  deckOrder: readonly CardId[],
+): readonly (readonly CardId[] | undefined)[] {
+  const next = orders.slice();
+  while (next.length <= roundIndex) next.push(undefined);
+  next[roundIndex] = [...deckOrder];
+  return next;
 }
 
 function roundConfigFor<S, C extends RuleValues, MS>(
@@ -116,15 +143,33 @@ function foldRound<S, C extends RuleValues, MS>(
 function openRound<S, C extends RuleValues, MS>(
   session: MatchSession<S, C, MS>,
   roundIndex: number,
+  deal: RoundDeal = {},
 ): MatchOutcome<S, C, MS> {
   const { def } = session;
   const config = roundConfigFor(def, session.match, roundIndex, session.config);
+  const deckOrder = deal.deckOrder ?? session.deckOrders[roundIndex];
+  if (session.veiled && !deckOrder) {
+    throw new Error(
+      `${def.id}: round ${roundIndex} of a veiled match needs its own ceremony deck order`,
+    );
+  }
   const round = createSession(def.game, {
     seed: roundSeed(session.seed, roundIndex),
     config,
     seats: session.seats,
+    veiled: session.veiled,
+    deckOrder,
   });
-  const opened: MatchSession<S, C, MS> = { ...session, roundIndex, round, status: 'playing' };
+  const deckOrders = deckOrder
+    ? withDeckOrder(session.deckOrders, roundIndex, deckOrder)
+    : session.deckOrders;
+  const opened: MatchSession<S, C, MS> = {
+    ...session,
+    roundIndex,
+    round,
+    status: 'playing',
+    deckOrders,
+  };
   const fx = createFx();
   for (const event of round.setupFx ?? []) fx.events.push(event);
 
@@ -141,11 +186,28 @@ function openRound<S, C extends RuleValues, MS>(
   return { session: opened, events: [], fx: fx.events };
 }
 
+export interface MatchOptions<C extends RuleValues> {
+  seed: number;
+  config: C;
+  seats: number;
+  /**
+   * Deal every round under Veil. Each round is its own ceremony, so the first
+   * round's `deckOrder` belongs here and every later round supplies one through
+   * {@link matchNextRound}.
+   */
+  veiled?: boolean;
+  /** ceremony deck order for round 0; required whenever `veiled` is set */
+  deckOrder?: readonly CardId[];
+}
+
 export function createMatch<S, C extends RuleValues, MS>(
   def: MatchDef<S, C, MS>,
-  opts: { seed: number; config: C; seats: number },
+  opts: MatchOptions<C>,
 ): MatchOutcome<S, C, MS> {
   const config = def.game.configSchema.resolve(opts.config);
+  if (opts.veiled && !def.game.veil) {
+    throw new Error(`${def.id}: ${def.game.id} does not support veiled rooms`);
+  }
   const match = def.init({ config, seats: opts.seats });
   const base: MatchSession<S, C, MS> = {
     def,
@@ -160,8 +222,10 @@ export function createMatch<S, C extends RuleValues, MS>(
     history: [],
     status: 'playing',
     result: null,
+    veiled: opts.veiled === true,
+    deckOrders: [],
   };
-  return openRound(base, 0);
+  return openRound(base, 0, { deckOrder: opts.deckOrder });
 }
 
 export function matchApply<S, C extends RuleValues, MS>(
@@ -241,9 +305,15 @@ export function matchInject<S, C extends RuleValues, MS>(
   };
 }
 
+/**
+ * Opens the next round. A veiled match must hand in that round's ceremony deck
+ * order: re-using the previous one would deal the same hands again, and dealing
+ * without one would quietly drop the room back to open cards.
+ */
 export function matchNextRound<S, C extends RuleValues, MS>(
   def: MatchDef<S, C, MS>,
   session: MatchSession<S, C, MS>,
+  deal: RoundDeal = {},
 ): MatchOutcome<S, C, MS> {
   if (def !== session.def) throw new Error('matchNextRound: def does not match the session');
   if (session.status === 'ended') {
@@ -252,7 +322,7 @@ export function matchNextRound<S, C extends RuleValues, MS>(
   if (session.status !== 'round-over') {
     return rejectMatch(session, 'round-playing', 'the current round is not over');
   }
-  return openRound(session, session.roundIndex + 1);
+  return openRound(session, session.roundIndex + 1, deal);
 }
 
 /**
@@ -265,13 +335,30 @@ export function matchNextRound<S, C extends RuleValues, MS>(
  * fold automatically and occupy an EMPTY slot. Replay lands on the exact live
  * status: it never auto-advances past a `round-over` the live session sat in.
  */
+export interface ReplayMatchOptions<C extends RuleValues> {
+  config: C;
+  seats: number;
+  veiled?: boolean;
+  /** ceremony deck orders by round index; required for a veiled match */
+  deckOrders?: readonly (readonly CardId[] | undefined)[];
+  /** re-check every logged player action instead of trusting the authority */
+  verify?: boolean;
+}
+
 export function replayMatch<S, C extends RuleValues, MS>(
   def: MatchDef<S, C, MS>,
   seed: number,
   roundLogs: readonly (readonly AppliedEvent[])[],
-  opts: { config: C; seats: number },
+  opts: ReplayMatchOptions<C>,
 ): MatchSession<S, C, MS> {
-  let session = createMatch(def, { seed, config: opts.config, seats: opts.seats }).session;
+  const deckOrders = opts.deckOrders ?? [];
+  let session = createMatch(def, {
+    seed,
+    config: opts.config,
+    seats: opts.seats,
+    veiled: opts.veiled,
+    deckOrder: deckOrders[0],
+  }).session;
   for (let i = 0; i < roundLogs.length; i++) {
     const log = roundLogs[i] ?? [];
     if (session.status === 'ended') break;
@@ -283,7 +370,7 @@ export function replayMatch<S, C extends RuleValues, MS>(
         }
         continue;
       }
-      session = matchNextRound(def, session).session;
+      session = matchNextRound(def, session, { deckOrder: deckOrders[i] }).session;
       if (session.status !== 'playing') {
         // the freshly opened round auto-folded too (or ended the match)
         if (log.length > 0) {
@@ -302,7 +389,15 @@ export function replayMatch<S, C extends RuleValues, MS>(
     const round = replaySession(def.game, roundSeed(seed, i), log, {
       config,
       seats: session.seats,
+      veiled: session.veiled,
+      deckOrder: session.deckOrders[i],
+      verify: opts.verify,
     });
+    if (round.fault) {
+      throw new Error(
+        `replayMatch: round ${i} event ${round.fault.seq} (${round.fault.move}) failed verification: ${round.fault.error.message}`,
+      );
+    }
     if (round.status === 'ended') {
       session = foldRound(session, round, createFx()).session;
     } else {

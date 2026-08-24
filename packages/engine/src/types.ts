@@ -255,6 +255,23 @@ export interface AppliedEvent {
   hash?: string;
 }
 
+/**
+ * A logged event that did not survive re-checking against the rules.
+ *
+ * Ordinary replay trusts the log (see `replaySession`). `verify` mode does not:
+ * it re-runs legality and validation for every player action, which is what a
+ * peer needs when the "authority" that produced the log is another player
+ * rather than a server it controls.
+ */
+export interface ReplayFault {
+  /** index of the offending event in the supplied log */
+  index: number;
+  seq: number;
+  seat: SeatId | null;
+  move: string;
+  error: RuleError;
+}
+
 export interface MatchResultRank {
   seat: SeatId;
   rank: number;
@@ -557,8 +574,26 @@ export interface GameSession<S, C extends RuleValues = RuleValues> {
   botsEnabled(seat: SeatId): boolean;
   /** fx emitted by def.setup — the opening deal animation */
   setupFx?: readonly FxEvent[];
-  /** hash of the most recently applied event; compare to a log tail to detect divergence */
+  /**
+   * Hash of the most recently applied event.
+   *
+   * This is a 32-bit FNV-1a checksum over canonical JSON: it is a **desync
+   * detector, not a tamper detector**. It reliably catches two peers whose
+   * state drifted apart, and it is trivially forgeable by a peer that wants to
+   * make a doctored log look consistent. Use `replaySession(..., {verify:true})`
+   * — not this hash — when the question is "did the authority cheat".
+   */
   lastAppliedHash?: string | null;
+  /**
+   * Highest authority time seen in the log so far, cached so that admitting an
+   * event is O(1) rather than a backwards scan of the whole log.
+   */
+  lastAtMs?: number;
+  /**
+   * The first logged event that failed re-validation, or null when the log was
+   * either clean or never verified. Only ever set by `verify` replay.
+   */
+  fault?: ReplayFault | null;
   /** true when this round was dealt under Veil */
   veiled?: boolean;
   /** the ceremony deck order this round was dealt from (veiled rooms only) */
@@ -610,9 +645,34 @@ export type SessionInjectFn = <S, C extends RuleValues>(
   meta?: ApplyMeta,
 ) => ApplyOutcome<S, C>;
 
+export interface ReplayOptions<C extends RuleValues> {
+  config?: C;
+  /**
+   * Seat count the log was produced at. Always pass it: a log where the last
+   * seat never acted cannot be told apart from a smaller table, so omitting it
+   * is an error rather than a guess.
+   */
+  seats?: number;
+  veiled?: boolean;
+  deckOrder?: readonly CardId[];
+  /**
+   * Re-check every logged player action against `flow.legalMoves` and
+   * `move.validate` instead of trusting the authority that produced it. The
+   * first failure stops the replay and lands on `session.fault`.
+   */
+  verify?: boolean;
+}
+
 export type ReplaySessionFn = <S, C extends RuleValues>(
   def: GameDef<S, C>,
   seed: number,
   log: readonly AppliedEvent[],
-  opts?: { config?: C; seats?: number; veiled?: boolean; deckOrder?: readonly CardId[] },
+  opts?: ReplayOptions<C>,
 ) => GameSession<S, C>;
+
+export type VerifyLogFn = <S, C extends RuleValues>(
+  def: GameDef<S, C>,
+  seed: number,
+  log: readonly AppliedEvent[],
+  opts?: ReplayOptions<C>,
+) => ReplayFault | null;

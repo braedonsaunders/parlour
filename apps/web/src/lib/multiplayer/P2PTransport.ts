@@ -13,6 +13,7 @@ import {
   validatePresenceSnapshot,
 } from './resilience';
 import { validateEmote } from './emotes';
+import { DEFAULT_ICE_SERVERS } from './iceServers';
 import { DuplicateActionError } from './EngineAuthority';
 import {
   dispatchWireData,
@@ -36,19 +37,6 @@ import type {
   SnapshotNotification,
   Transport,
 } from './types';
-
-export const DEFAULT_ICE_SERVERS: RTCIceServer[] = [
-  { urls: ['stun:stun.cloudflare.com:3478', 'stun:stun.l.google.com:19302'] },
-  {
-    urls: [
-      'turn:openrelay.metered.ca:80',
-      'turn:openrelay.metered.ca:443',
-      'turns:openrelay.metered.ca:443',
-    ],
-    username: 'openrelayproject',
-    credential: 'openrelayproject',
-  },
-];
 
 /** How long to wait before redialling a peer whose connection died. */
 const REDIAL_DELAY_MS = 1_000;
@@ -347,7 +335,8 @@ export class P2PTransport implements Transport {
     link.pc.close();
 
     const spent = this.redials.get(peerId) ?? 0;
-    const dials = peerId === this.resilience?.hostId ? !this.isHost() : this.signaling.publicKey < peerId;
+    const dials =
+      peerId === this.resilience?.hostId ? !this.isHost() : this.signaling.publicKey < peerId;
     if (!dials || spent >= MAX_REDIALS) return;
     this.redials.set(peerId, spent + 1);
     const timer = setTimeout(() => {

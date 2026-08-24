@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import Script from 'next/script';
 import { Baloo_2, Nunito_Sans } from 'next/font/google';
 import { ComfortSync } from '@/components/ComfortSync';
+import { LocaleSync } from '@/components/LocaleSync';
 import { AudioDirector } from '@/components/AudioDirector';
 import { SceneStage } from '@/components/backgrounds/SceneStage';
 import { SplashScreen } from '@/components/SplashScreen';
@@ -109,6 +110,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <WipeOverlay />
         <SplashScreen />
         <ComfortSync />
+        <LocaleSync />
         <AudioDirector />
         <PwaRegister />
         <Analytics />

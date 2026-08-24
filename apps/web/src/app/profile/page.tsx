@@ -7,9 +7,11 @@ import { knockSuccessRate, winRate, useProfileStore } from '@/stores/profile';
 import { useAudioStore } from '@/stores/audio';
 import type { AudioChannel } from '@/lib/audio/AudioManager';
 import { AvatarBadge } from '@/components/AvatarBadge';
+import { LOCALES, LOCALE_META, useLocale, useT } from '@/lib/i18n';
 import { headToHead, useHistoryStore, type HeadToHead } from '@/stores/history';
 
 export default function ProfilePage() {
+  const t = useT();
   const name = useProfileStore((s) => s.name);
   const avatarId = useProfileStore((s) => s.avatarId);
   const stats = useProfileStore((s) => s.stats);
@@ -49,31 +51,36 @@ export default function ProfilePage() {
     <main className="safe-page mx-auto flex min-h-dvh w-full max-w-4xl flex-col gap-6">
       <header className="flex items-center justify-between">
         <Link href="/" className="pill-soft text-sm font-bold text-dusk-100 hover:text-hearth-200">
-          ← Back
+          {t('common.backArrow')}
         </Link>
         <h1 className="font-display text-2xl font-extrabold tracking-tight text-hearth-50">
-          Profile
+          {t('profile.heading')}
         </h1>
       </header>
 
-      <section className="panel-soft flex flex-wrap items-center gap-5 p-5" aria-label="Identity">
+      <section
+        className="panel-soft flex flex-wrap items-center gap-5 p-5"
+        aria-label={t('profile.identity')}
+      >
         <AvatarBadge avatarId={avatarId} size={72} />
         <label className="flex-1">
           <span className="text-xs font-bold uppercase tracking-[0.2em] text-dusk-200">
-            Your name
+            {t('profile.yourName')}
           </span>
           <input
             value={name}
             onChange={(event) => setName(event.target.value)}
             maxLength={16}
-            placeholder="Anonymous regular"
+            placeholder={t('profile.namePlaceholder')}
             className="mt-1.5 w-full rounded-chunky border-2 border-dusk-700/60 bg-dusk-950/70 px-4 py-2.5 font-display text-lg font-bold text-hearth-50 outline-none transition-colors focus:border-hearth-400"
           />
         </label>
       </section>
 
-      <section aria-label="Pick an avatar" className="panel-soft p-5">
-        <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-dusk-200">Character</h2>
+      <section aria-label={t('profile.pickAvatar')} className="panel-soft p-5">
+        <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-dusk-200">
+          {t('profile.character')}
+        </h2>
         <div className="mt-3 grid grid-cols-4 gap-3 sm:grid-cols-8">
           {AVATARS.map((avatar) => (
             <button
@@ -93,10 +100,10 @@ export default function ProfilePage() {
         </div>
       </section>
 
-      <section aria-label="Lifetime stats" className="panel-soft p-5">
+      <section aria-label={t('profile.lifetimeLabel')} className="panel-soft p-5">
         <div className="flex items-center justify-between gap-3">
           <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-dusk-200">
-            Lifetime at the table
+            {t('profile.lifetime')}
           </h2>
           <button
             type="button"
@@ -115,28 +122,26 @@ export default function ProfilePage() {
                 : 'border-dusk-700/60 text-dusk-200 hover:text-hearth-200'
             }`}
           >
-            {confirmingReset ? 'Tap again to confirm' : 'Reset stats'}
+            {confirmingReset ? t('profile.confirmReset') : t('profile.resetStats')}
           </button>
         </div>
         <dl className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-          <Stat label="Games" value={stats.games} />
-          <Stat label="Wins" value={stats.wins} />
-          <Stat label="Win rate" value={`${rate}%`} />
-          <Stat label="Blitzes" value={stats.blitzes} />
-          <Stat label="Knock success" value={`${knockRate}%`} />
-          <Stat label="Best streak" value={stats.bestStreak} />
+          <Stat label={t('stats.games')} value={stats.games} />
+          <Stat label={t('stats.wins')} value={stats.wins} />
+          <Stat label={t('stats.winRate')} value={`${rate}%`} />
+          <Stat label={t('stats.blitzes')} value={stats.blitzes} />
+          <Stat label={t('stats.knockSuccess')} value={`${knockRate}%`} />
+          <Stat label={t('stats.bestStreak')} value={stats.bestStreak} />
         </dl>
       </section>
 
-      <section aria-label="Head-to-head history" className="panel-soft p-5">
+      <section aria-label={t('profile.regularsLabel')} className="panel-soft p-5">
         <div className="flex items-center justify-between gap-3">
           <div>
             <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-dusk-200">
-              Your regulars
+              {t('profile.regulars')}
             </h2>
-            <p className="mt-1 text-xs text-dusk-200/75">
-              Local-only matchups, keyed to each friend&apos;s Parlour profile.
-            </p>
+            <p className="mt-1 text-xs text-dusk-200/75">{t('profile.regularsHint')}</p>
           </div>
           {standings.length > 0 && (
             <button
@@ -155,13 +160,13 @@ export default function ProfilePage() {
                   : 'border-dusk-700/60 text-dusk-200 hover:text-hearth-200'
               }`}
             >
-              {confirmingHistoryReset ? 'Tap again to forget' : 'Clear history'}
+              {confirmingHistoryReset ? t('profile.confirmForget') : t('profile.clearHistory')}
             </button>
           )}
         </div>
         {standings.length === 0 ? (
           <p className="mt-4 rounded-chunky border border-dashed border-dusk-700/60 px-4 py-5 text-center text-sm text-dusk-200/80">
-            Finish a match with a friend and your rivalry will appear here.
+            {t('profile.noRegulars')}
           </p>
         ) : (
           <ul className="mt-4 grid gap-3 sm:grid-cols-2">
@@ -172,11 +177,13 @@ export default function ProfilePage() {
         )}
       </section>
 
-      <section aria-label="Audio settings" className="panel-soft p-5">
+      <section aria-label={t('sound.heading')} className="panel-soft p-5">
         <div className="flex items-center justify-between gap-3">
-          <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-dusk-200">Sound</h2>
+          <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-dusk-200">
+            {t('sound.heading')}
+          </h2>
           <span className="text-xs text-dusk-200/75">
-            {audioUnlocked ? 'playing at the table' : 'starts on your first tap'}
+            {audioUnlocked ? t('sound.playing') : t('sound.waiting')}
           </span>
         </div>
         <div className="mt-3 grid gap-3 sm:grid-cols-3">
@@ -193,16 +200,65 @@ export default function ProfilePage() {
         </div>
       </section>
 
-      <section aria-label="Accessibility" className="panel-soft p-5">
-        <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-dusk-200">Comfort</h2>
+      <LanguageSection />
+
+      <section aria-label={t('profile.comfortLabel')} className="panel-soft p-5">
+        <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-dusk-200">
+          {t('profile.comfort')}
+        </h2>
         <ToggleRow
-          label="Reduce motion"
-          hint="Calms celebrations and ambient movement everywhere."
+          label={t('profile.reduceMotion')}
+          hint={t('profile.reduceMotionHint')}
           checked={settings.reducedMotion}
           onChecked={(checked) => updateSettings({ reducedMotion: checked })}
         />
       </section>
     </main>
+  );
+}
+
+/**
+ * The language picker in the options menu.
+ *
+ * The home screen carries a quick switch for the common case; this is where
+ * someone goes looking when they have already left the title screen, and it
+ * says out loud that the choice is stored on this device rather than synced.
+ */
+function LanguageSection() {
+  const t = useT();
+  const { locale, setLocale } = useLocale();
+
+  return (
+    <section aria-label={t('language.heading')} className="panel-soft p-5">
+      <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-dusk-200">
+        {t('language.heading')}
+      </h2>
+      <p className="mt-1 text-xs text-dusk-200/75">{t('language.hint')}</p>
+      <div className="mt-3 flex flex-wrap gap-2" role="radiogroup" aria-label={t('language.label')}>
+        {LOCALES.map((id) => {
+          const meta = LOCALE_META[id];
+          const active = id === locale;
+          return (
+            <button
+              key={id}
+              type="button"
+              role="radio"
+              aria-checked={active}
+              lang={meta.tag}
+              data-testid={`language-choice-${id}`}
+              onClick={() => setLocale(id)}
+              className={`rounded-pill border-2 px-4 py-2 text-sm font-bold transition-colors ${
+                active
+                  ? 'border-hearth-300 bg-hearth-400/15 text-hearth-50'
+                  : 'border-dusk-700/60 text-dusk-100 hover:text-hearth-200'
+              }`}
+            >
+              {meta.nativeName}
+            </button>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 

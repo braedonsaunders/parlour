@@ -1,8 +1,6 @@
 'use client';
 
 import {
-  createSession,
-  isVeilHandle,
   isActingSeat,
   type CardRecycle,
   type FxEvent,
@@ -12,64 +10,14 @@ import {
   type SeatId,
 } from '@parlour/engine';
 import {
-  blitzConfigSchema,
-  createBlitzDef,
-  type BlitzConfig,
-  type BlitzState,
-} from '@parlour/game-blitz';
+  roomGame,
+  type MultiplayerGameId,
+  type MultiplayerGameSession,
+  type RoomAuthority,
+} from '@/lib/games/roomRegistry';
 import {
-  createEuchreDef,
-  euchreConfig,
-  type EuchreRules,
-  type EuchreState,
-} from '@parlour/game-euchre';
-import {
-  presidentConfig,
-  presidentGame,
-  type PresidentRules,
-  type PresidentState,
-} from '@parlour/game-president';
-import {
-  wildpileConfig,
-  wildpileGame,
-  type WildpileRules,
-  type WildpileState,
-} from '@parlour/game-wildpile';
-import {
-  ratscrewConfigSchema,
-  ratscrewGame,
-  type RatscrewConfig,
-  type RatscrewState,
-} from '@parlour/game-ratscrew';
-import {
-  cribbageConfigSchema,
-  createCribbageDef,
-  type CribbageConfig,
-  type CribbageState,
-} from '@parlour/game-cribbage';
-import {
-  heartsConfigSchema,
-  heartsGame,
-  type HeartsRules,
-  type HeartsState,
-} from '@parlour/game-hearts';
-import {
-  createSpadesDef,
-  spadesConfig,
-  type SpadesRules,
-  type SpadesState,
-} from '@parlour/game-spades';
-import {
-  createGinMatchDef,
-  ginConfigSchema,
-  type GinConfig,
-  type GinMatchState,
-} from '@parlour/game-gin';
-import {
-  EngineAuthority,
   P2PTransport,
   type AppliedPacket,
-  type AuthorityAdapter,
   type PresenceEvent,
   type RoomHandle,
   type RoomSecurity,
@@ -84,26 +32,12 @@ import {
   type RecoveryPolicy,
   type VeilAuditState,
 } from '@/lib/multiplayer/veil';
-import { botTurnKey, botTurns } from './botSeats';
+import { botTurnKey } from './botSeats';
 import { NostrSignaling, type RoomAnnouncement } from '@/lib/multiplayer/NostrSignaling';
-import {
-  createDealNonce,
-  dealCommitment,
-  DealSeedRound,
-} from '@/lib/multiplayer/dealSeed';
+import { createDealNonce, dealCommitment, DealSeedRound } from '@/lib/multiplayer/dealSeed';
 import { validateRoomCode } from '@/lib/rooms/code';
-import { hasValidSeatCount, seatRangeFor } from '@/lib/rooms/seatRange';
 
-export type MultiplayerGameId =
-  | 'blitz'
-  | 'cribbage'
-  | 'wildpile'
-  | 'ratscrew'
-  | 'euchre'
-  | 'hearts'
-  | 'gin'
-  | 'president'
-  | 'spades';
+export type { MultiplayerGameId, MultiplayerGameSession } from '@/lib/games/roomRegistry';
 
 /** What the room badge shows about privacy — see lib/multiplayer/veil. */
 export type MultiplayerSecurity = {
@@ -123,17 +57,6 @@ export type MultiplayerSecurity = {
   /** set when a seat left and its layer cannot be recovered — the round stops */
   paused: string | null;
 };
-export type MultiplayerGameSession =
-  | GameSession<BlitzState, BlitzConfig>
-  | GameSession<CribbageState, CribbageConfig>
-  | GameSession<WildpileState, WildpileRules>
-  | GameSession<RatscrewState, RatscrewConfig>
-  | GameSession<EuchreState, EuchreRules>
-  | GameSession<HeartsState, HeartsRules>
-  | GameSession<GinMatchState, GinConfig>
-  | GameSession<PresidentState, PresidentRules>
-  | GameSession<SpadesState, SpadesRules>;
-
 export type MultiplayerProfile = {
   name: string;
   avatarId: string;
@@ -181,9 +104,7 @@ type Listener = () => void;
  */
 const DEAL_ROUND_TIMEOUT_MS = 10_000;
 
-type SessionAuthority = AuthorityAdapter & {
-  getSession(): MultiplayerGameSession;
-};
+type SessionAuthority = RoomAuthority;
 
 type CreateRoomOptions = {
   seats: number;
@@ -260,12 +181,8 @@ export class MultiplayerRoomSession {
 
   async create(options: CreateRoomOptions): Promise<RoomHandle> {
     const gameId = options.gameId ?? 'blitz';
-    if (!hasValidSeatCount(gameId, options.seats)) {
-      const { min, max } = seatRangeFor(gameId);
-      throw new Error(`rooms require ${min}–${max} seats for ${gameId}`);
-    }
-    const settings = resolveRoomSettings({
-      gameId: options.gameId ?? 'blitz',
+    const settings = roomGame(gameId).resolveSettings({
+      gameId,
       seats: options.seats,
       config: options.config ?? {},
       security: options.security ?? 'open',
@@ -308,7 +225,9 @@ export class MultiplayerRoomSession {
     let announcement: RoomAnnouncement | null = null;
     try {
       announcement = await signaling.resolve(verdict.code, expectedHost);
-      const settings = resolveRoomSettings(announcement.settings);
+      const settings = roomGame(announcement.settings.gameId).resolveSettings(
+        announcement.settings,
+      );
       this.prepare(settings, signaling);
       const room = await this.transport!.join(verdict.code, announcement, expectedHost);
       const assignedSeat = this.transport!.seatForPeerId(room.peerId);
@@ -388,7 +307,11 @@ export class MultiplayerRoomSession {
 
     const seed = await this.dealRound.resolve(code, seats);
     this.seed = seed;
-    const runtime = createRoomRuntime(settings, seed, (seat, bot) => this.acceptSeatBot(seat, bot));
+    const runtime = roomGame(settings.gameId).createRuntime({
+      settings,
+      seed,
+      onSeatBot: (seat, bot) => this.acceptSeatBot(seat, bot),
+    });
     this.authority.importSnapshot(runtime.authority.exportSnapshot());
     this.transport.publishSnapshot();
     this.update({
@@ -467,7 +390,9 @@ export class MultiplayerRoomSession {
         });
       })
       .catch((error: unknown) => {
-        this.update({ error: error instanceof Error ? error.message : 'the deal could not be checked' });
+        this.update({
+          error: error instanceof Error ? error.message : 'the deal could not be checked',
+        });
       });
   }
 
@@ -481,7 +406,7 @@ export class MultiplayerRoomSession {
     const veil = this.veil;
     const settings = this.snapshot.settings;
     if (!veil || !settings || !this.transport) throw new Error('the veiled room is not ready');
-    const support = gameDefFor(settings).veil;
+    const support = roomGame(settings.gameId).veilSupport();
     if (!support) throw new Error(`${settings.gameId} cannot run a veiled room`);
 
     await waitForVeilKeys(veil.room);
@@ -497,12 +422,12 @@ export class MultiplayerRoomSession {
     }
     const plan = veil.session.dealPlan(support, opened);
 
-    const runtime = createRoomRuntime(
+    const runtime = roomGame(settings.gameId).createRuntime({
       settings,
-      this.seed,
-      (seat, bot) => this.acceptSeatBot(seat, bot),
-      plan.deckOrder,
-    );
+      seed: this.seed,
+      onSeatBot: (seat, bot) => this.acceptSeatBot(seat, bot),
+      deckOrder: plan.deckOrder,
+    });
     this.authority!.importSnapshot(runtime.authority.exportSnapshot());
     this.transport.publishSnapshot();
     this.update({
@@ -633,23 +558,11 @@ export class MultiplayerRoomSession {
 
   /** Public cards that this move must exchange for a fresh hidden stock. */
   private recyclableCards(move: string): readonly string[] | null {
-    if (!this.veil || !this.authority) return null;
-    const state = this.authority.getSession().state;
-    if (this.snapshot.gameId === 'blitz' && move === 'draw.stock') {
-      const blitz = state as BlitzState;
-      if (blitz.stock.length === 0 && blitz.discard.length > 1) {
-        const cards = blitz.discard.slice(1);
-        return cards.some((card) => !isVeilHandle(card)) ? cards : null;
-      }
-    }
-    if (this.snapshot.gameId === 'wildpile' && move === 'draw') {
-      const wild = state as WildpileState;
-      if (wild.stock.length === 0 && wild.discard.length > 1) {
-        const cards = wild.discard.slice(1);
-        return cards.some((card) => !isVeilHandle(card)) ? cards : null;
-      }
-    }
-    return null;
+    if (!this.veil || !this.authority || !this.snapshot.settings) return null;
+    return roomGame(this.snapshot.settings.gameId).recyclableCards(
+      this.authority.getSession().state,
+      move,
+    );
   }
 
   /** Runs one new epoch and returns the unpaired exchange the engine logs. */
@@ -790,19 +703,13 @@ export class MultiplayerRoomSession {
     const botSeats = this.snapshot.seats.filter((seat) => seat.bot).map((seat) => seat.seat);
     if (botSeats.length === 0) return;
 
-    const def = gameDefFor(this.snapshot.settings);
     // Under Veil the host reasons over what it can actually read, which for a
     // departed seat is its rebuilt hand. Nothing here reaches another peer.
     const view = this.veil
       ? resolveVeiledState(session.state, this.veil.session.knownFaces())
       : session.state;
 
-    const turns = botTurns({
-      def: def as never,
-      session: session as never,
-      view: view as never,
-      botSeats,
-    });
+    const turns = roomGame(this.snapshot.settings.gameId).botTurns(session, view, botSeats);
     for (const turn of turns) {
       const key = botTurnKey(session as never, turn.seat);
       if (this.scheduledBotTurns.has(key)) continue;
@@ -910,7 +817,11 @@ export class MultiplayerRoomSession {
     if (this.transport) throw new Error('this session already has an active room');
     const seed = normalizeSeed(this.dependencies.seed ?? randomSeed());
     this.seed = seed;
-    const runtime = createRoomRuntime(settings, seed, (seat, bot) => this.acceptSeatBot(seat, bot));
+    const runtime = roomGame(settings.gameId).createRuntime({
+      settings,
+      seed,
+      onSeatBot: (seat, bot) => this.acceptSeatBot(seat, bot),
+    });
     this.authority = runtime.authority;
     this.transport = new P2PTransport({
       authority: this.authority,
@@ -1167,19 +1078,6 @@ function stateHolds(state: unknown, handle: string): boolean {
   return stateContainsCardId(state, handle);
 }
 
-/** The game pack a room's settings name. */
-function gameDefFor(settings: RoomSettings) {
-  if (settings.gameId === 'ratscrew') return ratscrewGame;
-  if (settings.gameId === 'euchre') return createEuchreDef();
-  if (settings.gameId === 'hearts') return heartsGame;
-  if (settings.gameId === 'gin') return createGinMatchDef();
-  if (settings.gameId === 'wildpile') return wildpileGame;
-  if (settings.gameId === 'cribbage') return createCribbageDef();
-  if (settings.gameId === 'president') return presidentGame;
-  if (settings.gameId === 'spades') return createSpadesDef();
-  return createBlitzDef();
-}
-
 /**
  * Waits for the ceremony to reach `laid` layers. Peers publish their layers
  * over the mesh, so the host has to let those land before laying the next one.
@@ -1205,180 +1103,4 @@ async function waitForVeilKeys(room: VeilRoom): Promise<void> {
     await new Promise((resolve) => setTimeout(resolve, 50));
   }
   throw new Error('the shuffle ceremony stalled — a seat never published its key');
-}
-
-function resolveRoomSettings(settings: RoomSettings): RoomSettings {
-  if (!hasValidSeatCount(settings.gameId, settings.seats)) {
-    const { min, max } = seatRangeFor(settings.gameId);
-    throw new Error(`rooms require ${min}–${max} seats for ${settings.gameId}`);
-  }
-  const security: RoomSecurity = settings.security === 'veil' ? 'veil' : 'open';
-  if (settings.gameId === 'blitz') {
-    return {
-      gameId: 'blitz',
-      seats: settings.seats,
-      config: blitzConfigSchema.resolve(settings.config as Partial<BlitzConfig>),
-      security,
-    };
-  }
-  if (settings.gameId === 'wildpile') {
-    return {
-      gameId: 'wildpile',
-      seats: settings.seats,
-      config: wildpileConfig.resolve(settings.config as Partial<WildpileRules>),
-      security,
-    };
-  }
-  if (settings.gameId === 'ratscrew') {
-    return {
-      gameId: 'ratscrew',
-      seats: settings.seats,
-      config: ratscrewConfigSchema.resolve(settings.config as Partial<RatscrewConfig>),
-      security,
-    };
-  }
-  if (settings.gameId === 'euchre') {
-    return {
-      gameId: 'euchre',
-      seats: settings.seats,
-      config: euchreConfig.resolve(settings.config as Partial<EuchreRules>),
-      security,
-    };
-  }
-  if (settings.gameId === 'cribbage') {
-    if (settings.seats !== 2) throw new Error('Cribbage rooms require exactly two seats');
-    if (security === 'veil') {
-      throw new Error('Cribbage friend rooms use open replay until multi-deal re-veiling ships');
-    }
-    const config = cribbageConfigSchema.resolve(settings.config as Partial<CribbageConfig>);
-    return {
-      gameId: 'cribbage',
-      seats: 2,
-      // Friend rooms currently represent one replayable GameSession. Match
-      // Play is deliberately solo until room snapshots carry MatchSession
-      // round logs, so never let a forged announcement imply best-of-three.
-      config: { ...config, gamesToWin: 1 },
-      security: 'open',
-    };
-  }
-  if (settings.gameId === 'hearts') {
-    return {
-      gameId: 'hearts',
-      seats: settings.seats,
-      config: heartsConfigSchema.resolve(settings.config as Partial<HeartsRules>),
-      security,
-    };
-  }
-  if (settings.gameId === 'gin') {
-    return {
-      gameId: 'gin',
-      seats: settings.seats,
-      config: ginConfigSchema.resolve(settings.config as Partial<GinConfig>),
-      security,
-    };
-  }
-  if (settings.gameId === 'president') {
-    return {
-      gameId: 'president',
-      seats: settings.seats,
-      config: presidentConfig.resolve(settings.config as Partial<PresidentRules>),
-      security,
-    };
-  }
-  if (settings.gameId === 'spades') {
-    if (settings.seats !== 4) throw new Error('Spades rooms require exactly four seats');
-    if (security === 'veil') {
-      // Say so out loud rather than quietly downgrading. Advertising a
-      // cryptographic tier the engine no longer backs would be a lie told to
-      // the one person relying on it.
-      throw new Error('Spades friend rooms use open replay — veiled Spades is not available');
-    }
-    return {
-      gameId: 'spades',
-      seats: 4,
-      config: spadesConfig.resolve(settings.config as Partial<SpadesRules>),
-      security: 'open',
-    };
-  }
-  throw new Error(`unsupported room game: ${settings.gameId}`);
-}
-
-function createRoomRuntime(
-  settings: RoomSettings,
-  seed: number,
-  onSeatBot: (seat: number, bot: boolean) => void,
-  deckOrder?: readonly string[],
-): { session: MultiplayerGameSession; authority: SessionAuthority } {
-  // A veiled deal needs the ceremony order, and the ceremony cannot run until
-  // every seat is present. Until then the room sits on an ordinary lobby deal
-  // that is never played and is marked `open`, so a joining peer can replay the
-  // snapshot instead of choking on a veiled one with no deck order.
-  const veiled = settings.security === 'veil' && deckOrder !== undefined;
-  const veil = veiled ? { veiled: true, deckOrder } : {};
-  const runtimeSettings: RoomSettings = veiled ? settings : { ...settings, security: 'open' };
-  const seatsRange = seatRangeFor(settings.gameId);
-  const common = { settings: runtimeSettings, onSeatBot, seatsRange };
-  if (settings.gameId === 'ratscrew') {
-    const config = settings.config as RatscrewConfig;
-    const session = createSession(ratscrewGame, { seed, config, seats: settings.seats, ...veil });
-    const authority = new EngineAuthority({ def: ratscrewGame, session, ...common });
-    return { session, authority };
-  }
-
-  if (settings.gameId === 'euchre') {
-    const def = createEuchreDef();
-    const config = settings.config as EuchreRules;
-    const session = createSession(def, { seed, config, seats: settings.seats, ...veil });
-    const authority = new EngineAuthority({ def, session, ...common });
-    return { session, authority };
-  }
-  if (settings.gameId === 'hearts') {
-    const config = settings.config as HeartsRules;
-    const session = createSession(heartsGame, { seed, config, seats: settings.seats, ...veil });
-    const authority = new EngineAuthority({ def: heartsGame, session, ...common });
-    return { session, authority };
-  }
-  if (settings.gameId === 'gin') {
-    const def = createGinMatchDef();
-    const config = settings.config as GinConfig;
-    const session = createSession(def, { seed, config, seats: settings.seats, ...veil });
-    const authority = new EngineAuthority({ def, session, ...common });
-    return { session, authority };
-  }
-  if (settings.gameId === 'wildpile') {
-    const config = settings.config as WildpileRules;
-    const session = createSession(wildpileGame, { seed, config, seats: settings.seats, ...veil });
-    const authority = new EngineAuthority({ def: wildpileGame, session, ...common });
-    return { session, authority };
-  }
-
-  if (settings.gameId === 'president') {
-    const config = settings.config as PresidentRules;
-    const session = createSession(presidentGame, { seed, config, seats: settings.seats, ...veil });
-    const authority = new EngineAuthority({ def: presidentGame, session, ...common });
-    return { session, authority };
-  }
-
-  if (settings.gameId === 'spades') {
-    const def = createSpadesDef();
-    const config = settings.config as SpadesRules;
-    // Spades rooms always resolve to `open`, so the veil spread stays out.
-    const session = createSession(def, { seed, config, seats: 4 });
-    const authority = new EngineAuthority({ def, session, ...common });
-    return { session, authority };
-  }
-
-  if (settings.gameId === 'cribbage') {
-    const def = createCribbageDef();
-    const config = settings.config as CribbageConfig;
-    const session = createSession(def, { seed, config, seats: 2 });
-    const authority = new EngineAuthority({ def, session, settings: runtimeSettings, onSeatBot });
-    return { session, authority };
-  }
-
-  const def = createBlitzDef();
-  const config = settings.config as BlitzConfig;
-  const session = createSession(def, { seed, config, seats: settings.seats, ...veil });
-  const authority = new EngineAuthority({ def, session, ...common });
-  return { session, authority };
 }

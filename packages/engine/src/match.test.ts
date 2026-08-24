@@ -11,7 +11,9 @@ import {
   type MatchSession,
 } from './match';
 import { stateHash } from './runtime';
-import type { ConfigFieldValue, Flow, GameDef, Move, SeatId } from './types';
+import { dealOrder, isVeilHandle, veilSupport, veiledDeckOrder } from './veil';
+import { stdDeck } from './types';
+import type { CardId, ConfigFieldValue, Flow, GameDef, Move, SeatId } from './types';
 
 // --- roll fixture: each seat rolls once; highest roll takes the round --------
 
@@ -245,6 +247,161 @@ describe('matchApply / matchNextRound', () => {
     const { session } = driveMatch();
     expect(matchApply(rollMatch, session, 0, 'roll').rejected?.code).toBe('match-ended');
     expect(matchNextRound(rollMatch, session).rejected?.code).toBe('match-ended');
+  });
+});
+
+// --- veiled fixture: a match whose rounds deal from a ceremony order --------
+//
+// The match layer used to call createSession without veiled/deckOrder, so a
+// veiled game folded into a MatchDef quietly dealt open cards and nothing said
+// so. These tests pin the corrected contract.
+
+interface DealState {
+  seats: number;
+  hands: CardId[][];
+  /** the one card the ceremony opened in public — differs per round */
+  starter: CardId;
+  turn: SeatId;
+  done: boolean;
+}
+
+const DEAL_DECK = stdDeck();
+/** Deck index the public setup card lands at: seats × handSize. */
+const STARTER_AT = 2;
+
+const dealMove: Move<DealState> = {
+  validate: () => true,
+  apply: (state, seat) => ({ ...state, turn: (seat + 1) % state.seats, done: true }),
+};
+
+const dealGame: GameDef<DealState, RollRules> = {
+  id: 'deal-test',
+  howToPlay: { summary: 'test stub', objective: 'test stub', sections: [] },
+  configSchema: rollConfig,
+  setup(ctx) {
+    const order = dealOrder(ctx, DEAL_DECK);
+    const hands = Array.from({ length: ctx.seats }, (_, seat) => [order[seat] as CardId]);
+    return {
+      seats: ctx.seats,
+      hands,
+      starter: order[STARTER_AT] as CardId,
+      turn: 0,
+      done: false,
+    };
+  },
+  moves: { play: dealMove },
+  flow: {
+    start: (state) => ({ phase: 'play', actor: state.turn, round: 1 }),
+    legalMoves: () => [{ id: 'play' }],
+    advance: (state) =>
+      state.done
+        ? {
+            phase: { phase: 'ended', actor: null, round: 1 },
+            ended: { winner: 0, rankings: [{ seat: 0, rank: 1 }], reason: 'dealt' },
+          }
+        : { phase: { phase: 'play', actor: state.turn, round: 1 } },
+  },
+  playerView: (state) => state,
+  end: (state) =>
+    state.done ? { winner: 0, rankings: [{ seat: 0, rank: 1 }], reason: 'dealt' } : null,
+  bots: [],
+  veil: veilSupport({ deck: DEAL_DECK, handSize: 1, publicSetup: 'one' }),
+};
+
+const openDealGame: GameDef<DealState, RollRules> = {
+  ...dealGame,
+  id: 'deal-open',
+  veil: undefined,
+};
+
+const dealMatch: MatchDef<DealState, RollRules, RollMatchState> = {
+  id: 'deal-match',
+  game: dealGame,
+  init: ({ seats }) => ({ wins: Array.from({ length: seats }, () => 0) }),
+  fold: (match) => ({ wins: match.wins.map((w, seat) => (seat === 0 ? w + 1 : w)) }),
+  matchEnd: (match) => (match.wins[0]! >= 2 ? { winner: 0, rankings: [], reason: 'done' } : null),
+};
+
+const openDealMatch: MatchDef<DealState, RollRules, RollMatchState> = {
+  ...dealMatch,
+  id: 'deal-match-open',
+  game: openDealGame,
+};
+
+/**
+ * A ceremony order for `round`: every card an opaque handle bar the one card
+ * the room opened in public, which differs per round so two rounds are
+ * distinguishable even though both deal handles into hands.
+ */
+function ceremonyOrder(seats: number, round: number): CardId[] {
+  const opened = [DEAL_DECK.cardIds[round] as CardId];
+  return veiledDeckOrder(dealGame.veil!, seats, opened, rollConfig.defaults());
+}
+
+const VEIL_OPTS = { seed: 909, config: rollConfig.defaults(), seats: 2 };
+
+describe('veiled matches', () => {
+  it('refuses a veiled match on a game that has not opted into Veil', () => {
+    expect(() =>
+      createMatch(openDealMatch, { ...VEIL_OPTS, veiled: true, deckOrder: ceremonyOrder(2, 0) }),
+    ).toThrow(/does not support veiled rooms/);
+  });
+
+  it('refuses to open a veiled round with no ceremony order', () => {
+    expect(() => createMatch(dealMatch, { ...VEIL_OPTS, veiled: true })).toThrow(
+      /ceremony deck order/,
+    );
+  });
+
+  it('deals round 0 from the ceremony order rather than the seeded shuffle', () => {
+    const order = ceremonyOrder(2, 0);
+    const veiled = createMatch(dealMatch, { ...VEIL_OPTS, veiled: true, deckOrder: order });
+    const open = createMatch(dealMatch, VEIL_OPTS);
+
+    expect(veiled.session.round.veiled).toBe(true);
+    expect(veiled.session.round.state.hands.flat()).toEqual(order.slice(0, 2));
+    expect(veiled.session.round.state.hands.flat().every(isVeilHandle)).toBe(true);
+    // the open match still deals real faces, so this is not just "both hidden"
+    expect(open.session.round.state.hands.flat().some(isVeilHandle)).toBe(false);
+  });
+
+  it('makes every later round bring its own ceremony order', () => {
+    const created = createMatch(dealMatch, {
+      ...VEIL_OPTS,
+      veiled: true,
+      deckOrder: ceremonyOrder(2, 0),
+    });
+    const played = matchApply(dealMatch, created.session, 0, 'play');
+    expect(played.session.status).toBe('round-over');
+
+    expect(() => matchNextRound(dealMatch, played.session)).toThrow(/ceremony deck order/);
+
+    const second = ceremonyOrder(2, 1);
+    const opened = matchNextRound(dealMatch, played.session, { deckOrder: second });
+    expect(opened.session.round.veiled).toBe(true);
+    expect(opened.session.round.state.hands.flat()).toEqual(second.slice(0, 2));
+    // round 1 dealt from its OWN ceremony, not a repeat of round 0's
+    expect(opened.session.round.state.starter).toBe(second[STARTER_AT]);
+    expect(opened.session.round.state.starter).not.toBe(created.session.round.state.starter);
+  });
+
+  it('replays a veiled match from its round logs and ceremony orders', () => {
+    const orders = [ceremonyOrder(2, 0), ceremonyOrder(2, 1)];
+    let outcome = createMatch(dealMatch, { ...VEIL_OPTS, veiled: true, deckOrder: orders[0] });
+    outcome = matchApply(dealMatch, outcome.session, 0, 'play');
+    outcome = matchNextRound(dealMatch, outcome.session, { deckOrder: orders[1] });
+    outcome = matchApply(dealMatch, outcome.session, 0, 'play');
+    const live = outcome.session;
+
+    const replayed = replayMatch(dealMatch, VEIL_OPTS.seed, live.roundLogs, {
+      config: live.config,
+      seats: live.seats,
+      veiled: true,
+      deckOrders: orders,
+    });
+    expect(replayed.status).toBe(live.status);
+    expect(replayed.match).toEqual(live.match);
+    expect(stateHash(replayed.round.state)).toBe(stateHash(live.round.state));
   });
 });
 

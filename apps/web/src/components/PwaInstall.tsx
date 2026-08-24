@@ -1,5 +1,7 @@
 'use client';
 
+import { interpolateParts, useT } from '@/lib/i18n';
+
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import {
   getInstallPlatform,
@@ -55,6 +57,7 @@ function InstallInstructions({
   platform: InstallPlatform;
   onClose(): void;
 }) {
+  const t = useT();
   const closeRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
@@ -109,7 +112,7 @@ function InstallInstructions({
             ref={closeRef}
             type="button"
             onClick={onClose}
-            aria-label="Close install instructions"
+            aria-label={t('install.closeInstructions')}
             className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-dusk-200/20 bg-dusk-950/35 text-2xl text-dusk-100 transition hover:bg-dusk-900/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-hearth-200"
           >
             ×
@@ -127,7 +130,7 @@ function InstallInstructions({
             </span>
             <span className="text-sm text-dusk-50">
               <strong className="font-display">1.</strong>{' '}
-              {isIos ? 'Tap Share in your browser toolbar.' : 'Open your browser menu.'}
+              {isIos ? t('install.shareStep') : t('install.menuStep')}
             </span>
           </li>
           <li className="flex items-center gap-3 rounded-2xl border border-dusk-200/15 bg-dusk-950/30 p-3">
@@ -137,7 +140,7 @@ function InstallInstructions({
             <span className="text-sm text-dusk-50">
               <strong className="font-display">2.</strong> Choose{' '}
               <span className="font-bold">
-                {isIos ? 'Add to Home Screen' : 'Install app or Add to Home screen'}
+                {isIos ? t('install.addToHome') : t('install.either')}
               </span>
               .
             </span>
@@ -148,7 +151,18 @@ function InstallInstructions({
             </span>
             <span className="text-sm text-dusk-50">
               <strong className="font-display">3.</strong> Confirm with{' '}
-              <span className="font-bold">Add</span> or <span className="font-bold">Install</span>.
+              {interpolateParts(t('install.tapEither'), {
+                add: (
+                  <span key="add" className="font-bold">
+                    {t('install.add')}
+                  </span>
+                ),
+                install: (
+                  <span key="install" className="font-bold">
+                    {t('install.install')}
+                  </span>
+                ),
+              })}
             </span>
           </li>
         </ol>
@@ -158,6 +172,7 @@ function InstallInstructions({
 }
 
 export function PwaInstall() {
+  const t = useT();
   const clientReady = useSyncExternalStore(subscribeToClient, getClientSnapshot, getServerSnapshot);
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [installedOverride, setInstalledOverride] = useState<boolean | null>(null);
@@ -210,7 +225,7 @@ export function PwaInstall() {
     if (choice.outcome === 'accepted') setInstalledOverride(true);
   };
 
-  const label = installPrompt ? 'Install app' : 'Add to Home Screen';
+  const label = installPrompt ? t('install.installApp') : t('install.addToHome');
 
   return (
     <>

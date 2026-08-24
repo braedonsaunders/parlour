@@ -1,5 +1,7 @@
 'use client';
 
+import { useT } from '@/lib/i18n';
+
 import { SCENE_IDS, SCENE_LABELS, useSceneStore } from '@/stores/scene';
 import { useHydrated } from './SceneStage';
 
@@ -10,6 +12,7 @@ const SCENE_ICONS: Record<(typeof SCENE_IDS)[number], string> = {
 };
 
 export function ScenePicker() {
+  const t = useT();
   const sceneId = useSceneStore((state) => state.sceneId);
   const setScene = useSceneStore((state) => state.setScene);
   const hydrated = useHydrated();
@@ -19,7 +22,7 @@ export function ScenePicker() {
     <div
       className="pill-soft chrome-sw fixed z-30 flex items-center gap-1"
       role="radiogroup"
-      aria-label="Background scene"
+      aria-label={t('scene.label')}
     >
       {SCENE_IDS.map((id) => {
         const active = id === sceneId;

@@ -1,5 +1,7 @@
 'use client';
 
+import { useT } from '@/lib/i18n';
+
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useMemo } from 'react';
@@ -14,6 +16,7 @@ import { useProfileStore } from '@/stores/profile';
 
 export default function MatchEndPage() {
   const router = useRouter();
+  const t = useT();
   // The snapshot is restored from session storage on a reload, so it must not
   // be read during hydration — the prerendered markup has no match in it.
   const hydrated = useHydrated();
@@ -46,7 +49,7 @@ export default function MatchEndPage() {
             {hasRivalryToShow(rivalry) && (
               <MatchRivalry
                 rivalry={rivalry}
-                youName={you?.name?.trim() || profileName.trim() || 'You'}
+                youName={you?.name?.trim() || profileName.trim() || t('common.you')}
                 youAvatarId={you?.avatarId ?? profileAvatarId}
               />
             )}
@@ -58,27 +61,25 @@ export default function MatchEndPage() {
               className="btn-fat w-56 text-lg"
               data-testid="play-again"
             >
-              Play again
+              {t('matchEnd.playAgain')}
             </button>
             <Link href="/" className="btn-fat btn-fat--ghost w-32 text-lg">
-              Back
+              {t('common.back')}
             </Link>
           </div>
         </>
       ) : (
         <div className="panel-soft mx-6 max-w-md p-8 text-center">
           <h1 className="font-display text-2xl font-extrabold text-hearth-50">
-            No match on record
+            {t('matchEnd.none')}
           </h1>
-          <p className="mt-2 text-sm text-dusk-100/85">
-            Finish a game at the table and the podium will fill in here.
-          </p>
+          <p className="mt-2 text-sm text-dusk-100/85">{t('matchEnd.noneHint')}</p>
           <div className="mt-5 flex justify-center gap-3">
             <Link href="/play" className="btn-fat">
-              Play solo
+              {t('matchEnd.playSolo')}
             </Link>
             <Link href="/" className="btn-fat btn-fat--ghost">
-              Back
+              {t('common.back')}
             </Link>
           </div>
         </div>

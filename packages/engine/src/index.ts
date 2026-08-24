@@ -13,4 +13,5 @@ export {
   sessionApply,
   sessionInject,
   stateHash,
+  verifyLog,
 } from './runtime';

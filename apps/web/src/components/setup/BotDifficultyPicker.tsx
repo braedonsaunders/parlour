@@ -1,24 +1,38 @@
+'use client';
+
+import { useT, type MessageKey } from '@/lib/i18n';
 import type { BotTier } from '@/stores/setup';
 
-export const BOT_DIFFICULTIES: readonly { tier: BotTier; label: string }[] = [
-  { tier: 1, label: 'Easy' },
-  { tier: 2, label: 'Medium' },
-  { tier: 3, label: 'Hard' },
+/**
+ * The tiers, keyed rather than labelled.
+ *
+ * The label used to live on this constant, which meant it was resolved once at
+ * module load — before any language was known, and never again. Holding the
+ * message key instead lets the component read the label at render time, which
+ * is the only moment the player's language is a fact.
+ */
+export const BOT_DIFFICULTIES: readonly { tier: BotTier; labelKey: MessageKey }[] = [
+  { tier: 1, labelKey: 'setup.easy' },
+  { tier: 2, labelKey: 'setup.medium' },
+  { tier: 3, labelKey: 'setup.hard' },
 ];
 
 export function BotDifficultyPicker({
   value,
   onChange,
-  label = 'Bot skill',
+  label,
 }: {
   value: BotTier;
   onChange: (tier: BotTier) => void;
   label?: string;
 }) {
+  const t = useT();
+  const heading = label ?? t('setup.botSkill');
+
   return (
     <div data-testid="bot-difficulty-picker">
-      <p className="text-xs font-bold uppercase tracking-[0.2em] text-dusk-200">{label}</p>
-      <div className="mt-1.5 flex items-center gap-2" role="group" aria-label={label}>
+      <p className="text-xs font-bold uppercase tracking-[0.2em] text-dusk-200">{heading}</p>
+      <div className="mt-1.5 flex items-center gap-2" role="group" aria-label={heading}>
         {BOT_DIFFICULTIES.map((option) => (
           <button
             key={option.tier}
@@ -31,7 +45,7 @@ export function BotDifficultyPicker({
                 : 'border-dusk-700/60 bg-dusk-950/70 text-dusk-100'
             }`}
           >
-            {option.label}
+            {t(option.labelKey)}
           </button>
         ))}
       </div>

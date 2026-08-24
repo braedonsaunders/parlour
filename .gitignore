@@ -21,6 +21,7 @@ docs/music/
 # shipped engine + game code cites this spec by path, so it stays public
 !docs/VEILED-DECK-PROTOCOL.md
 !docs/NEXT-GAME-SHORTLIST.md
+!docs/ADDING-A-GAME.md
 !docs/REVIEW-CONSENSUS.md
 apps/web/public/audio/README.md
 packages/*/README.md
@@ -30,3 +31,4 @@ output/
 .playwright-cli/
 portrait.png
 scripts/shots*.mjs
+output/playwright/

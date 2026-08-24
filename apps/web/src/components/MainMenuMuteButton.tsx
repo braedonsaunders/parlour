@@ -1,8 +1,14 @@
 'use client';
 
+import { useT } from '@/lib/i18n';
 import { useAudioManager, useAudioStore } from '@/stores/audio';
 
+/**
+ * Positioning lives on the {@link MainMenuChrome} cluster rather than here, so
+ * the language button can sit beside this one instead of over it.
+ */
 export function MainMenuMuteButton() {
+  const t = useT();
   useAudioManager();
   const muted = useAudioStore((state) => state.channels.master.muted);
   const toggleMuted = useAudioStore((state) => state.toggleMuted);
@@ -10,13 +16,13 @@ export function MainMenuMuteButton() {
   return (
     <button
       type="button"
-      className="btn-fat btn-fat--ghost chrome-nw fixed z-30 h-12 min-w-12 px-3"
-      aria-label={muted ? 'Unmute sound' : 'Mute sound'}
+      className="btn-fat btn-fat--ghost h-12 min-w-12 px-3"
+      aria-label={muted ? t('sound.unmute') : t('sound.mute')}
       aria-pressed={muted}
       onClick={() => toggleMuted('master')}
     >
       {muted ? <MutedIcon /> : <SoundIcon />}
-      <span className="hidden sm:inline">{muted ? 'Sound off' : 'Sound on'}</span>
+      <span className="hidden sm:inline">{muted ? t('sound.off') : t('sound.on')}</span>
     </button>
   );
 }

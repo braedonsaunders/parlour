@@ -1,13 +1,17 @@
+'use client';
+
 import type { ReactNode } from 'react';
+import { useT } from '@/lib/i18n';
 import styles from '@/styles/table.module.css';
 
 /** The ••• affordance that opens the shared table menu. */
 export function TableMenuButton({ onOpen }: { onOpen: () => void }) {
+  const t = useT();
   return (
     <button
       type="button"
       className={`${styles.menuButton} btn-fat btn-fat--ghost`}
-      aria-label="Table menu"
+      aria-label={t('table.menu')}
       aria-haspopup="dialog"
       onClick={onOpen}
     >

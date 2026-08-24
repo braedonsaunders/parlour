@@ -7,6 +7,7 @@ import {
   sessionApply,
   sessionInject,
   stateHash,
+  verifyLog,
 } from './runtime';
 import { makeRng } from './rng';
 import {
@@ -26,6 +27,7 @@ import {
   type SessionApplyFn,
   type SessionInjectFn,
   type StateHashFn,
+  type VerifyLogFn,
 } from './types';
 import { addTo, drawFrom, removeFrom, shuffledIds } from './zones';
 
@@ -41,6 +43,7 @@ const _createSessionMatchesContract: CreateSessionFn = createSession;
 const _sessionApplyMatchesContract: SessionApplyFn = sessionApply;
 const _sessionInjectMatchesContract: SessionInjectFn = sessionInject;
 const _replaySessionMatchesContract: ReplaySessionFn = replaySession;
+const _verifyLogMatchesContract: VerifyLogFn = verifyLog;
 const _stateHashMatchesContract: StateHashFn = stateHash;
 const _makeRngMatchesContract: MakeRngFn = makeRng;
 
@@ -48,6 +51,7 @@ void _createSessionMatchesContract;
 void _sessionApplyMatchesContract;
 void _sessionInjectMatchesContract;
 void _replaySessionMatchesContract;
+void _verifyLogMatchesContract;
 void _stateHashMatchesContract;
 void _makeRngMatchesContract;
 
@@ -414,11 +418,73 @@ describe('replaySession', () => {
     expect(replayed.state).toEqual(live.session.state);
   });
 
-  it('derives config and seats when opts are omitted', () => {
+  it('derives config from the schema but refuses to guess the seat count', () => {
     const live = runScript();
-    const replayed = replaySession(miniGame, OPTS.seed, live.session.log);
-    expect(replayed.seats).toBe(3);
+    expect(() => replaySession(miniGame, OPTS.seed, live.session.log)).toThrow(/opts\.seats/);
+
+    const replayed = replaySession(miniGame, OPTS.seed, live.session.log, { seats: 3 });
     expect(replayed.config).toEqual(configSchema.defaults());
     expect(stateHash(replayed.state)).toBe(stateHash(live.session.state));
+  });
+
+  it('carries the highest authority time so admission does not rescan the log', () => {
+    const live = runScript();
+    const replayed = replaySession(miniGame, OPTS.seed, live.session.log, {
+      config: live.session.config,
+      seats: live.session.seats,
+    });
+    expect(replayed.lastAtMs).toBe(live.session.lastAtMs);
+  });
+});
+
+describe('verifyLog', () => {
+  it('passes a log the authority produced honestly', () => {
+    const live = runScript();
+    expect(
+      verifyLog(miniGame, OPTS.seed, live.session.log, {
+        config: live.session.config,
+        seats: live.session.seats,
+      }),
+    ).toBeNull();
+  });
+
+  it('catches a move the acting seat was not entitled to make', () => {
+    const live = runScript();
+    const tampered: AppliedEvent[] = live.session.log.map((e) => ({ ...e }));
+    const victim = tampered.find((e) => e.automatic !== true && e.seat !== null);
+    expect(victim).toBeDefined();
+    // Same move, wrong seat: the log stays internally consistent, so only
+    // re-running legality can tell that this could not have happened.
+    victim!.seat = ((victim!.seat as number) + 1) % 3;
+
+    const fault = verifyLog(miniGame, OPTS.seed, tampered, {
+      config: live.session.config,
+      seats: live.session.seats,
+    });
+    expect(fault).not.toBeNull();
+    expect(fault?.error.code).toBe('not-your-turn');
+    expect(fault?.seq).toBe(victim!.seq);
+  });
+
+  it('rejects a move the game does not define', () => {
+    const live = runScript();
+    const tampered: AppliedEvent[] = live.session.log.map((e) => ({ ...e }));
+    tampered[0] = { ...tampered[0]!, move: 'teleport' };
+
+    const fault = verifyLog(miniGame, OPTS.seed, tampered, {
+      config: live.session.config,
+      seats: live.session.seats,
+    });
+    expect(fault?.error.code).toBe('unknown-move');
+    expect(fault?.index).toBe(0);
+  });
+
+  it('leaves the fast path untouched — an unverified replay still trusts the log', () => {
+    const live = runScript();
+    const replayed = replaySession(miniGame, OPTS.seed, live.session.log, {
+      config: live.session.config,
+      seats: live.session.seats,
+    });
+    expect(replayed.fault).toBeNull();
   });
 });

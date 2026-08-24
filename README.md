@@ -54,7 +54,7 @@ That one line pays for everything downstream. Same seed plus the same events mea
 
 ### What a new game gets for free
 
-Write a rules module and you inherit catalog, bots, replay, settings, and help. The table page is still per-game until the shared shell lands.
+Write a rules module, add one registry entry and one table pack, and you inherit the rest. A game is no longer a branch in four different `switch` statements — the room registry (`lib/games/roomRegistry.ts`) answers every question a friend room asks about a game, and `GameTablePage` runs the table itself.
 
 |                    |                                                           |
 | ------------------ | --------------------------------------------------------- |
@@ -123,6 +123,10 @@ Under that: **Nostr relays for signaling only**, then a **WebRTC data-channel me
 No game server exists. Nothing to sign up for and nothing to leak, because there is no account and no database.
 
 > **Honest about the crypto:** in an ordinary room, hidden hands are _honest UI_ — the same trust model as playing cards at a kitchen table, which is the right call for friends play. The engine now carries the veiled-deck primitives for rooms that want more; the cryptographic reveal layer lives in the transport, not the rules.
+
+> **Honest about the hash:** every event carries a state hash, and it is a **desync detector, not a tamper detector**. It reliably catches two honest peers whose state drifted apart; it is trivially recomputed by a peer that doctored its own log. When the question is "did the authority cheat" rather than "did we drift", replay with `verifyLog` — it re-runs legality and validation for every logged action and names the first one a rules-abiding host could not have produced.
+
+> **Honest about the relay:** most players connect peer to peer over STUN. Symmetric NATs cannot, and those pairs need a TURN relay to carry the traffic. parlour ships with a free, shared, public relay as its default. Your cards stay private from it — the data channel is DTLS-encrypted end to end, and a veiled room is encrypted again on top — but its _availability_ is nobody's promise. Point `NEXT_PUBLIC_PARLOUR_TURN_URLS` (with `_USERNAME` and `_CREDENTIAL`) at your own relay and the bundled one is replaced rather than kept as a fallback. See [`iceServers.ts`](apps/web/src/lib/multiplayer/iceServers.ts).
 
 ## The bots are tested like a game, not like a function
 

@@ -1,5 +1,7 @@
 'use client';
 
+import { useT } from '@/lib/i18n';
+
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import {
@@ -42,6 +44,7 @@ function useRoomSnapshot(session: MultiplayerRoomSession | null) {
 }
 
 export default function JoinPage() {
+  const t = useT();
   const router = useWipeRouter();
   const name = useProfileStore((state) => state.name);
   const avatarId = useProfileStore((state) => state.avatarId);
@@ -77,16 +80,14 @@ export default function JoinPage() {
         activateMultiplayerSession(next);
       } catch (caught) {
         setError(
-          caught instanceof Error
-            ? `Could not reach table ${code}. Check the code and your connection.`
-            : 'Could not reach that table.',
+          caught instanceof Error ? t('join.unreachable', { code }) : t('join.unreachableGeneric'),
         );
         setRoomSession(null);
       } finally {
         setChecking(false);
       }
     },
-    [avatarId, checking, name],
+    [avatarId, checking, name, t],
   );
 
   useEffect(() => {
@@ -124,15 +125,13 @@ export default function JoinPage() {
         href="/"
         className="pill-soft chrome-nw absolute z-30 text-sm font-bold text-dusk-100 hover:text-hearth-200"
       >
-        ← Back
+        {t('common.backArrow')}
       </Link>
       <div>
         <h1 className="font-display text-3xl font-extrabold tracking-tight text-hearth-50">
-          Join a table
+          {t('join.heading')}
         </h1>
-        <p className="mt-1 text-sm text-dusk-100/85">
-          Type the four characters your friend shared.
-        </p>
+        <p className="mt-1 text-sm text-dusk-100/85">{t('join.hint')}</p>
       </div>
       <input
         type="text"
@@ -153,7 +152,7 @@ export default function JoinPage() {
         autoFocus={!linkCode}
         disabled={checking}
         data-filled={code.length > 0}
-        aria-label={`Room code, ${code.length} of ${ROOM_CODE_LENGTH} entered`}
+        aria-label={t('join.codeLabel', { entered: code.length, total: ROOM_CODE_LENGTH })}
         className={styles.codeInput}
       />
       <JoinStatus session={roomSession} fallbackError={error} />
@@ -163,7 +162,7 @@ export default function JoinPage() {
         disabled={code.length !== ROOM_CODE_LENGTH || checking}
         className="btn-fat w-64 text-lg"
       >
-        {checking ? 'Knocking…' : 'Pull up a chair'}
+        {checking ? t('join.knocking') : t('join.submit')}
       </button>
     </main>
   );
@@ -184,6 +183,7 @@ function GuestLobby({
   session: MultiplayerRoomSession;
   onLeave: () => void;
 }) {
+  const t = useT();
   const snapshot = useRoomSnapshot(session);
   const room = snapshot?.room;
   if (!snapshot || !room) return null;
@@ -195,7 +195,7 @@ function GuestLobby({
         onClick={onLeave}
         className="pill-soft chrome-nw absolute z-30 text-sm font-bold text-dusk-100 hover:text-hearth-200"
       >
-        ← Leave
+        {t('common.leaveArrow')}
       </button>
       {snapshot.error && (
         <p className="panel-soft max-w-md px-4 py-2.5 text-sm text-dusk-50" role="alert">
@@ -217,7 +217,7 @@ function GuestLobby({
         }))}
       />
       <p className="text-center text-sm text-dusk-100/80" role="status">
-        You have a seat. The table opens when the host deals.
+        {t('join.seated')}
       </p>
     </main>
   );
@@ -230,6 +230,7 @@ function JoinStatus({
   session: MultiplayerRoomSession | null;
   fallbackError: string | null;
 }) {
+  const t = useT();
   const snapshot = useRoomSnapshot(session);
   const message = fallbackError ?? snapshot?.error;
   return (
@@ -239,7 +240,7 @@ function JoinStatus({
           className="pill-soft inline-block animate-pulse px-4 py-2 text-sm text-hearth-200"
           role="status"
         >
-          Connecting securely…
+          {t('join.connecting')}
         </p>
       )}
       {message && (

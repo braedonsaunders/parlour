@@ -1,4 +1,5 @@
 'use client';
+import { useT } from '@/lib/i18n';
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -11,13 +12,14 @@ import modeStyles from '@/styles/modes.module.css';
 import gameStyles from '@/styles/games.module.css';
 
 export default function GameSelectPage() {
+  const t = useT();
   const router = useRouter();
   const [query, setQuery] = useState('');
   const visibleGames = useMemo(() => filterGames(GAMES, query), [query]);
   const hasQuery = query.trim().length > 0;
   const resultLabel = hasQuery
-    ? `${visibleGames.length} ${visibleGames.length === 1 ? 'game' : 'games'} found`
-    : `${GAMES.length} games ready to play`;
+    ? t.count('shelf.resultsFound', visibleGames.length)
+    : t('shelf.readyToPlay', { count: GAMES.length });
 
   return (
     <main className={gameStyles.page}>
@@ -26,10 +28,10 @@ export default function GameSelectPage() {
           href="/"
           className={`${gameStyles.backLink} pill-soft text-sm font-bold text-dusk-100 hover:text-hearth-200`}
         >
-          ← Back
+          {t('common.backArrow')}
         </Link>
         <div className={gameStyles.heading}>
-          <span className={gameStyles.eyebrow}>The game shelf</span>
+          <span className={gameStyles.eyebrow}>{t('shelf.heading')}</span>
           <h1 className="font-display text-2xl font-extrabold tracking-tight text-hearth-50">
             Choose your game
           </h1>
@@ -52,7 +54,7 @@ export default function GameSelectPage() {
             type="search"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search games…"
+            placeholder={t('shelf.search')}
             autoComplete="off"
             spellCheck={false}
             className={gameStyles.searchInput}
@@ -61,7 +63,7 @@ export default function GameSelectPage() {
             <button
               type="button"
               className={gameStyles.searchClear}
-              aria-label="Clear game search"
+              aria-label={t('shelf.clearSearch')}
               onClick={() => setQuery('')}
             >
               ×
@@ -86,7 +88,7 @@ export default function GameSelectPage() {
         </div>
 
         {visibleGames.length > 0 ? (
-          <div className={gameStyles.gameGrid} role="list" aria-label="Games">
+          <div className={gameStyles.gameGrid} role="list" aria-label={t('shelf.gamesLabel')}>
             {visibleGames.map((game) => (
               <GameTile
                 key={game.id}
@@ -101,7 +103,7 @@ export default function GameSelectPage() {
               ♣
             </span>
             <h2>No game on the shelf matches “{query.trim()}”</h2>
-            <p>Try a style like trick-taking, shedding, rummy, or slap.</p>
+            <p>{t('shelf.noMatch')}</p>
             <button type="button" className="pill-soft" onClick={() => setQuery('')}>
               Show every game
             </button>
@@ -114,7 +116,7 @@ export default function GameSelectPage() {
           ♠ ♦
         </span>
         <span>
-          <strong>More games join the shelf soon.</strong> One engine, many tables.
+          <strong>{t('shelf.moreSoon')}</strong> {t('shelf.oneEngine')}
         </span>
       </footer>
     </main>
@@ -122,6 +124,7 @@ export default function GameSelectPage() {
 }
 
 function GameTile({ def, onSelect }: { def: GameCatalogEntry; onSelect?: () => void }) {
+  const t = useT();
   const shelved = !onSelect;
   return (
     // The rules button is a sibling of the tile, not a child: a tile is itself
@@ -147,7 +150,7 @@ function GameTile({ def, onSelect }: { def: GameCatalogEntry; onSelect?: () => v
           ['--tile-shade' as string]: def.shade,
         }}
       >
-        {shelved && <span className={gameStyles.soonRibbon}>Soon</span>}
+        {shelved && <span className={gameStyles.soonRibbon}>{t('shelf.soon')}</span>}
         <div className={gameStyles.tileArt}>
           <GameArt cards={def.art} />
         </div>

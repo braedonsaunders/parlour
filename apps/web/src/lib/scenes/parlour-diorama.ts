@@ -1,189 +1,138 @@
-// @ts-nocheck
 import type { SceneId } from '@/stores/scene';
+import { clamp, fbm, hashi, hex, mulberry } from './diorama/noise';
+import {
+  clipDraw,
+  context2d,
+  ellipse,
+  fillPat,
+  glow,
+  makeTex,
+  rr,
+  tongue,
+} from './diorama/primitives';
 
 export type DioramaOptions = {
   getScene: () => SceneId;
   getReducedMotion: () => boolean;
 };
 
+/** Every texture the scenes bake, named so a typo cannot reach the canvas. */
+type TextureName =
+  | 'bark'
+  | 'brick'
+  | 'carpet'
+  | 'damask'
+  | 'endgrain'
+  | 'felt'
+  | 'grain'
+  | 'grass'
+  | 'leather'
+  | 'stone'
+  | 'tealpaper'
+  | 'wood';
+
+/** Pre-rendered sprites reused across frames. */
+type SpriteName = 'chand' | 'curtB' | 'curtG' | 'curtP' | 'vinyl' | 'wheel';
+
+/** One parallax plate: its canvas and the context already set up to draw on it. */
+interface Plate {
+  c: HTMLCanvasElement;
+  g: CanvasRenderingContext2D;
+}
+
+/**
+ * The anchors a scene's live pass needs, all present.
+ *
+ * The bakers fill {@link SceneExtras} field by field, so the stored value is
+ * partial until the bake finishes. `ensureBaked` always runs first, but the
+ * type system cannot see that — so each live pass narrows once at the top
+ * through {@link readyExtras} rather than asserting at every read.
+ */
+type ReadyExtras<K extends keyof SceneExtras> = SceneExtras & Required<Pick<SceneExtras, K>>;
+
+/** A point the live layer paints at. */
+interface Anchor {
+  x: number;
+  y: number;
+}
+
+/** An anchor with a uniform scale, for props that shrink with the viewport. */
+interface ScaledAnchor extends Anchor {
+  s: number;
+}
+
+/**
+ * Per-scene animation anchors captured while baking.
+ *
+ * The bakers record where the live layer has to paint — the fire's seat, the
+ * window's rectangle, the path of the arch to clip against — so the animated
+ * pass never has to recompute the layout the baked plates were drawn from.
+ * Every field is optional because each scene records only its own, and the
+ * live pass for a scene only ever reads the fields its own baker wrote.
+ */
+interface SceneExtras {
+  // campfire
+  moon?: { x: number; y: number; r: number };
+  lake?: { top: number; bot: number };
+  tent?: { x: number; y: number; h: number };
+  fire?: ScaledAnchor;
+  // casino
+  sign?: { x: number; y: number; w: number };
+  sconces?: Anchor[];
+  reels?: { x: number; y: number; w: number; h: number }[];
+  marquee?: Anchor[];
+  wheel?: ScaledAnchor;
+  table?: { x: number; yc: number; rx: number; ry: number };
+  chands?: ScaledAnchor[];
+  // snug
+  window?: { x: number; y: number; w: number; h: number };
+  hearth?: { ox: number; ohw: number; oby: number; oty: number };
+  archPath?: (c: CanvasRenderingContext2D) => void;
+  candles?: { x: number; y: number; h: number }[];
+  clock?: {
+    x: number;
+    pivotY: number;
+    winX: number;
+    winY: number;
+    winW: number;
+    winH: number;
+    len: number;
+  };
+  vinyl?: { x: number; y: number; r: number };
+  mug?: ScaledAnchor;
+  cat?: ScaledAnchor;
+}
+
 export function mountParlourDiorama(
   canvas: HTMLCanvasElement,
   options: DioramaOptions,
 ): () => void {
-  const ctx = canvas.getContext('2d', { alpha: false, desynchronized: true });
-  if (!ctx) return () => {};
-
-  /* ------------------------------------------------------------------ */
-  /* helpers                                                             */
-  /* ------------------------------------------------------------------ */
-
-  const mulberry = (seed) => {
-    let a = seed >>> 0;
-    return () => {
-      a = (a + 0x6d2b79f5) >>> 0;
-      let t = a;
-      t = Math.imul(t ^ (t >>> 15), t | 1);
-      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-    };
-  };
-
-  const lerp = (a, b, t) => a + (b - a) * t;
-  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
-
-  const hashi = (ix, iy) => {
-    let n = Math.imul(ix | 0, 374761393) + Math.imul(iy | 0, 668265263);
-    n = Math.imul(n ^ (n >>> 13), 1274126177);
-    return ((n ^ (n >>> 16)) >>> 0) / 4294967296;
-  };
-
-  const noise2 = (x, y) => {
-    const x0 = Math.floor(x);
-    const y0 = Math.floor(y);
-    const fx = x - x0;
-    const fy = y - y0;
-    const u = fx * fx * (3 - 2 * fx);
-    const v = fy * fy * (3 - 2 * fy);
-    return lerp(
-      lerp(hashi(x0, y0), hashi(x0 + 1, y0), u),
-      lerp(hashi(x0, y0 + 1), hashi(x0 + 1, y0 + 1), u),
-      v,
-    );
-  };
-
-  const fbm = (x, y, oct = 4) => {
-    let sum = 0;
-    let amp = 0.5;
-    let freq = 1;
-    for (let i = 0; i < oct; i += 1) {
-      sum += noise2(x * freq, y * freq) * amp;
-      freq *= 2;
-      amp *= 0.5;
-    }
-    return sum;
-  };
-
-  const hex = (value, alpha = 1) => {
-    const n = value.replace('#', '');
-    return `rgba(${parseInt(n.slice(0, 2), 16)},${parseInt(n.slice(2, 4), 16)},${parseInt(n.slice(4, 6), 16)},${alpha})`;
-  };
-
-  function makeTex(w, h, paint) {
-    const c = document.createElement('canvas');
-    c.width = w;
-    c.height = h;
-    paint(c.getContext('2d'));
-    return c;
-  }
-
-  /**
-   * Glows are the scene's most-called primitive — embers, firelight, lamps,
-   * every soft halo — and each call used to build a fresh radial gradient.
-   * The shape is always the same: opaque at the centre, a third of the way out
-   * at 40%, transparent at the rim. So one unit-radius gradient per colour is
-   * built once and then placed by scaling the context; the per-call alpha is
-   * applied as `globalAlpha`, which composites identically for a single fill.
-   */
-  const unitGlows = new WeakMap();
-
-  function unitGlow(c, color) {
-    let byColor = unitGlows.get(c);
-    if (!byColor) {
-      byColor = new Map();
-      unitGlows.set(c, byColor);
-    }
-    let gradient = byColor.get(color);
-    if (!gradient) {
-      gradient = c.createRadialGradient(0, 0, 0, 0, 0, 1);
-      gradient.addColorStop(0, hex(color, 1));
-      gradient.addColorStop(0.4, hex(color, 0.34));
-      gradient.addColorStop(1, hex(color, 0));
-      byColor.set(color, gradient);
-    }
-    return gradient;
-  }
-
-  function glow(c, x, y, r, color, alpha = 1) {
-    if (r <= 0) return;
-    c.save();
-    c.globalAlpha *= alpha;
-    c.translate(x, y);
-    c.scale(r, r);
-    c.fillStyle = unitGlow(c, color);
-    c.beginPath();
-    c.arc(0, 0, 1, 0, Math.PI * 2);
-    c.fill();
-    c.restore();
-  }
-
-  function ellipse(c, x, y, rx, ry, color) {
-    c.fillStyle = color;
-    c.beginPath();
-    c.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2);
-    c.fill();
-  }
-
-  function rr(c, x, y, w, h, r, color) {
-    c.fillStyle = color;
-    c.beginPath();
-    c.roundRect(x, y, w, h, r);
-    c.fill();
-  }
-
-  function clipDraw(c, path, paint) {
-    c.save();
-    c.beginPath();
-    path();
-    c.clip();
-    paint();
-    c.restore();
-  }
-
-  function fillPat(c, tex, x, y, w, h, alpha = 1) {
-    c.save();
-    c.globalAlpha = alpha;
-    c.fillStyle = c.createPattern(tex, 'repeat');
-    c.fillRect(x, y, w, h);
-    c.restore();
-  }
-
-  /* one wobbling flame tongue; comp='lighter' for hot cores */
-  function tongue(c, t, x, y, bw, h, color, ph, lean, comp) {
-    const w1 = Math.sin(t * 3.1 + ph) * 0.55 + Math.sin(t * 5.9 + ph * 1.7) * 0.45;
-    const w2 = Math.sin(t * 4.3 + ph * 2.3);
-    const hh = h * (1 + w2 * 0.07);
-    const tip = lean + bw * 0.85 * w1;
-    c.save();
-    if (comp) c.globalCompositeOperation = comp;
-    c.fillStyle = color;
-    c.beginPath();
-    c.moveTo(x - bw, y);
-    c.bezierCurveTo(
-      x - bw * 1.24,
-      y - hh * 0.3,
-      x - bw * 0.45 + tip * 0.45,
-      y - hh * 0.62,
-      x + tip,
-      y - hh,
-    );
-    c.bezierCurveTo(
-      x + bw * 0.45 + tip * 0.45,
-      y - hh * 0.56,
-      x + bw * 1.24,
-      y - hh * 0.27,
-      x + bw,
-      y,
-    );
-    c.closePath();
-    c.fill();
-    c.restore();
-  }
+  const ctx = context2d(canvas, { alpha: false, desynchronized: true });
 
   /* ------------------------------------------------------------------ */
   /* textures — generated once                                           */
   /* ------------------------------------------------------------------ */
 
-  const T = {};
+  /**
+   * The generated textures, named. Declaring the shape here rather than leaving
+   * it inferred from an empty object is what lets a typo in `tex('tealpaper')`
+   * become a build error instead of an `undefined` pattern painting nothing.
+   */
+  const T: Partial<Record<TextureName, HTMLCanvasElement>> = {};
+
+  /** A baked sprite. Reading one before `buildSprites` is a programming error. */
+  function spr(name: SpriteName): HTMLCanvasElement {
+    const canvas = S[name];
+    if (!canvas) throw new Error(`diorama sprite "${name}" was read before it was baked`);
+    return canvas;
+  }
+
+  /** A baked texture. Reading one before `buildTextures` is a programming error. */
+  function tex(name: TextureName): HTMLCanvasElement {
+    const canvas = T[name];
+    if (!canvas) throw new Error(`diorama texture "${name}" was read before it was baked`);
+    return canvas;
+  }
   function buildTextures() {
     T.wood = makeTex(256, 256, (c) => {
       c.fillStyle = '#5e3b21';
@@ -257,7 +206,7 @@ export function mountParlourDiorama(
     T.damask = makeTex(144, 144, (c) => {
       c.fillStyle = '#2c1019';
       c.fillRect(0, 0, 144, 144);
-      const motif = (cx, cy, s, a) => {
+      const motif = (cx: number, cy: number, s: number, a: number) => {
         c.save();
         c.translate(cx, cy);
         c.scale(s, s);
@@ -310,7 +259,7 @@ export function mountParlourDiorama(
       c.fillRect(0, 0, 120, 150);
       c.fillStyle = 'rgba(255,255,255,0.025)';
       c.fillRect(0, 0, 60, 150);
-      const sprig = (cx, cy, s) => {
+      const sprig = (cx: number, cy: number, s: number) => {
         c.save();
         c.translate(cx, cy);
         c.scale(s, s);
@@ -341,12 +290,14 @@ export function mountParlourDiorama(
       sprig(90, -35, 1);
       sprig(30, 190, 1);
       c.fillStyle = 'rgba(141,196,205,0.10)';
-      [
-        [62, 20],
-        [8, 100],
-        [112, 62],
-        [58, 140],
-      ].forEach(([x, y]) => {
+      (
+        [
+          [62, 20],
+          [8, 100],
+          [112, 62],
+          [58, 140],
+        ] as const
+      ).forEach(([x, y]) => {
         c.beginPath();
         c.arc(x, y, 1.3, 0, Math.PI * 2);
         c.fill();
@@ -357,7 +308,7 @@ export function mountParlourDiorama(
     T.carpet = makeTex(112, 112, (c) => {
       c.fillStyle = '#141d2b';
       c.fillRect(0, 0, 112, 112);
-      const quat = (cx, cy, a) => {
+      const quat = (cx: number, cy: number, a: number) => {
         c.save();
         c.translate(cx, cy);
         c.strokeStyle = `rgba(198,124,52,${a})`;
@@ -377,10 +328,12 @@ export function mountParlourDiorama(
       quat(28, 28, 0.5);
       quat(84, 84, 0.5);
       c.fillStyle = 'rgba(47,134,161,0.5)';
-      [
-        [84, 28],
-        [28, 84],
-      ].forEach(([x, y]) => {
+      (
+        [
+          [84, 28],
+          [28, 84],
+        ] as const
+      ).forEach(([x, y]) => {
         c.save();
         c.translate(x, y);
         c.rotate(Math.PI / 4);
@@ -511,9 +464,18 @@ export function mountParlourDiorama(
   /* sprites — generated once                                            */
   /* ------------------------------------------------------------------ */
 
-  const S = {};
+  /**
+   * Pre-rendered sprites, plus the two geometry slots the chandelier needs:
+   * where its bulbs sit on the sprite, and how far its chain hangs. They live
+   * beside the canvases because they are baked at the same moment and read by
+   * the same live pass.
+   */
+  const S: Partial<Record<SpriteName, HTMLCanvasElement>> & {
+    chandBulbs?: [number, number][];
+    chandHang?: [number, number];
+  } = {};
   function buildSprites() {
-    const curtain = (color) =>
+    const curtain = (color: string) =>
       makeTex(48, 256, (c) => {
         const g = c.createLinearGradient(0, 0, 0, 256);
         g.addColorStop(0, hex(color, 0));
@@ -639,7 +601,7 @@ export function mountParlourDiorama(
     });
 
     /* brass chandelier: logical 320x300 baked at 2x */
-    const chandBulbs = [];
+    const chandBulbs: [number, number][] = [];
     S.chand = makeTex(640, 600, (c) => {
       c.scale(2, 2);
       c.translate(160, 0);
@@ -712,7 +674,16 @@ export function mountParlourDiorama(
   /* shared small props                                                  */
   /* ------------------------------------------------------------------ */
 
-  function card(c, x, y, rot, rank, suit, red, s = 1) {
+  function card(
+    c: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    rot: number,
+    rank: string,
+    suit: string,
+    red: boolean,
+    s = 1,
+  ) {
     c.save();
     c.translate(x, y);
     c.rotate(rot);
@@ -752,7 +723,7 @@ export function mountParlourDiorama(
     c.restore();
   }
 
-  function cardBack(c, x, y, rot, s = 1) {
+  function cardBack(c: CanvasRenderingContext2D, x: number, y: number, rot: number, s = 1) {
     c.save();
     c.translate(x, y);
     c.rotate(rot);
@@ -783,7 +754,14 @@ export function mountParlourDiorama(
     c.restore();
   }
 
-  function chipStack(c, x, y, color, n, s = 1) {
+  function chipStack(
+    c: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    color: string,
+    n: number,
+    s = 1,
+  ) {
     c.save();
     c.translate(x, y);
     c.scale(s, s);
@@ -817,7 +795,15 @@ export function mountParlourDiorama(
   }
 
   /* layered pine with optional warm rim on the side facing +dir */
-  function pine(c, x, y, h, seed, lit, dir = 1) {
+  function pine(
+    c: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    h: number,
+    seed: number,
+    lit: boolean,
+    dir = 1,
+  ) {
     const rnd = mulberry(seed);
     c.save();
     c.translate(x, y);
@@ -825,7 +811,7 @@ export function mountParlourDiorama(
     clipDraw(
       c,
       () => c.rect(-h * 0.035, -h * 0.3, h * 0.07, h * 0.34),
-      () => fillPat(c, T.bark, -h * 0.05, -h * 0.32, h * 0.1, h * 0.38, 0.95),
+      () => fillPat(c, tex('bark'), -h * 0.05, -h * 0.32, h * 0.1, h * 0.38, 0.95),
     );
     const tiers = 15;
     for (let i = 0; i < tiers; i += 1) {
@@ -871,7 +857,7 @@ export function mountParlourDiorama(
   let H = 0;
   let dpr = 1;
   let bakeDpr = 1;
-  let scene = 'campfire';
+  let scene: SceneId = 'campfire';
   let mx = 0;
   let my = 0;
   let px = 0;
@@ -886,15 +872,28 @@ export function mountParlourDiorama(
   const coarseQuery = window.matchMedia('(pointer: coarse)');
   let reduced = options.getReducedMotion() || calmQuery.matches;
 
-  const plates = { campfire: null, casino: null, snug: null };
-  const EX = { campfire: {}, casino: {}, snug: {} };
+  /** The four baked parallax plates per scene, filled on first render. */
+  const plates: Record<SceneId, Plate[] | null> = { campfire: null, casino: null, snug: null };
+  const EX: Record<SceneId, SceneExtras> = { campfire: {}, casino: {}, snug: {} };
 
-  const twinkles = [];
-  const flies = [];
-  const embersCF = [];
-  const embersSN = [];
-  const rain = [];
-  const motes = [];
+  /**
+   * The animated fields, seeded once from fixed seeds so the scatter is the
+   * same on every device. Positions are stored in 0–1 space where the field
+   * spans the viewport and in pixels where it is anchored to a prop.
+   */
+  const twinkles: { x: number; y: number; r: number; a: number; s: number; p: number }[] = [];
+  const flies: { x: number; y: number; s: number; p: number; ox: number; oy: number }[] = [];
+  const embersCF: {
+    x: number;
+    delay: number;
+    life: number;
+    sway: number;
+    lift: number;
+    r: number;
+  }[] = [];
+  const embersSN: { x: number; delay: number; life: number; sway: number; r: number }[] = [];
+  const rain: { x: number; y: number; len: number; s: number; a: number }[] = [];
+  const motes: { x: number; r: number; s: number; p: number }[] = [];
 
   function seedFields() {
     const rt = mulberry(0x7a11);
@@ -962,18 +961,18 @@ export function mountParlourDiorama(
     }
   }
 
-  function plate() {
+  function plate(): Plate {
     const c = document.createElement('canvas');
     c.width = Math.round((W + PAD * 2) * bakeDpr);
     c.height = Math.round((H + PAD * 2) * bakeDpr);
-    const g = c.getContext('2d');
+    const g = context2d(c);
     g.setTransform(bakeDpr, 0, 0, bakeDpr, PAD * bakeDpr, PAD * bakeDpr);
     g.imageSmoothingEnabled = true;
     g.imageSmoothingQuality = 'high';
     return { c, g };
   }
 
-  const DEPTHS = [5, 11, 19, 30];
+  const DEPTHS = [5, 11, 19, 30] as const;
 
   /**
    * The four parallax plates are the most expensive thing on screen: four
@@ -985,23 +984,31 @@ export function mountParlourDiorama(
    * enough to see (the deepest plate moves 30px per unit of offset, so a
    * hundredth of a unit is a third of a pixel). Steady state is one blit.
    */
-  let flatPlate = null;
-  let flatFor = null;
+  let flatPlate: {
+    c: HTMLCanvasElement;
+    g: CanvasRenderingContext2D;
+    w: number;
+    h: number;
+  } | null = null;
+  let flatFor: readonly Plate[] | null = null;
   let flatKey = '';
-  let washGradient = null;
+  let washGradient: CanvasGradient | null = null;
   let washFor = '';
 
-  function blitPlates(arr) {
+  function blitPlates(arr: readonly Plate[]) {
     // While the parallax is still easing there is a new composite every frame,
     // and caching one costs more than it saves. Draw straight through until it
     // settles, then cut the composite once and ride it.
     if (Math.abs(px - mx) > 0.002 || Math.abs(py - my) > 0.002) {
       flatFor = null;
       for (let i = 0; i < arr.length; i += 1) {
+        const plateAt = arr[i];
+        const depth = DEPTHS[i] ?? 0;
+        if (!plateAt) continue;
         ctx.drawImage(
-          arr[i].c,
-          -PAD - px * DEPTHS[i],
-          -PAD - py * DEPTHS[i] * 0.6,
+          plateAt.c,
+          -PAD - px * depth,
+          -PAD - py * depth * 0.6,
           W + PAD * 2,
           H + PAD * 2,
         );
@@ -1013,20 +1020,24 @@ export function mountParlourDiorama(
       const c = document.createElement('canvas');
       c.width = Math.max(1, Math.round(W * dpr));
       c.height = Math.max(1, Math.round(H * dpr));
-      flatPlate = { c, g: c.getContext('2d'), w: W, h: H };
+      flatPlate = { c, g: context2d(c), w: W, h: H };
       flatFor = null;
     }
+    const flat = flatPlate;
     if (flatFor !== arr || flatKey !== key) {
-      const g = flatPlate.g;
+      const g = flat.g;
       g.setTransform(dpr, 0, 0, dpr, 0, 0);
       g.clearRect(0, 0, W, H);
       g.imageSmoothingEnabled = true;
       g.imageSmoothingQuality = 'medium';
       for (let i = 0; i < arr.length; i += 1) {
+        const plateAt = arr[i];
+        const depth = DEPTHS[i] ?? 0;
+        if (!plateAt) continue;
         g.drawImage(
-          arr[i].c,
-          -PAD - px * DEPTHS[i],
-          -PAD - py * DEPTHS[i] * 0.6,
+          plateAt.c,
+          -PAD - px * depth,
+          -PAD - py * depth * 0.6,
           W + PAD * 2,
           H + PAD * 2,
         );
@@ -1034,10 +1045,10 @@ export function mountParlourDiorama(
       flatFor = arr;
       flatKey = key;
     }
-    ctx.drawImage(flatPlate.c, 0, 0, W, H);
+    ctx.drawImage(flat.c, 0, 0, W, H);
   }
 
-  function withDepth(depth, fn) {
+  function withDepth(depth: number, fn: () => void) {
     ctx.save();
     ctx.translate(-px * depth, -py * depth * 0.6);
     fn();
@@ -1053,7 +1064,7 @@ export function mountParlourDiorama(
     const mid = plate();
     const near = plate();
     const fore = plate();
-    const ex = {};
+    const ex: SceneExtras = {};
     EX.campfire = ex;
 
     /* ---- far: sky, stars, moon, distant ridges -------------------- */
@@ -1132,19 +1143,21 @@ export function mountParlourDiorama(
     g.arc(moonX, moonY, moonR, 0, Math.PI * 2);
     g.fill();
     g.fillStyle = 'rgba(150,138,112,0.3)';
-    [
-      [-0.25, 0.2, 0.2],
-      [0.3, -0.28, 0.14],
-      [0.16, 0.34, 0.17],
-      [-0.42, -0.2, 0.1],
-      [0.46, 0.18, 0.1],
-    ].forEach(([dx, dy, r]) => {
+    (
+      [
+        [-0.25, 0.2, 0.2],
+        [0.3, -0.28, 0.14],
+        [0.16, 0.34, 0.17],
+        [-0.42, -0.2, 0.1],
+        [0.46, 0.18, 0.1],
+      ] as const
+    ).forEach(([dx, dy, r]) => {
       g.beginPath();
       g.arc(moonX + dx * moonR, moonY + dy * moonR, r * moonR, 0, Math.PI * 2);
       g.fill();
     });
 
-    const ridge = (yBase, amp, color, seed) => {
+    const ridge = (yBase: number, amp: number, color: string, seed: number) => {
       g.fillStyle = color;
       g.beginPath();
       g.moveTo(-PAD, H + PAD);
@@ -1247,7 +1260,8 @@ export function mountParlourDiorama(
 
     /* ---- near: shore, grass, tent, edge pines --------------------- */
     const n = near.g;
-    const shoreAt = (x) => H * 0.645 + Math.sin(x * 0.012) * 6 + (fbm(x * 0.01, 4, 3) - 0.5) * 12;
+    const shoreAt = (x: number) =>
+      H * 0.645 + Math.sin(x * 0.012) * 6 + (fbm(x * 0.01, 4, 3) - 0.5) * 12;
     n.beginPath();
     n.moveTo(-PAD, H + PAD);
     n.lineTo(-PAD, shoreAt(-PAD));
@@ -1271,7 +1285,7 @@ export function mountParlourDiorama(
         n.closePath();
       },
       () => {
-        fillPat(n, T.grass, -PAD, H * 0.62, W + PAD * 2, H * 0.5, 0.9);
+        fillPat(n, tex('grass'), -PAD, H * 0.62, W + PAD * 2, H * 0.5, 0.9);
         const dirt = n.createRadialGradient(
           W * 0.5,
           H * 0.85,
@@ -1403,10 +1417,12 @@ export function mountParlourDiorama(
     n.lineTo(th * 0.8, 16);
     n.stroke();
     n.fillStyle = '#c99b52';
-    [
-      [-th * 0.8, 16],
-      [th * 0.8, 16],
-    ].forEach(([sx, sy]) => {
+    (
+      [
+        [-th * 0.8, 16],
+        [th * 0.8, 16],
+      ] as const
+    ).forEach(([sx, sy]) => {
       n.fillRect(sx - 1.4, sy - 2, 2.8, 8);
     });
     n.fillStyle = '#e29349';
@@ -1454,7 +1470,7 @@ export function mountParlourDiorama(
     ellipse(f, FX, FY + 12 * fs, 82 * fs, 20 * fs, '#1c0f08');
 
     /* burning logs */
-    const burnLog = (dx, dy, len, thick, rot) => {
+    const burnLog = (dx: number, dy: number, len: number, thick: number, rot: number) => {
       f.save();
       f.translate(FX + dx * fs, FY + dy * fs);
       f.rotate(rot);
@@ -1462,7 +1478,8 @@ export function mountParlourDiorama(
         f,
         () =>
           f.roundRect(-len * 0.5 * fs, -thick * 0.5 * fs, len * fs, thick * fs, thick * 0.5 * fs),
-        () => fillPat(f, T.bark, -len * 0.5 * fs, -thick * 0.6 * fs, len * fs, thick * 1.3 * fs),
+        () =>
+          fillPat(f, tex('bark'), -len * 0.5 * fs, -thick * 0.6 * fs, len * fs, thick * 1.3 * fs),
       );
       const charG = f.createLinearGradient(-len * 0.5 * fs, 0, len * 0.5 * fs, 0);
       charG.addColorStop(0, 'rgba(8,4,2,0.1)');
@@ -1533,7 +1550,14 @@ export function mountParlourDiorama(
     });
 
     /* seating logs cropping the bottom — you are sitting here */
-    const seatLog = (cx, cy, len, thick, rot, mirror) => {
+    const seatLog = (
+      cx: number,
+      cy: number,
+      len: number,
+      thick: number,
+      rot: number,
+      mirror: boolean,
+    ) => {
       f.save();
       f.translate(cx, cy);
       f.rotate(rot);
@@ -1542,7 +1566,7 @@ export function mountParlourDiorama(
         f,
         () => f.roundRect(-len / 2, -thick / 2, len, thick, thick * 0.5),
         () => {
-          fillPat(f, T.bark, -len / 2, -thick * 0.6, len, thick * 1.35, 0.95);
+          fillPat(f, tex('bark'), -len / 2, -thick * 0.6, len, thick * 1.35, 0.95);
           const shade = f.createLinearGradient(0, -thick / 2, 0, thick / 2);
           shade.addColorStop(0, 'rgba(255,178,74,0.28)');
           shade.addColorStop(0.35, 'rgba(0,0,0,0)');
@@ -1556,7 +1580,7 @@ export function mountParlourDiorama(
         f,
         () => f.ellipse(0, -thick * 0.34, len * 0.42, thick * 0.2, 0, 0, Math.PI * 2),
         () => {
-          fillPat(f, T.wood, -len * 0.42, -thick * 0.56, len * 0.84, thick * 0.44, 0.95);
+          fillPat(f, tex('wood'), -len * 0.42, -thick * 0.56, len * 0.84, thick * 0.44, 0.95);
           f.fillStyle = 'rgba(255,205,140,0.16)';
           f.fillRect(-len * 0.42, -thick * 0.56, len * 0.84, thick * 0.44);
         },
@@ -1565,7 +1589,8 @@ export function mountParlourDiorama(
       clipDraw(
         f,
         () => f.ellipse(endX, 0, thick * 0.44, thick * 0.5, 0, 0, Math.PI * 2),
-        () => fillPat(f, T.endgrain, endX - thick * 0.5, -thick * 0.52, thick, thick * 1.05, 0.98),
+        () =>
+          fillPat(f, tex('endgrain'), endX - thick * 0.5, -thick * 0.52, thick, thick * 1.05, 0.98),
       );
       f.restore();
     };
@@ -1645,9 +1670,18 @@ export function mountParlourDiorama(
     plates.campfire = [far, mid, near, fore];
   }
 
-  function liveCampfire(t) {
-    blitPlates(plates.campfire);
-    const ex = EX.campfire;
+  /** Narrows a baked scene's anchors, or reports the bake never ran. */
+  function readyExtras<K extends keyof SceneExtras>(
+    ex: SceneExtras,
+    keys: readonly K[],
+  ): ReadyExtras<K> | null {
+    return keys.every((key) => ex[key] !== undefined) ? (ex as ReadyExtras<K>) : null;
+  }
+
+  function liveCampfire(t: number) {
+    blitPlates(plates.campfire ?? []);
+    const ex = readyExtras(EX.campfire, ['moon', 'lake', 'tent', 'fire'] as const);
+    if (!ex) return;
 
     /* aurora curtains — full width, three interleaved colors */
     withDepth(DEPTHS[0], () => {
@@ -1655,9 +1689,9 @@ export function mountParlourDiorama(
       ctx.globalCompositeOperation = 'screen';
       const step = Math.max(18, W / 70);
       const passes = [
-        { spr: S.curtG, ph: 0, sp: 0.055, base: H * 0.34, y0: H * 0.01, aK: 0.6 },
-        { spr: S.curtB, ph: 40, sp: 0.04, base: H * 0.27, y0: H * 0.05, aK: 0.38 },
-        { spr: S.curtP, ph: 90, sp: 0.075, base: H * 0.2, y0: H * 0.1, aK: 0.24 },
+        { spr: spr('curtG'), ph: 0, sp: 0.055, base: H * 0.34, y0: H * 0.01, aK: 0.6 },
+        { spr: spr('curtB'), ph: 40, sp: 0.04, base: H * 0.27, y0: H * 0.05, aK: 0.38 },
+        { spr: spr('curtP'), ph: 90, sp: 0.075, base: H * 0.2, y0: H * 0.1, aK: 0.24 },
       ];
       passes.forEach((p) => {
         for (let x = -PAD; x < W + PAD; x += step) {
@@ -1679,7 +1713,7 @@ export function mountParlourDiorama(
         ctx.arc(s.x * W, s.y * H, s.r, 0, Math.PI * 2);
         ctx.fill();
       });
-      const shoot = (delay, x, y) => {
+      const shoot = (delay: number, x: number, y: number) => {
         const u = ((t + delay) % 17) / 17;
         if (u < 0.045) {
           const p = u / 0.045;
@@ -1720,7 +1754,7 @@ export function mountParlourDiorama(
       ctx.translate(0, top);
       ctx.scale(1, -0.5);
       ctx.translate(0, -(bot - top) * 2);
-      ctx.drawImage(S.curtG, 0, (bot - top) * 0.9, W, (bot - top) * 1.1);
+      ctx.drawImage(spr('curtG'), 0, (bot - top) * 0.9, W, (bot - top) * 1.1);
       ctx.restore();
       ctx.globalAlpha = 1;
       for (let i = 0; i < 5; i += 1) {
@@ -1861,7 +1895,7 @@ export function mountParlourDiorama(
     const mid = plate();
     const near = plate();
     const fore = plate();
-    const ex = {};
+    const ex: SceneExtras = {};
     EX.casino = ex;
     const k = clamp(Math.min(W, H) / 820, 0.7, 1.3);
 
@@ -1876,7 +1910,7 @@ export function mountParlourDiorama(
     wall.addColorStop(1, '#2c1018');
     g.fillStyle = wall;
     g.fillRect(-PAD, -PAD, W + PAD * 2, RAIL + PAD);
-    fillPat(g, T.damask, -PAD, -PAD, W + PAD * 2, RAIL + PAD, 0.9);
+    fillPat(g, tex('damask'), -PAD, -PAD, W + PAD * 2, RAIL + PAD, 0.9);
     const wallShade = g.createLinearGradient(0, 0, W, 0);
     wallShade.addColorStop(0, 'rgba(10,3,6,0.5)');
     wallShade.addColorStop(0.25, 'rgba(10,3,6,0)');
@@ -1908,7 +1942,7 @@ export function mountParlourDiorama(
     g.fillRect(-PAD, H * 0.05, W + PAD * 2, 1);
 
     /* framed wall art */
-    const art = (ax, motifPaint) => {
+    const art = (ax: number, motifPaint: (aw: number, ah: number) => void) => {
       const aw = 84 * k;
       const ah = 106 * k;
       g.save();
@@ -1926,7 +1960,7 @@ export function mountParlourDiorama(
       motifPaint(aw, ah);
       g.restore();
     };
-    art(W * 0.27, (aw, ah) => {
+    art(W * 0.27, (aw: number, ah: number) => {
       const pg = g.createLinearGradient(0, -ah / 2, 0, ah / 2);
       pg.addColorStop(0, '#25586e');
       pg.addColorStop(1, '#12293a');
@@ -1939,7 +1973,7 @@ export function mountParlourDiorama(
       g.strokeStyle = 'rgba(226,194,137,0.4)';
       g.strokeRect(-aw / 2 + 13 * k, -ah / 2 + 13 * k, aw - 26 * k, ah - 26 * k);
     });
-    art(W * 0.73, (aw, ah) => {
+    art(W * 0.73, (aw: number, ah: number) => {
       const pg = g.createLinearGradient(0, -ah / 2, 0, ah / 2);
       pg.addColorStop(0, '#6b2434');
       pg.addColorStop(1, '#33101c');
@@ -1981,12 +2015,14 @@ export function mountParlourDiorama(
     g.beginPath();
     g.roundRect(W * 0.5 - SW / 2 + 10, SY - SW * 0.115 + 10, SW - 20, SW * 0.23 - 20, SW * 0.045);
     g.stroke();
-    [
-      [-1, -1],
-      [1, -1],
-      [-1, 1],
-      [1, 1],
-    ].forEach(([qx, qy]) => {
+    (
+      [
+        [-1, -1],
+        [1, -1],
+        [-1, 1],
+        [1, 1],
+      ] as const
+    ).forEach(([qx, qy]) => {
       ellipse(g, W * 0.5 + qx * (SW / 2 - 16), SY + qy * (SW * 0.115 - 14), 4, 4, '#e2c289');
       ellipse(g, W * 0.5 + qx * (SW / 2 - 17), SY + qy * (SW * 0.115 - 15), 1.6, 1.6, '#fff3d6');
     });
@@ -2009,7 +2045,7 @@ export function mountParlourDiorama(
         wgrad.addColorStop(1, '#1c0d06');
         g.fillStyle = wgrad;
         g.fillRect(-PAD, RAIL + 12, W + PAD * 2, WBOT - RAIL);
-        fillPat(g, T.wood, -PAD, RAIL + 12, W + PAD * 2, WBOT - RAIL, 0.6);
+        fillPat(g, tex('wood'), -PAD, RAIL + 12, W + PAD * 2, WBOT - RAIL, 0.6);
         for (let x = 10; x < W + PAD; x += 128) {
           g.strokeStyle = 'rgba(20,8,3,0.6)';
           g.lineWidth = 2;
@@ -2024,7 +2060,8 @@ export function mountParlourDiorama(
     g.fillRect(-PAD, WBOT - 4, W + PAD * 2, 4);
 
     /* sconces */
-    ex.sconces = [];
+    const sconces: Anchor[] = [];
+    ex.sconces = sconces;
     [W * 0.055, W * 0.945].forEach((sx) => {
       glow(g, sx, H * 0.345, 52 * k, '#f2b06a', 0.15);
       rr(g, sx - 3.4, H * 0.365, 6.8, 26 * k, 3, '#6d4a1c');
@@ -2035,7 +2072,7 @@ export function mountParlourDiorama(
       g.quadraticCurveTo(sx, H * 0.33, sx + 11 * k, H * 0.3);
       g.quadraticCurveTo(sx + 15 * k, H * 0.345, sx, H * 0.365);
       g.fill();
-      ex.sconces.push({ x: sx, y: H * 0.308 });
+      sconces.push({ x: sx, y: H * 0.308 });
     });
 
     /* ---- mid: carpet floor ---------------------------------------- */
@@ -2045,7 +2082,7 @@ export function mountParlourDiorama(
     floorG.addColorStop(1, '#0d131c');
     m.fillStyle = floorG;
     m.fillRect(-PAD, WBOT, W + PAD * 2, H - WBOT + PAD * 2);
-    fillPat(m, T.carpet, -PAD, WBOT, W + PAD * 2, H - WBOT + PAD * 2, 0.9);
+    fillPat(m, tex('carpet'), -PAD, WBOT, W + PAD * 2, H - WBOT + PAD * 2, 0.9);
     const floorEdge = m.createLinearGradient(0, 0, W, 0);
     floorEdge.addColorStop(0, 'rgba(4,7,12,0.55)');
     floorEdge.addColorStop(0.3, 'rgba(4,7,12,0)');
@@ -2123,7 +2160,8 @@ export function mountParlourDiorama(
     n.beginPath();
     n.roundRect(-56, -142, 112, 58, 7);
     n.stroke();
-    ex.reels = [];
+    const reels: { x: number; y: number; w: number; h: number }[] = [];
+    ex.reels = reels;
     [-36, 0, 36].forEach((dx) => {
       const rg = n.createLinearGradient(0, -138, 0, -88);
       rg.addColorStop(0, '#cfc4ae');
@@ -2133,7 +2171,7 @@ export function mountParlourDiorama(
       n.beginPath();
       n.roundRect(dx - 15, -138, 30, 50, 3);
       n.fill();
-      ex.reels.push({ x: SLX + dx * ss, y: SLB - 113 * ss, w: 30 * ss, h: 50 * ss });
+      reels.push({ x: SLX + dx * ss, y: SLB - 113 * ss, w: 30 * ss, h: 50 * ss });
     });
     n.strokeStyle = 'rgba(189,47,58,0.65)';
     n.lineWidth = 2;
@@ -2143,11 +2181,13 @@ export function mountParlourDiorama(
     n.stroke();
     /* buttons + tray */
     rr(n, -46, -74, 92, 18, 6, '#1c0810');
-    [
-      [-28, '#bd2f3a'],
-      [0, '#e2c289'],
-      [28, '#2f86a1'],
-    ].forEach(([dx, col]) => {
+    (
+      [
+        [-28, '#bd2f3a'],
+        [0, '#e2c289'],
+        [28, '#2f86a1'],
+      ] as const
+    ).forEach(([dx, col]) => {
       ellipse(n, dx, -65, 9, 6.4, col);
       ellipse(n, dx - 2, -67, 3, 2, 'rgba(255,255,255,0.4)');
     });
@@ -2206,7 +2246,7 @@ export function mountParlourDiorama(
     clipDraw(
       n,
       () => n.ellipse(0, -108, 118, 30, 0, 0, Math.PI * 2),
-      () => fillPat(n, T.wood, -118, -140, 236, 66, 0.55),
+      () => fillPat(n, tex('wood'), -118, -140, 236, 66, 0.55),
     );
     n.strokeStyle = '#c99b52';
     n.lineWidth = 3;
@@ -2242,7 +2282,7 @@ export function mountParlourDiorama(
         wg.addColorStop(1, '#402410');
         f.fillStyle = wg;
         f.fillRect(TXc - RXr, TB - RYr - 4, RXr * 2, RYr);
-        fillPat(f, T.wood, TXc - RXr, TB - RYr - 4, RXr * 2, RYr, 0.55);
+        fillPat(f, tex('wood'), TXc - RXr, TB - RYr - 4, RXr * 2, RYr, 0.55);
       },
     );
     f.strokeStyle = 'rgba(20,10,4,0.7)';
@@ -2278,7 +2318,7 @@ export function mountParlourDiorama(
         felt.addColorStop(1, '#113a30');
         f.fillStyle = felt;
         f.fillRect(TXc - RXr, TB - RYr, RXr * 2, RYr);
-        fillPat(f, T.felt, TXc - RXr, TB - RYr, RXr * 2, RYr, 0.75);
+        fillPat(f, tex('felt'), TXc - RXr, TB - RYr, RXr * 2, RYr, 0.75);
         const railShadow = f.createLinearGradient(0, TB - RYr * 0.9, 0, TB - RYr * 0.9 + 42);
         railShadow.addColorStop(0, 'rgba(4,12,10,0.55)');
         railShadow.addColorStop(1, 'rgba(4,12,10,0)');
@@ -2297,11 +2337,13 @@ export function mountParlourDiorama(
     f.beginPath();
     f.ellipse(TXc, TB, RXr * 0.7, RYr * 0.7, 0, Math.PI * 1.08, Math.PI * 1.92);
     f.stroke();
-    [
-      [-0.13, 0.012, -0.1],
-      [0, 0, 0],
-      [0.13, 0.012, 0.1],
-    ].forEach(([ux, uy, rot]) => {
+    (
+      [
+        [-0.13, 0.012, -0.1],
+        [0, 0, 0],
+        [0.13, 0.012, 0.1],
+      ] as const
+    ).forEach(([ux, uy, rot]) => {
       f.save();
       f.translate(TXc + W * ux, H * (0.815 + uy));
       f.rotate(rot);
@@ -2334,9 +2376,18 @@ export function mountParlourDiorama(
     ];
   }
 
-  function liveCasino(t) {
-    blitPlates(plates.casino);
-    const ex = EX.casino;
+  function liveCasino(t: number) {
+    blitPlates(plates.casino ?? []);
+    const ex = readyExtras(EX.casino, [
+      'sign',
+      'sconces',
+      'reels',
+      'marquee',
+      'wheel',
+      'table',
+      'chands',
+    ] as const);
+    if (!ex) return;
 
     /* neon sign + wall glow */
     withDepth(DEPTHS[0], () => {
@@ -2355,28 +2406,31 @@ export function mountParlourDiorama(
       ctx.shadowColor = 'rgba(255,150,70,0.9)';
       ctx.shadowBlur = 24;
       for (let i = 0; i < word.length; i += 1) {
+        const letter = word[i] ?? '';
         const isDip = dip && i === 4;
         ctx.globalAlpha = isDip ? 0.3 : 1;
         ctx.fillStyle = '#ffdcae';
-        ctx.fillText(word[i], cx, s.y - s.w * 0.012);
+        ctx.fillText(letter, cx, s.y - s.w * 0.012);
         if (!isDip) {
           ctx.shadowBlur = 0;
           ctx.fillStyle = '#fff3d6';
-          ctx.fillText(word[i], cx, s.y - s.w * 0.012);
+          ctx.fillText(letter, cx, s.y - s.w * 0.012);
           ctx.shadowBlur = 24;
         }
-        cx += widths[i];
+        cx += widths[i] ?? 0;
       }
       ctx.restore();
       ctx.globalAlpha = 1;
       ctx.textAlign = 'center';
       ctx.font = `700 ${Math.round(fsz * 0.34)}px "Baloo 2", sans-serif`;
-      [
-        ['♠', '#9fdcef', -3],
-        ['♥', '#ff9d7a', -1],
-        ['♦', '#ff9d7a', 1],
-        ['♣', '#9fdcef', 3],
-      ].forEach(([ch, col, u]) => {
+      (
+        [
+          ['♠', '#9fdcef', -3],
+          ['♥', '#ff9d7a', -1],
+          ['♦', '#ff9d7a', 1],
+          ['♣', '#9fdcef', 3],
+        ] as const
+      ).forEach(([ch, col, u]) => {
         ctx.fillStyle = col;
         ctx.globalAlpha = 0.55 + 0.45 * (0.5 + 0.5 * Math.sin(t * 1.8 + u * 2));
         ctx.fillText(ch, s.x + u * fsz * 0.42, s.y + s.w * 0.078);
@@ -2400,23 +2454,19 @@ export function mountParlourDiorama(
 
     /* chandeliers: swinging sprites + cones + motes */
     withDepth(DEPTHS[1], () => {
+      const hang = S.chandHang ?? [0, 0];
+      const bulbs = S.chandBulbs ?? [];
       ex.chands.forEach((ch, i) => {
         const rot = Math.sin(t * 0.5 + i * 1.9) * 0.02;
         const sc = ch.s * 0.5;
         ctx.save();
         ctx.translate(ch.x, ch.y);
         ctx.rotate(rot);
-        ctx.drawImage(
-          S.chand,
-          -S.chandHang[0] * 2 * sc,
-          -S.chandHang[1] * 2 * sc,
-          640 * sc,
-          600 * sc,
-        );
+        ctx.drawImage(spr('chand'), -hang[0] * 2 * sc, -hang[1] * 2 * sc, 640 * sc, 600 * sc);
         ctx.restore();
         const cosA = Math.cos(rot);
         const sinA = Math.sin(rot);
-        S.chandBulbs.forEach(([bx, by], kk) => {
+        bulbs.forEach(([bx, by], kk) => {
           const dx = bx * ch.s * 0.5 * 2 * 0.5;
           const dy = (by - 8) * ch.s * 0.5 * 2 * 0.5;
           const gx = ch.x + dx * cosA - dy * sinA;
@@ -2458,7 +2508,7 @@ export function mountParlourDiorama(
         glow(ctx, b.x, b.y, 7, '#ffe9c4', 0.5 * on);
         ellipse(ctx, b.x, b.y, 2.4, 2.4, `rgba(255,236,196,${0.4 + 0.6 * on})`);
       });
-      const symbols = ['7', '♠', '♥', '★', '♦'];
+      const symbols = ['7', '♠', '♥', '★', '♦'] as const;
       const symColor = {
         7: '#bd5f20',
         '♠': '#20475c',
@@ -2479,8 +2529,8 @@ export function mountParlourDiorama(
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         for (let kk = -1; kk <= 1; kk += 1) {
-          const sym = symbols[(((idx + kk) % 5) + 5) % 5];
-          ctx.fillStyle = symColor[sym];
+          const sym = symbols[(((idx + kk) % 5) + 5) % 5] ?? symbols[0]!;
+          ctx.fillStyle = symColor[sym] ?? '#ffffff';
           ctx.fillText(sym, r0.x, r0.y + (kk + frac) * r0.h * 0.7);
         }
         ctx.textBaseline = 'alphabetic';
@@ -2491,7 +2541,7 @@ export function mountParlourDiorama(
       ctx.translate(wh.x, wh.y);
       ctx.scale(wh.s, wh.s * 0.42);
       ctx.rotate(t * 0.8);
-      ctx.drawImage(S.wheel, -118, -118, 236, 236);
+      ctx.drawImage(spr('wheel'), -118, -118, 236, 236);
       ctx.restore();
       ctx.save();
       ctx.translate(wh.x, wh.y);
@@ -2531,7 +2581,7 @@ export function mountParlourDiorama(
     const mid = plate();
     const near = plate();
     const fore = plate();
-    const ex = {};
+    const ex: SceneExtras = {};
     EX.snug = ex;
 
     const RAILY = H * 0.575;
@@ -2545,7 +2595,7 @@ export function mountParlourDiorama(
     wall.addColorStop(1, '#27454c');
     g.fillStyle = wall;
     g.fillRect(-PAD, -PAD, W + PAD * 2, FLOORY + PAD);
-    fillPat(g, T.tealpaper, -PAD, -PAD, W + PAD * 2, RAILY + PAD, 0.85);
+    fillPat(g, tex('tealpaper'), -PAD, -PAD, W + PAD * 2, RAILY + PAD, 0.85);
     g.fillStyle = 'rgba(6,12,14,0.3)';
     g.fillRect(-PAD, -PAD, W + PAD * 2, PAD + H * 0.06);
     g.save();
@@ -2579,7 +2629,7 @@ export function mountParlourDiorama(
     const wh2 = WY1 - WY0;
     ex.window = { x: WX0, y: WY0, w: ww, h: wh2 };
     /* curtains behind casing edges */
-    const drape = (dx0, flip) => {
+    const drape = (dx0: number, flip: boolean) => {
       g.save();
       g.translate(dx0, WY0 - 18);
       if (flip) g.scale(-1, 1);
@@ -2623,7 +2673,7 @@ export function mountParlourDiorama(
     g.shadowBlur = 16;
     rr(g, WX0 - 16, WY0 - 14, ww + 32, wh2 + 28, 10, '#3b2417');
     g.restore();
-    fillPat(g, T.wood, WX0 - 16, WY0 - 14, ww + 32, wh2 + 28, 0.5);
+    fillPat(g, tex('wood'), WX0 - 16, WY0 - 14, ww + 32, wh2 + 28, 0.5);
     g.strokeStyle = 'rgba(214,160,96,0.28)';
     g.lineWidth = 1.4;
     g.strokeRect(WX0 - 12, WY0 - 10, ww + 24, wh2 + 20);
@@ -2669,13 +2719,15 @@ export function mountParlourDiorama(
         g.fillRect(WX0 + ww * 0.17, WY0 + wh2 * 0.47, ww * 0.03, wh2 * 0.09);
         g.fillRect(WX0 + ww * 0.71, WY0 + wh2 * 0.44, ww * 0.03, wh2 * 0.1);
         /* lit windows */
-        [
-          [0.14, 0.72],
-          [0.3, 0.7],
-          [0.42, 0.68],
-          [0.63, 0.74],
-          [0.8, 0.68],
-        ].forEach(([u, v], i2) => {
+        (
+          [
+            [0.14, 0.72],
+            [0.3, 0.7],
+            [0.42, 0.68],
+            [0.63, 0.74],
+            [0.8, 0.68],
+          ] as const
+        ).forEach(([u, v], i2) => {
           const lx = WX0 + ww * u;
           const ly = WY0 + wh2 * v;
           glow(g, lx, ly, 8, '#f2b06a', 0.5);
@@ -2713,11 +2765,13 @@ export function mountParlourDiorama(
     g.strokeStyle = '#2c6e4f';
     g.lineWidth = 2.2;
     g.lineCap = 'round';
-    [
-      [-6, -30, -10],
-      [0, -34, 2],
-      [6, -28, 10],
-    ].forEach(([x1, y1, x2]) => {
+    (
+      [
+        [-6, -30, -10],
+        [0, -34, 2],
+        [6, -28, 10],
+      ] as const
+    ).forEach(([x1, y1, x2]) => {
       g.beginPath();
       g.moveTo(0, -14);
       g.quadraticCurveTo(x1, y1 * 0.7, x2, y1);
@@ -2743,7 +2797,7 @@ export function mountParlourDiorama(
         wg.addColorStop(1, '#241408');
         g.fillStyle = wg;
         g.fillRect(-PAD, RAILY + 9, W + PAD * 2, FLOORY - RAILY);
-        fillPat(g, T.wood, -PAD, RAILY + 9, W + PAD * 2, FLOORY - RAILY, 0.65);
+        fillPat(g, tex('wood'), -PAD, RAILY + 9, W + PAD * 2, FLOORY - RAILY, 0.65);
         for (let x = 8; x < W + PAD; x += 96) {
           g.strokeStyle = 'rgba(16,8,3,0.55)';
           g.lineWidth = 2;
@@ -2765,7 +2819,7 @@ export function mountParlourDiorama(
     floorG.addColorStop(1, '#180d05');
     m.fillStyle = floorG;
     m.fillRect(-PAD, FLOORY, W + PAD * 2, H - FLOORY + PAD * 2);
-    fillPat(m, T.wood, -PAD, FLOORY, W + PAD * 2, H - FLOORY + PAD * 2, 0.5);
+    fillPat(m, tex('wood'), -PAD, FLOORY, W + PAD * 2, H - FLOORY + PAD * 2, 0.5);
     m.strokeStyle = 'rgba(20,10,4,0.55)';
     for (let i = 0; i < 9; i += 1) {
       const u = i / 8;
@@ -2857,7 +2911,7 @@ export function mountParlourDiorama(
       m.stroke();
       m.restore();
     }
-    fillPat(m, T.grain, RGX - RRX, RGY - RRY, RRX * 2, RRY * 2, 0.4);
+    fillPat(m, tex('grain'), RGX - RRX, RGY - RRY, RRX * 2, RRY * 2, 0.4);
     m.restore();
 
     /* ---- near: hearth (LEFT WALL FIXTURE), shelf, clock, console ---- */
@@ -2884,7 +2938,7 @@ export function mountParlourDiorama(
       n,
       () => n.rect(BX0, -PAD, BX1 - BX0, H * 0.745 + PAD),
       () => {
-        fillPat(n, T.brick, BX0, -PAD, BX1 - BX0, H * 0.745 + PAD, 1);
+        fillPat(n, tex('brick'), BX0, -PAD, BX1 - BX0, H * 0.745 + PAD, 1);
         const bShade = n.createLinearGradient(BX0, 0, BX1, 0);
         bShade.addColorStop(0, 'rgba(10,5,2,0.5)');
         bShade.addColorStop(0.35, 'rgba(10,5,2,0.05)');
@@ -2912,7 +2966,7 @@ export function mountParlourDiorama(
     n.shadowOffsetY = 6;
     rr(n, BX0 - 10, MY, BX1 - BX0 + 20, 20, 4, '#6a4228');
     n.restore();
-    fillPat(n, T.wood, BX0 - 10, MY, BX1 - BX0 + 20, 20, 0.65);
+    fillPat(n, tex('wood'), BX0 - 10, MY, BX1 - BX0 + 20, 20, 0.65);
     n.fillStyle = 'rgba(255,214,160,0.2)';
     n.fillRect(BX0 - 10, MY, BX1 - BX0 + 20, 3);
     [BX0 + 14, BX1 - 26].forEach((cx0) => {
@@ -2927,7 +2981,7 @@ export function mountParlourDiorama(
     });
 
     /* firebox opening: arch in the wall ABOVE the hearth slab */
-    const archPath = (c) => {
+    const archPath = (c: CanvasRenderingContext2D) => {
       c.moveTo(OX - OHW, OBY);
       c.lineTo(OX - OHW, OTY + (OBY - OTY) * 0.42);
       c.quadraticCurveTo(OX - OHW, OTY, OX, OTY);
@@ -2973,7 +3027,7 @@ export function mountParlourDiorama(
       () => {
         n.fillStyle = '#070302';
         n.fillRect(OX - OHW, OTY - 6, OHW * 2, OBY - OTY + 8);
-        fillPat(n, T.brick, OX - OHW, OTY, OHW * 2, OBY - OTY, 0.3);
+        fillPat(n, tex('brick'), OX - OHW, OTY, OHW * 2, OBY - OTY, 0.3);
         const soot = n.createLinearGradient(0, OTY, 0, OBY);
         soot.addColorStop(0, 'rgba(0,0,0,0.85)');
         soot.addColorStop(0.55, 'rgba(0,0,0,0.5)');
@@ -2991,18 +3045,20 @@ export function mountParlourDiorama(
         n.translate(OX, OBY - 9);
         n.rotate(-0.14);
         rr(n, -OHW * 0.62, -6, OHW * 1.24, 12, 6, '#2c160a');
-        fillPat(n, T.bark, -OHW * 0.62, -7, OHW * 1.24, 15, 0.6);
+        fillPat(n, tex('bark'), -OHW * 0.62, -7, OHW * 1.24, 15, 0.6);
         n.rotate(0.3);
         rr(n, -OHW * 0.54, -3, OHW * 1.08, 11, 5, '#38200e');
-        fillPat(n, T.bark, -OHW * 0.54, -4, OHW * 1.08, 14, 0.55);
+        fillPat(n, tex('bark'), -OHW * 0.54, -4, OHW * 1.08, 14, 0.55);
         n.restore();
         n.strokeStyle = 'rgba(255,150,60,0.8)';
         n.lineWidth = 1.6;
-        [
-          [-0.4, -14],
-          [-0.1, -10],
-          [0.24, -13],
-        ].forEach(([u, dy]) => {
+        (
+          [
+            [-0.4, -14],
+            [-0.1, -10],
+            [0.24, -13],
+          ] as const
+        ).forEach(([u, dy]) => {
           n.beginPath();
           n.moveTo(OX + u * OHW, OBY + dy);
           n.lineTo(OX + u * OHW + 6, OBY + dy + 5);
@@ -3031,7 +3087,7 @@ export function mountParlourDiorama(
     slab.addColorStop(1, '#3c3028');
     n.fillStyle = slab;
     n.fillRect(OX - OHW - 46, OBY, (OHW + 46) * 2, H * 0.075);
-    fillPat(n, T.stone, OX - OHW - 46, OBY, (OHW + 46) * 2, H * 0.075, 0.5);
+    fillPat(n, tex('stone'), OX - OHW - 46, OBY, (OHW + 46) * 2, H * 0.075, 0.5);
     n.fillStyle = 'rgba(255,160,74,0.14)';
     n.fillRect(OX - OHW - 46, OBY, (OHW + 46) * 2, H * 0.075);
     n.restore();
@@ -3099,11 +3155,13 @@ export function mountParlourDiorama(
         glow(n, 22, -18, 14, '#fff6dc', 0.6);
         ellipse(n, 22, -18, 5, 5, '#fef8e6');
         n.fillStyle = '#081420';
-        [
-          [-38, 12],
-          [-20, 6],
-          [40, 10],
-        ].forEach(([tx0, s0]) => {
+        (
+          [
+            [-38, 12],
+            [-20, 6],
+            [40, 10],
+          ] as const
+        ).forEach(([tx0, s0]) => {
           n.beginPath();
           n.moveTo(tx0 - s0, 38);
           n.lineTo(tx0, 2 - s0);
@@ -3138,11 +3196,13 @@ export function mountParlourDiorama(
       n.quadraticCurveTo(0, -3 + i * 6, 26 - i * 2, -10 + i * 6);
       n.stroke();
     }
-    [
-      [-10, -14, -0.2],
-      [6, -17, 0.24],
-      [-2, -20, 0],
-    ].forEach(([dx, dy, rot0]) => {
+    (
+      [
+        [-10, -14, -0.2],
+        [6, -17, 0.24],
+        [-2, -20, 0],
+      ] as const
+    ).forEach(([dx, dy, rot0]) => {
       n.save();
       n.translate(dx, dy);
       n.rotate(rot0);
@@ -3163,7 +3223,7 @@ export function mountParlourDiorama(
     n.shadowOffsetX = 8;
     rr(n, SX0, SHY, shw, H * 0.72 - SHY, 4, '#3b2417');
     n.restore();
-    fillPat(n, T.wood, SX0, SHY, shw, H * 0.72 - SHY, 0.55);
+    fillPat(n, tex('wood'), SX0, SHY, shw, H * 0.72 - SHY, 0.55);
     rr(n, SX0 - 6, SHY - 10, shw + 12, 12, 3, '#55341f');
     n.fillStyle = 'rgba(255,214,160,0.18)';
     n.fillRect(SX0 - 6, SHY - 10, shw + 12, 2.4);
@@ -3206,7 +3266,7 @@ export function mountParlourDiorama(
         while (bx < limit - 40) {
           const bw = 9 + Math.round(br() * 6);
           const bh = shelfH * (0.5 + br() * 0.34);
-          n.fillStyle = bookCols[Math.floor(br() * bookCols.length)];
+          n.fillStyle = bookCols[Math.floor(br() * bookCols.length)] ?? bookCols[0]!;
           n.fillRect(bx, syy - bh, bw, bh);
           n.fillStyle = 'rgba(255,230,190,0.16)';
           n.fillRect(bx + 1.4, syy - bh + 3, 1.8, bh - 6);
@@ -3227,7 +3287,7 @@ export function mountParlourDiorama(
             n.rotate(-0.16);
             n.translate(-(bx + bw), -syy);
           }
-          n.fillStyle = bookCols[Math.floor(br() * bookCols.length)];
+          n.fillStyle = bookCols[Math.floor(br() * bookCols.length)] ?? bookCols[0]!;
           n.fillRect(bx, syy - bh, bw, bh);
           n.fillStyle = 'rgba(255,230,190,0.16)';
           n.fillRect(bx + 1.4, syy - bh + 3, 1.8, bh - 6);
@@ -3267,7 +3327,7 @@ export function mountParlourDiorama(
     n.shadowOffsetX = 5;
     rr(n, CX - caseW / 2, caseT, caseW, caseB - caseT, 8, '#5a3a22');
     n.restore();
-    fillPat(n, T.wood, CX - caseW / 2, caseT, caseW, caseB - caseT, 0.5);
+    fillPat(n, tex('wood'), CX - caseW / 2, caseT, caseW, caseB - caseT, 0.5);
     n.fillStyle = '#3b2417';
     n.beginPath();
     n.moveTo(CX - caseW / 2, caseT);
@@ -3328,7 +3388,7 @@ export function mountParlourDiorama(
     n.shadowBlur = 14;
     rr(n, KX0, KTY, kw, H * 0.115, 6, '#4a2e18');
     n.restore();
-    fillPat(n, T.wood, KX0, KTY, kw, H * 0.115, 0.6);
+    fillPat(n, tex('wood'), KX0, KTY, kw, H * 0.115, 0.6);
     n.fillStyle = 'rgba(255,214,160,0.18)';
     n.fillRect(KX0, KTY, kw, 3);
     /* speaker fabric */
@@ -3382,7 +3442,7 @@ export function mountParlourDiorama(
       f,
       () => f.ellipse(0, -2, 62, 17, 0, 0, Math.PI * 2),
       () => {
-        fillPat(f, T.wood, -62, -20, 124, 40, 0.95);
+        fillPat(f, tex('wood'), -62, -20, 124, 40, 0.95);
         const tl = f.createLinearGradient(-62, 0, 62, 0);
         tl.addColorStop(0, 'rgba(255,178,74,0.3)');
         tl.addColorStop(0.5, 'rgba(80,40,14,0.12)');
@@ -3449,7 +3509,7 @@ export function mountParlourDiorama(
         lg.addColorStop(1, '#173c4e');
         f.fillStyle = lg;
         f.fillRect(-88, -90, 176, 146);
-        fillPat(f, T.leather, -88, -90, 176, 146, 0.55);
+        fillPat(f, tex('leather'), -88, -90, 176, 146, 0.55);
         f.fillStyle = 'rgba(255,178,74,0.16)';
         f.fillRect(-88, -90, 34, 146);
       },
@@ -3465,14 +3525,16 @@ export function mountParlourDiorama(
     f.lineTo(78, 46);
     f.stroke();
     /* tufting */
-    [
-      [-26, -52],
-      [0, -56],
-      [26, -52],
-      [-26, -28],
-      [0, -32],
-      [26, -28],
-    ].forEach(([dx, dy]) => {
+    (
+      [
+        [-26, -52],
+        [0, -56],
+        [26, -52],
+        [-26, -28],
+        [0, -32],
+        [26, -28],
+      ] as const
+    ).forEach(([dx, dy]) => {
       f.strokeStyle = 'rgba(12,32,42,0.7)';
       f.lineWidth = 1.4;
       f.beginPath();
@@ -3497,10 +3559,12 @@ export function mountParlourDiorama(
     const armG = f.createLinearGradient(0, -20, 0, 40);
     armG.addColorStop(0, '#2e6a84');
     armG.addColorStop(1, '#153847');
-    [
-      [-1, 0],
-      [1, 0],
-    ].forEach(([sgn]) => {
+    (
+      [
+        [-1, 0],
+        [1, 0],
+      ] as const
+    ).forEach(([sgn]) => {
       f.fillStyle = armG;
       f.beginPath();
       f.moveTo(sgn * 58, -16);
@@ -3553,9 +3617,19 @@ export function mountParlourDiorama(
     plates.snug = [far, mid, near, fore];
   }
 
-  function liveSnug(t) {
-    blitPlates(plates.snug);
-    const ex = EX.snug;
+  function liveSnug(t: number) {
+    blitPlates(plates.snug ?? []);
+    const ex = readyExtras(EX.snug, [
+      'window',
+      'hearth',
+      'archPath',
+      'candles',
+      'clock',
+      'vinyl',
+      'mug',
+      'cat',
+    ] as const);
+    if (!ex) return;
 
     /* rain in the window */
     withDepth(DEPTHS[0], () => {
@@ -3691,7 +3765,7 @@ export function mountParlourDiorama(
       ctx.translate(v.x, v.y);
       ctx.scale(1, 0.4);
       ctx.rotate(t * 2.2);
-      ctx.drawImage(S.vinyl, -v.r, -v.r, v.r * 2, v.r * 2);
+      ctx.drawImage(spr('vinyl'), -v.r, -v.r, v.r * 2, v.r * 2);
       ctx.restore();
       ctx.save();
       ctx.strokeStyle = '#c9c2b4';
@@ -3866,13 +3940,13 @@ export function mountParlourDiorama(
    * constructed, two full-screen fills, plus the grain blit. Baked once per
    * resize, the whole chrome pass costs a single blit.
    */
-  let vignettePlate = null;
+  let vignettePlate: HTMLCanvasElement | null = null;
 
   function bakeVignette() {
     const c = document.createElement('canvas');
     c.width = Math.max(1, Math.round(W * dpr));
     c.height = Math.max(1, Math.round(H * dpr));
-    const g = c.getContext('2d');
+    const g = context2d(c);
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
     const radial = g.createRadialGradient(W * 0.5, H * 0.55, H * 0.14, W * 0.5, H * 0.53, H * 0.82);
     radial.addColorStop(0, 'rgba(4,9,14,0)');
@@ -3885,9 +3959,9 @@ export function mountParlourDiorama(
     grade.addColorStop(1, 'rgba(20,10,4,0.1)');
     g.fillStyle = grade;
     g.fillRect(0, 0, W, H);
-    if (T.grain) {
+    if (tex('grain')) {
       g.globalAlpha = 0.07;
-      g.drawImage(T.grain, 0, 0, W, H);
+      g.drawImage(tex('grain'), 0, 0, W, H);
       g.globalAlpha = 1;
     }
     vignettePlate = c;
@@ -3895,17 +3969,17 @@ export function mountParlourDiorama(
 
   function vignette() {
     if (!vignettePlate) bakeVignette();
-    ctx.drawImage(vignettePlate, 0, 0, W, H);
+    if (vignettePlate) ctx.drawImage(vignettePlate, 0, 0, W, H);
   }
 
-  function ensureBaked(id) {
+  function ensureBaked(id: SceneId) {
     if (plates[id]) return;
     if (id === 'campfire') bakeCampfire();
     else if (id === 'casino') bakeCasino();
     else bakeSnug();
   }
 
-  function renderScene(t) {
+  function renderScene(t: number) {
     ensureBaked(scene);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.imageSmoothingEnabled = true;
@@ -3947,7 +4021,7 @@ export function mountParlourDiorama(
   let calmSince = 0;
   let lastDrawn = -Infinity;
 
-  function frame(now) {
+  function frame(now: number) {
     frameId = requestAnimationFrame(frame);
     const next = options.getScene();
     if (next !== scene) scene = next;
@@ -4009,7 +4083,7 @@ export function mountParlourDiorama(
     else if (!frameId) frameId = requestAnimationFrame(frame);
   }
 
-  const onPointerMove = (event) => {
+  const onPointerMove = (event: PointerEvent) => {
     // Parallax follows a hovering cursor. A touch pointer only reports where a
     // finger already landed, so on a phone it buys nothing and costs a full
     // re-composite of the scene every time you tap a card.

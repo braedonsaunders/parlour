@@ -8,7 +8,7 @@ import { presidentCatalog } from '@parlour/game-president';
 import { ratscrewCatalog } from '@parlour/game-ratscrew';
 import { wildpileCatalog } from '@parlour/game-wildpile';
 import { describe, expect, it } from 'vitest';
-import { GAMES, getGame, getGameMode, isGameId, isGameModeId, modePreset } from './games';
+import { GAMES, getGame, getGameMode, isGameId, isGameModeId, modePreset } from './shelf';
 
 describe('game shelf catalog', () => {
   it('leads with blitz and keeps the shelf growing', () => {
@@ -19,6 +19,7 @@ describe('game shelf catalog', () => {
       'ratscrew',
       'euchre',
       'spades',
+      'poker',
       'klondike',
       'hearts',
       'gin',

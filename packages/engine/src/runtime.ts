@@ -21,6 +21,8 @@ import {
   type LegalMove,
   type MatchResult,
   type PhaseState,
+  type ReplayFault,
+  type ReplayOptions,
   type RuleError,
   type RuleValues,
   type SeatId,
@@ -30,6 +32,11 @@ const MAX_AUTO_ROUNDS = 1000;
 
 // ---------------------------------------------------------------------------
 // stateHash — stable FNV-1a over canonical JSON
+//
+// This is a 32-bit checksum for spotting *divergence*, not a cryptographic
+// commitment. It answers "did two honest peers drift apart"; it does not answer
+// "did this peer doctor the log", because anyone who can edit the log can
+// recompute the hash. `verifyLog` is the tool for the second question.
 // ---------------------------------------------------------------------------
 
 function canonical(value: unknown): string {
@@ -132,6 +139,8 @@ interface Cursor<S> {
   result: MatchResult | null;
   seq: number;
   events: AppliedEvent[];
+  /** highest authority time applied so far; carried forward so admission is O(1) */
+  lastAtMs?: number;
 }
 
 function applyStep<S, C extends RuleValues>(
@@ -180,6 +189,7 @@ function applyStep<S, C extends RuleValues>(
 
   cursor.state = state;
   cursor.seq = seq + 1;
+  if (input.atMs !== undefined) cursor.lastAtMs = input.atMs;
   cursor.events.push(event);
   return event;
 }
@@ -244,6 +254,14 @@ function rejection<S, C extends RuleValues>(
 }
 
 /**
+ * The session's cached authority time, falling back to a scan for sessions that
+ * predate the field (a log deserialized by an older peer, say).
+ */
+function sessionLastAtMs<S, C extends RuleValues>(session: GameSession<S, C>): number | undefined {
+  return session.lastAtMs ?? lastAtMsOf(session.log);
+}
+
+/**
  * Guards Veil openings before anything else looks at them: only a veiled round
  * may carry reveals, the game must have opted into Veil, and every opening has
  * to conserve the deck (known handle in, unseen face out).
@@ -279,7 +297,15 @@ function revealRejection<S, C extends RuleValues>(
   return recycleFault ? rejection(session, recycleFault.code, recycleFault.message) : null;
 }
 
-function timingError(log: readonly AppliedEvent[], meta: Readonly<ApplyMeta>): RuleError | null {
+/**
+ * Admits an authority timestamp against the highest one already logged.
+ *
+ * The previous time is carried on the session rather than rediscovered by
+ * scanning backwards for the last event that carried one. A log with sparse
+ * `atMs` made that scan walk to the head, so a match paid O(n²) in total for a
+ * check that is O(1) with one cached number.
+ */
+function timingError(lastAtMs: number | undefined, meta: Readonly<ApplyMeta>): RuleError | null {
   if (meta.atMs === undefined) return null;
   if (!Number.isSafeInteger(meta.atMs) || meta.atMs < 0) {
     return {
@@ -287,17 +313,22 @@ function timingError(log: readonly AppliedEvent[], meta: Readonly<ApplyMeta>): R
       message: 'atMs must be a non-negative safe integer',
     };
   }
-  for (let index = log.length - 1; index >= 0; index--) {
-    const previous = log[index]?.atMs;
-    if (previous === undefined) continue;
-    return meta.atMs < previous
-      ? {
-          code: 'event-time-regressed',
-          message: `atMs ${meta.atMs} is earlier than the previous authority time ${previous}`,
-        }
-      : null;
+  if (lastAtMs !== undefined && meta.atMs < lastAtMs) {
+    return {
+      code: 'event-time-regressed',
+      message: `atMs ${meta.atMs} is earlier than the previous authority time ${lastAtMs}`,
+    };
   }
   return null;
+}
+
+/** Highest authority time in a log, for sessions rebuilt outside applyStep. */
+function lastAtMsOf(log: readonly AppliedEvent[]): number | undefined {
+  for (let index = log.length - 1; index >= 0; index--) {
+    const previous = log[index]?.atMs;
+    if (previous !== undefined) return previous;
+  }
+  return undefined;
 }
 
 /** Per-seat legal moves, falling back to the phase-wide list (single-actor games). */
@@ -326,7 +357,7 @@ export function sessionApply<S, C extends RuleValues>(
   if (!isActingSeat(session.phase, seat)) {
     return rejection(session, 'not-your-turn', `seat ${seat} is not an acting seat`);
   }
-  const invalidTiming = timingError(session.log, meta);
+  const invalidTiming = timingError(sessionLastAtMs(session), meta);
   if (invalidTiming) return rejection(session, invalidTiming.code, invalidTiming.message);
 
   const reveals = meta.reveals ?? [];
@@ -360,6 +391,7 @@ export function sessionApply<S, C extends RuleValues>(
     result: session.result,
     seq: session.log.length,
     events: [],
+    lastAtMs: sessionLastAtMs(session),
   };
 
   const event = applyStep(
@@ -388,6 +420,7 @@ export function sessionApply<S, C extends RuleValues>(
     result: cursor.result,
     lastAppliedHash:
       cursor.events[cursor.events.length - 1]?.hash ?? session.lastAppliedHash ?? null,
+    lastAtMs: cursor.lastAtMs,
   };
 
   return { events: cursor.events, fx: fx.events, session: next };
@@ -420,7 +453,7 @@ export function sessionInject<S, C extends RuleValues>(
   if (!def.flow.canInject) {
     return rejection(session, 'injection-unsupported', `${def.id} does not accept injected events`);
   }
-  const invalidTiming = timingError(session.log, meta);
+  const invalidTiming = timingError(sessionLastAtMs(session), meta);
   if (invalidTiming) return rejection(session, invalidTiming.code, invalidTiming.message);
   const reveals = meta.reveals ?? [];
   const revealFault = revealRejection(def, session, reveals, meta.recycle);
@@ -444,6 +477,7 @@ export function sessionInject<S, C extends RuleValues>(
     result: session.result,
     seq: session.log.length,
     events: [],
+    lastAtMs: sessionLastAtMs(session),
   };
 
   const event = applyStep(
@@ -473,6 +507,7 @@ export function sessionInject<S, C extends RuleValues>(
     result: cursor.result,
     lastAppliedHash:
       cursor.events[cursor.events.length - 1]?.hash ?? session.lastAppliedHash ?? null,
+    lastAtMs: cursor.lastAtMs,
   };
 
   return { events: cursor.events, fx: fx.events, session: next };
@@ -482,25 +517,109 @@ export function sessionInject<S, C extends RuleValues>(
 // Replay
 // ---------------------------------------------------------------------------
 
-function deriveSeats(log: readonly AppliedEvent[]): number {
-  let max = -1;
-  for (const e of log) if (e.seat !== null && e.seat > max) max = e.seat;
-  return Math.max(2, max + 1);
+/**
+ * Re-checks one logged player action the way `sessionApply` would have.
+ *
+ * Automatic and injected events are the runtime's own work rather than a claim
+ * made by a peer, so they are not re-derived here: `settle` produced them from
+ * a state this replay is reproducing anyway, and an injected event is admitted
+ * by `flow.canInject` below instead.
+ */
+function verifyEvent<S, C extends RuleValues>(
+  def: GameDef<S, C>,
+  cursor: Cursor<S>,
+  logged: AppliedEvent,
+  index: number,
+): ReplayFault | null {
+  const fault = (error: RuleError): ReplayFault => ({
+    index,
+    seq: logged.seq,
+    seat: logged.seat,
+    move: logged.move,
+    error,
+  });
+
+  if (!def.moves[logged.move]) {
+    return fault({
+      code: 'unknown-move',
+      message: `move ${logged.move} is not defined by ${def.id}`,
+    });
+  }
+  const timing = timingError(cursor.lastAtMs, { atMs: logged.atMs });
+  if (timing) return fault(timing);
+
+  if (logged.automatic === true) return null;
+
+  const opened = applyReveals(cursor.state, logged.reveals ?? []);
+
+  if (logged.injected === true) {
+    if (!def.flow.canInject) {
+      return fault({
+        code: 'injection-unsupported',
+        message: `${def.id} does not accept injected events`,
+      });
+    }
+    const verdict = def.flow.canInject(opened, cursor.phase, logged.move, logged.payload, {
+      atMs: logged.atMs,
+      reveals: logged.reveals,
+      recycle: logged.recycle,
+    });
+    return verdict === true ? null : fault(verdict);
+  }
+
+  if (logged.seat === null) {
+    return fault({
+      code: 'seatless-player-move',
+      message: `${logged.move} has no seat but is not automatic or injected`,
+    });
+  }
+  if (!isActingSeat(cursor.phase, logged.seat)) {
+    return fault({
+      code: 'not-your-turn',
+      message: `seat ${logged.seat} is not an acting seat`,
+    });
+  }
+  const legal = legalMovesForSeat(def, opened, cursor.phase, logged.seat);
+  if (!legal.some((m) => m.id === logged.move)) {
+    return fault({
+      code: 'illegal-move',
+      message: `move ${logged.move} was not legal at seq ${logged.seq}`,
+    });
+  }
+  const verdict = def.moves[logged.move]!.validate(opened, logged.seat, logged.payload, {
+    recycle: logged.recycle,
+  });
+  return verdict === true ? null : fault(verdict);
 }
 
 /**
- * Folds an authoritative log back into a session. Legality/validation are skipped
- * (the log came from an authority); autoMoves already live in the log, so
- * flow.advance is consulted only to track phase and termination.
+ * Folds an authoritative log back into a session.
+ *
+ * By default legality and validation are skipped: the log came from the
+ * authority, autoMoves already live in it, and flow.advance is consulted only
+ * to track phase and termination. That is what makes rejoin cheap.
+ *
+ * Pass `verify: true` when the authority is not trusted — in a peer mesh the
+ * host is another player, and nothing else in the pipeline would notice a host
+ * that logged a move it was not entitled to make. Verification stops at the
+ * first bad event and reports it on `session.fault`.
  */
 export function replaySession<S, C extends RuleValues>(
   def: GameDef<S, C>,
   seed: number,
   log: readonly AppliedEvent[],
-  opts?: { config?: C; seats?: number; veiled?: boolean; deckOrder?: readonly CardId[] },
+  opts?: ReplayOptions<C>,
 ): GameSession<S, C> {
   const config = opts?.config ?? def.configSchema.defaults();
-  const seats = opts?.seats ?? deriveSeats(log);
+  if (opts?.seats === undefined) {
+    // Guessing from the log's highest acting seat cannot tell a four-hander
+    // where one seat never moved apart from a three-hander, and the wrong seat
+    // count silently deals a different game.
+    throw new Error(
+      `${def.id}: replaySession needs opts.seats — a log does not carry the table size`,
+    );
+  }
+  const seats = opts.seats;
   const base = createSession(def, {
     seed,
     config,
@@ -519,8 +638,14 @@ export function replaySession<S, C extends RuleValues>(
     events: [],
   };
 
-  for (const logged of log) {
+  let fault: ReplayFault | null = null;
+
+  for (const [index, logged] of log.entries()) {
     if (cursor.status !== 'playing') break;
+    if (opts?.verify) {
+      fault = verifyEvent(def, cursor, logged, index);
+      if (fault) break;
+    }
     const event = applyStep(
       def,
       seed,
@@ -562,10 +687,33 @@ export function replaySession<S, C extends RuleValues>(
     status: cursor.status,
     result: cursor.result,
     lastAppliedHash: cursor.events[cursor.events.length - 1]?.hash ?? null,
+    lastAtMs: cursor.lastAtMs,
+    fault,
   };
 }
 
-/** True when a replayed session reproduces the authority's final hash. */
+/**
+ * Replays a log with every player action re-checked, and reports the first one
+ * that a rules-abiding authority could not have produced.
+ *
+ * This is the answer to "can I trust this peer's log", which the event hash
+ * deliberately is not — that hash detects drift between honest peers and is
+ * forgeable by a dishonest one.
+ */
+export function verifyLog<S, C extends RuleValues>(
+  def: GameDef<S, C>,
+  seed: number,
+  log: readonly AppliedEvent[],
+  opts?: ReplayOptions<C>,
+): ReplayFault | null {
+  return replaySession(def, seed, log, { ...opts, verify: true }).fault ?? null;
+}
+
+/**
+ * True when a replayed session reproduces the authority's final hash — i.e. the
+ * two agree on what happened. A doctored log agrees with itself, so this is a
+ * desync check and not an integrity check; see {@link verifyLog}.
+ */
 export function replayMatchesLog(hash: string | null | undefined, log: readonly AppliedEvent[]) {
   const expected = log[log.length - 1]?.hash;
   return expected === undefined || expected === hash;
