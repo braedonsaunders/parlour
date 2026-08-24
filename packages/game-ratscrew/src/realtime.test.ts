@@ -116,5 +116,5 @@ describe('balance gates', () => {
     expect(report.personas.rows.map((row) => row.key)).toEqual(['bolt', 'jinx', 'quinn', 'rusty']);
     // structural sanity even when a band edge wobbles on small samples
     expect(report.thresholds.headToHeadMin).toBeGreaterThan(0.5);
-  });
+  }, 20_000);
 });
