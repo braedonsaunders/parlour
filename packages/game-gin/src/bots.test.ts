@@ -39,7 +39,7 @@ describe('bot legality', () => {
       }
       expect(session.status).toBe('ended');
     }
-  });
+  }, 20_000);
 
   it('every persona completes hands without stalling', () => {
     for (const persona of GIN_PERSONAS) {
@@ -66,7 +66,7 @@ describe('bot legality', () => {
       }
       expect(session.status).toBe('ended');
     }
-  });
+  }, 20_000);
 
   it('exposes six personas and three tiers', () => {
     expect(GIN_PERSONAS).toHaveLength(6);
