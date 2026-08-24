@@ -3,6 +3,7 @@ import {
   Fx,
   chooseBotMove,
   createMatch,
+  createSession,
   makeRng,
   matchApply,
   matchInject,
@@ -54,8 +55,10 @@ function drive<MS extends AnyMatchState>(
     if (!policy) throw new Error('blitz ships no bots');
     const legal = def.game.flow.legalMoves(round.state, round.phase);
     const rng = makeRng(seed).fork(`test:${outcome.session.roundIndex}:${round.log.length}`);
+    const knock = legal.find((move) => move.id === 'knock');
     const choice =
-      chooseBotMove(policy, def.game.playerView(round.state, actor), actor, legal, rng) ??
+      (round.log.length > 60 && knock) ||
+      chooseBotMove(policy, def.game.playerView(round.state, actor), actor, legal, rng) ||
       legal[0]!;
     outcome = matchApply(def, outcome.session, actor, choice.id, choice.payload) as typeof outcome;
     if (outcome.rejected) throw new Error(outcome.rejected.message);
@@ -78,14 +81,17 @@ function finishRound<S extends BlitzState, MS extends AnyMatchState>(
     if (actor === null) throw new Error('no actor while playing');
     const policy = def.game.bots[0]!;
     const legal = def.game.flow.legalMoves(round.state, round.phase);
+    const knock = legal.find((move) => move.id === 'knock');
     const choice =
+      (round.log.length > 60 && knock) ||
       chooseBotMove(
         policy,
         def.game.playerView(round.state, actor),
         actor,
         legal,
         makeRng(seed).fork(`finish:${round.log.length}`),
-      ) ?? legal[0]!;
+      ) ||
+      legal[0]!;
     outcome = matchApply(def, outcome.session, actor, choice.id, choice.payload);
   }
   return outcome;
@@ -115,6 +121,19 @@ describe('createBlitzLivesMatchDef', () => {
     const def = createBlitzLivesMatchDef({ startingLives: 2 });
     const { session } = drive<BlitzLivesMatchState>(def, 77);
     expect(session.match.lives.every((l) => l >= 0 && l <= 2)).toBe(true);
+  });
+
+  it('sits eliminated seats out of later rounds', () => {
+    const def = createBlitzLivesMatchDef();
+    const config = def.roundConfig!({ lives: [3, 0, 2] }, 1, blitzConfigSchema.defaults());
+    expect(config.outMask).toBe(1 << 1);
+    const session = createSession(def.game, { seed: 4, config, seats: 3 });
+    expect(session.state.out).toEqual([1]);
+    expect(session.state.hands[1]).toEqual([]);
+    expect(session.phase.actor).not.toBe(1);
+    expect(def.game.flow.legalMoves(session.state, { phase: 'turn', actor: 1, round: 1 })).toEqual(
+      [],
+    );
   });
 
   it('replays a whole lives match from its round logs', () => {

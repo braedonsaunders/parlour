@@ -80,6 +80,7 @@ describe('policy legality', () => {
       drawnFromDiscard: null,
       pickups: [],
       outcome: null,
+      out: [],
       veiled: false,
     };
     const legal = [{ id: 'draw.stock' }, { id: 'draw.discard' }];

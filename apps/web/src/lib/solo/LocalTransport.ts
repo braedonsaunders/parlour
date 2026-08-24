@@ -4,6 +4,7 @@ import {
   blitzConfigSchema,
   createBlitzDef,
   makePersonaBot,
+  outMaskFromLives,
   type BlitzConfig,
   type BlitzState,
   type PersonaDef,
@@ -185,9 +186,10 @@ export class LocalTransport {
   }
 
   private createRound(): BlitzSession {
+    const outMask = this.options.mode === 'classic' ? outMaskFromLives(this.lives) : 0;
     return createSession(this.def, {
       seed: (this.options.seed + (this.round - 1) * 9_973) | 0,
-      config: blitzConfigSchema.defaults(),
+      config: { ...blitzConfigSchema.defaults(), outMask },
       seats: this.options.seats,
     });
   }
@@ -235,6 +237,7 @@ export class LocalTransport {
           ? this.lives.flatMap((_lives, seat) => (winners.includes(seat) ? [] : [seat]))
           : lowestRankedSeats(outcome?.rankings ?? []);
       for (const seat of losers) {
+        if ((this.lives[seat] ?? 0) <= 0) continue;
         this.lives[seat] = Math.max(0, (this.lives[seat] ?? 0) - 1);
         fx.push({ kind: Fx.ChipLoss, payload: { seat, livesLeft: this.lives[seat] } });
       }

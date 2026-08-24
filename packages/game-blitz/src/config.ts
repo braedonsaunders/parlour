@@ -1,4 +1,4 @@
-import { defineConfig } from '@parlour/engine';
+import { defineConfig, type ConfigSchema, type SeatId } from '@parlour/engine';
 import type { RuleValues } from '@parlour/engine';
 
 /**
@@ -12,9 +12,28 @@ export interface BlitzConfig extends RuleValues {
   tieLowest: 'both' | 'nobody' | 'redeal';
   /** ★ can't re-discard the card just drawn from the discard pile */
   discardLock: boolean;
+  /**
+   * Bit i set ⇒ seat i sits this round out (classic elimination). Not a
+   * house-rule field — the match layer writes it via `roundConfig`.
+   */
+  outMask: number;
 }
 
-export const blitzConfigSchema = defineConfig<BlitzConfig>(
+/** Bitmask of seats whose lives have already hit zero. */
+export function outMaskFromLives(lives: readonly number[]): number {
+  return lives.reduce((mask, remaining, seat) => (remaining <= 0 ? mask | (1 << seat) : mask), 0);
+}
+
+export function outSeatsFromMask(mask: number | undefined, seats: number): SeatId[] {
+  const bits = typeof mask === 'number' && Number.isSafeInteger(mask) ? mask : 0;
+  const out: SeatId[] = [];
+  for (let seat = 0; seat < seats; seat++) {
+    if (bits & (1 << seat)) out.push(seat);
+  }
+  return out;
+}
+
+const inner = defineConfig<BlitzConfig>(
   [
     {
       key: 'threeOfAKind',
@@ -51,3 +70,15 @@ export const blitzConfigSchema = defineConfig<BlitzConfig>(
     { id: 'friendly', label: 'Friendly', values: { tieLowest: 'nobody', discardLock: false } },
   ],
 );
+
+/** Preserves the match-layer `outMask` that `defineConfig` would otherwise drop. */
+export const blitzConfigSchema: ConfigSchema<BlitzConfig> = {
+  fields: inner.fields,
+  presets: inner.presets,
+  defaults: () => ({ ...inner.defaults(), outMask: 0 }),
+  resolve(values) {
+    const raw = values.outMask;
+    const outMask = typeof raw === 'number' && Number.isSafeInteger(raw) && raw >= 0 ? raw : 0;
+    return { ...inner.resolve(values), outMask };
+  },
+};

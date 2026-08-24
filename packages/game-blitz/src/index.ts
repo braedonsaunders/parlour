@@ -28,8 +28,9 @@ export type {
 } from './match';
 export { matchResultOf, scoreRound } from './score';
 export type { Pickup, RoundOutcome, RoundReason, BlitzState } from './state';
-export { blitzConfigSchema } from './config';
+export { blitzConfigSchema, outMaskFromLives, outSeatsFromMask } from './config';
 export type { BlitzConfig } from './config';
+export { isSittingOut, liveSeats, sittingOut } from './state';
 export * from './bots';
 
 /** canonical game id, mirrored for transport/session wiring */

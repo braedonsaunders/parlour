@@ -17,11 +17,11 @@ import {
   type SeatId,
 } from '@parlour/engine';
 import { blitzHowToPlay } from './howto';
-import { blitzConfigSchema, type BlitzConfig } from './config';
+import { blitzConfigSchema, outSeatsFromMask, type BlitzConfig } from './config';
 import { isBlitz } from './hand';
 import { TIER_BOTS } from './bots/personas';
 import { matchResultOf, scoreRound } from './score';
-import type { BlitzState, RoundOutcome } from './state';
+import { isSittingOut, liveSeats, type BlitzState, type RoundOutcome } from './state';
 
 const DECK = stdDeck();
 export const HAND_SIZE = 3;
@@ -42,7 +42,7 @@ function withDrawnFromDiscard(state: BlitzState, card: CardId | null): BlitzStat
  * is skipped here and its owner claims with `blitz.claim` instead.
  */
 export function blitzSeat(state: BlitzState): SeatId | null {
-  for (let seat = 0; seat < state.seats; seat++) {
+  for (const seat of liveSeats(state)) {
     const hand = state.hands[seat] ?? [];
     if (hasVeiledCard(hand)) continue;
     if (isBlitz(hand)) return seat;
@@ -63,8 +63,20 @@ function isRealCard(card: CardId): boolean {
   return !isVeilHandle(card);
 }
 
-function allSeats(state: BlitzState): SeatId[] {
-  return Array.from({ length: state.seats }, (_, seat) => seat);
+function nextLiveSeat(state: BlitzState, from: SeatId): SeatId {
+  const live = liveSeats(state);
+  for (let step = 1; step <= state.seats; step++) {
+    const seat = (from + step) % state.seats;
+    if (live.includes(seat)) return seat;
+  }
+  return live[0] ?? from;
+}
+
+function requireLive(state: BlitzState, seat: SeatId): true | { code: string; message: string } {
+  if (isSittingOut(state, seat)) {
+    return { code: 'seat-out', message: `seat ${seat} is out of the match` };
+  }
+  return true;
 }
 
 function reshuffleStock(state: BlitzState, ctx: MoveCtx): BlitzState {
@@ -83,7 +95,9 @@ function reshuffleStock(state: BlitzState, ctx: MoveCtx): BlitzState {
 // ---------------------------------------------------------------------------
 
 const drawStock: Move<BlitzState> = {
-  validate(state, _seat, _payload, ctx) {
+  validate(state, seat, _payload, ctx) {
+    const live = requireLive(state, seat);
+    if (live !== true) return live;
     if (state.stock.length === 0 && state.discard.length <= 1) {
       return { code: 'no-cards-to-draw', message: 'stock and discard are both exhausted' };
     }
@@ -121,7 +135,9 @@ const drawStock: Move<BlitzState> = {
 };
 
 const drawDiscard: Move<BlitzState> = {
-  validate(state) {
+  validate(state, seat) {
+    const live = requireLive(state, seat);
+    if (live !== true) return live;
     if (state.discard.length === 0) {
       return { code: 'empty-discard', message: 'the discard pile is empty' };
     }
@@ -143,6 +159,8 @@ const drawDiscard: Move<BlitzState> = {
 
 const discardCard: Move<BlitzState> = {
   validate(state, seat, payload) {
+    const live = requireLive(state, seat);
+    if (live !== true) return live;
     const card = (payload as { card?: unknown } | null)?.card;
     if (typeof card !== 'string') return { code: 'bad-payload', message: 'expected {card}' };
     if (!(state.hands[seat] ?? []).includes(card)) {
@@ -164,7 +182,7 @@ const discardCard: Move<BlitzState> = {
       hands: state.hands.map((h, i) => (i === seat ? removeFrom(h, card) : h)),
       discard: addTo(state.discard, card),
       drawnFromDiscard: null,
-      turn: (seat + 1) % state.seats,
+      turn: nextLiveSeat(state, seat),
     };
     if (next.knocker !== null) {
       next = { ...next, postKnockTurns: next.postKnockTurns - 1 };
@@ -174,7 +192,9 @@ const discardCard: Move<BlitzState> = {
 };
 
 const knock: Move<BlitzState> = {
-  validate(state) {
+  validate(state, seat) {
+    const live = requireLive(state, seat);
+    if (live !== true) return live;
     if (state.knocker !== null) {
       return { code: 'already-knocked', message: 'someone has already knocked this round' };
     }
@@ -185,8 +205,8 @@ const knock: Move<BlitzState> = {
     return {
       ...state,
       knocker: seat,
-      postKnockTurns: state.seats - 1,
-      turn: (seat + 1) % state.seats,
+      postKnockTurns: Math.max(0, liveSeats(state).length - 1),
+      turn: nextLiveSeat(state, seat),
     };
   },
 };
@@ -207,6 +227,8 @@ const knock: Move<BlitzState> = {
  */
 const claimBlitz: Move<BlitzState> = {
   validate(state, seat) {
+    const live = requireLive(state, seat);
+    if (live !== true) return live;
     if (state.outcome) return { code: 'round-over', message: 'the round is already decided' };
     const hand = state.hands[seat] ?? [];
     if (hasVeiledCard(hand)) {
@@ -292,7 +314,7 @@ const showdown: Move<BlitzState> = {
  * widens who may *speak up*, never who may play.
  */
 function withClaimants(state: BlitzState, phase: PhaseState): PhaseState {
-  return state.veiled ? { ...phase, actors: allSeats(state) } : phase;
+  return state.veiled ? { ...phase, actors: liveSeats(state) } : phase;
 }
 
 function turnPhase(state: BlitzState): PhaseState {
@@ -310,7 +332,7 @@ function discardPhase(state: BlitzState): PhaseState {
  * the openings the claim carried, so legality never leaks the hand.
  */
 function canClaimBlitz(state: BlitzState, seat: SeatId): boolean {
-  if (!state.veiled || state.outcome) return false;
+  if (!state.veiled || state.outcome || isSittingOut(state, seat)) return false;
   return (state.hands[seat] ?? []).length === HAND_SIZE;
 }
 
@@ -318,7 +340,7 @@ const flow: GameDef<BlitzState, BlitzConfig>['flow'] = {
   start: (state) => turnPhase(state),
 
   legalMoves(state, phase) {
-    if (phase.actor === null || state.outcome) return [];
+    if (phase.actor === null || state.outcome || isSittingOut(state, phase.actor)) return [];
     if (phase.phase === 'showdown.reveal') return [];
     if (phase.phase === 'discard') {
       return (state.hands[phase.actor] ?? []).map(
@@ -336,7 +358,7 @@ const flow: GameDef<BlitzState, BlitzConfig>['flow'] = {
   },
 
   legalMovesFor(state, phase, seat) {
-    if (state.outcome) return [];
+    if (state.outcome || isSittingOut(state, seat)) return [];
     if (phase.phase === 'showdown.reveal') {
       // The phase itself lists the seats still owing a reveal, so this stays
       // true even after the move's own openings have landed.
@@ -416,10 +438,15 @@ export function createBlitzDef(options: BlitzDefOptions = {}): GameDef<BlitzStat
 
     setup(ctx) {
       const { config, seats, fx } = ctx;
+      const out = outSeatsFromMask(config.outMask, seats);
       const ids = dealOrder(ctx, DECK);
       const hands: CardId[][] = [];
       let cursor = 0;
       for (let seat = 0; seat < seats; seat++) {
+        if (out.includes(seat)) {
+          hands.push([]);
+          continue;
+        }
         const hand = ids.slice(cursor, cursor + HAND_SIZE);
         cursor += HAND_SIZE;
         hands.push(hand);
@@ -444,18 +471,23 @@ export function createBlitzDef(options: BlitzDefOptions = {}): GameDef<BlitzStat
         dealIndex * DEAL_STAGGER_MS,
       );
 
+      const turn = out.includes(0)
+        ? (Array.from({ length: seats }, (_, seat) => seat).find((seat) => !out.includes(seat)) ??
+          0)
+        : 0;
       const state: BlitzState = {
         rules: config,
         seats,
         hands,
         stock: ids.slice(cursor + 1),
         discard: [flipped],
-        turn: 0,
+        turn,
         knocker: null,
         postKnockTurns: 0,
         drawnFromDiscard: null,
         pickups: [],
         outcome: null,
+        out,
         veiled: ctx.veiled === true,
       };
 

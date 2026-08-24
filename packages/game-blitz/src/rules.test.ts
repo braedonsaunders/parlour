@@ -34,6 +34,7 @@ function freshState(partial: Partial<BlitzState> = {}): BlitzState {
     drawnFromDiscard: null,
     pickups: [],
     outcome: null,
+    out: [],
     veiled: false,
     ...partial,
   };
@@ -99,8 +100,9 @@ describe('handValue', () => {
     expect(handValue(['S1', 'S12', 'S13'], BASE)).toBe(31);
     expect(isBlitz(['S1', 'S12', 'S13'])).toBe(true);
     expect(isBlitz(['S1', 'S12', 'H13'])).toBe(false);
-    // transient four-card hands may sum past 31 mid-turn — not a blitz
+    // a four-card pile can total 31 (or more) mid-turn — that is not a blitz
     expect(isBlitz(['S1', 'S10', 'S11', 'S12'])).toBe(false);
+    expect(isBlitz(['S1', 'S10', 'H5', 'S13'])).toBe(false);
   });
 
   it('counts three of a kind per house rule', () => {
@@ -340,6 +342,64 @@ describe('blitz round flow', () => {
     const state = freshState({ stock: [], discard: ['S2'] });
     const verdict = def.moves['draw.stock']!.validate(state, 0, undefined);
     expect(verdict).not.toBe(true);
+  });
+
+  it('does not treat a four-card 31 as a blitz — the extra card still has to go', () => {
+    const state = freshState({
+      hands: [
+        ['S1', 'S10', 'H5'], // 21 in spades across a live three-card hand
+        ['C2', 'C3', 'C4'],
+      ],
+      stock: ['S13'],
+      discard: ['D2'],
+    });
+    const ctx = { rng: makeRng(1), fx: createFx(), event: { seq: 0 } };
+    const drawn = def.moves['draw.stock']!.apply(state, 0, undefined, ctx);
+    expect(drawn.hands[0]).toEqual(['S13', 'S1', 'S10', 'H5']);
+    expect(handValue(drawn.hands[0]!, DEFAULTS)).toBe(31);
+    expect(isBlitz(drawn.hands[0]!)).toBe(false);
+    expect(blitzSeat(drawn)).toBeNull();
+    expect(
+      def.flow.advance(drawn, { seq: 0, seat: 0, move: 'draw.stock' }, 2).autoMoves ?? [],
+    ).toEqual([]);
+
+    const kept = def.moves['discard']!.apply(
+      drawn,
+      0,
+      { card: 'H5' },
+      {
+        rng: makeRng(1),
+        fx: createFx(),
+        event: { seq: 1 },
+      },
+    );
+    expect(kept.hands[0]).toEqual(['S13', 'S1', 'S10']);
+    expect(isBlitz(kept.hands[0]!)).toBe(true);
+    expect(blitzSeat(kept)).toBe(0);
+  });
+
+  it('does not deal to or pass the turn to a seat that is already out', () => {
+    const session = createSession(def, {
+      seed: 4,
+      config: { ...DEFAULTS, outMask: 1 << 2 },
+      seats: 4,
+    });
+    expect(session.state.out).toEqual([2]);
+    expect(session.state.hands[2]).toEqual([]);
+    expect(session.state.hands[0]).toHaveLength(HAND_SIZE);
+    expect(session.state.hands[1]).toHaveLength(HAND_SIZE);
+    expect(session.state.hands[3]).toHaveLength(HAND_SIZE);
+    expect(session.phase.actor).not.toBe(2);
+
+    const actors: number[] = [];
+    const finished = drive(session, 400);
+    for (const event of finished.log) {
+      if (event.seat !== null && event.move !== 'blitz' && event.move !== 'showdown') {
+        actors.push(event.seat);
+      }
+    }
+    expect(actors).not.toContain(2);
+    expect(finished.state.hands[2]).toEqual([]);
   });
 
   it('ends instantly on a dealt blitz before any turn', () => {

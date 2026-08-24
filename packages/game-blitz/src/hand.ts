@@ -100,10 +100,10 @@ export function handValue(hand: readonly CardId[], config: BlitzConfig): number 
 }
 
 /**
- * Blitz = holding a suited exactly-31 (spec §5.1: "reaching exactly 31").
- * Transient four-card hands can sum higher than 31 mid-turn — that is not a
- * blitz. Three-of-a-kind never blitzes.
+ * Blitz = a live three-card hand whose best suit is exactly 31 (spec §5.1).
+ * After a draw the actor holds four cards — that pile can total 31 without
+ * being a legal hand, so it is not a blitz. Three-of-a-kind never blitzes.
  */
 export function isBlitz(hand: readonly CardId[]): boolean {
-  return (bestSuit(hand)?.value ?? 0) === BLITZ_VALUE;
+  return hand.length === 3 && (bestSuit(hand)?.value ?? 0) === BLITZ_VALUE;
 }

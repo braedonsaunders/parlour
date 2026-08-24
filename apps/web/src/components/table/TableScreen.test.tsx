@@ -154,6 +154,34 @@ describe('TableScreen owner hand', () => {
     expect(container.textContent).not.toContain('Your turn');
   });
 
+  it('hides an eliminated opponent fan', () => {
+    const view: TableView = {
+      ...VIEW,
+      players: [
+        VIEW.players[0]!,
+        {
+          seat: 1,
+          name: 'Juniper',
+          avatarId: 'juniper',
+          hand: [],
+          handCount: 3,
+          lives: 0,
+          isBot: true,
+          eliminated: true,
+        },
+      ],
+    };
+
+    act(() => {
+      root.render(createElement(TableScreen, { view, fx: [], fxKey: 0 }));
+    });
+
+    const seat = container.querySelector('[data-seat="1"]');
+    expect(seat?.className).toMatch(/seatEliminated/);
+    expect(seat?.querySelector('[aria-label="3 hidden cards"]')).toBeNull();
+    expect(seat?.querySelector('[aria-label="0 hidden cards"]')).not.toBeNull();
+  });
+
   it('shows the local player life chips beside their hand', () => {
     act(() => {
       root.render(createElement(TableScreen, { view: VIEW, fx: [], fxKey: 0 }));

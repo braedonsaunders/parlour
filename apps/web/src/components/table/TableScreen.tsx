@@ -168,7 +168,7 @@ function Seat({
   displayCount: number;
 }) {
   const avatar = getAvatar(player.avatarId);
-  const count = displayCount;
+  const count = player.eliminated ? 0 : displayCount;
   const style = { '--seat-accent': avatar.accent, '--seat-shade': avatar.shade } as CSSProperties;
 
   return (

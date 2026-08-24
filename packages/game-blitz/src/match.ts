@@ -7,7 +7,7 @@ import {
   type Move,
   type SeatId,
 } from '@parlour/engine';
-import type { BlitzConfig } from './config';
+import { outMaskFromLives, type BlitzConfig } from './config';
 import { createBlitzDef, type BlitzDefOptions } from './rules';
 import type { BlitzState } from './state';
 
@@ -77,6 +77,9 @@ export function createBlitzLivesMatchDef(
     id: 'blitz-lives',
     game: createBlitzDef(options),
     init: ({ seats }) => ({ lives: Array.from({ length: seats }, () => startingLives) }),
+    roundConfig(match, _roundIndex, base) {
+      return { ...base, outMask: outMaskFromLives(match.lives) };
+    },
     fold(match, result, ctx) {
       const winners = winnersOf(result);
       const losers =

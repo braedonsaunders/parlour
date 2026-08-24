@@ -373,14 +373,17 @@ function tableView(snapshot: SoloSnapshot, transport: LocalTransport): TableView
   const scores = snapshot.mode === 'classic' ? snapshot.lives : snapshot.wins;
   const scoreLabel = snapshot.mode === 'classic' ? 'lives' : 'wins';
   return {
-    players: snapshot.players.map((player) => ({
-      ...player,
-      hand: state.hands[player.seat] ?? [],
-      handCount: state.hands[player.seat]?.length ?? 0,
-      lives: scores[player.seat] ?? 0,
-      isLocal: player.seat === 0,
-      eliminated: snapshot.mode === 'classic' && snapshot.lives[player.seat] === 0,
-    })),
+    players: snapshot.players.map((player) => {
+      const eliminated = snapshot.mode === 'classic' && snapshot.lives[player.seat] === 0;
+      return {
+        ...player,
+        hand: eliminated ? [] : (state.hands[player.seat] ?? []),
+        handCount: eliminated ? 0 : (state.hands[player.seat]?.length ?? 0),
+        lives: scores[player.seat] ?? 0,
+        isLocal: player.seat === 0,
+        eliminated,
+      };
+    }),
     activeSeat: snapshot.session.phase.actor,
     stockCount: state.stock.length,
     discard: state.discard,

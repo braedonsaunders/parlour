@@ -1,6 +1,6 @@
 import type { MatchResult, MatchResultRank, SeatId } from '@parlour/engine';
 import { handValue } from './hand';
-import type { BlitzState, RoundOutcome } from './state';
+import { liveSeats, type BlitzState, type RoundOutcome } from './state';
 
 /**
  * Showdown scoring (spec §5.1): lowest hand loses. If the knocker is lowest or
@@ -9,7 +9,7 @@ import type { BlitzState, RoundOutcome } from './state';
  */
 export function scoreRound(state: BlitzState): RoundOutcome {
   const config = state.rules;
-  const seats = Array.from({ length: state.seats }, (_, i) => i as SeatId);
+  const seats = liveSeats(state);
   const values = new Map<SeatId, number>(
     seats.map((seat) => [seat, handValue(state.hands[seat] ?? [], config)]),
   );
