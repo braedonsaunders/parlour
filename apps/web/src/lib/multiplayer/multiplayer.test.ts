@@ -36,6 +36,7 @@ const counterFlow: Flow<CounterState> = {
 };
 const counterGame: GameDef<CounterState, CounterRules> = {
   id: 'counter',
+  howToPlay: { summary: 'test stub', objective: 'test stub', sections: [] },
   configSchema: counterConfig,
   setup: () => ({ count: 0 }),
   moves: { increment },

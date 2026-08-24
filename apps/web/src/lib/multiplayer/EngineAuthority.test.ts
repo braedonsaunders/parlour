@@ -25,6 +25,7 @@ const configSchema = defineConfig<TestConfig>([
 
 const game: GameDef<TestState, TestConfig> = {
   id: 'authority-test',
+  howToPlay: { summary: 'test stub', objective: 'test stub', sections: [] },
   configSchema,
   setup: ({ config, seats }) => ({ score: config.openingScore, seats }),
   moves: {
