@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { createSession, replaySession, sessionApply, stateHash, veiledDeckOrder } from '@parlour/engine';
+import {
+  createSession,
+  replaySession,
+  sessionApply,
+  stateHash,
+  veiledDeckOrder,
+} from '@parlour/engine';
 import { ratscrewConfigSchema } from './config';
 import { ratscrewGame, type RatscrewState } from './game';
 

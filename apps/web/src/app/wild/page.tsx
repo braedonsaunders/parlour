@@ -3,7 +3,8 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
-import { wildpileConfig } from '@parlour/game-wildpile';
+import { wildpileConfig, wildpileHowToPlay } from '@parlour/game-wildpile';
+import { HowToPlayButton } from '@/components/HowToPlay';
 import { RuleSettings } from '@/components/settings/RuleSettings';
 import { useCenteredCarousel } from '@/hooks/useCenteredCarousel';
 import { WILD_MODES, type WildModeDef } from '@/lib/wild/modes';
@@ -50,7 +51,7 @@ export default function WildSetupPage() {
         <h1 className="font-display text-xl font-extrabold tracking-tight text-hearth-50">
           Wild <span className="text-dusk-100/80">· pick your pile</span>
         </h1>
-        <span className="w-16" aria-hidden="true" />
+        <HowToPlayButton doc={wildpileHowToPlay} title="Wild" subtitle="the shedding game" />
       </header>
 
       <div
@@ -150,37 +151,46 @@ function ModeTile({
   onSelect: () => void;
 }) {
   return (
-    <button
-      type="button"
-      role="radio"
-      aria-checked={selected}
-      data-selected={selected}
-      onClick={onSelect}
-      className={styles.tile}
-      style={{
-        ['--tile-accent' as string]: def.accent,
-        ['--tile-accent-soft' as string]: `${def.accent}44`,
-      }}
-    >
-      <span className={styles.tileGlow} />
-      <span className={styles.preview}>
-        <span className={gameStyles.wildCard}>7</span>
-        {(PREVIEW_CARDS[def.id] ?? PREVIEW_CARDS.classic ?? []).map((pip, index) => (
-          <span key={index} className={gameStyles.wildCard}>
-            {pip}
-          </span>
-        ))}
-      </span>
-      <span className={styles.tagline}>{def.tagline}</span>
-      <h2 className={styles.modeName}>{def.name}</h2>
-      <span className={styles.facts}>
-        {def.facts.map((fact) => (
-          <span key={fact} className={styles.fact}>
-            {fact}
-          </span>
-        ))}
-      </span>
-      <p className={styles.description}>{def.description}</p>
-    </button>
+    <div className={gameStyles.tileWrap}>
+      <HowToPlayButton
+        doc={wildpileHowToPlay}
+        title={def.name}
+        subtitle={`Wild · ${def.tagline}`}
+        variant="chip"
+        className={gameStyles.tileHelp}
+      />
+      <button
+        type="button"
+        role="radio"
+        aria-checked={selected}
+        data-selected={selected}
+        onClick={onSelect}
+        className={styles.tile}
+        style={{
+          ['--tile-accent' as string]: def.accent,
+          ['--tile-accent-soft' as string]: `${def.accent}44`,
+        }}
+      >
+        <span className={styles.tileGlow} />
+        <span className={styles.preview}>
+          <span className={gameStyles.wildCard}>7</span>
+          {(PREVIEW_CARDS[def.id] ?? PREVIEW_CARDS.classic ?? []).map((pip, index) => (
+            <span key={index} className={gameStyles.wildCard}>
+              {pip}
+            </span>
+          ))}
+        </span>
+        <span className={styles.tagline}>{def.tagline}</span>
+        <h2 className={styles.modeName}>{def.name}</h2>
+        <span className={styles.facts}>
+          {def.facts.map((fact) => (
+            <span key={fact} className={styles.fact}>
+              {fact}
+            </span>
+          ))}
+        </span>
+        <p className={styles.description}>{def.description}</p>
+      </button>
+    </div>
   );
 }

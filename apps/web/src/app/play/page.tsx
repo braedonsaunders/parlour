@@ -3,10 +3,13 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { blitzHowToPlay } from '@parlour/game-blitz';
+import { HowToPlayButton } from '@/components/HowToPlay';
 import { useCenteredCarousel } from '@/hooks/useCenteredCarousel';
 import { MODES, type ModeDef, type PreviewKind } from '@/lib/modes';
 import { useSetupStore } from '@/stores/setup';
 import styles from '@/styles/modes.module.css';
+import gameStyles from '@/styles/games.module.css';
 
 const SEAT_OPTIONS = [2, 3, 4] as const;
 const TIERS = [
@@ -33,8 +36,8 @@ export default function ModeSelectPage() {
   };
 
   return (
-    <main className="flex min-h-dvh flex-col">
-      <header className="flex items-center justify-between px-6 pt-5">
+    <main className={`${styles.fitScreen} flex flex-col`}>
+      <header className={`${styles.fitHeader} flex items-center justify-between px-6`}>
         <Link
           href="/games"
           className="pill-soft text-sm font-bold text-dusk-100 hover:text-hearth-200"
@@ -44,12 +47,12 @@ export default function ModeSelectPage() {
         <h1 className="font-display text-xl font-extrabold tracking-tight text-hearth-50">
           Blitz <span className="text-dusk-100/80">· pick your mode</span>
         </h1>
-        <span className="w-16" aria-hidden="true" />
+        <HowToPlayButton doc={blitzHowToPlay} title="Blitz" subtitle="the 31 game" />
       </header>
 
       <div
         ref={carouselRef}
-        className={`${styles.carousel} ${styles.centeredCarousel}`}
+        className={`${styles.carousel} ${styles.centeredCarousel} ${styles.fitCarousel}`}
         role="radiogroup"
         aria-label="Match format"
       >
@@ -64,10 +67,10 @@ export default function ModeSelectPage() {
       </div>
 
       <section
-        className="mx-auto mb-auto flex w-full max-w-3xl flex-col gap-4 rounded-chunky px-6 pb-8"
+        className={`${styles.fitFooter} mx-auto flex w-full max-w-3xl flex-col px-6`}
         aria-label="Table setup"
       >
-        <div className="panel-soft flex flex-wrap items-center justify-between gap-4 p-4">
+        <div className="panel-soft flex flex-wrap items-center justify-between gap-4 p-3.5">
           <Stepper
             label="Seats"
             value={`${seats}`}
@@ -109,7 +112,7 @@ export default function ModeSelectPage() {
             Create Room
           </button>
         </div>
-        <p className="text-center text-xs text-dusk-200/80">
+        <p className={`${styles.fitHint} text-center text-xs text-dusk-200/80`}>
           Rooms play with friends over a share code — solo deals you in with the bots above.
         </p>
       </section>
@@ -127,31 +130,40 @@ function ModeTile({
   onSelect: () => void;
 }) {
   return (
-    <button
-      type="button"
-      role="radio"
-      aria-checked={selected}
-      data-selected={selected}
-      onClick={onSelect}
-      className={styles.tile}
-      style={{
-        ['--tile-accent' as string]: def.accent,
-        ['--tile-accent-soft' as string]: `${def.accent}44`,
-      }}
-    >
-      <span className={styles.tileGlow} />
-      <Preview kind={def.preview} />
-      <span className={styles.tagline}>{def.tagline}</span>
-      <h2 className={styles.modeName}>{def.name}</h2>
-      <span className={styles.facts}>
-        {def.facts.map((fact) => (
-          <span key={fact} className={styles.fact}>
-            {fact}
-          </span>
-        ))}
-      </span>
-      <p className={styles.description}>{def.description}</p>
-    </button>
+    <div className={gameStyles.tileWrap}>
+      <HowToPlayButton
+        doc={blitzHowToPlay}
+        title={def.name}
+        subtitle={`Blitz · ${def.tagline}`}
+        variant="chip"
+        className={gameStyles.tileHelp}
+      />
+      <button
+        type="button"
+        role="radio"
+        aria-checked={selected}
+        data-selected={selected}
+        onClick={onSelect}
+        className={styles.tile}
+        style={{
+          ['--tile-accent' as string]: def.accent,
+          ['--tile-accent-soft' as string]: `${def.accent}44`,
+        }}
+      >
+        <span className={styles.tileGlow} />
+        <Preview kind={def.preview} />
+        <span className={styles.tagline}>{def.tagline}</span>
+        <h2 className={styles.modeName}>{def.name}</h2>
+        <span className={styles.facts}>
+          {def.facts.map((fact) => (
+            <span key={fact} className={styles.fact}>
+              {fact}
+            </span>
+          ))}
+        </span>
+        <p className={styles.description}>{def.description}</p>
+      </button>
+    </div>
   );
 }
 

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { type FxEvent } from '@parlour/engine';
 import type { WildpileColor } from '@parlour/game-wildpile';
 import { WildTableScreen } from '@/components/table/wild/WildTableScreen';
+import { fxTimelineDurationMs } from '@/lib/table/fx-motion';
 import { WildTransport, type WildDispatch, type WildSnapshot } from '@/lib/solo/WildTransport';
 import { wildModeForRules } from '@/lib/wild/modes';
 import { wildTableView } from '@/lib/wild/view';
@@ -19,6 +20,9 @@ import {
   wildMultiplayerSession,
   type MultiplayerRoomSession,
 } from '../../_multiplayer/roomSession';
+
+/** Breath left after the last card lands before the next seat moves. */
+const FX_SETTLE_MS = 160;
 
 export default function WildTablePage() {
   const multiplayer = useSyncExternalStore(
@@ -182,6 +186,7 @@ function ActiveMultiplayerWildTable({ room }: { room: MultiplayerRoomSession }) 
       onCallLastCard={() => dispatch('callLastCard')}
       onChooseTarget={(seat: number) => dispatch('chooseTarget', { seat })}
       onPass={() => dispatch('pass')}
+      onChallengeDrawFour={() => dispatch('challengeDrawFour')}
       onQuit={() => {
         room.close();
         clearActiveMultiplayerSession();
@@ -224,7 +229,11 @@ function ActiveWildTable({ transport }: { transport: WildTransport }) {
     const botSeat = snapshot.session.phase.actor;
     if (botSeat === null) return;
     // Interrupt/color decisions read as reflexes; regular turns keep the human pace.
-    const delay = snapshot.session.phase.phase === 'play' ? 480 + botSeat * 90 : 240;
+    const pace = snapshot.session.phase.phase === 'play' ? 480 + botSeat * 90 : 240;
+    // Never act over the top of the previous burst. A stacked pickup takes over
+    // a second to land, and cutting it off is what makes the table feel like it
+    // dumped cards on you rather than dealt them.
+    const delay = Math.max(pace, fxTimelineDurationMs(fx) + FX_SETTLE_MS);
     const timer = window.setTimeout(() => {
       try {
         accept(transport.playBotTurn());
@@ -235,6 +244,7 @@ function ActiveWildTable({ transport }: { transport: WildTransport }) {
     return () => window.clearTimeout(timer);
   }, [
     accept,
+    fx,
     snapshot.session.log.length,
     snapshot.session.phase.actor,
     snapshot.session.phase.phase,
@@ -294,6 +304,7 @@ function ActiveWildTable({ transport }: { transport: WildTransport }) {
       onCallLastCard={() => dispatch('callLastCard')}
       onChooseTarget={(seat: number) => dispatch('chooseTarget', { seat })}
       onPass={() => dispatch('pass')}
+      onChallengeDrawFour={() => dispatch('challengeDrawFour')}
       onQuit={() => router.push('/wild')}
     />
   );

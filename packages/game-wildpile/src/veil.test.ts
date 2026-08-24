@@ -64,9 +64,16 @@ describe('wildpile under Veil', () => {
   it('plays a card by opening it, and the pile takes the real face', () => {
     const { session } = veiled();
     const handle = (session.state as WildpileState).hands[0]![0]!;
-    const outcome = sessionApply(wildpileGame, session, 0, 'playCard', { card: 'red-9-0' }, {
-      reveals: [[handle, 'red-9-0']],
-    });
+    const outcome = sessionApply(
+      wildpileGame,
+      session,
+      0,
+      'playCard',
+      { card: 'red-9-0' },
+      {
+        reveals: [[handle, 'red-9-0']],
+      },
+    );
     expect(outcome.rejected).toBeUndefined();
     const state = outcome.session.state as WildpileState;
     expect(state.discard[0]).toBe('red-9-0');
@@ -78,9 +85,16 @@ describe('wildpile under Veil', () => {
   it('refuses a play whose opened card does not match the pile', () => {
     const { session } = veiled();
     const handle = (session.state as WildpileState).hands[0]![0]!;
-    const outcome = sessionApply(wildpileGame, session, 0, 'playCard', { card: 'blue-9-0' }, {
-      reveals: [[handle, 'blue-9-0']],
-    });
+    const outcome = sessionApply(
+      wildpileGame,
+      session,
+      0,
+      'playCard',
+      { card: 'blue-9-0' },
+      {
+        reveals: [[handle, 'blue-9-0']],
+      },
+    );
     // Opening the card does not make it legal — a blue 9 on a red 5 is still
     // nothing, so the move never reaches the log.
     expect(outcome.rejected?.code).toBe('illegal-move');
@@ -100,9 +114,16 @@ describe('veiled jump-in', () => {
   it('opens the window to every seat, because the table cannot see who matches', () => {
     const { session } = veiled(3, jumpy);
     const handle = (session.state as WildpileState).hands[0]![0]!;
-    const played = sessionApply(wildpileGame, session, 0, 'playCard', { card: 'red-9-0' }, {
-      reveals: [[handle, 'red-9-0']],
-    }).session;
+    const played = sessionApply(
+      wildpileGame,
+      session,
+      0,
+      'playCard',
+      { card: 'red-9-0' },
+      {
+        reveals: [[handle, 'red-9-0']],
+      },
+    ).session;
     const state = played.state as WildpileState;
     expect(state.interrupt?.card).toBe('red-9-0');
     expect(state.interrupt?.candidates).toEqual([1, 2]);
@@ -111,9 +132,16 @@ describe('veiled jump-in', () => {
   it('lets a seat with nothing decline, handing the turn on', () => {
     const { session } = veiled(3, jumpy);
     const handle = (session.state as WildpileState).hands[0]![0]!;
-    let current = sessionApply(wildpileGame, session, 0, 'playCard', { card: 'red-9-0' }, {
-      reveals: [[handle, 'red-9-0']],
-    }).session;
+    let current = sessionApply(
+      wildpileGame,
+      session,
+      0,
+      'playCard',
+      { card: 'red-9-0' },
+      {
+        reveals: [[handle, 'red-9-0']],
+      },
+    ).session;
     current = sessionApply(wildpileGame, current, 1, 'declineJump').session;
     current = sessionApply(wildpileGame, current, 2, 'declineJump').session;
     const state = current.state as WildpileState;
@@ -124,18 +152,39 @@ describe('veiled jump-in', () => {
   it('only accepts a jump whose opened card is an exact match', () => {
     const { session } = veiled(3, jumpy);
     const handle = (session.state as WildpileState).hands[0]![0]!;
-    const played = sessionApply(wildpileGame, session, 0, 'playCard', { card: 'red-9-0' }, {
-      reveals: [[handle, 'red-9-0']],
-    }).session;
+    const played = sessionApply(
+      wildpileGame,
+      session,
+      0,
+      'playCard',
+      { card: 'red-9-0' },
+      {
+        reveals: [[handle, 'red-9-0']],
+      },
+    ).session;
     const jumper = (played.state as WildpileState).hands[1]![0]!;
     expect(
-      sessionApply(wildpileGame, played, 1, 'playCard', { card: 'blue-9-0' }, {
-        reveals: [[jumper, 'blue-9-0']],
-      }).rejected?.code,
+      sessionApply(
+        wildpileGame,
+        played,
+        1,
+        'playCard',
+        { card: 'blue-9-0' },
+        {
+          reveals: [[jumper, 'blue-9-0']],
+        },
+      ).rejected?.code,
     ).toBe('illegal-move');
-    const good = sessionApply(wildpileGame, played, 1, 'playCard', { card: 'red-9-1' }, {
-      reveals: [[jumper, 'red-9-1']],
-    });
+    const good = sessionApply(
+      wildpileGame,
+      played,
+      1,
+      'playCard',
+      { card: 'red-9-1' },
+      {
+        reveals: [[jumper, 'red-9-1']],
+      },
+    );
     expect(good.rejected).toBeUndefined();
     expect((good.session.state as WildpileState).discard[0]).toBe('red-9-1');
   });
@@ -150,9 +199,16 @@ describe('veiled replay', () => {
   it('reproduces the board and leaves unopened hands hidden', () => {
     const { deckOrder, session } = veiled();
     const handle = (session.state as WildpileState).hands[0]![0]!;
-    const played = sessionApply(wildpileGame, session, 0, 'playCard', { card: 'red-9-0' }, {
-      reveals: [[handle, 'red-9-0']],
-    }).session;
+    const played = sessionApply(
+      wildpileGame,
+      session,
+      0,
+      'playCard',
+      { card: 'red-9-0' },
+      {
+        reveals: [[handle, 'red-9-0']],
+      },
+    ).session;
 
     const replayed = replaySession(wildpileGame, 91, played.log, {
       config: defaults,

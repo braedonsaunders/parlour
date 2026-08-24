@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { RoomLobby } from '@/components/multiplayer/RoomLobby';
+import { SecurityBadge, SecurityPicker } from '@/components/multiplayer/TableSecurity';
+import type { RoomSecurity } from '@/lib/multiplayer';
 import { useProfileStore } from '@/stores/profile';
 import {
   activateMultiplayerSession,
@@ -17,18 +19,36 @@ export default function CreateRoomPage() {
   const avatarId = useProfileStore((state) => state.avatarId);
   const sessionRef = useRef<MultiplayerRoomSession | null>(null);
   const [session, setSession] = useState<MultiplayerRoomSession | null>(null);
+  // The tier has to be settled before the room is announced: it is part of the
+  // round header every seat signs, so it cannot change once the table is open.
+  const [security, setSecurity] = useState<RoomSecurity>('open');
+  const [opening, setOpening] = useState(false);
 
   useEffect(() => {
-    if (sessionRef.current) return;
+    if (!opening || sessionRef.current) return;
     const next = new MultiplayerRoomSession(multiplayerProfile(name, avatarId));
     sessionRef.current = next;
     setSession(next);
     void next
-      .create({ seats: 2 })
+      .create({ seats: 2, security })
       .then(() => activateMultiplayerSession(next))
       .catch(() => undefined);
-  }, [avatarId, name]);
+  }, [avatarId, name, opening, security]);
 
+  if (!opening) {
+    return (
+      <main className="flex min-h-dvh flex-col items-center justify-center gap-5 px-6 py-8">
+        <h1 className="text-2xl font-black text-dusk-50">Open a table</h1>
+        <SecurityPicker value={security} supported seats={2} onChange={setSecurity} />
+        <button type="button" className="btn-fat" onClick={() => setOpening(true)}>
+          Open the table
+        </button>
+        <Link href="/" className="pill-soft text-sm font-bold text-dusk-100">
+          ← Back home
+        </Link>
+      </main>
+    );
+  }
   if (!session) return <LobbyLoading />;
   return (
     <ActiveCreateLobby session={session} capacity={2} onStarted={() => router.push('/table')} />
@@ -88,10 +108,13 @@ function ActiveCreateLobby({
           connected: seat.connected,
         }))}
         onStart={() => {
-          session.start();
-          onStarted();
+          void session
+            .start()
+            .then(onStarted)
+            .catch(() => undefined);
         }}
       />
+      <SecurityBadge security={snapshot.security} />
       <p className="text-center text-sm text-dusk-100/80">
         Share the code with a friend. The match unlocks when a second player sits down.
       </p>
