@@ -373,7 +373,6 @@ export function sessionApply<S, C extends RuleValues>(
       automatic: false,
       atMs: meta.atMs,
       reveals,
-      conceals,
       recycle: meta.recycle,
     },
     fx,
