@@ -1,6 +1,6 @@
 'use client';
 
-import { createSession, type FxEvent, type GameSession } from '@parlour/engine';
+import { createSession, type FxEvent, type GameSession, type RuleValues } from '@parlour/engine';
 import {
   blitzConfigSchema,
   createBlitzDef,
@@ -8,13 +8,26 @@ import {
   type BlitzState,
 } from '@parlour/game-blitz';
 import {
+  wildpileConfig,
+  wildpileGame,
+  type WildpileRules,
+  type WildpileState,
+} from '@parlour/game-wildpile';
+import {
   EngineAuthority,
   P2PTransport,
   type AppliedPacket,
+  type AuthorityAdapter,
   type PresenceEvent,
   type RoomHandle,
+  type RoomSettings,
 } from '@/lib/multiplayer';
-import type { NostrSignaling } from '@/lib/multiplayer/NostrSignaling';
+import { NostrSignaling, type RoomAnnouncement } from '@/lib/multiplayer/NostrSignaling';
+import { validateRoomCode } from '@/lib/rooms/code';
+
+export type MultiplayerGameId = 'blitz' | 'wildpile';
+export type MultiplayerGameSession =
+  GameSession<BlitzState, BlitzConfig> | GameSession<WildpileState, WildpileRules>;
 
 export type MultiplayerProfile = {
   name: string;
@@ -30,7 +43,9 @@ export type MultiplayerSeat = MultiplayerProfile & {
 
 export type MultiplayerRoomSnapshot = {
   room: RoomHandle | null;
-  session: GameSession<BlitzState, BlitzConfig> | null;
+  gameId: MultiplayerGameId | null;
+  settings: RoomSettings | null;
+  session: MultiplayerGameSession | null;
   localSeat: number | null;
   seats: readonly MultiplayerSeat[];
   connection: 'connecting' | 'connected' | 'reconnecting' | 'closed';
@@ -49,15 +64,25 @@ type SessionDependencies = {
 
 type Listener = () => void;
 
-const def = createBlitzDef();
+type SessionAuthority = AuthorityAdapter & {
+  getSession(): MultiplayerGameSession;
+};
+
+type CreateRoomOptions = {
+  seats: number;
+  gameId?: MultiplayerGameId;
+  config?: RuleValues;
+};
 
 export class MultiplayerRoomSession {
   private readonly listeners = new Set<Listener>();
-  private authority: EngineAuthority<BlitzState, BlitzConfig> | null = null;
+  private authority: SessionAuthority | null = null;
   private transport: P2PTransport | null = null;
   private sequence = 0;
   private snapshot: MultiplayerRoomSnapshot = {
     room: null,
+    gameId: null,
+    settings: null,
     session: null,
     localSeat: null,
     seats: [],
@@ -81,14 +106,14 @@ export class MultiplayerRoomSession {
     return () => this.listeners.delete(listener);
   };
 
-  async create(options: { seats: number }): Promise<RoomHandle> {
+  async create(options: CreateRoomOptions): Promise<RoomHandle> {
     if (options.seats < 2 || options.seats > 4) throw new Error('rooms require 2–4 seats');
-    this.prepare(options.seats);
-    const settings = {
-      gameId: def.id,
+    const settings = resolveRoomSettings({
+      gameId: options.gameId ?? 'blitz',
       seats: options.seats,
-      config: blitzConfigSchema.defaults(),
-    };
+      config: options.config ?? {},
+    });
+    this.prepare(settings);
     try {
       const room = await this.transport!.create(settings);
       this.update({
@@ -106,10 +131,16 @@ export class MultiplayerRoomSession {
   }
 
   async join(code: string): Promise<RoomHandle> {
-    this.prepare(4);
     this.update({ connection: 'connecting' });
+    const verdict = validateRoomCode(code);
+    if (!verdict.ok) throw new Error('Room codes use four unambiguous letters or digits');
+    const signaling = this.dependencies.signaling ?? new NostrSignaling();
+    let announcement: RoomAnnouncement | null = null;
     try {
-      const room = await this.transport!.join(code);
+      announcement = await signaling.resolve(verdict.code);
+      const settings = resolveRoomSettings(announcement.settings);
+      this.prepare(settings, signaling);
+      const room = await this.transport!.join(verdict.code, announcement);
       this.update({
         room,
         seats: [
@@ -125,6 +156,7 @@ export class MultiplayerRoomSession {
       });
       return room;
     } catch (error) {
+      if (!this.transport) signaling.close();
       this.fail(error, `Table ${code} isn't answering. Check the code and try again.`);
       throw error;
     }
@@ -132,7 +164,9 @@ export class MultiplayerRoomSession {
 
   start(): void {
     if (!this.snapshot.isHost) throw new Error('only the host can start the match');
-    if (this.snapshot.seats.length < 2) throw new Error('at least two players must be seated');
+    if (this.snapshot.seats.length < (this.snapshot.settings?.seats ?? 2)) {
+      throw new Error('every seat must be filled before the match starts');
+    }
     this.update({ stage: 'table' });
   }
 
@@ -148,33 +182,43 @@ export class MultiplayerRoomSession {
     });
   }
 
+  inject(move: string, payload?: unknown): void {
+    if (!this.transport) throw new Error('the room is not connected');
+    this.transport.inject(move, payload);
+  }
+
   close(): void {
     this.transport?.close();
     this.transport = null;
     this.update({ connection: 'closed' });
   }
 
-  private prepare(seats: number): void {
+  private prepare(settings: RoomSettings, signaling?: NostrSignaling): void {
     if (this.transport) throw new Error('this session already has an active room');
-    const session = createSession(def, {
-      seed: this.dependencies.seed ?? randomSeed(),
-      config: blitzConfigSchema.defaults(),
-      seats,
-    });
-    this.authority = new EngineAuthority({
-      def,
-      session,
-      settings: { gameId: def.id, seats, config: blitzConfigSchema.defaults() },
-    });
+    const runtime = createRoomRuntime(
+      settings,
+      this.dependencies.seed ?? randomSeed(),
+      (seat, bot) => this.acceptSeatBot(seat, bot),
+    );
+    this.authority = runtime.authority;
     this.transport = new P2PTransport({
       authority: this.authority,
       profileId: this.profile.profileId,
-      signaling: this.dependencies.signaling,
+      profileName: this.profile.name,
+      profileAvatarId: this.profile.avatarId,
+      signaling: signaling ?? this.dependencies.signaling,
       peerConnection: this.dependencies.peerConnection,
     });
     this.transport.onEvent((packet) => this.accept(packet));
     this.transport.onPresence((presence) => this.acceptPresence(presence));
-    this.update({ session, fx: session.setupFx ?? [], fxKey: 0, error: null });
+    this.update({
+      gameId: settings.gameId as MultiplayerGameId,
+      settings,
+      session: runtime.session,
+      fx: runtime.session.setupFx ?? [],
+      fxKey: 0,
+      error: null,
+    });
   }
 
   private accept(packet: AppliedPacket): void {
@@ -196,15 +240,22 @@ export class MultiplayerRoomSession {
       this.update({ error: presence.message });
       return;
     }
+    if (presence.kind === 'host.changed') {
+      this.update({
+        isHost: presence.hostId === this.snapshot.room?.peerId,
+        room: this.snapshot.room
+          ? { ...this.snapshot.room, hostId: presence.hostId }
+          : this.snapshot.room,
+      });
+      return;
+    }
     if (presence.kind === 'peer.joined' || presence.kind === 'seat.reclaimed') {
       const isLocal = presence.peerId === this.snapshot.room?.peerId;
       const existing = this.snapshot.seats.filter((seat) => seat.seat !== presence.seat);
       const joined: MultiplayerSeat = isLocal
         ? { ...this.profile, seat: presence.seat, connected: true, bot: false }
         : {
-            name: `Friend ${presence.seat + 1}`,
-            avatarId: 'cobalt',
-            profileId: presence.peerId,
+            ...presence.profile,
             seat: presence.seat,
             connected: true,
             bot: false,
@@ -230,6 +281,14 @@ export class MultiplayerRoomSession {
         ),
       });
     }
+  }
+
+  private acceptSeatBot(seat: number, bot: boolean): void {
+    this.update({
+      seats: this.snapshot.seats.map((player) =>
+        player.seat === seat ? { ...player, bot, connected: !bot } : player,
+      ),
+    });
   }
 
   private fail(_error: unknown, fallback: string): void {
@@ -279,4 +338,65 @@ function randomSeed(): number {
   const bytes = new Uint32Array(1);
   crypto.getRandomValues(bytes);
   return bytes[0]! | 0;
+}
+
+export function blitzMultiplayerSession(
+  snapshot: MultiplayerRoomSnapshot,
+): GameSession<BlitzState, BlitzConfig> | null {
+  return snapshot.gameId === 'blitz'
+    ? (snapshot.session as GameSession<BlitzState, BlitzConfig> | null)
+    : null;
+}
+
+export function wildMultiplayerSession(
+  snapshot: MultiplayerRoomSnapshot,
+): GameSession<WildpileState, WildpileRules> | null {
+  return snapshot.gameId === 'wildpile'
+    ? (snapshot.session as GameSession<WildpileState, WildpileRules> | null)
+    : null;
+}
+
+function resolveRoomSettings(settings: RoomSettings): RoomSettings {
+  if (!Number.isInteger(settings.seats) || settings.seats < 2 || settings.seats > 4) {
+    throw new Error('rooms require 2–4 seats');
+  }
+  if (settings.gameId === 'blitz') {
+    return {
+      gameId: 'blitz',
+      seats: settings.seats,
+      config: blitzConfigSchema.resolve(settings.config as Partial<BlitzConfig>),
+    };
+  }
+  if (settings.gameId === 'wildpile') {
+    return {
+      gameId: 'wildpile',
+      seats: settings.seats,
+      config: wildpileConfig.resolve(settings.config as Partial<WildpileRules>),
+    };
+  }
+  throw new Error(`unsupported room game: ${settings.gameId}`);
+}
+
+function createRoomRuntime(
+  settings: RoomSettings,
+  seed: number,
+  onSeatBot: (seat: number, bot: boolean) => void,
+): { session: MultiplayerGameSession; authority: SessionAuthority } {
+  if (settings.gameId === 'wildpile') {
+    const config = settings.config as WildpileRules;
+    const session = createSession(wildpileGame, { seed, config, seats: settings.seats });
+    const authority = new EngineAuthority({
+      def: wildpileGame,
+      session,
+      settings,
+      onSeatBot,
+    });
+    return { session, authority };
+  }
+
+  const def = createBlitzDef();
+  const config = settings.config as BlitzConfig;
+  const session = createSession(def, { seed, config, seats: settings.seats });
+  const authority = new EngineAuthority({ def, session, settings, onSeatBot });
+  return { session, authority };
 }

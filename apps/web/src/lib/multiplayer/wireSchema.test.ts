@@ -17,23 +17,35 @@ const migration = {
   },
 };
 
+const profile = { profileId: 'profile', name: 'Juniper', avatarId: 'ember' };
+
 const validMessages = [
-  { type: 'hello', profileId: 'profile' },
+  { type: 'hello', profile },
   {
     type: 'welcome',
     hostId: 'host',
     seat: 1,
-    peers: [{ peerId: 'host', profileId: 'profile' }],
+    peers: [{ peerId: 'host', profile }],
     snapshot: migration,
   },
-  { type: 'mesh.peers', peers: [{ peerId: 'peer', profileId: 'profile' }] },
+  { type: 'mesh.peers', peers: [{ peerId: 'peer', profile }] },
   { type: 'presence.state', presence: migration.presence },
   { type: 'intent', action: { id: 'action', seat: 1, move: 'draw', payload: null } },
   {
     type: 'applied',
     packet: {
       actionId: 'action',
-      events: [{ seq: 1, seat: 1, move: 'draw', automatic: false, hash: 'event-hash' }],
+      events: [
+        {
+          seq: 1,
+          seat: 1,
+          move: 'draw',
+          atMs: 25,
+          automatic: false,
+          injected: false,
+          hash: 'event-hash',
+        },
+      ],
       fx: [{ kind: 'card.draw', payload: { card: 'H2' }, at: 0 }],
       stateHash: 'hash',
     },
@@ -53,8 +65,8 @@ describe('wire message schema', () => {
   it.each([
     ['unknown discriminator', { type: 'admin', action: {} }],
     ['unexpected field', { type: 'heartbeat', sentAt: 1, action: {} }],
-    ['empty identity', { type: 'hello', profileId: '' }],
-    ['oversized identity', { type: 'hello', profileId: 'x'.repeat(129) }],
+    ['empty identity', { type: 'hello', profile: { ...profile, profileId: '' } }],
+    ['oversized identity', { type: 'hello', profile: { ...profile, profileId: 'x'.repeat(129) } }],
     [
       'malformed welcome seats',
       {
@@ -83,7 +95,7 @@ describe('wire message schema', () => {
         type: 'mesh.peers',
         peers: Array.from({ length: 5 }, (_, index) => ({
           peerId: `peer-${index}`,
-          profileId: `profile-${index}`,
+          profile: { ...profile, profileId: `profile-${index}` },
         })),
       },
     ],

@@ -12,6 +12,8 @@ export interface PodiumEntry extends SeatView {
   blitzes: number;
   knockWins: number;
   livesLeft: number | null;
+  /** Wild's ranking detail: cards still in hand when the deal ended. */
+  cardsLeft: number | null;
 }
 
 function detailNumber(
@@ -31,6 +33,7 @@ export function derivePodium(result: MatchResult, seats: readonly SeatInfo[]): P
     if (!info) continue;
     const view: SeatView = toSeatView(info);
     const livesRaw = ranking.detail?.livesLeft;
+    const cardsRaw = ranking.detail?.cards;
     entries.push({
       ...view,
       rank: ranking.rank,
@@ -38,6 +41,7 @@ export function derivePodium(result: MatchResult, seats: readonly SeatInfo[]): P
       blitzes: detailNumber(ranking.detail, 'blitzes'),
       knockWins: detailNumber(ranking.detail, 'knockWins'),
       livesLeft: typeof livesRaw === 'number' && Number.isFinite(livesRaw) ? livesRaw : null,
+      cardsLeft: typeof cardsRaw === 'number' && Number.isFinite(cardsRaw) ? cardsRaw : null,
     });
   }
 

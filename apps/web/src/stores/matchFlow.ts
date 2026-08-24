@@ -1,13 +1,17 @@
 import { create } from 'zustand';
 import type { MatchResult } from '@parlour/engine';
 import type { SeatInfo } from '@/lib/seats';
+import type { GameId } from '@/lib/games';
 import type { ModeId } from '@/lib/modes';
+import type { WildModeId } from '@/lib/wild/modes';
 
 /** Everything the podium needs about the finished match. */
 export interface MatchSnapshot {
   result: MatchResult;
   seats: readonly SeatInfo[];
-  mode: ModeId;
+  /** Which shelf game produced this match; absent means Blitz (pre-Wild callers). */
+  game?: GameId;
+  mode: ModeId | WildModeId;
   /** The human's seat, for jingle-vs-sting and the "you" framing; null when absent. */
   localSeat: number | null;
 }

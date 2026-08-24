@@ -8,6 +8,7 @@ import { useProfileStore } from '@/stores/profile';
 import styles from '@/styles/join.module.css';
 import {
   activateMultiplayerSession,
+  type MultiplayerGameId,
   multiplayerProfile,
   MultiplayerRoomSession,
 } from '../_multiplayer/roomSession';
@@ -140,7 +141,7 @@ export default function JoinPage() {
       <JoinStatus
         session={roomSession}
         fallbackError={error}
-        onConnected={() => router.replace('/table')}
+        onConnected={(gameId) => router.replace(gameId === 'wildpile' ? '/wild/table' : '/table')}
       />
       <button
         type="button"
@@ -161,7 +162,7 @@ function JoinStatus({
 }: {
   session: MultiplayerRoomSession | null;
   fallbackError: string | null;
-  onConnected: () => void;
+  onConnected: (gameId: MultiplayerGameId) => void;
 }) {
   const snapshot = useSyncExternalStore(
     session?.subscribe ?? subscribeNoop,
@@ -169,8 +170,10 @@ function JoinStatus({
     session?.getSnapshot ?? (() => null),
   );
   useEffect(() => {
-    if (snapshot?.localSeat !== null && snapshot?.localSeat !== undefined) onConnected();
-  }, [onConnected, snapshot?.localSeat]);
+    if (snapshot?.localSeat !== null && snapshot?.localSeat !== undefined && snapshot.gameId) {
+      onConnected(snapshot.gameId);
+    }
+  }, [onConnected, snapshot?.gameId, snapshot?.localSeat]);
   const message = fallbackError ?? snapshot?.error;
   return (
     <div aria-live="assertive" className="min-h-14 max-w-md">

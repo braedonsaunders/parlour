@@ -33,11 +33,14 @@ export default function ModeSelectPage() {
   return (
     <main className="flex min-h-dvh flex-col">
       <header className="flex items-center justify-between px-6 pt-5">
-        <Link href="/" className="pill-soft text-sm font-bold text-dusk-100 hover:text-hearth-200">
-          ← Back
+        <Link
+          href="/games"
+          className="pill-soft text-sm font-bold text-dusk-100 hover:text-hearth-200"
+        >
+          ← Games
         </Link>
         <h1 className="font-display text-xl font-extrabold tracking-tight text-hearth-50">
-          Pick your game
+          Blitz <span className="text-dusk-100/80">· pick your mode</span>
         </h1>
         <span className="w-16" aria-hidden="true" />
       </header>
@@ -78,9 +81,30 @@ export default function ModeSelectPage() {
           onClick={start}
           disabled={starting}
           className="btn-fat mx-auto w-72 text-lg"
+          data-testid="deal-me-in"
         >
           {starting ? 'Setting the table…' : 'Deal me in'}
         </button>
+
+        <div className="flex items-center justify-center gap-3">
+          <button
+            type="button"
+            onClick={() => router.push('/join')}
+            className="btn-fat btn-fat--teal w-40"
+          >
+            Join Room
+          </button>
+          <button
+            type="button"
+            onClick={() => router.push('/create')}
+            className="btn-fat btn-fat--ghost w-40"
+          >
+            Create Room
+          </button>
+        </div>
+        <p className="text-center text-xs text-dusk-200/80">
+          Rooms play with friends over a share code — solo deals you in with the bots above.
+        </p>
       </section>
     </main>
   );

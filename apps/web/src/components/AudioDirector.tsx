@@ -1,21 +1,20 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useAudioManager, useAudioStore } from '@/stores/audio';
+import { useAudioManager, useAudioStore, useMusicController } from '@/stores/audio';
 
-/** Preloads audio on every route, unlocks it on gesture, and keeps ambience alive. */
+/** Preloads audio on every route, unlocks it on gesture, and keeps the music alive. */
 export function AudioDirector() {
   const manager = useAudioManager();
+  const controller = useMusicController();
   const unlocked = useAudioStore((state) => state.unlocked);
   const music = useAudioStore((state) => state.channels.music);
   const master = useAudioStore((state) => state.channels.master);
 
   useEffect(() => {
-    if (!unlocked || music.muted || master.muted || manager.activeVoices('music.parlour') > 0) {
-      return;
-    }
-    manager.play('music.parlour');
-  }, [manager, master.muted, music.muted, unlocked]);
+    if (!unlocked || music.muted || master.muted) return;
+    controller.autoStart();
+  }, [controller, unlocked, music.muted, master.muted]);
 
   useEffect(() => {
     const onPointerDown = (event: PointerEvent) => {

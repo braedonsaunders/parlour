@@ -45,7 +45,12 @@ type StarFieldProps = {
   seed?: number;
 };
 
-export function EmberField({ count = 10, color = '#eab271', seed = 3, spread = 30 }: EmberFieldProps) {
+export function EmberField({
+  count = 10,
+  color = '#eab271',
+  seed = 3,
+  spread = 30,
+}: EmberFieldProps) {
   const rnd = seededRandom(0xe3be2 + seed);
   return (
     <div className={s.fill}>
@@ -106,7 +111,13 @@ type FirefliesProps = {
   seed?: number;
 };
 
-export function SmokeWisps({ count = 3, left = 50, bottom = 30, seed = 5, peak = 0.35 }: SmokeWispsProps) {
+export function SmokeWisps({
+  count = 3,
+  left = 50,
+  bottom = 30,
+  seed = 5,
+  peak = 0.35,
+}: SmokeWispsProps) {
   const rnd = seededRandom(0x50f7 + seed);
   return (
     <>
@@ -138,7 +149,11 @@ type SmokeWispsProps = {
   peak?: number;
 };
 
-export function DustMotes({ count = 10, color = 'rgba(242, 176, 106, 0.9)', seed = 9 }: DustMotesProps) {
+export function DustMotes({
+  count = 10,
+  color = 'rgba(242, 176, 106, 0.9)',
+  seed = 9,
+}: DustMotesProps) {
   const rnd = seededRandom(0xd057 + seed);
   return (
     <div className={s.fill}>

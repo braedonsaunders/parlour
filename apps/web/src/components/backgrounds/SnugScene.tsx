@@ -45,7 +45,12 @@ function Wallpaper() {
       <defs>
         <pattern id="sn-paper" width="44" height="52" patternUnits="userSpaceOnUse">
           <path d="M22 6 Q30 16 22 26 Q14 16 22 6" fill="none" stroke="#7fc0d1" strokeWidth="1" />
-          <path d="M0 40 Q11 33 22 40 Q33 47 44 40" fill="none" stroke="#7fc0d1" strokeWidth="0.8" />
+          <path
+            d="M0 40 Q11 33 22 40 Q33 47 44 40"
+            fill="none"
+            stroke="#7fc0d1"
+            strokeWidth="0.8"
+          />
         </pattern>
       </defs>
       <rect width="100%" height="100%" fill="url(#sn-paper)" />
@@ -90,7 +95,17 @@ function Wainscot() {
         viewBox="0 0 1440 72"
       >
         {Array.from({ length: 18 }, (_, i) => (
-          <rect key={i} x={8 + i * 80} y="10" width="64" height="52" rx="5" fill="none" stroke="#241609" strokeWidth="3" />
+          <rect
+            key={i}
+            x={8 + i * 80}
+            y="10"
+            width="64"
+            height="52"
+            rx="5"
+            fill="none"
+            stroke="#241609"
+            strokeWidth="3"
+          />
         ))}
       </svg>
     </>
@@ -139,8 +154,15 @@ function RainyWindow() {
             boxShadow: '0 0 18px 5px rgba(253, 246, 236, 0.2)',
           }}
         />
-        <svg style={{ position: 'absolute', left: 0, bottom: '18%', width: '100%', height: '26%' }} preserveAspectRatio="none" viewBox="0 0 100 30">
-          <path d="M0 30 V16 L14 8 L26 18 L40 6 L56 20 L70 10 L84 20 L100 12 V30 Z" fill="#0a141f" />
+        <svg
+          style={{ position: 'absolute', left: 0, bottom: '18%', width: '100%', height: '26%' }}
+          preserveAspectRatio="none"
+          viewBox="0 0 100 30"
+        >
+          <path
+            d="M0 30 V16 L14 8 L26 18 L40 6 L56 20 L70 10 L84 20 L100 12 V30 Z"
+            fill="#0a141f"
+          />
         </svg>
         <div
           style={{
@@ -170,8 +192,26 @@ function RainyWindow() {
           />
         ))}
       </div>
-      <div style={{ position: 'absolute', left: '48.5%', top: 0, bottom: 0, width: '3%', background: '#3b2417' }} />
-      <div style={{ position: 'absolute', left: 0, right: 0, top: '46%', height: '5%', background: '#3b2417' }} />
+      <div
+        style={{
+          position: 'absolute',
+          left: '48.5%',
+          top: 0,
+          bottom: 0,
+          width: '3%',
+          background: '#3b2417',
+        }}
+      />
+      <div
+        style={{
+          position: 'absolute',
+          left: 0,
+          right: 0,
+          top: '46%',
+          height: '5%',
+          background: '#3b2417',
+        }}
+      />
       <div
         style={{
           position: 'absolute',
@@ -209,17 +249,35 @@ function Fireplace() {
           )}
         </g>
         <path d="M40 150 V72 Q40 46 100 46 Q160 46 160 72 V150 Z" fill="#120a06" />
-        <path d="M40 150 V72 Q40 46 100 46 Q160 46 160 72 V150" fill="none" stroke="#241609" strokeWidth="5" />
+        <path
+          d="M40 150 V72 Q40 46 100 46 Q160 46 160 72 V150"
+          fill="none"
+          stroke="#241609"
+          strokeWidth="5"
+        />
         <g transform="translate(100 132)">
-          <path d="M-34 8 L34 16 M34 8 L-34 16" stroke="#3b2417" strokeWidth="7" strokeLinecap="round" />
+          <path
+            d="M-34 8 L34 16 M34 8 L-34 16"
+            stroke="#3b2417"
+            strokeWidth="7"
+            strokeLinecap="round"
+          />
           <g className={s.flameOuter}>
-            <path d="M0 -52 Q20 -22 16 4 Q10 12 0 12 Q-10 12 -16 4 Q-20 -22 0 -52" fill="#e29349" opacity="0.9" />
+            <path
+              d="M0 -52 Q20 -22 16 4 Q10 12 0 12 Q-10 12 -16 4 Q-20 -22 0 -52"
+              fill="#e29349"
+              opacity="0.9"
+            />
           </g>
           <g className={s.flameMid}>
             <path d="M0 -38 Q14 -16 11 6 Q7 12 0 12 Q-7 12 -11 6 Q-14 -16 0 -38" fill="#d97a2b" />
           </g>
           <g className={s.flameCore}>
-            <path d="M0 -22 Q7 -8 5 8 Q3 12 0 12 Q-3 12 -5 8 Q-7 -8 0 -22" fill="#fdf6ec" opacity="0.92" />
+            <path
+              d="M0 -22 Q7 -8 5 8 Q3 12 0 12 Q-3 12 -5 8 Q-7 -8 0 -22"
+              fill="#fdf6ec"
+              opacity="0.92"
+            />
           </g>
         </g>
         <MantelClutter />
@@ -252,7 +310,15 @@ function MantelClutter() {
       <g transform="translate(168 0)">
         <rect x="-3" y="4" width="6" height="11" rx="1.5" fill="#a67833" />
         <rect x="-1.6" y="-4" width="3.2" height="9" fill="#fdf6ec" />
-        <ellipse className={s.snCandle} style={{ '--delay': '-0.5s' } as CSSProperties} cx="0" cy="-7" rx="2.4" ry="4" fill="#f2b06a" />
+        <ellipse
+          className={s.snCandle}
+          style={{ '--delay': '-0.5s' } as CSSProperties}
+          cx="0"
+          cy="-7"
+          rx="2.4"
+          ry="4"
+          fill="#f2b06a"
+        />
       </g>
       <g transform="translate(100 -1)">
         <rect x="-16" y="-16" width="32" height="31" rx="3" fill="#6d4a2c" />
@@ -269,7 +335,15 @@ function MantelClutter() {
   );
 }
 
-const BOOK_COLORS = ['#96471c', '#25586e', '#62301b', '#2c6e4f', '#bd5f20', '#244a5c', '#78391d'] as const;
+const BOOK_COLORS = [
+  '#96471c',
+  '#25586e',
+  '#62301b',
+  '#2c6e4f',
+  '#bd5f20',
+  '#244a5c',
+  '#78391d',
+] as const;
 
 function Bookshelf() {
   const rnd = seededRandom(0xb00c);
@@ -311,7 +385,12 @@ function WallClock() {
         <rect x="10" y="0" width="40" height="74" rx="6" fill="#55341f" />
         <rect x="14" y="4" width="32" height="66" rx="4" fill="#3b2417" />
         <circle cx="30" cy="24" r="15" fill="#f9e8d2" stroke="#a67833" strokeWidth="2.5" />
-        <path d="M30 24 L30 14 M30 24 L37 27" stroke="#241609" strokeWidth="2" strokeLinecap="round" />
+        <path
+          d="M30 24 L30 14 M30 24 L37 27"
+          stroke="#241609"
+          strokeWidth="2"
+          strokeLinecap="round"
+        />
         <circle cx="30" cy="24" r="1.8" fill="#241609" />
         <g className={s.snPendulum} style={{ transformOrigin: '30px 42px' }}>
           <line x1="30" y1="42" x2="30" y2="62" stroke="#c99b52" strokeWidth="2" />
@@ -329,7 +408,12 @@ function FloorAndRug() {
         className={s.fill}
         style={{ background: 'linear-gradient(180deg, #46301d 0%, #34220f 55%, #241609 100%)' }}
       />
-      <svg className={s.fill} style={{ opacity: 0.3 }} preserveAspectRatio="none" viewBox="0 0 1440 200">
+      <svg
+        className={s.fill}
+        style={{ opacity: 0.3 }}
+        preserveAspectRatio="none"
+        viewBox="0 0 1440 200"
+      >
         {Array.from({ length: 6 }, (_, row) => (
           <path
             key={row}
@@ -364,7 +448,12 @@ function Armchair() {
       <svg width="100%" viewBox="0 0 170 130" style={{ overflow: 'visible' }}>
         <ellipse cx="85" cy="124" rx="76" ry="8" fill="#03070a" opacity="0.5" />
         <path d="M20 118 V56 Q20 30 46 30 H124 Q150 30 150 56 V118 Z" fill="#25586e" />
-        <path d="M20 118 V56 Q20 30 46 30 H124 Q150 30 150 56 V118" fill="none" stroke="#1c4356" strokeWidth="4" />
+        <path
+          d="M20 118 V56 Q20 30 46 30 H124 Q150 30 150 56 V118"
+          fill="none"
+          stroke="#1c4356"
+          strokeWidth="4"
+        />
         <rect x="34" y="70" width="102" height="30" rx="12" fill="#2f6d88" />
         <path d="M14 74 Q4 74 4 88 Q4 104 18 104 L26 104 V118 H14 Z" fill="#1c4356" />
         <path d="M156 74 Q166 74 166 88 Q166 104 152 104 L144 104 V118 H156 Z" fill="#1c4356" />
@@ -373,10 +462,16 @@ function Armchair() {
         <rect x="130" y="120" width="10" height="8" rx="2" fill="#241609" />
         <Cat />
       </svg>
-      <span className={s.snZzz} style={{ right: '26%', top: '18%', fontSize: '2vh', '--delay': '0s' } as CSSProperties}>
+      <span
+        className={s.snZzz}
+        style={{ right: '26%', top: '18%', fontSize: '2vh', '--delay': '0s' } as CSSProperties}
+      >
         z
       </span>
-      <span className={s.snZzz} style={{ right: '21%', top: '14%', fontSize: '1.5vh', '--delay': '1.6s' } as CSSProperties}>
+      <span
+        className={s.snZzz}
+        style={{ right: '21%', top: '14%', fontSize: '1.5vh', '--delay': '1.6s' } as CSSProperties}
+      >
         z
       </span>
     </div>
@@ -387,15 +482,37 @@ function Cat() {
   return (
     <g transform="translate(85 84)">
       <g className={s.snTail} style={{ transformOrigin: '-30px 6px' }}>
-        <path d="M-28 8 Q-48 4 -46 -10 Q-45 -18 -38 -16" fill="none" stroke="#d97a2b" strokeWidth="7" strokeLinecap="round" />
+        <path
+          d="M-28 8 Q-48 4 -46 -10 Q-45 -18 -38 -16"
+          fill="none"
+          stroke="#d97a2b"
+          strokeWidth="7"
+          strokeLinecap="round"
+        />
       </g>
       <g className={s.snCat}>
         <ellipse cx="0" cy="0" rx="34" ry="18" fill="#e29349" />
-        <path d="M-6 -14 Q0 -22 8 -15 Q20 -22 26 -12 Q32 -2 22 2 Q10 6 -2 0 Q-8 -6 -6 -14" fill="#eab271" />
+        <path
+          d="M-6 -14 Q0 -22 8 -15 Q20 -22 26 -12 Q32 -2 22 2 Q10 6 -2 0 Q-8 -6 -6 -14"
+          fill="#eab271"
+        />
         <circle cx="20" cy="-8" r="11" fill="#e29349" />
         <path d="M12 -16 L14 -24 L20 -18 Z M26 -17 L31 -23 L31 -15 Z" fill="#d97a2b" />
-        <path d="M14 -6 Q17 -4 20 -6 M22 -6 Q25 -4 28 -6" fill="none" stroke="#96471c" strokeWidth="1.6" strokeLinecap="round" />
-        <path d="M-14 -4 Q-8 -10 0 -6 M-4 4 Q4 8 12 4" fill="none" stroke="#d97a2b" strokeWidth="1.4" strokeLinecap="round" opacity="0.7" />
+        <path
+          d="M14 -6 Q17 -4 20 -6 M22 -6 Q25 -4 28 -6"
+          fill="none"
+          stroke="#96471c"
+          strokeWidth="1.6"
+          strokeLinecap="round"
+        />
+        <path
+          d="M-14 -4 Q-8 -10 0 -6 M-4 4 Q4 8 12 4"
+          fill="none"
+          stroke="#d97a2b"
+          strokeWidth="1.4"
+          strokeLinecap="round"
+          opacity="0.7"
+        />
       </g>
     </g>
   );
@@ -408,7 +525,12 @@ function SideTable() {
         <ellipse cx="45" cy="76" rx="40" ry="5" fill="#03070a" opacity="0.5" />
         <ellipse cx="45" cy="26" rx="42" ry="9" fill="#8a5a35" />
         <ellipse cx="45" cy="23" rx="42" ry="9" fill="#a8734a" />
-        <path d="M12 27 L16 74 M78 27 L74 74 M45 33 L45 76" stroke="#55341f" strokeWidth="5" strokeLinecap="round" />
+        <path
+          d="M12 27 L16 74 M78 27 L74 74 M45 33 L45 76"
+          stroke="#55341f"
+          strokeWidth="5"
+          strokeLinecap="round"
+        />
         <g transform="translate(24 8)">
           <path d="M0 6 Q0 14 9 14 Q18 14 18 6 L17 0 H1 Z" fill="#bd5f20" />
           <path d="M18 4 Q25 4 24 9 Q23 13 17 12" fill="none" stroke="#bd5f20" strokeWidth="2.4" />
@@ -426,8 +548,32 @@ function SideTable() {
           </text>
         </g>
       </svg>
-      <span className={s.snSteam} style={{ left: '32%', top: '-6%', width: 7, height: 7, '--dur': '4s', '--delay': '0s' } as CSSProperties} />
-      <span className={s.snSteam} style={{ left: '37%', top: '-4%', width: 5, height: 5, '--dur': '5s', '--delay': '2s' } as CSSProperties} />
+      <span
+        className={s.snSteam}
+        style={
+          {
+            left: '32%',
+            top: '-6%',
+            width: 7,
+            height: 7,
+            '--dur': '4s',
+            '--delay': '0s',
+          } as CSSProperties
+        }
+      />
+      <span
+        className={s.snSteam}
+        style={
+          {
+            left: '37%',
+            top: '-4%',
+            width: 5,
+            height: 5,
+            '--dur': '5s',
+            '--delay': '2s',
+          } as CSSProperties
+        }
+      />
     </div>
   );
 }
@@ -447,18 +593,59 @@ function RecordPlayer() {
           <circle cx="46" cy="30" r="7" fill="#d97a2b" />
           <circle cx="46" cy="30" r="1.6" fill="#241609" />
         </g>
-        <line x1="88" y1="14" x2="70" y2="34" stroke="#c9c2b4" strokeWidth="3" strokeLinecap="round" />
+        <line
+          x1="88"
+          y1="14"
+          x2="70"
+          y2="34"
+          stroke="#c9c2b4"
+          strokeWidth="3"
+          strokeLinecap="round"
+        />
         <circle cx="88" cy="14" r="4.5" fill="#a67833" />
         <circle cx="24" cy="62" r="4" fill="#e2c289" />
         <rect x="60" y="58" width="34" height="8" rx="4" fill="#3b2417" />
       </svg>
-      <span className={s.snNote} style={{ left: '20%', top: '-16%', fontSize: '2.4vh', '--dur': '6s', '--delay': '0s' } as CSSProperties}>
+      <span
+        className={s.snNote}
+        style={
+          {
+            left: '20%',
+            top: '-16%',
+            fontSize: '2.4vh',
+            '--dur': '6s',
+            '--delay': '0s',
+          } as CSSProperties
+        }
+      >
         ♪
       </span>
-      <span className={s.snNote} style={{ left: '48%', top: '-10%', fontSize: '1.9vh', '--dur': '7s', '--delay': '2.4s' } as CSSProperties}>
+      <span
+        className={s.snNote}
+        style={
+          {
+            left: '48%',
+            top: '-10%',
+            fontSize: '1.9vh',
+            '--dur': '7s',
+            '--delay': '2.4s',
+          } as CSSProperties
+        }
+      >
         ♫
       </span>
-      <span className={s.snNote} style={{ left: '34%', top: '-22%', fontSize: '1.6vh', '--dur': '8s', '--delay': '4.6s' } as CSSProperties}>
+      <span
+        className={s.snNote}
+        style={
+          {
+            left: '34%',
+            top: '-22%',
+            fontSize: '1.6vh',
+            '--dur': '8s',
+            '--delay': '4.6s',
+          } as CSSProperties
+        }
+      >
         ♪
       </span>
     </div>

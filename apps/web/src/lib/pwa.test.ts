@@ -28,4 +28,21 @@ describe('installable offline shell', () => {
       'You’re still at the table',
     );
   });
+
+  it('clones cacheable responses before the browser can consume their bodies', () => {
+    const worker = readFileSync(join(process.cwd(), 'public/sw.js'), 'utf8');
+
+    expect(worker).toContain('const cacheCopy = response.ok');
+    expect(worker).not.toContain('cache.put(request, response.clone())');
+  });
+
+  it('removes production service workers and parlour caches during development', () => {
+    const layout = readFileSync(join(process.cwd(), 'src/app/layout.tsx'), 'utf8');
+
+    expect(layout).toContain("process.env.NODE_ENV === 'development'");
+    expect(layout).toContain('id="parlour-pwa-development-reset"');
+    expect(layout).toContain('strategy="beforeInteractive"');
+    expect(layout).toContain("key.startsWith('parlour-')");
+    expect(layout).toContain("new URL(worker.scriptURL).pathname === '/sw.js'");
+  });
 });

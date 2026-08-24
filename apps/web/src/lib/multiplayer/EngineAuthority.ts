@@ -1,6 +1,7 @@
 import {
   replaySession,
   sessionApply,
+  sessionInject,
   stateHash,
   type GameDef,
   type GameSession,
@@ -37,20 +38,25 @@ export class EngineAuthority<S, C extends RuleValues> implements AuthorityAdapte
   private readonly def: GameDef<S, C>;
   private readonly now: () => number;
   private readonly onSeatBot?: (seat: number, bot: boolean) => void;
+  private clockAnchorWallMs: number;
+  private clockAnchorAtMs = 0;
 
   constructor(options: EngineAuthorityOptions<S, C>) {
     this.def = options.def;
     this.authorityState = { session: options.session, settings: options.settings };
     this.now = options.now ?? (() => Date.now());
+    this.clockAnchorWallMs = this.now();
     this.onSeatBot = options.onSeatBot;
   }
 
   apply(action: PlayerAction): AppliedPacket {
     if (this.acceptedActions.has(action.id)) throw new DuplicateActionError(action.id);
     const { session, settings } = this.authorityState;
-    const outcome = sessionApply(this.def, session, action.seat, action.move, action.payload);
+    const { timestamp, atMs } = this.authorityTime(session);
+    const outcome = sessionApply(this.def, session, action.seat, action.move, action.payload, {
+      atMs,
+    });
     if (outcome.rejected) throw new Error(outcome.rejected.message);
-    const timestamp = this.now();
     const events = outcome.events.map((event) => ({ ...event, ts: timestamp }));
     const nextSession = { ...outcome.session, log: [...session.log, ...events] };
     this.authorityState = { session: nextSession, settings };
@@ -59,6 +65,26 @@ export class EngineAuthority<S, C extends RuleValues> implements AuthorityAdapte
     this.acceptedActions.set(action.id, lastSeq);
     return {
       actionId: action.id,
+      events,
+      fx: outcome.fx,
+      stateHash: stateHash(nextSession.state),
+    };
+  }
+
+  inject(actionId: string, move: string, payload?: unknown): AppliedPacket {
+    if (this.acceptedActions.has(actionId)) throw new DuplicateActionError(actionId);
+    const { session, settings } = this.authorityState;
+    const { timestamp, atMs } = this.authorityTime(session);
+    const outcome = sessionInject(this.def, session, move, payload, { atMs });
+    if (outcome.rejected) throw new Error(outcome.rejected.message);
+    const events = outcome.events.map((event) => ({ ...event, ts: timestamp }));
+    const nextSession = { ...outcome.session, log: [...session.log, ...events] };
+    this.authorityState = { session: nextSession, settings };
+    const lastSeq = events.at(-1)?.seq;
+    if (lastSeq === undefined) throw new Error('accepted injection produced no replay event');
+    this.acceptedActions.set(actionId, lastSeq);
+    return {
+      actionId,
       events,
       fx: outcome.fx,
       stateHash: stateHash(nextSession.state),
@@ -131,6 +157,8 @@ export class EngineAuthority<S, C extends RuleValues> implements AuthorityAdapte
       session: { ...replayed, log: [...snapshot.log] },
       settings: { ...snapshot.settings, config },
     };
+    this.clockAnchorAtMs = snapshot.log.at(-1)?.atMs ?? 0;
+    this.clockAnchorWallMs = this.now();
     this.acceptedActions = acceptedActions;
   }
 
@@ -140,6 +168,16 @@ export class EngineAuthority<S, C extends RuleValues> implements AuthorityAdapte
 
   getSession(): GameSession<S, C> {
     return this.authorityState.session;
+  }
+
+  private authorityTime(session: GameSession<S, C>): { timestamp: number; atMs: number } {
+    const timestamp = this.now();
+    const previousAtMs = session.log.at(-1)?.atMs ?? 0;
+    const atMs = Math.max(
+      previousAtMs,
+      this.clockAnchorAtMs + Math.max(0, Math.trunc(timestamp - this.clockAnchorWallMs)),
+    );
+    return { timestamp, atMs };
   }
 
   private resolveSnapshotConfig(value: unknown): C {

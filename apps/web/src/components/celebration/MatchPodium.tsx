@@ -81,11 +81,7 @@ export function MatchPodium({ snapshot }: { snapshot: MatchSnapshot }) {
             'Match complete'
           )}
         </h1>
-        <p className={styles.modeLine}>
-          {snapshot.mode === 'classic' && 'Classic · lives'}
-          {snapshot.mode === 'fast' && 'Fast · first to the pot'}
-          {snapshot.mode === 'timed' && 'Timed · against the clock'}
-        </p>
+        <p className={styles.modeLine}>{modeLine(snapshot)}</p>
       </header>
 
       <ol className={styles.plaqueRow}>
@@ -116,19 +112,28 @@ export function MatchPodium({ snapshot }: { snapshot: MatchSnapshot }) {
               {entry.seat === snapshot.localSeat && ' (you)'}
             </span>
             <dl className={styles.statsRow}>
-              <div>
-                <dt>Blitzes</dt>
-                <dd>{entry.blitzes}</dd>
-              </div>
-              <div>
-                <dt>Knock wins</dt>
-                <dd>{entry.knockWins}</dd>
-              </div>
-              {entry.livesLeft !== null && (
+              {snapshot.game === 'wild' ? (
                 <div>
-                  <dt>Lives</dt>
-                  <dd>{entry.livesLeft}</dd>
+                  <dt>Cards left</dt>
+                  <dd>{entry.cardsLeft ?? 0}</dd>
                 </div>
+              ) : (
+                <>
+                  <div>
+                    <dt>Blitzes</dt>
+                    <dd>{entry.blitzes}</dd>
+                  </div>
+                  <div>
+                    <dt>Knock wins</dt>
+                    <dd>{entry.knockWins}</dd>
+                  </div>
+                  {entry.livesLeft !== null && (
+                    <div>
+                      <dt>Lives</dt>
+                      <dd>{entry.livesLeft}</dd>
+                    </div>
+                  )}
+                </>
               )}
             </dl>
           </li>
@@ -136,6 +141,22 @@ export function MatchPodium({ snapshot }: { snapshot: MatchSnapshot }) {
       </ol>
     </div>
   );
+}
+
+function modeLine(snapshot: MatchSnapshot): string {
+  if (snapshot.game === 'wild') {
+    return snapshot.mode === 'party' ? 'Wild · party pile' : 'Wild · classic pile';
+  }
+  switch (snapshot.mode) {
+    case 'classic':
+      return 'Classic · lives';
+    case 'fast':
+      return 'Fast · first to the pot';
+    case 'timed':
+      return 'Timed · against the clock';
+    default:
+      return 'House game';
+  }
 }
 
 function avatarOf(snapshot: MatchSnapshot, seat: number): string {

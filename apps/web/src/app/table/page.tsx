@@ -2,14 +2,16 @@
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { useRouter } from 'next/navigation';
-import { Fx, type FxEvent, type MatchResult } from '@parlour/engine';
+import { Fx, isActingSeat, type FxEvent, type MatchResult } from '@parlour/engine';
 import { RoundEndOverlay } from '@/components/celebration/RoundEndOverlay';
 import { TableScreen, type TableView } from '@/components/table/TableScreen';
 import { LocalTransport, type LocalDispatch, type SoloSnapshot } from '@/lib/solo/LocalTransport';
+import { botKey, buildMatchRecord, friendKey, useHistoryStore } from '@/stores/history';
 import { useMatchFlowStore } from '@/stores/matchFlow';
 import { useProfileStore } from '@/stores/profile';
 import { useSetupStore } from '@/stores/setup';
 import {
+  blitzMultiplayerSession,
   clearActiveMultiplayerSession,
   getActiveMultiplayerSession,
   subscribeActiveMultiplayerSession,
@@ -60,6 +62,11 @@ function ActiveMultiplayerTable({ room }: { room: MultiplayerRoomSession }) {
   const router = useRouter();
   const snapshot = useSyncExternalStore(room.subscribe, room.getSnapshot, room.getSnapshot);
   const [localError, setLocalError] = useState<string | null>(null);
+  const setLastMatch = useMatchFlowStore((state) => state.setLastMatch);
+  const registerPlayAgain = useMatchFlowStore((state) => state.registerPlayAgain);
+  const recordResult = useProfileStore((state) => state.recordResult);
+  const recordMatch = useHistoryStore((state) => state.recordMatch);
+  const reportedMatch = useRef<string | null>(null);
 
   const dispatch = useCallback(
     (move: string, payload?: unknown) => {
@@ -74,11 +81,59 @@ function ActiveMultiplayerTable({ room }: { room: MultiplayerRoomSession }) {
   );
 
   const view = multiplayerTableView(snapshot);
+  const session = blitzMultiplayerSession(snapshot);
   const busy =
-    !snapshot.session ||
+    !session ||
     snapshot.localSeat === null ||
-    snapshot.session.status !== 'playing' ||
-    snapshot.session.phase.actor !== snapshot.localSeat;
+    session.status !== 'playing' ||
+    !isActingSeat(session.phase, snapshot.localSeat);
+
+  useEffect(() => {
+    const session = blitzMultiplayerSession(snapshot);
+    const localSeat = snapshot.localSeat;
+    const result = session?.result;
+    if (!session || session.status !== 'ended' || !result || localSeat === null) return;
+    const id = `multiplayer:${snapshot.room?.code ?? 'room'}:${session.seed}:${
+      session.lastAppliedHash ?? session.log.length
+    }`;
+    if (reportedMatch.current === id) return;
+    reportedMatch.current = id;
+
+    const localRank = result.rankings.find((rank) => rank.seat === localSeat);
+    const detail = localRank?.detail ?? {};
+    recordResult({
+      won: localRank?.rank === 1,
+      blitzes: numericDetail(detail.blitzes),
+      knocks: numericDetail(detail.knocks),
+      knockWins: numericDetail(detail.knockWins),
+    });
+    const record = buildMatchRecord({
+      id,
+      at: Date.now(),
+      game: 'blitz',
+      mode: 'fast',
+      result,
+      localSeat,
+      seats: snapshot.seats.map((seat) => ({
+        seat: seat.seat,
+        name: seat.name,
+        avatarId: seat.avatarId,
+        kind: 'friend' as const,
+        key: friendKey(seat.profileId),
+      })),
+    });
+    if (record) recordMatch(record);
+    setLastMatch({
+      result,
+      seats: snapshot.seats.map(({ seat, name, avatarId }) => ({ seat, name, avatarId })),
+      mode: 'fast',
+      localSeat,
+    });
+    registerPlayAgain(() => router.push('/create'));
+    room.close();
+    clearActiveMultiplayerSession();
+    router.push('/match-end');
+  }, [recordMatch, recordResult, registerPlayAgain, room, router, setLastMatch, snapshot]);
 
   return (
     <TableScreen
@@ -90,7 +145,7 @@ function ActiveMultiplayerTable({ room }: { room: MultiplayerRoomSession }) {
       onDraw={(source) => dispatch(`draw.${source}`)}
       onDiscard={(card) => dispatch('discard', { card })}
       onKnock={() => dispatch('knock')}
-      onMenu={() => {
+      onQuit={() => {
         room.close();
         clearActiveMultiplayerSession();
         router.push('/');
@@ -100,11 +155,14 @@ function ActiveMultiplayerTable({ room }: { room: MultiplayerRoomSession }) {
 }
 
 function multiplayerTableView(snapshot: MultiplayerRoomSnapshot): TableView | null {
-  const session = snapshot.session;
+  const session = blitzMultiplayerSession(snapshot);
   const localSeat = snapshot.localSeat;
   if (!session || localSeat === null) return null;
-  const isLocalTurn = session.status === 'playing' && session.phase.actor === localSeat;
-  const legal = isLocalTurn ? session.def.flow.legalMoves(session.state, session.phase) : [];
+  const isLocalTurn = session.status === 'playing' && isActingSeat(session.phase, localSeat);
+  const legal = isLocalTurn
+    ? (session.def.flow.legalMovesFor?.(session.state, session.phase, localSeat) ??
+      session.def.flow.legalMoves(session.state, session.phase))
+    : [];
   const moveIds = new Set(legal.map((move) => move.id));
   const discardCards = legal.flatMap((move) =>
     move.id === 'discard' &&
@@ -136,11 +194,16 @@ function multiplayerTableView(snapshot: MultiplayerRoomSnapshot): TableView | nu
   };
 }
 
+function numericDetail(value: number | string | boolean | undefined): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : 0;
+}
+
 function ActiveSoloTable({ transport }: { transport: LocalTransport }) {
   const router = useRouter();
   const setLastMatch = useMatchFlowStore((state) => state.setLastMatch);
   const registerPlayAgain = useMatchFlowStore((state) => state.registerPlayAgain);
   const recordResult = useProfileStore((state) => state.recordResult);
+  const recordMatch = useHistoryStore((state) => state.recordMatch);
   const reportedMatch = useRef<LocalTransport | null>(null);
   const [snapshot, setSnapshot] = useState(() => transport.getSnapshot());
   const [fx, setFx] = useState<readonly FxEvent[]>(() => snapshot.session.setupFx ?? []);
@@ -229,6 +292,24 @@ function ActiveSoloTable({ transport }: { transport: LocalTransport }) {
     const result = matchResult(snapshot);
     const localMetrics = snapshot.metrics[0] ?? { blitzes: 0, knocks: 0, knockWins: 0 };
     recordResult({ won: snapshot.matchWinner === 0, ...localMetrics });
+    const record = buildMatchRecord({
+      id: crypto.randomUUID(),
+      at: Date.now(),
+      game: 'blitz',
+      mode: snapshot.mode,
+      result,
+      localSeat: 0,
+      seats: snapshot.players.map((player) => ({
+        seat: player.seat,
+        name: player.name,
+        avatarId: player.avatarId,
+        kind: player.isBot ? ('bot' as const) : ('friend' as const),
+        key: player.isBot
+          ? botKey(player.personaId ?? player.avatarId)
+          : friendKey(`seat-${player.seat}`),
+      })),
+    });
+    if (record) recordMatch(record);
     setLastMatch({
       result,
       seats: snapshot.players.map(({ seat, name, avatarId }) => ({ seat, name, avatarId })),
@@ -237,7 +318,7 @@ function ActiveSoloTable({ transport }: { transport: LocalTransport }) {
     });
     registerPlayAgain(() => router.push('/table'));
     router.push('/match-end');
-  }, [recordResult, registerPlayAgain, router, setLastMatch, snapshot, transport]);
+  }, [recordMatch, recordResult, registerPlayAgain, router, setLastMatch, snapshot, transport]);
 
   const view = tableView(snapshot, transport);
   const nextRound = useCallback(() => accept(transport.startNextRound()), [accept, transport]);
@@ -253,7 +334,7 @@ function ActiveSoloTable({ transport }: { transport: LocalTransport }) {
         onDraw={(source) => dispatch(`draw.${source}`)}
         onDiscard={(card) => dispatch('discard', { card })}
         onKnock={() => dispatch('knock')}
-        onMenu={() => router.push('/play')}
+        onQuit={() => router.push('/play')}
       />
       {snapshot.session.status === 'ended' && snapshot.matchWinner === null && (
         <RoundEndOverlay

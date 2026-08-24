@@ -1,12 +1,13 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { AVATARS } from '@/lib/avatars';
 import { knockSuccessRate, winRate, useProfileStore } from '@/stores/profile';
 import { useAudioStore } from '@/stores/audio';
 import type { AudioChannel } from '@/lib/audio/AudioManager';
 import { AvatarBadge } from '@/components/AvatarBadge';
+import { headToHead, useHistoryStore, type HeadToHead } from '@/stores/history';
 
 export default function ProfilePage() {
   const name = useProfileStore((s) => s.name);
@@ -18,6 +19,9 @@ export default function ProfilePage() {
   const updateSettings = useProfileStore((s) => s.updateSettings);
   const resetStats = useProfileStore((s) => s.resetStats);
   const [confirmingReset, setConfirmingReset] = useState(false);
+  const [confirmingHistoryReset, setConfirmingHistoryReset] = useState(false);
+  const records = useHistoryStore((s) => s.records);
+  const clearHistory = useHistoryStore((s) => s.clearHistory);
   const audioChannels = useAudioStore((s) => s.channels);
   const audioUnlocked = useAudioStore((s) => s.unlocked);
   const setVolume = useAudioStore((s) => s.setVolume);
@@ -30,8 +34,16 @@ export default function ProfilePage() {
     }
   }, [confirmingReset]);
 
+  useEffect(() => {
+    if (confirmingHistoryReset) {
+      const timer = window.setTimeout(() => setConfirmingHistoryReset(false), 2500);
+      return () => window.clearTimeout(timer);
+    }
+  }, [confirmingHistoryReset]);
+
   const rate = Math.round(winRate(stats) * 100);
   const knockRate = Math.round(knockSuccessRate(stats) * 100);
+  const standings = useMemo(() => headToHead(records), [records]);
 
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-4xl flex-col gap-6 px-6 py-8">
@@ -116,6 +128,50 @@ export default function ProfilePage() {
         </dl>
       </section>
 
+      <section aria-label="Head-to-head history" className="panel-soft p-5">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-dusk-200">
+              Your regulars
+            </h2>
+            <p className="mt-1 text-xs text-dusk-200/75">
+              Local-only matchups, keyed to each friend&apos;s Parlour profile.
+            </p>
+          </div>
+          {standings.length > 0 && (
+            <button
+              type="button"
+              onClick={() => {
+                if (confirmingHistoryReset) {
+                  clearHistory();
+                  setConfirmingHistoryReset(false);
+                } else {
+                  setConfirmingHistoryReset(true);
+                }
+              }}
+              className={`rounded-pill border px-3 py-1 text-xs font-bold transition-colors ${
+                confirmingHistoryReset
+                  ? 'border-rust bg-rust/30 text-hearth-100'
+                  : 'border-dusk-700/60 text-dusk-200 hover:text-hearth-200'
+              }`}
+            >
+              {confirmingHistoryReset ? 'Tap again to forget' : 'Clear history'}
+            </button>
+          )}
+        </div>
+        {standings.length === 0 ? (
+          <p className="mt-4 rounded-chunky border border-dashed border-dusk-700/60 px-4 py-5 text-center text-sm text-dusk-200/80">
+            Finish a match with a friend and your rivalry will appear here.
+          </p>
+        ) : (
+          <ul className="mt-4 grid gap-3 sm:grid-cols-2">
+            {standings.slice(0, 8).map((standing) => (
+              <Standing key={standing.key} standing={standing} />
+            ))}
+          </ul>
+        )}
+      </section>
+
       <section aria-label="Audio settings" className="panel-soft p-5">
         <div className="flex items-center justify-between gap-3">
           <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-dusk-200">Sound</h2>
@@ -147,6 +203,30 @@ export default function ProfilePage() {
         />
       </section>
     </main>
+  );
+}
+
+function Standing({ standing }: { standing: HeadToHead }) {
+  const decided = standing.wins + standing.losses;
+  const rate = decided === 0 ? 0 : Math.round((standing.wins / decided) * 100);
+  return (
+    <li className="flex items-center gap-3 rounded-chunky border border-dusk-700/40 bg-dusk-950/60 p-3">
+      <AvatarBadge avatarId={standing.avatarId} size={44} />
+      <div className="min-w-0 flex-1">
+        <div className="flex items-baseline justify-between gap-2">
+          <span className="truncate font-display font-bold text-hearth-50">{standing.name}</span>
+          <span className="text-[0.65rem] font-bold uppercase tracking-[0.16em] text-dusk-300">
+            {standing.kind === 'friend' ? 'friend' : 'house bot'}
+          </span>
+        </div>
+        <p className="mt-0.5 text-sm font-bold text-dusk-100">
+          {standing.wins} W · {standing.losses} L · {standing.ties} T
+        </p>
+        <p className="text-xs text-dusk-200/75">
+          {standing.games} {standing.games === 1 ? 'match' : 'matches'} · {rate}% head-to-head
+        </p>
+      </div>
+    </li>
   );
 }
 

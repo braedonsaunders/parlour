@@ -101,10 +101,7 @@
     opacity: var(--peak, 0.5);
   }
   100% {
-    transform: translate(
-        calc(-50% + var(--dx, 20vmin)),
-        calc(-50% + var(--dy, -20vmin))
-      )
+    transform: translate(calc(-50% + var(--dx, 20vmin)), calc(-50% + var(--dy, -20vmin)))
       rotate(var(--spin-to, 24deg)) scale(var(--grow, 1.5));
     opacity: 0;
   }

@@ -1,5 +1,5 @@
 import { createRoomCode, roomJoinUrl, validateRoomCode } from '../rooms/code';
-import { NostrSignaling, type SignalPayload } from './NostrSignaling';
+import { NostrSignaling, type RoomAnnouncement, type SignalPayload } from './NostrSignaling';
 import { HEARTBEAT_INTERVAL_MS, MultiplayerState, validatePresenceSnapshot } from './resilience';
 import { validateEmote } from './emotes';
 import { DuplicateActionError } from './EngineAuthority';
@@ -10,6 +10,7 @@ import type {
   Emote,
   MigrationSnapshot,
   PlayerAction,
+  PlayerProfile,
   PresenceSnapshot,
   PresenceEvent,
   RoomHandle,
@@ -41,6 +42,8 @@ type PeerLink = {
 type P2PTransportOptions = {
   authority: AuthorityAdapter;
   profileId: string;
+  profileName?: string;
+  profileAvatarId?: string;
   signaling?: NostrSignaling;
   iceServers?: RTCIceServer[];
   origin?: string;
@@ -52,6 +55,7 @@ type P2PTransportOptions = {
 export class P2PTransport implements Transport {
   private readonly authority: AuthorityAdapter;
   private readonly profileId: string;
+  private readonly profile: PlayerProfile;
   private readonly signaling: NostrSignaling;
   private readonly iceServers: RTCIceServer[];
   private readonly origin: string;
@@ -59,7 +63,7 @@ export class P2PTransport implements Transport {
   private readonly randomBytes: (length: number) => Uint8Array;
   private readonly peerConnection: (configuration: RTCConfiguration) => RTCPeerConnection;
   private readonly links = new Map<string, PeerLink>();
-  private readonly profiles = new Map<string, string>();
+  private readonly profiles = new Map<string, PlayerProfile>();
   private readonly eventListeners = new Set<(event: AppliedPacket) => void>();
   private readonly snapshotListeners = new Set<(notification: SnapshotNotification) => void>();
   private readonly presenceListeners = new Set<(event: PresenceEvent) => void>();
@@ -72,10 +76,16 @@ export class P2PTransport implements Transport {
   private lastEmoteAt = -Infinity;
   private pendingResync = false;
   private closed = false;
+  private systemSequence = 0;
 
   constructor(options: P2PTransportOptions) {
     this.authority = options.authority;
     this.profileId = options.profileId;
+    this.profile = {
+      profileId: options.profileId,
+      name: options.profileName?.trim().slice(0, 32) || 'Player',
+      avatarId: options.profileAvatarId?.trim().slice(0, 128) || 'ember',
+    };
     this.signaling = options.signaling ?? new NostrSignaling();
     this.iceServers = options.iceServers ?? DEFAULT_ICE_SERVERS;
     this.origin = options.origin ?? window.location.origin;
@@ -98,17 +108,17 @@ export class P2PTransport implements Transport {
     await this.signaling.announce(code, settings);
     this.startRoom(code, this.signaling.publicKey);
     this.resilience?.assignSeat(0, this.signaling.publicKey, this.profileId);
-    this.profiles.set(this.signaling.publicKey, this.profileId);
+    this.profiles.set(this.signaling.publicKey, this.profile);
     return this.handle(code);
   }
 
-  async join(rawCode: string): Promise<RoomHandle> {
+  async join(rawCode: string, resolvedRoom?: RoomAnnouncement): Promise<RoomHandle> {
     this.assertOpen();
     const verdict = validateRoomCode(rawCode);
     if (!verdict.ok) throw new Error('Room codes use four unambiguous letters or digits');
     const { code } = verdict;
     this.emitPresence({ kind: 'connection', state: 'connecting' });
-    const room = await this.signaling.resolve(code);
+    const room = resolvedRoom ?? (await this.signaling.resolve(code));
     this.startRoom(code, room.hostPubkey);
     await this.connect(room.hostPubkey, true);
     return this.handle(code);
@@ -125,6 +135,14 @@ export class P2PTransport implements Transport {
     this.resilience?.trackPending(action);
     if (this.isHost()) void this.applyAsHost(action);
     else this.sendTo(this.resilience!.hostId, { type: 'intent', action });
+  }
+
+  inject(move: string, payload?: unknown): void {
+    this.assertReady();
+    if (!this.isHost()) throw new Error('only the host authority may inject system events');
+    if (!this.authority.inject) throw new Error('this game authority does not accept injection');
+    const actionId = `system:${this.signaling.publicKey}:${this.systemSequence++}`;
+    void this.applySystemAsHost(actionId, move, payload);
   }
 
   sendEmote(emote: Emote): boolean {
@@ -224,7 +242,7 @@ export class P2PTransport implements Transport {
     link.channel = channel;
     channel.onopen = () => {
       this.resilience?.seePeer(peerId, this.now());
-      this.sendTo(peerId, { type: 'hello', profileId: this.profileId });
+      this.sendTo(peerId, { type: 'hello', profile: this.profile });
       this.emitPresence({ kind: 'connection', state: 'connected' });
     };
     channel.onmessage = (event) => {
@@ -265,12 +283,13 @@ export class P2PTransport implements Transport {
       case 'heartbeat':
         return;
       case 'hello':
-        this.profiles.set(peerId, message.profileId.slice(0, 128));
-        if (this.isHost()) this.welcome(peerId, message.profileId.slice(0, 128));
+        this.profiles.set(peerId, message.profile);
+        if (this.isHost()) this.welcome(peerId, message.profile.profileId);
         return;
       case 'welcome':
         if (peerId !== this.resilience?.hostId || message.hostId !== peerId) return;
         this.resilience.hostId = message.hostId;
+        await this.connectMesh(message.peers);
         await this.importMigration(message.snapshot);
         const occupant = this.resilience.seats.get(message.seat);
         if (
@@ -281,7 +300,6 @@ export class P2PTransport implements Transport {
         ) {
           throw new Error('welcome seat does not match joining profile');
         }
-        await this.connectMesh(message.peers);
         return;
       case 'mesh.peers':
         await this.connectMesh(message.peers);
@@ -364,8 +382,8 @@ export class P2PTransport implements Transport {
     this.broadcastPresence();
     this.emitPresence(
       reclaimed === null
-        ? { kind: 'peer.joined', peerId, seat }
-        : { kind: 'seat.reclaimed', peerId, seat },
+        ? { kind: 'peer.joined', peerId, seat, profile: this.profileFor(peerId, profileId) }
+        : { kind: 'seat.reclaimed', peerId, seat, profile: this.profileFor(peerId, profileId) },
     );
   }
 
@@ -383,13 +401,13 @@ export class P2PTransport implements Transport {
   }
 
   private peerDescriptors(): PeerDescriptor[] {
-    return [...this.profiles].map(([peerId, profileId]) => ({ peerId, profileId }));
+    return [...this.profiles].map(([peerId, profile]) => ({ peerId, profile }));
   }
 
   private async connectMesh(peers: PeerDescriptor[]): Promise<void> {
     const connections: Promise<void>[] = [];
     for (const peer of peers) {
-      this.profiles.set(peer.peerId, peer.profileId);
+      this.profiles.set(peer.peerId, peer.profile);
       if (this.signaling.publicKey < peer.peerId) connections.push(this.connect(peer.peerId, true));
     }
     await Promise.all(connections);
@@ -406,6 +424,24 @@ export class P2PTransport implements Transport {
       this.emitPresence({
         kind: 'error',
         message: error instanceof Error ? error.message : 'Action rejected',
+      });
+    }
+  }
+
+  private async applySystemAsHost(
+    actionId: string,
+    move: string,
+    payload?: unknown,
+  ): Promise<void> {
+    try {
+      const packet = await this.authority.inject!(actionId, move, payload);
+      this.broadcast({ type: 'applied', packet });
+      this.emitEvent(packet);
+    } catch (error) {
+      if (error instanceof DuplicateActionError) return;
+      this.emitPresence({
+        kind: 'error',
+        message: error instanceof Error ? error.message : 'System event rejected',
       });
     }
   }
@@ -458,15 +494,35 @@ export class P2PTransport implements Transport {
     for (const [seat, occupant] of this.resilience!.seats) {
       const previous = before.get(seat);
       if (!previous) {
-        this.emitPresence({ kind: 'peer.joined', peerId: occupant.peerId, seat });
+        this.emitPresence({
+          kind: 'peer.joined',
+          peerId: occupant.peerId,
+          seat,
+          profile: this.profileFor(occupant.peerId, occupant.profileId),
+        });
       } else if (!previous.bot && occupant.bot) {
         this.authority.setSeatBot(seat, true);
         this.emitPresence({ kind: 'peer.left', peerId: occupant.peerId, seat, bot: true });
       } else if (previous.bot && !occupant.bot) {
         this.authority.setSeatBot(seat, false);
-        this.emitPresence({ kind: 'seat.reclaimed', peerId: occupant.peerId, seat });
+        this.emitPresence({
+          kind: 'seat.reclaimed',
+          peerId: occupant.peerId,
+          seat,
+          profile: this.profileFor(occupant.peerId, occupant.profileId),
+        });
       }
     }
+  }
+
+  private profileFor(peerId: string, profileId: string): PlayerProfile {
+    return (
+      this.profiles.get(peerId) ?? {
+        profileId,
+        name: 'Friend',
+        avatarId: 'cobalt',
+      }
+    );
   }
 
   private broadcastPresence(): void {

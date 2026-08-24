@@ -1,15 +1,15 @@
 'use client';
 
-import { useEffect, useMemo, useRef, type CSSProperties, type RefObject } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type RefObject } from 'react';
 import { type FxEvent } from '@parlour/engine';
-import { gsap } from 'gsap';
 import { AnimatePresence, motion } from 'motion/react';
 import { getAvatar } from '@/lib/avatars';
-import { getAudioManager } from '@/lib/audio/AudioManager';
-import { soundCuesForFx } from '@/lib/audio/cues';
-import { buildFxTimeline, type FxCue, type Zone } from '@/lib/table/fx-motion';
+import { buildFxTimeline, type FxCue } from '@/lib/table/fx-motion';
 import { ownerCurrentCount } from '@/lib/table/owner-count';
+import { discardRotation, useFxAnimation, useTableAudio } from './fx-animation';
+import { HandRail } from './HandRail';
 import { PlayingCard } from './PlayingCard';
+import { TableMenu } from './TableMenu';
 import { AvatarBadge } from '@/components/AvatarBadge';
 import styles from '@/styles/table.module.css';
 
@@ -48,13 +48,38 @@ export type TableScreenProps = {
   onDraw?: (source: 'stock' | 'discard') => void;
   onDiscard?: (card: string) => void;
   onKnock?: () => void;
-  onMenu?: () => void;
+  /** Fired only after the player confirms quitting from the table menu. */
+  onQuit?: () => void;
 };
 
 export function TableScreen(props: TableScreenProps) {
   const { view, error } = props;
   const rootRef = useRef<HTMLElement>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
   useTableAudio(props.fx, props.fxKey);
+
+  useEffect(() => {
+    const gameWindow = window as Window & { render_game_to_text?: () => string };
+    const renderGameToText = () =>
+      JSON.stringify({
+        coordinateSystem: 'CSS pixels; origin is top-left, x grows right, y grows down',
+        game: 'blitz',
+        status: error ? 'error' : view ? 'ready' : 'loading',
+        error,
+        activeSeat: view?.activeSeat ?? null,
+        stockCount: view?.stockCount ?? null,
+        discardTop: view?.discard.at(-1) ?? null,
+        hand: view?.players.find(({ isLocal }) => isLocal)?.hand ?? [],
+        legal: view?.legal ?? null,
+        activeFx: props.fx.map(({ kind, at }) => ({ kind, at: at ?? 0 })),
+      });
+    gameWindow.render_game_to_text = renderGameToText;
+    return () => {
+      if (gameWindow.render_game_to_text === renderGameToText) {
+        delete gameWindow.render_game_to_text;
+      }
+    };
+  }, [error, props.fx, view]);
 
   if (error) {
     return (
@@ -89,7 +114,8 @@ export function TableScreen(props: TableScreenProps) {
           type="button"
           className={`${styles.menuButton} btn-fat btn-fat--ghost`}
           aria-label="Table menu"
-          onClick={props.onMenu}
+          aria-haspopup="dialog"
+          onClick={() => setMenuOpen(true)}
         >
           •••
         </button>
@@ -117,23 +143,24 @@ export function TableScreen(props: TableScreenProps) {
           Knock
         </button>
       </div>
+
+      <TableMenu
+        open={menuOpen}
+        onClose={() => setMenuOpen(false)}
+        onQuit={() => {
+          setMenuOpen(false);
+          props.onQuit?.();
+        }}
+      />
     </main>
   );
-}
-
-function useTableAudio(fx: readonly FxEvent[], fxKey: string | number) {
-  useEffect(() => {
-    const audio = getAudioManager();
-    const timers = soundCuesForFx(fx).map((cue) =>
-      window.setTimeout(() => audio.play(cue.id, { rate: cue.rate }), cue.atMs),
-    );
-    return () => timers.forEach((timer) => window.clearTimeout(timer));
-  }, [fx, fxKey]);
 }
 
 function Seat({ player, active }: { player: TablePlayer; active: boolean }) {
   const avatar = getAvatar(player.avatarId);
   const count = player.handCount ?? player.hand.length;
+  const visibleCards = Math.min(count, 5);
+  const fanStep = visibleCards > 1 ? 22 / (visibleCards - 1) : 0;
   const style = { '--seat-accent': avatar.accent, '--seat-shade': avatar.shade } as CSSProperties;
 
   return (
@@ -147,8 +174,13 @@ function Seat({ player, active }: { player: TablePlayer; active: boolean }) {
     >
       {!player.isLocal && (
         <div className={styles.opponentCards} aria-label={`${count} hidden cards`}>
-          {Array.from({ length: count }, (_, index) => (
-            <PlayingCard key={index} compact faceDown rotation={(index - (count - 1) / 2) * 9} />
+          {Array.from({ length: visibleCards }, (_, index) => (
+            <PlayingCard
+              key={index}
+              compact
+              faceDown
+              rotation={(index - (visibleCards - 1) / 2) * fanStep}
+            />
           ))}
         </div>
       )}
@@ -181,7 +213,12 @@ function Piles({
 }) {
   const visibleDiscard = view.discard.slice(0, 3).reverse();
   return (
-    <div className={styles.piles}>
+    <div className={styles.piles} data-local-turn={!busy}>
+      {!busy && (
+        <span className={styles.turnIndicator} aria-hidden="true">
+          Your turn
+        </span>
+      )}
       <button
         type="button"
         data-zone="stock"
@@ -219,35 +256,47 @@ function LocalHand(props: TableScreenProps & { view: TableView }) {
   const canChoose = props.view.legal.discardCards.length > 0 && !props.busy;
   const currentCount = ownerCurrentCount(props.view.players);
   return (
-    <div className={styles.localHand} data-zone={`hand:${player.seat}`} aria-label="Your hand">
-      <output className={styles.ownerCount} aria-label={`My current count: ${currentCount ?? 0}`}>
-        <span>My count</span>
-        <strong>{currentCount ?? 0}</strong>
-      </output>
+    <HandRail
+      count={player.hand.length}
+      zone={`hand:${player.seat}`}
+      label="Your hand"
+      accessory={
+        <output className={styles.ownerCount} aria-label={`My current count: ${currentCount ?? 0}`}>
+          <span>My count</span>
+          <strong>{currentCount ?? 0}</strong>
+        </output>
+      }
+    >
       <AnimatePresence initial={false} mode="popLayout">
-        {player.hand.map((card, index) => (
-          <motion.div
-            layout
-            layoutId={`card:${card}`}
-            key={card}
-            className={styles.handCard}
-            style={{ '--fan-index': index - (player.hand.length - 1) / 2 } as CSSProperties}
-            initial={{ y: 30, opacity: 0, scale: 0.9 }}
-            animate={{ y: 0, opacity: 1, scale: 1 }}
-            exit={{ y: -50, opacity: 0, scale: 0.9 }}
-            transition={{ duration: 0.22, ease: [0.2, 0.8, 0.3, 1] }}
-          >
-            <div className={styles.handFan}>
-              <PlayingCard
-                card={card}
-                disabled={!canChoose || !props.view.legal.discardCards.includes(card)}
-                onClick={() => props.onDiscard?.(card)}
-              />
-            </div>
-          </motion.div>
-        ))}
+        {player.hand.map((card, index) => {
+          const fanIndex = index - (player.hand.length - 1) / 2;
+          const playable = canChoose && props.view.legal.discardCards.includes(card);
+          return (
+            <motion.div
+              layout
+              layoutId={`card:${card}`}
+              key={card}
+              className={styles.handCard}
+              data-hand-card
+              data-playable={canChoose ? playable : undefined}
+              style={{ '--fan-index': fanIndex, '--fan-abs': Math.abs(fanIndex) } as CSSProperties}
+              initial={{ y: 24, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: -24, opacity: 0 }}
+              transition={{ duration: 0.22, ease: [0.2, 0.8, 0.3, 1] }}
+            >
+              <div className={styles.handFan}>
+                <PlayingCard
+                  card={card}
+                  disabled={!playable}
+                  onClick={() => props.onDiscard?.(card)}
+                />
+              </div>
+            </motion.div>
+          );
+        })}
       </AnimatePresence>
-    </div>
+    </HandRail>
   );
 }
 
@@ -289,12 +338,11 @@ function Cue({ cue, players }: { cue: FxCue; players: readonly TablePlayer[] }) 
   if (cue.type === 'deal' || cue.type === 'draw' || cue.type === 'discard') {
     return (
       <div data-fx-cue={cue.id} data-card-flight className={styles.flyingCard}>
-        <PlayingCard
-          card={cue.card}
-          faceDown={cue.type === 'deal' && cue.to !== 'hand:0'}
-          compact
-        />
         <i className={styles.cardTrail} />
+        <span data-flight-card className={styles.flightCardVisual}>
+          <PlayingCard card={cue.card} faceDown={cue.type === 'deal' && cue.to !== 'hand:0'} />
+        </span>
+        <i className={styles.cardGlint} />
       </div>
     );
   }
@@ -341,122 +389,4 @@ function Cue({ cue, players }: { cue: FxCue; players: readonly TablePlayer[] }) 
   }
 
   return <span data-fx-cue={cue.id} data-seat-burst={cue.seat} className={styles.turnPop} />;
-}
-
-function useFxAnimation(
-  cues: readonly FxCue[],
-  rootRef: RefObject<HTMLElement | null>,
-  key: string | number,
-) {
-  useEffect(() => {
-    const root = rootRef.current;
-    if (!root || cues.length === 0) return;
-    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const bounds = root.getBoundingClientRect();
-    const context = gsap.context(() => {
-      const timeline = gsap.timeline();
-      for (const cue of cues) {
-        const element = root.querySelector<HTMLElement>(`[data-fx-cue="${cue.id}"]`);
-        if (!element) continue;
-        const start = cue.startMs / 1000;
-        if (reduced) {
-          timeline
-            .set(element, { autoAlpha: 1 }, start)
-            .set(element, { autoAlpha: 0 }, start + 0.01);
-          continue;
-        }
-        if (cue.type === 'deal' || cue.type === 'draw' || cue.type === 'discard') {
-          const from = zonePoint(cue.from, bounds.width, bounds.height);
-          const to = zonePoint(cue.to, bounds.width, bounds.height);
-          timeline
-            .set(element, { x: from.x, y: from.y, scale: 0.88, rotate: -9, autoAlpha: 1 }, start)
-            .to(
-              element,
-              {
-                x: to.x,
-                y: to.y,
-                scale: 1.05,
-                rotate: cue.type === 'discard' ? discardRotation(cue.card, 0) : 2,
-                duration: cue.durationMs / 1000,
-                ease: 'power3.out',
-              },
-              start,
-            )
-            .to(
-              element,
-              { scale: 0.96, duration: 0.08, ease: 'power2.inOut' },
-              start + cue.durationMs / 1000,
-            )
-            .set(element, { autoAlpha: 0 });
-        } else if (cue.type === 'knock' || cue.type === 'blitz') {
-          timeline
-            .fromTo(
-              element,
-              { autoAlpha: 0, scale: 0.2, rotate: -8 },
-              {
-                autoAlpha: 1,
-                scale: 1.1,
-                rotate: 0,
-                duration: 0.22,
-                ease: 'back.out(2.4)',
-              },
-              start,
-            )
-            .to(element, { scale: 1, duration: 0.12, ease: 'power2.out' })
-            .to(
-              element,
-              { autoAlpha: 0, scale: 1.18, duration: 0.28, ease: 'power2.in' },
-              start + cue.durationMs / 1000 - 0.28,
-            );
-          if (cue.type === 'knock') {
-            timeline.to(
-              root.querySelector('[data-table-screen]') ?? root,
-              {
-                x: 4,
-                duration: 0.04,
-                repeat: 3,
-                yoyo: true,
-                ease: 'none',
-              },
-              start,
-            );
-          }
-        } else {
-          const point = zonePoint(`seat:${cue.seat}`, bounds.width, bounds.height);
-          timeline
-            .set(element, { x: point.x, y: point.y, autoAlpha: 0, scale: 0.4 }, start)
-            .to(element, { autoAlpha: 1, scale: 1.1, duration: 0.2, ease: 'back.out(2)' }, start)
-            .to(
-              element,
-              { autoAlpha: 0, scale: 0.9, duration: 0.2 },
-              start + cue.durationMs / 1000 - 0.2,
-            );
-        }
-      }
-    }, root);
-    return () => context.revert();
-  }, [cues, rootRef, key]);
-}
-
-function zonePoint(zone: Zone, width: number, height: number) {
-  const points: Record<string, readonly [number, number]> = {
-    stock: [0.43, 0.47],
-    discard: [0.54, 0.47],
-    'hand:0': [0.5, 0.82],
-    'hand:1': [0.12, 0.48],
-    'hand:2': [0.5, 0.15],
-    'hand:3': [0.88, 0.48],
-    'seat:0': [0.5, 0.82],
-    'seat:1': [0.12, 0.48],
-    'seat:2': [0.5, 0.15],
-    'seat:3': [0.88, 0.48],
-  };
-  const [x, y] = points[zone] ?? [0.5, 0.5];
-  return { x: x * width, y: y * height };
-}
-
-function discardRotation(card: string, index: number) {
-  let hash = index * 13;
-  for (let i = 0; i < card.length; i += 1) hash = (hash * 31 + card.charCodeAt(i)) | 0;
-  return (Math.abs(hash) % 19) - 9;
 }

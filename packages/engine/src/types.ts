@@ -89,6 +89,22 @@ export interface RuleError {
 export interface MoveCtx {
   rng: Rng;
   fx: FxEmitter;
+  /**
+   * Replay-stable facts about the event currently being reduced. `atMs` is an
+   * authority-supplied match-relative timestamp, never a clock read performed
+   * by engine code. Real-time rules may consult it because it is persisted in
+   * the event log and supplied again during replay.
+   */
+  event: {
+    seq: number;
+    atMs?: number;
+  };
+}
+
+/** Replay-relevant metadata supplied by the transport authority. */
+export interface ApplyMeta {
+  /** Non-negative, monotonic, authority-normalized milliseconds. */
+  atMs?: number;
 }
 
 export interface Move<S> {
@@ -105,8 +121,27 @@ export interface LegalMove {
 export interface PhaseState {
   phase: string;
   actor: SeatId | null;
+  /**
+   * Seats that may act concurrently this phase (simultaneous decisions:
+   * jump-ins, slaps, secret picks). When present and non-empty it supersedes
+   * `actor` for turn-gating; keep `actor` as the "primary" seat (or null) so
+   * single-actor callers keep working. The authority serializes arrivals into
+   * the log, so replay stays deterministic — "first to slap" is simply the
+   * slap event that landed first.
+   */
+  actors?: readonly SeatId[];
   round: number;
   label?: string;
+}
+
+/** Every seat allowed to act in this phase (multi-actor aware). */
+export function actingSeats(phase: PhaseState): readonly SeatId[] {
+  if (phase.actors && phase.actors.length > 0) return phase.actors;
+  return phase.actor === null ? [] : [phase.actor];
+}
+
+export function isActingSeat(phase: PhaseState, seat: SeatId): boolean {
+  return actingSeats(phase).includes(seat);
 }
 
 export interface AutoMove {
@@ -126,8 +161,26 @@ export interface FlowAdvance {
 export interface Flow<S> {
   start(state: S, seats: number): PhaseState;
   legalMoves(state: S, phase: PhaseState): readonly LegalMove[];
+  /**
+   * Per-seat enumeration for simultaneous phases (`phase.actors`). When absent
+   * the runtime falls back to `legalMoves` for every acting seat.
+   */
+  legalMovesFor?(state: S, phase: PhaseState, seat: SeatId): readonly LegalMove[];
   /** compute the next phase/actor after an applied event; pure */
   advance(state: S, event: AppliedEvent, seats: number): FlowAdvance;
+  /**
+   * Opt-in gate for transport-injected system events (`sessionInject`), e.g.
+   * authoritative clock ticks for timed rules. Injection is refused when this
+   * hook is absent — wall-clock time enters the engine ONLY through a move the
+   * game explicitly accepts, and only via the log (so replay reproduces it).
+   */
+  canInject?(
+    state: S,
+    phase: PhaseState,
+    moveId: string,
+    payload: unknown,
+    meta: Readonly<ApplyMeta>,
+  ): true | RuleError;
 }
 
 // ---------------------------------------------------------------------------
@@ -142,7 +195,18 @@ export interface AppliedEvent {
   payload?: unknown;
   /** wall-clock stamp added by transports OUTSIDE determinism; never replayed into state */
   ts?: number;
+  /**
+   * Authority-normalized match time that IS replayed into MoveCtx. Unlike
+   * `ts`, this is deterministic game input and must be monotonic in the log.
+   */
+  atMs?: number;
   automatic?: boolean;
+  /**
+   * True for events injected by the transport via `sessionInject` (e.g. clock
+   * ticks). Unlike `ts`, an injected payload IS part of the deterministic log:
+   * once the authority logs it, every replay reproduces it bit-for-bit.
+   */
+  injected?: boolean;
   hash?: string;
 }
 
@@ -330,6 +394,14 @@ export declare function sessionApply<S, C extends RuleValues>(
   seat: SeatId,
   moveId: string,
   payload?: unknown,
+  meta?: ApplyMeta,
+): ApplyOutcome<S, C>;
+export declare function sessionInject<S, C extends RuleValues>(
+  def: GameDef<S, C>,
+  session: GameSession<S, C>,
+  moveId: string,
+  payload?: unknown,
+  meta?: ApplyMeta,
 ): ApplyOutcome<S, C>;
 export declare function replaySession<S, C extends RuleValues>(
   def: GameDef<S, C>,

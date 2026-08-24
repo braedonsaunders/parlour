@@ -168,3 +168,8 @@ html.reduce-motion *::after {
   animation-iteration-count: 1 !important;
   transition-duration: 0.001ms !important;
 }
+
+/* Table controls own the scarce mobile edges; playback continues without the global transport pill. */
+body:has([data-table-screen]) [data-testid='music-player'] {
+  display: none;
+}

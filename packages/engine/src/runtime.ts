@@ -1,11 +1,14 @@
 import { makeRng } from './rng';
 import {
   createFx,
+  isActingSeat,
   type AppliedEvent,
+  type ApplyMeta,
   type ApplyOutcome,
   type FxEmitter,
   type GameDef,
   type GameSession,
+  type LegalMove,
   type MatchResult,
   type PhaseState,
   type RuleError,
@@ -94,6 +97,8 @@ interface StepInput {
   moveId: string;
   payload?: unknown;
   automatic: boolean;
+  injected?: boolean;
+  atMs?: number;
 }
 
 interface Cursor<S> {
@@ -116,7 +121,11 @@ function applyStep<S, C extends RuleValues>(
   if (!move) throw new Error(`unknown move: ${input.moveId}`);
   const seq = cursor.seq;
   const seat = input.seat ?? -1;
-  const state = move.apply(cursor.state, seat, input.payload, { rng: eventRng(seed, seq), fx });
+  const state = move.apply(cursor.state, seat, input.payload, {
+    rng: eventRng(seed, seq),
+    fx,
+    event: input.atMs === undefined ? { seq } : { seq, atMs: input.atMs },
+  });
 
   const event: AppliedEvent = {
     seq,
@@ -126,6 +135,8 @@ function applyStep<S, C extends RuleValues>(
     hash: stateHash(state),
   };
   if (input.automatic) event.automatic = true;
+  if (input.injected) event.injected = true;
+  if (input.atMs !== undefined) event.atMs = input.atMs;
 
   cursor.state = state;
   cursor.seq = seq + 1;
@@ -169,7 +180,13 @@ function settle<S, C extends RuleValues>(
         def,
         seed,
         cursor,
-        { seat: auto.seat, moveId: auto.move, payload: auto.payload, automatic: true },
+        {
+          seat: auto.seat,
+          moveId: auto.move,
+          payload: auto.payload,
+          automatic: true,
+          atMs: event.atMs,
+        },
         fx,
       );
     }
@@ -186,21 +203,57 @@ function rejection<S, C extends RuleValues>(
   return { events: [], fx: [], session, rejected: { code, message } };
 }
 
+function timingError(log: readonly AppliedEvent[], meta: Readonly<ApplyMeta>): RuleError | null {
+  if (meta.atMs === undefined) return null;
+  if (!Number.isSafeInteger(meta.atMs) || meta.atMs < 0) {
+    return {
+      code: 'invalid-event-time',
+      message: 'atMs must be a non-negative safe integer',
+    };
+  }
+  for (let index = log.length - 1; index >= 0; index--) {
+    const previous = log[index]?.atMs;
+    if (previous === undefined) continue;
+    return meta.atMs < previous
+      ? {
+          code: 'event-time-regressed',
+          message: `atMs ${meta.atMs} is earlier than the previous authority time ${previous}`,
+        }
+      : null;
+  }
+  return null;
+}
+
+/** Per-seat legal moves, falling back to the phase-wide list (single-actor games). */
+function legalMovesForSeat<S, C extends RuleValues>(
+  def: GameDef<S, C>,
+  state: S,
+  phase: PhaseState,
+  seat: SeatId,
+): readonly LegalMove[] {
+  return def.flow.legalMovesFor
+    ? def.flow.legalMovesFor(state, phase, seat)
+    : def.flow.legalMoves(state, phase);
+}
+
 export function sessionApply<S, C extends RuleValues>(
   def: GameDef<S, C>,
   session: GameSession<S, C>,
   seat: SeatId,
   moveId: string,
   payload?: unknown,
+  meta: ApplyMeta = {},
 ): ApplyOutcome<S, C> {
   if (session.status !== 'playing') {
     return rejection(session, 'match-ended', 'the match has already ended');
   }
-  if (session.phase.actor !== seat) {
-    return rejection(session, 'not-your-turn', `seat ${seat} is not the acting seat`);
+  if (!isActingSeat(session.phase, seat)) {
+    return rejection(session, 'not-your-turn', `seat ${seat} is not an acting seat`);
   }
+  const invalidTiming = timingError(session.log, meta);
+  if (invalidTiming) return rejection(session, invalidTiming.code, invalidTiming.message);
 
-  const legal = def.flow.legalMoves(session.state, session.phase);
+  const legal = legalMovesForSeat(def, session.state, session.phase, seat);
   const match = legal.find((m) => m.id === moveId);
   if (!match) {
     return rejection(session, 'illegal-move', `move ${moveId} is not legal right now`);
@@ -230,7 +283,81 @@ export function sessionApply<S, C extends RuleValues>(
     def,
     session.seed,
     cursor,
-    { seat, moveId, payload: effectivePayload, automatic: false },
+    { seat, moveId, payload: effectivePayload, automatic: false, atMs: meta.atMs },
+    fx,
+  );
+  settle(def, session.seed, session.seats, cursor, event, fx);
+
+  const next: GameSession<S, C> = {
+    ...session,
+    log: [...session.log, ...cursor.events],
+    state: cursor.state,
+    phase: cursor.phase,
+    status: cursor.status,
+    result: cursor.result,
+    lastAppliedHash:
+      cursor.events[cursor.events.length - 1]?.hash ?? session.lastAppliedHash ?? null,
+  };
+
+  return { events: cursor.events, fx: fx.events, session: next };
+}
+
+// ---------------------------------------------------------------------------
+// Inject (authoritative system events, e.g. clock ticks)
+// ---------------------------------------------------------------------------
+
+/**
+ * Applies a seat-less system move on behalf of the transport/authority — the
+ * ONLY sanctioned path for wall-clock time (or any other external fact) to
+ * reach game state. The game must opt in via `flow.canInject`; the injected
+ * payload lands in the log like any event, so replay reproduces it exactly.
+ */
+export function sessionInject<S, C extends RuleValues>(
+  def: GameDef<S, C>,
+  session: GameSession<S, C>,
+  moveId: string,
+  payload?: unknown,
+  meta: ApplyMeta = {},
+): ApplyOutcome<S, C> {
+  if (session.status !== 'playing') {
+    return rejection(session, 'match-ended', 'the match has already ended');
+  }
+  const move = def.moves[moveId];
+  if (!move) {
+    return rejection(session, 'unknown-move', `move ${moveId} is not defined by ${def.id}`);
+  }
+  if (!def.flow.canInject) {
+    return rejection(session, 'injection-unsupported', `${def.id} does not accept injected events`);
+  }
+  const invalidTiming = timingError(session.log, meta);
+  if (invalidTiming) return rejection(session, invalidTiming.code, invalidTiming.message);
+  const verdict = def.flow.canInject(session.state, session.phase, moveId, payload, meta);
+  if (verdict !== true) {
+    return { events: [], fx: [], session, rejected: verdict };
+  }
+
+  const fx = createFx();
+  const cursor: Cursor<S> = {
+    state: session.state,
+    phase: session.phase,
+    status: session.status,
+    result: session.result,
+    seq: session.log.length,
+    events: [],
+  };
+
+  const event = applyStep(
+    def,
+    session.seed,
+    cursor,
+    {
+      seat: null,
+      moveId,
+      payload,
+      automatic: false,
+      injected: true,
+      atMs: meta.atMs,
+    },
     fx,
   );
   settle(def, session.seed, session.seats, cursor, event, fx);
@@ -295,6 +422,8 @@ export function replaySession<S, C extends RuleValues>(
         moveId: logged.move,
         payload: logged.payload,
         automatic: logged.automatic === true,
+        injected: logged.injected === true,
+        atMs: logged.atMs,
       },
       fx,
     );

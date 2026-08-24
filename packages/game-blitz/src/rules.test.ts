@@ -301,7 +301,7 @@ describe('blitz round flow', () => {
 
   it('reshuffles the discard minus its top when the stock runs dry', () => {
     const state = freshState({ stock: [], discard: ['S2', 'H6', 'D11'] });
-    const ctx = { rng: makeRng(99), fx: createFx() };
+    const ctx = { rng: makeRng(99), fx: createFx(), event: { seq: 0 } };
 
     const verdict = def.moves['draw.stock']!.validate(state, 0, undefined);
     expect(verdict).toBe(true);

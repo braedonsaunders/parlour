@@ -70,8 +70,8 @@ export default function TitlePage() {
         custom={0.12}
         className="max-w-md text-balance text-dusk-100/90"
       >
-        A cozy little table in a small warm world. Blitz deals first — thirty-one, knocks, and one
-        very loud celebration.
+        A cozy little table in a small warm world. Pick a game off the shelf and deal in — sly bots,
+        quick rounds, and one very loud celebration.
       </motion.p>
 
       <motion.div
@@ -83,30 +83,20 @@ export default function TitlePage() {
       >
         <button
           type="button"
-          onClick={() => router.push('/play')}
+          onClick={() => router.push('/games')}
           className="btn-fat w-64 text-lg"
-          data-testid="play-solo"
+          data-testid="play"
         >
-          Play Solo
+          Play
         </button>
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => router.push('/join')}
-            className="btn-fat btn-fat--teal w-40"
-          >
-            Join Room
-          </button>
-          <button
-            type="button"
-            onClick={() => router.push('/create')}
-            className="btn-fat btn-fat--ghost w-40"
-          >
-            Create Room
-          </button>
-        </div>
+        <Link
+          href="/join"
+          className="pill-soft text-sm font-bold text-dusk-100 transition-transform duration-150 ease-pop hover:-translate-y-0.5 hover:text-hearth-200"
+        >
+          Have a room code? Join a table →
+        </Link>
         <span className="pill-soft mt-1 cursor-default select-none text-xs uppercase tracking-[0.25em] text-dusk-200">
-          Blitz · the 31 game
+          a growing shelf of card games
         </span>
       </motion.div>
 

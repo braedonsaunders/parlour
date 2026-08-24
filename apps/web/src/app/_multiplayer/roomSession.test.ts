@@ -1,8 +1,9 @@
-import { stateHash } from '@parlour/engine';
+import { applyPreset, stateHash } from '@parlour/engine';
+import { wildpileConfig } from '@parlour/game-wildpile';
 import { afterEach, describe, expect, it } from 'vitest';
 import { NostrSignaling, type SignalPayload } from '@/lib/multiplayer/NostrSignaling';
 import type { RoomSettings } from '@/lib/multiplayer/types';
-import { MultiplayerRoomSession } from './roomSession';
+import { MultiplayerRoomSession, wildMultiplayerSession } from './roomSession';
 
 type SignalHandler = (sender: string, signal: SignalPayload) => void;
 
@@ -154,6 +155,18 @@ describe('multiplayer route composition', () => {
     const room = await host.create({ seats: 2 });
     await guest.join(room.code);
     await eventually(() => expect(guest.getSnapshot().localSeat).toBe(1));
+    await eventually(() => {
+      expect(host.getSnapshot().seats.find((seat) => seat.seat === 1)).toMatchObject({
+        profileId: 'guest-profile',
+        name: 'Guest',
+        avatarId: 'cobalt',
+      });
+      expect(guest.getSnapshot().seats.find((seat) => seat.seat === 0)).toMatchObject({
+        profileId: 'host-profile',
+        name: 'Host',
+        avatarId: 'ember',
+      });
+    });
 
     host.send('draw.stock');
 
@@ -163,6 +176,54 @@ describe('multiplayer route composition', () => {
     });
     expect(stateHash(guest.getSnapshot().session?.state)).toBe(
       stateHash(host.getSnapshot().session?.state),
+    );
+  });
+
+  it('discovers a Wild room and keeps its action-card state synchronized', async () => {
+    const broker = new MockSignalingBroker();
+    const rtc = new MockRtcNetwork();
+    const host = new MultiplayerRoomSession(
+      { name: 'Host', avatarId: 'ember', profileId: 'wild-host' },
+      {
+        signaling: broker.signaling('wild-host-peer'),
+        peerConnection: rtc.factory('host'),
+        seed: 91,
+      },
+    );
+    const guest = new MultiplayerRoomSession(
+      { name: 'Guest', avatarId: 'mint', profileId: 'wild-guest' },
+      {
+        signaling: broker.signaling('wild-guest-peer'),
+        peerConnection: rtc.factory('guest'),
+        seed: 7,
+      },
+    );
+    sessions.push(host, guest);
+
+    const room = await host.create({
+      gameId: 'wildpile',
+      seats: 2,
+      config: applyPreset(wildpileConfig, 'party'),
+    });
+    await guest.join(room.code);
+    await eventually(() => expect(guest.getSnapshot().localSeat).toBe(1));
+
+    expect(host.getSnapshot()).toMatchObject({ gameId: 'wildpile' });
+    expect(guest.getSnapshot()).toMatchObject({ gameId: 'wildpile' });
+    expect(guest.getSnapshot().settings?.config).toMatchObject({ stacking: true, jumpIn: true });
+
+    const hostSession = wildMultiplayerSession(host.getSnapshot());
+    expect(hostSession).not.toBeNull();
+    const move = hostSession!.def.flow.legalMoves(hostSession!.state, hostSession!.phase)[0];
+    expect(move).toBeDefined();
+    host.send(move!.id, move!.payload);
+
+    await eventually(() => {
+      expect(wildMultiplayerSession(host.getSnapshot())?.log).toHaveLength(1);
+      expect(wildMultiplayerSession(guest.getSnapshot())?.log).toHaveLength(1);
+    });
+    expect(stateHash(wildMultiplayerSession(guest.getSnapshot())?.state)).toBe(
+      stateHash(wildMultiplayerSession(host.getSnapshot())?.state),
     );
   });
 });

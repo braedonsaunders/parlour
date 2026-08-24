@@ -1,0 +1,209 @@
+/* Game-shelf tile previews — structural tile/carousel classes come from
+   modes.module.css; only the per-game artwork lives here. */
+
+.tile {
+  overflow: hidden;
+}
+
+/* On phones the shelf pages one full-width card at a time; the shared
+   carousel's snap + gutter padding does the rest. Descendant selectors beat
+   modes.module.css's fixed 21rem tile width regardless of bundle order. */
+@media (max-width: 640px) {
+  .shelf {
+    scroll-snap-type: x mandatory;
+  }
+
+  /* Just narrower than the gutters so the next card peeks in as a scroll hint. */
+  .shelf .tile,
+  .shelf .shelfHint {
+    width: calc(100vw - 4.5rem);
+  }
+}
+
+.tile[data-shelved='true'] {
+  cursor: default;
+  filter: saturate(0.55) brightness(0.82);
+}
+
+.tile[data-shelved='true']:hover {
+  transform: none;
+  filter: saturate(0.55) brightness(0.82);
+}
+
+.soonRibbon {
+  position: absolute;
+  top: 1.9rem;
+  right: -2.6rem;
+  z-index: 1;
+  transform: rotate(35deg);
+  padding: 0.3rem 3rem;
+  font-family: var(--font-display), sans-serif;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: #fff4e2;
+  background: linear-gradient(180deg, var(--tile-accent), var(--tile-shade, #7c2c3e));
+  box-shadow: 0 4px 14px -6px rgba(6, 16, 22, 0.9);
+  pointer-events: none;
+}
+
+/* --- blitz: fanned 31 hand ----------------------------------------------- */
+
+.fanCard {
+  position: absolute;
+  left: 50%;
+  top: 62%;
+  width: 3.2rem;
+  height: 4.4rem;
+  margin: -2.2rem 0 0 -1.6rem;
+  border-radius: 12%;
+  background: linear-gradient(180deg, #fdf6ec, #f2cfa4);
+  border: 2px solid rgba(120, 57, 29, 0.5);
+  color: #78391d;
+  font-family: var(--font-display), sans-serif;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.15rem;
+  transform-origin: 50% 120%;
+  box-shadow: 0 8px 20px -10px rgba(6, 16, 22, 0.9);
+}
+
+.fanCard:nth-child(1) {
+  animation: fan-left 3s var(--ease-pop) infinite;
+}
+
+.fanCard:nth-child(2) {
+  animation: fan-mid 3s var(--ease-pop) infinite;
+  color: #a3372c;
+}
+
+.fanCard:nth-child(3) {
+  animation: fan-right 3s var(--ease-pop) infinite;
+}
+
+@keyframes fan-left {
+  0%,
+  12% {
+    transform: rotate(0deg);
+  }
+  32%,
+  88% {
+    transform: rotate(-16deg);
+  }
+  100% {
+    transform: rotate(0deg);
+  }
+}
+
+@keyframes fan-mid {
+  0%,
+  12% {
+    transform: translateY(0);
+  }
+  32%,
+  88% {
+    transform: translateY(-0.35rem) scale(1.06);
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+
+@keyframes fan-right {
+  0%,
+  12% {
+    transform: rotate(0deg);
+  }
+  32%,
+  88% {
+    transform: rotate(16deg);
+  }
+  100% {
+    transform: rotate(0deg);
+  }
+}
+
+/* --- wild: loud shedding cards ------------------------------------------- */
+
+.wildCard {
+  position: absolute;
+  left: 50%;
+  top: 58%;
+  width: 3rem;
+  height: 4.2rem;
+  margin: -2.1rem 0 0 -1.5rem;
+  border-radius: 14%;
+  border: 3px solid rgba(255, 244, 226, 0.85);
+  color: #fff4e2;
+  font-family: var(--font-display), sans-serif;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  box-shadow: 0 8px 20px -10px rgba(6, 16, 22, 0.9);
+  animation: wild-bob 2.8s ease-in-out infinite;
+}
+
+.wildCard:nth-child(1) {
+  background: linear-gradient(180deg, #d95763, #a3372c);
+  transform: translateX(-2.9rem) rotate(-14deg);
+}
+
+.wildCard:nth-child(2) {
+  background: linear-gradient(180deg, #e2b049, #b07a1c);
+  transform: translateX(-1rem) rotate(-4deg);
+  animation-delay: 0.2s;
+}
+
+.wildCard:nth-child(3) {
+  background: linear-gradient(180deg, #5fae7b, #2f6b48);
+  transform: translateX(0.9rem) rotate(5deg);
+  animation-delay: 0.4s;
+}
+
+.wildCard:nth-child(4) {
+  background: linear-gradient(180deg, #4ba1ba, #25586e);
+  transform: translateX(2.8rem) rotate(15deg);
+  animation-delay: 0.6s;
+}
+
+@keyframes wild-bob {
+  0%,
+  100% {
+    margin-top: -2.1rem;
+  }
+  50% {
+    margin-top: -2.45rem;
+  }
+}
+
+/* --- more-games shelf hint ------------------------------------------------ */
+
+.shelfHint {
+  flex: none;
+  width: 15rem;
+  scroll-snap-align: center;
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  border-radius: var(--radius-fat);
+  border: 2px dashed rgba(175, 218, 228, 0.28);
+  background: rgba(21, 40, 51, 0.35);
+  color: rgba(215, 237, 242, 0.6);
+  text-align: center;
+  padding: 1.25rem;
+}
+
+.shelfHintMark {
+  font-family: var(--font-display), sans-serif;
+  font-size: 2rem;
+  font-weight: 800;
+  opacity: 0.7;
+}

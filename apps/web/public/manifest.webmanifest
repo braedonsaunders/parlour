@@ -4,7 +4,7 @@
   "description": "Cozy card games. Blitz first.",
   "start_url": "/",
   "display": "fullscreen",
-  "orientation": "landscape",
+  "orientation": "any",
   "background_color": "#152833",
   "theme_color": "#152833",
   "icons": [

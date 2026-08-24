@@ -3,6 +3,12 @@ import type { AppliedEvent, FxEvent, RuleValues, SeatId } from '@parlour/engine'
 export type PeerId = string;
 export type ProfileId = string;
 
+export type PlayerProfile = {
+  profileId: ProfileId;
+  name: string;
+  avatarId: string;
+};
+
 export type RoomSettings = {
   gameId: string;
   seats: number;
@@ -59,9 +65,9 @@ export type RemoteApplyResult = {
 };
 
 export type PresenceEvent =
-  | { kind: 'peer.joined'; peerId: PeerId; seat: SeatId }
+  | { kind: 'peer.joined'; peerId: PeerId; seat: SeatId; profile: PlayerProfile }
   | { kind: 'peer.left'; peerId: PeerId; seat: SeatId; bot: true }
-  | { kind: 'seat.reclaimed'; peerId: PeerId; seat: SeatId }
+  | { kind: 'seat.reclaimed'; peerId: PeerId; seat: SeatId; profile: PlayerProfile }
   | { kind: 'host.changed'; hostId: PeerId }
   | { kind: 'connection'; state: 'connecting' | 'connected' | 'reconnecting' | 'closed' }
   | { kind: 'error'; message: string };
@@ -78,6 +84,11 @@ export type RoomHandle = {
 
 export interface AuthorityAdapter {
   apply(action: PlayerAction): AppliedPacket | Promise<AppliedPacket>;
+  inject?(
+    actionId: string,
+    move: string,
+    payload?: unknown,
+  ): AppliedPacket | Promise<AppliedPacket>;
   applyRemote(packet: AppliedPacket): RemoteApplyResult | Promise<RemoteApplyResult>;
   exportSnapshot(): ReplaySnapshot;
   importSnapshot(snapshot: ReplaySnapshot): void | Promise<void>;
@@ -88,6 +99,8 @@ export interface Transport {
   create(settings: RoomSettings): Promise<RoomHandle>;
   join(code: string): Promise<RoomHandle>;
   send(action: PlayerAction): void;
+  /** Host-only authoritative system event, such as a deterministic clock tick. */
+  inject(move: string, payload?: unknown): void;
   sendEmote(emote: Emote): boolean;
   onEvent(cb: (event: AppliedPacket) => void): () => void;
   onSnapshot(cb: (notification: SnapshotNotification) => void): () => void;

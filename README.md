@@ -17,8 +17,11 @@ parlour/
 ```
 
 - Seeded deterministic engine: same seed + same event log ⇒ identical state on every peer. Enables replays, reconnect, host migration, spectate-later.
+- Single-seat and simultaneous phases share one reducer path; authority-normalized event time is logged and replayed instead of read inside game code.
+- `MatchDef` composes deterministic round sessions into lives, cumulative scores, dealer rotation, timed formats, and sudden death.
 - Moves are pure reducers that emit an ordered **fx timeline**; the UI animates only from fx events, never by diffing state.
-- P2P multiplayer: Nostr signaling → WebRTC DataChannel mesh, host-authoritative with full resilience (host election, bot takeover, rejoin). Redaction is honest-UI, not cryptography — fine for friends play.
+- P2P multiplayer: Nostr signaling → WebRTC DataChannel mesh, host-authoritative with full resilience (host election, bot takeover, rejoin). Redaction is honest-UI, not cryptography — fine for friends play. The opt-in cryptographic direction is specified in [Parlour Veil](docs/VEILED-DECK-PROTOCOL.md).
+- Local profiles keep account-free lifetime stats and stable friend-vs-friend head-to-head history. See the popularity-informed [next-game shortlist](docs/NEXT-GAME-SHORTLIST.md).
 
 ## Quickstart
 

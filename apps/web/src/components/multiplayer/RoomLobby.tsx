@@ -135,10 +135,10 @@ export function RoomLobby({
         <button
           className="btn-fat mt-6 w-full"
           type="button"
-          disabled={seats.length < 2 || connection !== 'connected'}
+          disabled={seats.length < capacity || connection !== 'connected'}
           onClick={onStart}
         >
-          Start match
+          {seats.length < capacity ? `Waiting for ${capacity - seats.length} more` : 'Start match'}
         </button>
       )}
     </section>

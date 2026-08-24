@@ -1,4 +1,4 @@
-const CACHE = 'parlour-shell-v2';
+const CACHE = 'parlour-shell-v3';
 const SHELL = [
   '/',
   '/offline.html',
@@ -44,13 +44,22 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
 
+  const fetchForCache = () =>
+    fetch(request).then((response) => {
+      const cacheCopy = response.ok && response.type === 'basic' ? response.clone() : null;
+      const cacheWrite = cacheCopy
+        ? caches.open(CACHE).then((cache) => cache.put(request, cacheCopy))
+        : Promise.resolve();
+
+      return { response, cacheWrite };
+    });
+
   if (request.mode === 'navigate') {
+    const network = fetchForCache();
+
     event.respondWith(
-      fetch(request)
-        .then((response) => {
-          if (response.ok) caches.open(CACHE).then((cache) => cache.put(request, response.clone()));
-          return response;
-        })
+      network
+        .then(({ response }) => response)
         .catch(() =>
           caches
             .match(request)
@@ -58,19 +67,16 @@ self.addEventListener('fetch', (event) => {
             .then((fallback) => fallback ?? Response.error()),
         ),
     );
+    event.waitUntil(network.then(({ cacheWrite }) => cacheWrite).catch(() => undefined));
     return;
   }
 
-  event.respondWith(
-    caches.match(request).then(
-      (cached) =>
-        cached ??
-        fetch(request).then((response) => {
-          if (response.ok && response.type === 'basic') {
-            caches.open(CACHE).then((cache) => cache.put(request, response.clone()));
-          }
-          return response;
-        }),
-    ),
-  );
+  const cacheFirst = caches
+    .match(request)
+    .then((cached) =>
+      cached ? { response: cached, cacheWrite: Promise.resolve() } : fetchForCache(),
+    );
+
+  event.respondWith(cacheFirst.then(({ response }) => response));
+  event.waitUntil(cacheFirst.then(({ cacheWrite }) => cacheWrite).catch(() => undefined));
 });

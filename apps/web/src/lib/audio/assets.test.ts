@@ -14,7 +14,6 @@ const REQUIRED_SOUNDS = [
   'ui.pop',
   'win.jingle',
   'lose.sting',
-  'music.parlour',
 ] as const;
 
 describe('production audio suite', () => {
@@ -32,8 +31,10 @@ describe('production audio suite', () => {
     }
   });
 
-  it('keeps music looping on its own channel', () => {
-    const ambience = SOUND_MANIFEST.find((sound) => sound.id === 'music.parlour');
-    expect(ambience).toMatchObject({ channel: 'music', loop: true, cap: 1 });
+  it('reserves every manifest slot for SFX; music lives in the music manifest', () => {
+    for (const sound of SOUND_MANIFEST) {
+      expect(sound.channel).toBe('sfx');
+    }
+    expect(SOUND_MANIFEST.some((sound) => sound.id === 'music.parlour')).toBe(false);
   });
 });

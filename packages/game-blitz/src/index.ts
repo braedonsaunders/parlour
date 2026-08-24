@@ -10,6 +10,20 @@ export {
   suitSums,
 } from './hand';
 export { blitzSeat, createBlitzDef, HAND_SIZE } from './rules';
+export {
+  createBlitzLivesMatchDef,
+  createBlitzTimedMatchDef,
+  createBlitzWinsMatchDef,
+  FIRST_TO_WINS,
+  STARTING_LIVES,
+  TIMED_DURATION_MS,
+} from './match';
+export type {
+  BlitzLivesMatchState,
+  BlitzTimedMatchState,
+  BlitzTimedRoundState,
+  BlitzWinsMatchState,
+} from './match';
 export { matchResultOf, scoreRound } from './score';
 export type { Pickup, RoundOutcome, RoundReason, BlitzState } from './state';
 export { blitzConfigSchema } from './config';

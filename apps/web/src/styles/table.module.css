@@ -170,16 +170,25 @@
 
 .opponentCards {
   position: absolute;
-  top: -1.1rem;
+  top: -0.85rem;
   z-index: -1;
   display: flex;
   justify-content: center;
+  transform-origin: 50% 115%;
 }
 
 .opponentCards > * {
-  margin-inline: -0.72rem;
+  margin-inline: -1.16rem;
   transform: rotate(var(--card-rotation));
-  transform-origin: 50% 120%;
+  transform-origin: 50% 135%;
+}
+
+.seat1 .opponentCards {
+  transform: rotate(16deg);
+}
+
+.seat3 .opponentCards {
+  transform: rotate(-16deg);
 }
 
 .piles {
@@ -190,6 +199,49 @@
   display: flex;
   gap: clamp(1.2rem, 3vw, 2.8rem);
   transform: translate(-50%, -50%) scale(0.78);
+  isolation: isolate;
+}
+
+.piles[data-local-turn='true']::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: -1.65rem -2rem;
+  border: 2px solid rgba(255, 218, 160, 0.48);
+  border-radius: 2.2rem;
+  background: radial-gradient(
+    ellipse,
+    rgba(255, 188, 92, 0.3),
+    rgba(75, 177, 185, 0.08) 55%,
+    transparent 76%
+  );
+  box-shadow:
+    0 0 22px rgba(255, 194, 105, 0.48),
+    0 0 54px rgba(75, 177, 185, 0.25),
+    inset 0 0 24px rgba(255, 222, 171, 0.15);
+  animation: pileTurnGlow 1.25s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.turnIndicator {
+  position: absolute;
+  z-index: 4;
+  left: 50%;
+  top: -2.25rem;
+  translate: -50% 0;
+  padding: 0.22rem 0.66rem;
+  border: 1px solid rgba(255, 237, 207, 0.72);
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(226, 147, 73, 0.96), rgba(150, 71, 28, 0.96));
+  color: #fff4df;
+  box-shadow: 0 5px 16px rgba(4, 14, 20, 0.44);
+  font:
+    800 0.68rem/1 var(--font-display),
+    sans-serif;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  pointer-events: none;
 }
 
 .pileButton {
@@ -226,10 +278,14 @@
 }
 
 .localHand {
+  --fan-n: 3;
+  --fan-un: 0.334;
+  --fan-step: 0px;
+  --hand-card-width: clamp(5.6rem, 8vw, 7.2rem);
   position: absolute;
   z-index: 10;
   left: 50%;
-  bottom: -2.2rem;
+  bottom: -0.35rem;
   display: flex;
   justify-content: center;
   width: min(52rem, 74vw);
@@ -238,8 +294,16 @@
   pointer-events: none;
 }
 
+.handTrack {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+
 .ownerCount {
   position: absolute;
+  z-index: 3;
   left: 0;
   top: 4.2rem;
   display: grid;
@@ -272,16 +336,66 @@
 }
 
 .handCard {
-  position: relative;
-  margin-inline: clamp(0.2rem, 0.65vw, 0.4rem);
+  position: absolute;
+  left: 50%;
+  top: 0.9rem;
+  width: var(--hand-card-width);
+  margin-left: calc(var(--hand-card-width) / -2);
   pointer-events: auto;
 }
-.handFan {
-  transform-origin: 50% 150%;
-  transform: rotate(calc(var(--fan-index) * 3.5deg));
+
+.localHand .card {
+  width: 100%;
 }
-.handCard:hover {
-  z-index: 5;
+
+.handFan {
+  transform-origin: 50% 138%;
+  transform: translateX(calc(var(--fan-index) * var(--fan-step) + var(--spread-x, 0rem)))
+    rotate(calc(var(--fan-index) * min(6deg, 24deg * var(--fan-un))))
+    translateY(
+      calc(
+        var(--fan-abs, 0) * min(0.48rem, 2.1rem * var(--fan-un)) + var(--spread-y, 0rem) +
+          var(--playable-y, 0rem)
+      )
+    );
+  transition: transform 280ms var(--ease-pop);
+}
+
+.handCard[data-playable='true'] {
+  --playable-y: -0.62rem;
+}
+
+.handCard[data-playable='true'] .card {
+  filter: saturate(1.12) brightness(1.07);
+  box-shadow:
+    0 13px 24px -8px rgba(3, 11, 15, 0.82),
+    0 0 0 2px rgba(255, 224, 173, 0.46),
+    0 0 20px rgba(255, 193, 102, 0.32),
+    inset 0 0 0 1px rgba(92, 48, 25, 0.18);
+}
+
+.handCard[data-playable='false'] .card {
+  filter: grayscale(0.58) saturate(0.22) brightness(0.62);
+  opacity: 0.68;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .handCard:hover .handFan,
+  .handCard:focus-within .handFan {
+    --spread-y: -0.42rem;
+  }
+  .handCard:hover ~ .handCard .handFan,
+  .handCard:focus-within ~ .handCard .handFan {
+    --spread-x: 0.9rem;
+  }
+  .handCard:has(~ .handCard:hover) .handFan,
+  .handCard:has(~ .handCard:focus-within) .handFan {
+    --spread-x: -0.9rem;
+  }
+  .localHand button.card:not(:disabled):hover {
+    filter: brightness(1.06) saturate(1.04);
+    transform: rotate(var(--card-rotation));
+  }
 }
 
 .card {
@@ -371,13 +485,18 @@ button.card:not(:disabled):hover {
 .actionRail {
   position: absolute;
   right: max(1.25rem, env(safe-area-inset-right));
-  bottom: max(1.1rem, env(safe-area-inset-bottom));
+  top: max(5.1rem, calc(env(safe-area-inset-top) + 4.25rem));
   z-index: 22;
-  display: grid;
-  gap: 0.6rem;
+  display: flex;
+  gap: 0.45rem;
 }
 .actionRail button {
-  min-width: 7.5rem;
+  min-width: 0;
+  min-height: 2.35rem;
+  padding: 0.48rem 0.82rem;
+  border-radius: 0.85rem;
+  font-size: 0.78rem;
+  letter-spacing: 0.035em;
 }
 .actionRail button:disabled {
   filter: grayscale(0.7) brightness(0.7);
@@ -395,21 +514,74 @@ button.card:not(:disabled):hover {
 }
 .flyingCard {
   position: absolute;
-  left: -2rem;
-  top: -3rem;
+  left: 0;
+  top: 0;
+  translate: -50% -50%;
   opacity: 0;
   will-change: transform, opacity;
 }
+.flightCardVisual {
+  position: relative;
+  z-index: 2;
+  display: block;
+  line-height: 0;
+  filter: drop-shadow(0 16px 18px rgba(3, 11, 15, 0.48));
+  will-change: transform;
+}
+.flightCardVisual .card {
+  transition: none;
+}
 .cardTrail {
   position: absolute;
-  z-index: -1;
-  right: 65%;
-  top: 45%;
-  width: 5rem;
-  height: 1rem;
+  z-index: 1;
+  left: 50%;
+  top: 50%;
+  width: clamp(6rem, 12vw, 10rem);
+  height: clamp(0.8rem, 1.6vw, 1.3rem);
   border-radius: 999px;
-  background: linear-gradient(90deg, transparent, rgba(255, 217, 160, 0.7));
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(81, 211, 220, 0.12) 24%,
+    rgba(255, 188, 91, 0.55) 67%,
+    rgba(255, 242, 207, 0.94) 100%
+  );
   filter: blur(5px);
+  transform: translate(-100%, -50%) rotate(var(--flight-angle, 0rad));
+  transform-origin: 100% 50%;
+  opacity: 0;
+  box-shadow: 0 0 18px rgba(255, 188, 91, 0.38);
+}
+.cardTrail::before,
+.cardTrail::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  border-radius: inherit;
+  background: linear-gradient(90deg, transparent, rgba(255, 245, 218, 0.92));
+}
+.cardTrail::before {
+  top: -0.38rem;
+  width: 68%;
+  height: 0.13rem;
+}
+.cardTrail::after {
+  bottom: -0.34rem;
+  width: 48%;
+  height: 0.1rem;
+}
+.cardGlint {
+  position: absolute;
+  z-index: 3;
+  left: 50%;
+  top: 50%;
+  width: 1.6rem;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff 0 5%, #ffe0a3 14%, transparent 68%);
+  filter: blur(0.4px);
+  translate: -50% -50%;
+  opacity: 0;
 }
 .burst {
   position: absolute;
@@ -582,6 +754,25 @@ button.card:not(:disabled):hover {
     opacity: 1;
   }
 }
+
+@keyframes pileTurnGlow {
+  0%,
+  100% {
+    opacity: 0.62;
+    transform: scale(0.97);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.035);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .piles[data-local-turn='true']::before {
+    animation: none;
+    opacity: 0.86;
+  }
+}
 @keyframes ripple {
   from {
     transform: scale(0.2);
@@ -598,27 +789,146 @@ button.card:not(:disabled):hover {
   }
 }
 
+@media (orientation: portrait) {
+  .seat {
+    width: clamp(6rem, 24vw, 8.5rem);
+  }
+  .seat1 {
+    left: 3%;
+    top: 7.2rem;
+    translate: 0 0;
+  }
+  .seat2 {
+    top: 3.4rem;
+  }
+  .seat3 {
+    right: 3%;
+    top: 7.2rem;
+    translate: 0 0;
+  }
+  .seat1 .opponentCards {
+    transform: rotate(8deg);
+  }
+  .seat3 .opponentCards {
+    transform: rotate(-8deg);
+  }
+  .feltMark {
+    top: 48%;
+    font-size: clamp(4rem, 18vw, 9rem);
+  }
+  .piles {
+    top: 48%;
+    transform: translate(-50%, -50%) scale(0.85);
+  }
+  .localHand {
+    --hand-card-width: 5.1rem;
+    bottom: -0.4rem;
+    width: min(30rem, 100vw);
+  }
+  .ownerCount {
+    left: 50%;
+    top: -2.9rem;
+    translate: -50% 0;
+  }
+  .actionRail {
+    right: max(0.9rem, env(safe-area-inset-right));
+    top: max(4.8rem, calc(env(safe-area-inset-top) + 4rem));
+  }
+}
+
 @media (max-height: 560px) {
   .seat2 {
-    top: 1%;
+    top: 1.25rem;
   }
   .seat1,
   .seat3 {
     top: 44%;
   }
   .localHand {
-    bottom: -4rem;
+    bottom: -1.5rem;
     transform: translateX(-50%) scale(0.82);
   }
   .ownerCount {
     left: -1.2rem;
   }
   .piles {
-    top: 44%;
+    top: 50.5%;
     transform: translate(-50%, -50%) scale(0.62);
   }
-  .actionRail {
-    transform: scale(0.86);
-    transform-origin: bottom right;
+  .piles[data-local-turn='true']::before {
+    inset: -0.65rem -1rem;
   }
+  .actionRail {
+    top: 4rem;
+    transform: scale(0.82);
+    transform-origin: top right;
+  }
+}
+
+/* --- table menu modal ----------------------------------------------------- */
+
+.menuOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.menuScrim {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  cursor: pointer;
+  background: radial-gradient(120% 90% at 50% 40%, rgba(9, 20, 27, 0.82), rgba(9, 20, 27, 0.6));
+  backdrop-filter: blur(3px);
+}
+
+.menuScrim:focus-visible {
+  outline: 3px solid var(--hearth-core);
+  outline-offset: -6px;
+}
+
+.menuPanel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+  width: min(24rem, calc(100% - 2.5rem));
+  padding: 1.75rem 1.6rem 1.6rem;
+  text-align: center;
+}
+
+.menuTitle {
+  font-family: var(--font-display), sans-serif;
+  font-size: 1.45rem;
+  font-weight: 800;
+  color: var(--ink-bright, #f3e6cf);
+}
+
+.menuHint {
+  margin-top: -0.5rem;
+  font-size: 0.9rem;
+  color: var(--ink-dim);
+}
+
+.menuToggles {
+  display: flex;
+  justify-content: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.menuActions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.quitButton {
+  border-color: rgba(94, 22, 22, 0.65);
+  background: linear-gradient(180deg, #ef8f7c 0%, #d05438 48%, #a2321d 100%);
+  color: #3c0d05;
+  text-shadow: 0 1px 0 rgba(255, 226, 214, 0.55);
 }

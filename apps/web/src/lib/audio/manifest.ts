@@ -16,14 +16,11 @@ export const SOUND_MANIFEST: readonly SoundDef[] = [
   { id: 'turn.tick', src: '/audio/turn-tick.wav', channel: 'sfx', cap: 2, minInterval: 120 },
   { id: 'ui.pop', src: '/audio/ui-pop.wav', channel: 'sfx', cap: 3, minInterval: 60 },
   { id: 'win.jingle', src: '/audio/win-jingle.wav', channel: 'sfx', cap: 1, minInterval: 1200 },
-  { id: 'lose.sting', src: '/audio/lose-sting.wav', channel: 'sfx', cap: 1, minInterval: 1200 },
   {
-    id: 'music.parlour',
-    src: '/audio/parlour-ambience.wav',
-    channel: 'music',
-    loop: true,
+    id: 'lose.sting',
+    src: '/audio/lose-sting.wav',
+    channel: 'sfx',
     cap: 1,
-    minInterval: 1000,
-    volume: 0.6,
+    minInterval: 1200,
   },
 ];

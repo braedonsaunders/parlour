@@ -1,4 +1,5 @@
 import { act, createElement } from 'react';
+import { Fx } from '@parlour/engine';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { TableScreen, type TableView } from './TableScreen';
@@ -57,6 +58,10 @@ describe('TableScreen owner hand', () => {
 
     expect(legalCard?.disabled).toBe(false);
     expect(illegalCard?.disabled).toBe(true);
+    expect(legalCard?.closest('[data-playable]')?.getAttribute('data-playable')).toBe('true');
+    expect(illegalCard?.closest('[data-playable]')?.getAttribute('data-playable')).toBe('false');
+    expect(container.querySelector('[data-local-turn="true"]')).not.toBeNull();
+    expect(container.textContent).toContain('Your turn');
     expect(
       Array.from(container.querySelectorAll('button')).some(
         (button) => button.textContent === 'Discard',
@@ -67,6 +72,15 @@ describe('TableScreen owner hand', () => {
 
     expect(onDiscard).toHaveBeenCalledOnce();
     expect(onDiscard).toHaveBeenCalledWith('H1');
+  });
+
+  it('removes the center-pile turn glow while another seat is acting', () => {
+    act(() => {
+      root.render(createElement(TableScreen, { view: VIEW, fx: [], fxKey: 0, busy: true }));
+    });
+
+    expect(container.querySelector('[data-local-turn="false"]')).not.toBeNull();
+    expect(container.textContent).not.toContain('Your turn');
   });
 
   it('shows the newest discard on top when the pile contains more than three cards', () => {
@@ -82,5 +96,28 @@ describe('TableScreen owner hand', () => {
     );
 
     expect(visibleCards).toEqual(['J of diamonds', 'Q of hearts', 'K of clubs']);
+  });
+
+  it('uses a full-size card chassis throughout a draw flight', () => {
+    Object.defineProperty(window, 'matchMedia', {
+      configurable: true,
+      value: () => ({ matches: true }),
+    });
+
+    act(() => {
+      root.render(
+        createElement(TableScreen, {
+          view: VIEW,
+          fx: [{ kind: Fx.DrawCard, payload: { card: 'C4', seat: 0, from: 'discard' }, at: 0 }],
+          fxKey: 1,
+        }),
+      );
+    });
+
+    const flightCard = container.querySelector<HTMLElement>(
+      '[data-flight-card] > [aria-label="4 of clubs"]',
+    );
+    expect(flightCard).not.toBeNull();
+    expect(flightCard?.className).not.toMatch(/cardCompact/);
   });
 });

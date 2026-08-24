@@ -111,7 +111,7 @@ describe('wildpile moves and flow', () => {
       fixture({ hands: [[card('skip')], [card('1')], [card('2')]] }).state,
       0,
       { card: card('skip') },
-      { rng: makeRng(1), fx },
+      { rng: makeRng(1), fx, event: { seq: 0 } },
     );
     expect(skipped?.turn).toBe(2);
     expect(fx.events.map((event) => event.kind)).toContain('wildpile.skip');
@@ -120,7 +120,7 @@ describe('wildpile moves and flow', () => {
       fixture({ hands: [[card('reverse')], [card('1')], [card('2')]] }).state,
       0,
       { card: card('reverse') },
-      { rng: makeRng(1), fx: createFx() },
+      { rng: makeRng(1), fx: createFx(), event: { seq: 0 } },
     );
     expect(reversed).toMatchObject({ direction: -1, turn: 2 });
 

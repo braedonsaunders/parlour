@@ -65,8 +65,14 @@ export function CampfireScene() {
             }}
           />
         </div>
-        <span className={s.cfShoot} style={{ top: '12%', left: '68%', '--dur': '13s', '--delay': '3s' } as CSSProperties} />
-        <span className={s.cfShoot} style={{ top: '6%', left: '34%', '--dur': '19s', '--delay': '9s' } as CSSProperties} />
+        <span
+          className={s.cfShoot}
+          style={{ top: '12%', left: '68%', '--dur': '13s', '--delay': '3s' } as CSSProperties}
+        />
+        <span
+          className={s.cfShoot}
+          style={{ top: '6%', left: '34%', '--dur': '19s', '--delay': '9s' } as CSSProperties}
+        />
       </div>
 
       <div data-parallax className={s.layer}>
@@ -90,7 +96,8 @@ export function CampfireScene() {
           className={s.fill}
           style={{
             top: '70%',
-            background: 'linear-gradient(90deg, rgba(4, 10, 9, 0.55) 0%, transparent 32%, transparent 68%, rgba(4, 10, 9, 0.55) 100%)',
+            background:
+              'linear-gradient(90deg, rgba(4, 10, 9, 0.55) 0%, transparent 32%, transparent 68%, rgba(4, 10, 9, 0.55) 100%)',
           }}
         />
         <StringLights />
@@ -121,12 +128,24 @@ function Mountains() {
           opacity="0.85"
         />
         <path d="M-40 320 L210 108 L470 320 Z" fill="#182741" />
-        <path d="M210 108 L266 156 L238 174 L210 158 L182 176 L156 156 Z" fill="#5f7ea6" opacity="0.7" />
+        <path
+          d="M210 108 L266 156 L238 174 L210 158 L182 176 L156 156 Z"
+          fill="#5f7ea6"
+          opacity="0.7"
+        />
         <path d="M340 320 L640 52 L950 320 Z" fill="#1b2c49" />
-        <path d="M640 52 L712 116 L678 138 L640 116 L600 140 L570 116 Z" fill="#6d8cb4" opacity="0.75" />
+        <path
+          d="M640 52 L712 116 L678 138 L640 116 L600 140 L570 116 Z"
+          fill="#6d8cb4"
+          opacity="0.75"
+        />
         <path d="M640 52 L640 116 L600 140 L570 116 Z" fill="#3d5578" opacity="0.4" />
         <path d="M840 320 L1120 96 L1400 320 Z" fill="#182741" />
-        <path d="M1120 96 L1178 148 L1148 166 L1120 148 L1090 168 L1064 148 Z" fill="#5f7ea6" opacity="0.7" />
+        <path
+          d="M1120 96 L1178 148 L1148 166 L1120 148 L1090 168 L1064 148 Z"
+          fill="#5f7ea6"
+          opacity="0.7"
+        />
         <path d="M1200 320 L1420 170 L1640 320 Z" fill="#141f36" />
       </svg>
       <div className={s.cfMist} style={{ bottom: '-4%' }} />
@@ -136,14 +155,29 @@ function Mountains() {
 
 function Lake() {
   return (
-    <div style={{ position: 'absolute', left: 0, right: 0, bottom: '22%', height: '13%', overflow: 'hidden' }}>
+    <div
+      style={{
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        bottom: '22%',
+        height: '13%',
+        overflow: 'hidden',
+      }}
+    >
       <div
         className={s.fill}
         style={{ background: 'linear-gradient(180deg, #0d2135 0%, #0f2a40 55%, #0c1f30 100%)' }}
       />
       <div
         className={s.cfGlint}
-        style={{ right: '15.5%', top: '0%', width: '5%', height: '100%', transformOrigin: '50% 0%' }}
+        style={{
+          right: '15.5%',
+          top: '0%',
+          width: '5%',
+          height: '100%',
+          transformOrigin: '50% 0%',
+        }}
       />
       {[0, 1, 2].map((i) => (
         <div
@@ -300,17 +334,34 @@ function Campfire() {
       <svg width="100%" viewBox="0 0 120 96" style={{ position: 'relative', overflow: 'visible' }}>
         <ellipse cx="60" cy="88" rx="46" ry="8" fill="#03080a" opacity="0.6" />
         <g className={s.flameOuter}>
-          <path d="M60 8 Q82 46 76 78 Q70 88 60 88 Q50 88 44 78 Q38 46 60 8" fill="#e29349" opacity="0.85" />
+          <path
+            d="M60 8 Q82 46 76 78 Q70 88 60 88 Q50 88 44 78 Q38 46 60 8"
+            fill="#e29349"
+            opacity="0.85"
+          />
         </g>
         <g className={s.flameMid}>
-          <path d="M60 24 Q76 50 71 80 Q66 88 60 88 Q54 88 49 80 Q44 50 60 24" fill="#d97a2b" opacity="0.95" />
+          <path
+            d="M60 24 Q76 50 71 80 Q66 88 60 88 Q54 88 49 80 Q44 50 60 24"
+            fill="#d97a2b"
+            opacity="0.95"
+          />
         </g>
         <g className={s.flameCore}>
-          <path d="M60 44 Q68 60 64 82 Q62 88 60 88 Q58 88 56 82 Q52 60 60 44" fill="#fdf6ec" opacity="0.92" />
+          <path
+            d="M60 44 Q68 60 64 82 Q62 88 60 88 Q58 88 56 82 Q52 60 60 44"
+            fill="#fdf6ec"
+            opacity="0.92"
+          />
         </g>
         <path d="M28 78 L88 88 L88 94 L28 84 Z" fill="#55341f" />
         <path d="M92 78 L32 88 L32 94 L92 84 Z" fill="#3b2417" />
-        <path d="M30 79 L50 82 M62 84 L84 88" stroke="#241609" strokeWidth="1.4" strokeLinecap="round" />
+        <path
+          d="M30 79 L50 82 M62 84 L84 88"
+          stroke="#241609"
+          strokeWidth="1.4"
+          strokeLinecap="round"
+        />
         <g fill="#3d4a52">
           {Array.from({ length: 9 }, (_, i) => {
             const angle = (i / 9) * Math.PI * 2;

@@ -17,8 +17,14 @@ export function CasinoScene() {
       <div data-parallax className={s.layer}>
         <Chandelier left="20%" size={20} dur="8s" delay="0s" />
         <Chandelier left="64%" size={24} dur="10s" delay="-4s" />
-        <div className={s.csCone} style={{ left: '16%', top: '22%', width: '24%', height: '52%' }} />
-        <div className={s.csCone} style={{ left: '60%', top: '26%', width: '28%', height: '50%' }} />
+        <div
+          className={s.csCone}
+          style={{ left: '16%', top: '22%', width: '24%', height: '52%' }}
+        />
+        <div
+          className={s.csCone}
+          style={{ left: '60%', top: '26%', width: '28%', height: '50%' }}
+        />
         <DustMotes count={8} seed={41} color="rgba(226, 194, 137, 0.7)" />
       </div>
 
@@ -44,7 +50,11 @@ function Wallpaper() {
         <pattern id="cs-damask" width="56" height="56" patternUnits="userSpaceOnUse">
           <path d="M28 6 L40 28 L28 50 L16 28 Z" fill="none" stroke="#e2c289" strokeWidth="1" />
           <circle cx="28" cy="28" r="3.5" fill="none" stroke="#e2c289" strokeWidth="0.8" />
-          <path d="M0 28 L8 28 M48 28 L56 28 M28 0 L28 4 M28 52 L28 56" stroke="#e2c289" strokeWidth="0.8" />
+          <path
+            d="M0 28 L8 28 M48 28 L56 28 M28 0 L28 4 M28 52 L28 56"
+            stroke="#e2c289"
+            strokeWidth="0.8"
+          />
         </pattern>
       </defs>
       <rect width="100%" height="100%" fill="url(#cs-damask)" />
@@ -77,12 +87,29 @@ function GoldTrim() {
         }}
       />
       <svg
-        style={{ position: 'absolute', left: 0, right: 0, top: 'calc(64% + 10px)', width: '100%', height: '5%', opacity: 0.5 }}
+        style={{
+          position: 'absolute',
+          left: 0,
+          right: 0,
+          top: 'calc(64% + 10px)',
+          width: '100%',
+          height: '5%',
+          opacity: 0.5,
+        }}
         preserveAspectRatio="none"
       >
         <defs>
           <pattern id="cs-wainscot" width="90" height="60" patternUnits="userSpaceOnUse">
-            <rect x="8" y="8" width="74" height="44" rx="5" fill="none" stroke="#5c3a20" strokeWidth="2" />
+            <rect
+              x="8"
+              y="8"
+              width="74"
+              height="44"
+              rx="5"
+              fill="none"
+              stroke="#5c3a20"
+              strokeWidth="2"
+            />
           </pattern>
         </defs>
         <rect width="100%" height="100%" fill="url(#cs-wainscot)" />
@@ -166,7 +193,15 @@ function Sconce({ left, delay }: { left: string; delay: string }) {
       <svg width="100%" viewBox="0 0 40 70" style={{ overflow: 'visible' }}>
         <path d="M20 42 Q6 40 8 26 Q14 34 20 32 Q26 34 32 26 Q34 40 20 42" fill="#a67833" />
         <rect x="17" y="42" width="6" height="14" rx="3" fill="#6d4a1c" />
-        <ellipse className={s.warmFlicker} cx="20" cy="22" rx="9" ry="12" fill="#f2b06a" opacity="0.8" />
+        <ellipse
+          className={s.warmFlicker}
+          cx="20"
+          cy="22"
+          rx="9"
+          ry="12"
+          fill="#f2b06a"
+          opacity="0.8"
+        />
         <ellipse cx="20" cy="26" rx="4" ry="6" fill="#fdf6ec" />
       </svg>
       <div
@@ -179,7 +214,8 @@ function Sconce({ left, delay }: { left: string; delay: string }) {
             width: '18vh',
             height: '22vh',
             transform: 'translateX(-50%)',
-            background: 'radial-gradient(50% 50% at 50% 50%, rgba(242, 176, 106, 0.2) 0%, transparent 70%)',
+            background:
+              'radial-gradient(50% 50% at 50% 50%, rgba(242, 176, 106, 0.2) 0%, transparent 70%)',
             '--delay': delay,
           } as CSSProperties
         }
@@ -188,16 +224,40 @@ function Sconce({ left, delay }: { left: string; delay: string }) {
   );
 }
 
-function Chandelier({ left, size, dur, delay }: { left: string; size: number; dur: string; delay: string }) {
+function Chandelier({
+  left,
+  size,
+  dur,
+  delay,
+}: {
+  left: string;
+  size: number;
+  dur: string;
+  delay: string;
+}) {
   return (
     <div
       className={s.csChandelier}
-      style={{ position: 'absolute', left, top: '4%', width: `${size}vh`, '--dur': dur, '--delay': delay } as CSSProperties}
+      style={
+        {
+          position: 'absolute',
+          left,
+          top: '4%',
+          width: `${size}vh`,
+          '--dur': dur,
+          '--delay': delay,
+        } as CSSProperties
+      }
     >
       <svg width="100%" viewBox="0 0 120 110" style={{ overflow: 'visible' }}>
         <line x1="60" y1="0" x2="60" y2="26" stroke="#a67833" strokeWidth="2.5" />
-        <path d="M60 26 Q24 34 20 58 M60 26 Q96 34 100 58 M60 26 Q42 40 40 62 M60 26 Q78 40 80 62 M60 26 L60 66"
-          fill="none" stroke="#c99b52" strokeWidth="3" strokeLinecap="round" />
+        <path
+          d="M60 26 Q24 34 20 58 M60 26 Q96 34 100 58 M60 26 Q42 40 40 62 M60 26 Q78 40 80 62 M60 26 L60 66"
+          fill="none"
+          stroke="#c99b52"
+          strokeWidth="3"
+          strokeLinecap="round"
+        />
         {[
           { x: 20, y: 58 },
           { x: 40, y: 62 },
@@ -219,7 +279,14 @@ function Chandelier({ left, size, dur, delay }: { left: string; size: number; du
             <path d={`M${c.x} ${c.y} q-3 7 0 12 q3 -5 0 -12`} fill="#d7edf2" opacity="0.65" />
           </g>
         ))}
-        <ellipse className={s.warmFlicker} cx="60" cy="52" rx="58" ry="30" fill="rgba(242, 176, 106, 0.13)" />
+        <ellipse
+          className={s.warmFlicker}
+          cx="60"
+          cy="52"
+          rx="58"
+          ry="30"
+          fill="rgba(242, 176, 106, 0.13)"
+        />
       </svg>
     </div>
   );
@@ -232,8 +299,22 @@ function SlotMachine() {
     <div style={{ position: 'absolute', left: '7%', bottom: '26%', width: '20vh' }}>
       <svg width="100%" viewBox="0 0 120 170" style={{ overflow: 'visible' }}>
         <ellipse cx="60" cy="164" rx="54" ry="6" fill="#03060a" opacity="0.6" />
-        <rect x="12" y="30" width="96" height="132" rx="10" fill="#4a1a26" stroke="#a67833" strokeWidth="2.5" />
-        <path d="M12 60 Q60 8 108 60 V44 Q60 -6 12 44 Z" fill="#5c2230" stroke="#a67833" strokeWidth="2" />
+        <rect
+          x="12"
+          y="30"
+          width="96"
+          height="132"
+          rx="10"
+          fill="#4a1a26"
+          stroke="#a67833"
+          strokeWidth="2.5"
+        />
+        <path
+          d="M12 60 Q60 8 108 60 V44 Q60 -6 12 44 Z"
+          fill="#5c2230"
+          stroke="#a67833"
+          strokeWidth="2"
+        />
         {Array.from({ length: 7 }, (_, i) => {
           const t = i / 6;
           const x = 18 + t * 84;
@@ -250,7 +331,16 @@ function SlotMachine() {
             />
           );
         })}
-        <rect x="22" y="66" width="76" height="34" rx="5" fill="#120609" stroke="#e2c289" strokeWidth="1.5" />
+        <rect
+          x="22"
+          y="66"
+          width="76"
+          height="34"
+          rx="5"
+          fill="#120609"
+          stroke="#e2c289"
+          strokeWidth="1.5"
+        />
         {[0, 1, 2].map((r) => (
           <g key={r}>
             <clipPath id={`cs-reel-${r}`}>
@@ -279,13 +369,47 @@ function SlotMachine() {
             </g>
           </g>
         ))}
-        <rect x="34" y="108" width="52" height="12" rx="6" fill="#120609" stroke="#a67833" strokeWidth="1.2" />
-        <text x="60" y="117.5" textAnchor="middle" fontSize="9" fontWeight="800" fill="#e2c289" letterSpacing="1.5">
+        <rect
+          x="34"
+          y="108"
+          width="52"
+          height="12"
+          rx="6"
+          fill="#120609"
+          stroke="#a67833"
+          strokeWidth="1.2"
+        />
+        <text
+          x="60"
+          y="117.5"
+          textAnchor="middle"
+          fontSize="9"
+          fontWeight="800"
+          fill="#e2c289"
+          letterSpacing="1.5"
+        >
           777
         </text>
-        <rect x="26" y="128" width="68" height="20" rx="4" fill="#33121c" stroke="#6d4a1c" strokeWidth="1.2" />
+        <rect
+          x="26"
+          y="128"
+          width="68"
+          height="20"
+          rx="4"
+          fill="#33121c"
+          stroke="#6d4a1c"
+          strokeWidth="1.2"
+        />
         <ellipse cx="60" cy="138" rx="20" ry="5" fill="#0d0508" />
-        <line x1="108" y1="72" x2="118" y2="52" stroke="#a67833" strokeWidth="3.5" strokeLinecap="round" />
+        <line
+          x1="108"
+          y1="72"
+          x2="118"
+          y2="52"
+          stroke="#a67833"
+          strokeWidth="3.5"
+          strokeLinecap="round"
+        />
         <circle cx="118" cy="50" r="5" fill="#bd2f3a" />
       </svg>
     </div>
@@ -307,7 +431,15 @@ function wedgePath(start: number, end: number): string {
 
 function Roulette() {
   return (
-    <div style={{ position: 'absolute', right: '8%', bottom: '27%', width: '24vh', perspective: '60vh' }}>
+    <div
+      style={{
+        position: 'absolute',
+        right: '8%',
+        bottom: '27%',
+        width: '24vh',
+        perspective: '60vh',
+      }}
+    >
       <div style={{ transform: 'rotateX(52deg)', transformStyle: 'preserve-3d' }}>
         <svg width="100%" viewBox="0 0 120 120" style={{ overflow: 'visible' }}>
           <circle cx="60" cy="60" r="56" fill="#55341f" stroke="#6d4a1c" strokeWidth="3" />
@@ -335,7 +467,8 @@ function Roulette() {
           height: '5vh',
           transform: 'translateX(-50%)',
           borderRadius: '50%',
-          background: 'radial-gradient(50% 50% at 50% 50%, rgba(3, 6, 10, 0.6) 0%, transparent 75%)',
+          background:
+            'radial-gradient(50% 50% at 50% 50%, rgba(3, 6, 10, 0.6) 0%, transparent 75%)',
         }}
       />
     </div>
@@ -376,8 +509,7 @@ function CardTable() {
           inset: '9% 4% 0 4%',
           borderRadius: '50% 50% 0 0 / 100% 100% 0 0',
           overflow: 'hidden',
-          background:
-            'radial-gradient(70% 90% at 50% 30%, #2c6e4f 0%, #1d5c46 46%, #14453a 100%)',
+          background: 'radial-gradient(70% 90% at 50% 30%, #2c6e4f 0%, #1d5c46 46%, #14453a 100%)',
           boxShadow: 'inset 0 10px 34px rgba(3, 10, 8, 0.6)',
         }}
       >
@@ -392,12 +524,24 @@ function CardTable() {
         <div className={s.csSheen} />
       </div>
       {CHIP_STACKS.map((stack, i) => (
-        <div key={i} style={{ position: 'absolute', left: stack.left, bottom: stack.bottom, width: '4.6vh' }}>
+        <div
+          key={i}
+          style={{ position: 'absolute', left: stack.left, bottom: stack.bottom, width: '4.6vh' }}
+        >
           <svg width="100%" viewBox="0 0 40 46" style={{ overflow: 'visible' }}>
             {Array.from({ length: stack.count }, (_, c) => (
               <g key={c} transform={`translate(0 ${38 - c * 6})`}>
                 <ellipse cx="20" cy="4" rx="17" ry="6" fill={stack.color} />
-                <ellipse cx="20" cy="2.5" rx="17" ry="6" fill={stack.color} stroke="#fdf6ec" strokeWidth="1.4" strokeDasharray="5 6" />
+                <ellipse
+                  cx="20"
+                  cy="2.5"
+                  rx="17"
+                  ry="6"
+                  fill={stack.color}
+                  stroke="#fdf6ec"
+                  strokeWidth="1.4"
+                  strokeDasharray="5 6"
+                />
               </g>
             ))}
           </svg>
@@ -414,7 +558,16 @@ function FannedCards({ left, bottom }: { left: string; bottom: string }) {
       <svg width="100%" viewBox="0 0 110 70" style={{ overflow: 'visible' }}>
         {[-16, 0, 16].map((angle, i) => (
           <g key={i} transform={`rotate(${angle} 55 92)`}>
-            <rect x="40" y="6" width="30" height="42" rx="4" fill="#fdf6ec" stroke="#d9a856" strokeWidth="1.4" />
+            <rect
+              x="40"
+              y="6"
+              width="30"
+              height="42"
+              rx="4"
+              fill="#fdf6ec"
+              stroke="#d9a856"
+              strokeWidth="1.4"
+            />
             <text
               x="55"
               y="33"

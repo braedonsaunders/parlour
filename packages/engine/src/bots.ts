@@ -1,14 +1,15 @@
 import { makeRng } from './rng';
 import { createSession, sessionApply } from './runtime';
-import type {
-  BotPolicy,
-  GameDef,
-  GameSession,
-  LegalMove,
-  MatchResult,
-  Rng,
-  RuleValues,
-  SeatId,
+import {
+  actingSeats,
+  type BotPolicy,
+  type GameDef,
+  type GameSession,
+  type LegalMove,
+  type MatchResult,
+  type Rng,
+  type RuleValues,
+  type SeatId,
 } from './types';
 
 // ---------------------------------------------------------------------------
@@ -85,17 +86,29 @@ export function runBotGame<S, C extends RuleValues>(
       );
     }
 
-    const actor = session.phase.actor;
-    if (actor === null)
+    const acting = actingSeats(session.phase);
+    if (acting.length === 0)
       throw new Error(`runBotGame: stalled flow — no acting seat (seed ${opts.seed})`);
+
+    // multi-actor phases: act for the first listed seat that has a legal move
+    let actor: SeatId | null = null;
+    let legal: readonly LegalMove[] = [];
+    for (const seat of acting) {
+      const forSeat = def.flow.legalMovesFor
+        ? def.flow.legalMovesFor(session.state, session.phase, seat)
+        : def.flow.legalMoves(session.state, session.phase);
+      if (forSeat.length > 0) {
+        actor = seat;
+        legal = forSeat;
+        break;
+      }
+    }
+    if (actor === null) {
+      throw new Error(`runBotGame: no acting seat has a legal move (seed ${opts.seed})`);
+    }
 
     const policy = opts.policies[actor];
     if (!policy) throw new Error(`runBotGame: no bot policy seated at ${actor}`);
-
-    const legal = def.flow.legalMoves(session.state, session.phase);
-    if (legal.length === 0) {
-      throw new Error(`runBotGame: seat ${actor} has no legal moves (seed ${opts.seed})`);
-    }
 
     const view = def.playerView(session.state, actor);
     let choice = policy.chooseMove(view, actor, legal, rng, { thinkMs: () => 0 });

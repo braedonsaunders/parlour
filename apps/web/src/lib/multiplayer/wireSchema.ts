@@ -6,6 +6,7 @@ import type {
   MigrationSnapshot,
   PlayerAction,
   PresenceSnapshot,
+  PlayerProfile,
   ReplaySnapshot,
   SeatPresence,
 } from './types';
@@ -28,10 +29,10 @@ const MAX_TIMESTAMP = 8_640_000_000_000_000;
 const MAX_FX_OFFSET = 60_000;
 const MAX_CONFIG_NUMBER = 1_000_000;
 
-export type PeerDescriptor = { peerId: string; profileId: string };
+export type PeerDescriptor = { peerId: string; profile: PlayerProfile };
 
 export type WireMessage =
-  | { type: 'hello'; profileId: string }
+  | { type: 'hello'; profile: PlayerProfile }
   | {
       type: 'welcome';
       hostId: string;
@@ -116,9 +117,19 @@ function isJsonValue(value: unknown): boolean {
 function isPeerDescriptor(value: unknown): value is PeerDescriptor {
   return (
     isRecord(value) &&
-    hasOnlyKeys(value, ['peerId', 'profileId']) &&
+    hasOnlyKeys(value, ['peerId', 'profile']) &&
     isBoundedString(value.peerId) &&
-    isBoundedString(value.profileId)
+    isPlayerProfile(value.profile)
+  );
+}
+
+function isPlayerProfile(value: unknown): value is PlayerProfile {
+  return (
+    isRecord(value) &&
+    hasOnlyKeys(value, ['profileId', 'name', 'avatarId']) &&
+    isBoundedString(value.profileId) &&
+    isBoundedString(value.name, 32) &&
+    isBoundedString(value.avatarId, MAX_LABEL_LENGTH)
   );
 }
 
@@ -183,13 +194,19 @@ function isPlayerAction(value: unknown): value is PlayerAction {
 function isAppliedEvent(value: unknown): value is AppliedEvent {
   return (
     isRecord(value) &&
-    hasOnlyKeys(value, ['seq', 'seat', 'move'], ['payload', 'ts', 'automatic', 'hash']) &&
+    hasOnlyKeys(
+      value,
+      ['seq', 'seat', 'move'],
+      ['payload', 'ts', 'atMs', 'automatic', 'injected', 'hash'],
+    ) &&
     isBoundedInteger(value.seq, MAX_SEQUENCE) &&
     (value.seat === null || isSeat(value.seat)) &&
     isBoundedString(value.move, MAX_LABEL_LENGTH) &&
     (!Object.hasOwn(value, 'payload') || isJsonValue(value.payload)) &&
     (!Object.hasOwn(value, 'ts') || isBoundedInteger(value.ts, MAX_TIMESTAMP)) &&
+    (!Object.hasOwn(value, 'atMs') || isBoundedInteger(value.atMs, MAX_TIMESTAMP)) &&
     (!Object.hasOwn(value, 'automatic') || typeof value.automatic === 'boolean') &&
+    (!Object.hasOwn(value, 'injected') || typeof value.injected === 'boolean') &&
     (!Object.hasOwn(value, 'hash') || isBoundedString(value.hash, MAX_HASH_LENGTH))
   );
 }
@@ -299,7 +316,7 @@ function isWireMessage(value: unknown): value is WireMessage {
   if (!isRecord(value) || typeof value.type !== 'string') return false;
   switch (value.type) {
     case 'hello':
-      return hasOnlyKeys(value, ['type', 'profileId']) && isBoundedString(value.profileId);
+      return hasOnlyKeys(value, ['type', 'profile']) && isPlayerProfile(value.profile);
     case 'welcome': {
       if (
         !hasOnlyKeys(value, ['type', 'hostId', 'seat', 'peers', 'snapshot']) ||

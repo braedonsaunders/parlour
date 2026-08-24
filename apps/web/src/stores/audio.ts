@@ -9,7 +9,15 @@ import {
   type AudioManager,
   type AudioSettings,
 } from '@/lib/audio/AudioManager';
+import {
+  getMusicController,
+  resetMusicControllerForTests,
+  type MusicController,
+  type MusicState,
+} from '@/lib/audio/MusicController';
+import { BASE_PACK_ID } from '@/lib/audio/music';
 import { SOUND_MANIFEST } from '@/lib/audio/manifest';
+import { useSceneStore } from '@/stores/scene';
 import { useProfileStore } from '@/stores/profile';
 
 type AudioStore = {
@@ -28,7 +36,28 @@ export const useAudioStore = create<AudioStore>(() => ({
   toggleMuted: (channel) => getAudioManager().toggleMuted(channel),
 }));
 
+type MusicStore = MusicState & {
+  toggle: () => void;
+  next: () => void;
+  previous: () => void;
+  selectTrack: (trackId: string) => void;
+  toggleShuffle: () => void;
+};
+
+export const useMusicStore = create<MusicStore>(() => ({
+  status: 'idle',
+  trackId: null,
+  shuffle: false,
+  packId: BASE_PACK_ID,
+  toggle: () => getMusicController().toggle(),
+  next: () => getMusicController().next(),
+  previous: () => getMusicController().previous(),
+  selectTrack: (trackId) => getMusicController().play(trackId),
+  toggleShuffle: () => getMusicController().toggleShuffle(),
+}));
+
 let bound = false;
+let musicBound = false;
 
 function bindManager(manager: AudioManager): void {
   if (bound) return;
@@ -60,6 +89,15 @@ function bindManager(manager: AudioManager): void {
   });
 }
 
+function bindMusic(): void {
+  if (musicBound) return;
+  musicBound = true;
+
+  const controller = getMusicController();
+  useMusicStore.setState(controller.getState());
+  controller.subscribe((state) => useMusicStore.setState(state));
+}
+
 export function useAudioManager(): AudioManager {
   const manager = getAudioManager();
 
@@ -70,4 +108,27 @@ export function useAudioManager(): AudioManager {
   }, [manager]);
 
   return manager;
+}
+
+/** Binds the shared MusicController (audio settings + active scene) and returns it. */
+export function useMusicController(): MusicController {
+  const manager = useAudioManager();
+
+  useEffect(() => {
+    bindMusic();
+    const controller = getMusicController(manager);
+    controller.setScene(useSceneStore.getState().sceneId);
+    const unsubscribeScene = useSceneStore.subscribe((scene, prev) => {
+      if (scene.sceneId !== prev.sceneId) controller.setScene(scene.sceneId);
+    });
+    return unsubscribeScene;
+  }, [manager]);
+
+  return getMusicController(manager);
+}
+
+export function resetMusicBindingsForTests(): void {
+  bound = false;
+  musicBound = false;
+  resetMusicControllerForTests();
 }

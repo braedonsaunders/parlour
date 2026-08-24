@@ -382,7 +382,12 @@
   left: 0;
   right: 0;
   height: 9%;
-  background: linear-gradient(180deg, transparent 0%, rgba(127, 192, 209, 0.1) 55%, transparent 100%);
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(127, 192, 209, 0.1) 55%,
+    transparent 100%
+  );
   filter: blur(8px);
 }
 
@@ -633,7 +638,12 @@
   top: 0;
   bottom: 0;
   width: 34%;
-  background: linear-gradient(100deg, transparent 0%, rgba(255, 226, 186, 0.14) 50%, transparent 100%);
+  background: linear-gradient(
+    100deg,
+    transparent 0%,
+    rgba(255, 226, 186, 0.14) 50%,
+    transparent 100%
+  );
   will-change: transform;
   animation: sheenSweep 9s ease-in-out infinite;
 }

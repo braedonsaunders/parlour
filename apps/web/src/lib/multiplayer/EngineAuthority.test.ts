@@ -32,6 +32,13 @@ const game: GameDef<TestState, TestConfig> = {
       validate: () => true,
       apply: (state) => ({ ...state, score: state.score + 1 }),
     },
+    clock: {
+      validate: () => true,
+      apply: (state, _seat, _payload, ctx) => ({
+        ...state,
+        score: state.score + (ctx.event.atMs ?? 0),
+      }),
+    },
   },
   flow: {
     start: () => ({ phase: 'play', actor: 0, round: 1 }),
@@ -39,6 +46,8 @@ const game: GameDef<TestState, TestConfig> = {
     advance: (_state, _event, seats) => ({
       phase: { phase: 'play', actor: seats > 1 ? 1 : 0, round: 1 },
     }),
+    canInject: (_state, _phase, move) =>
+      move === 'clock' ? true : { code: 'bad-injection', message: 'unsupported injection' },
   },
   playerView: (state) => state,
   end: () => null,
@@ -73,6 +82,31 @@ function snapshot(config: TestConfig, seats = 3): ReplaySnapshot {
 }
 
 describe('EngineAuthority snapshots', () => {
+  it('stamps and broadcasts replay-stable authority time for system injection', () => {
+    let now = 1_000;
+    const config = configSchema.defaults();
+    const injected = new EngineAuthority({
+      def: game,
+      session: createSession(game, { seed: 5, config, seats: 2 }),
+      settings: settings(config),
+      now: () => now,
+    });
+    now = 1_250;
+
+    const packet = injected.inject('clock-1', 'clock');
+
+    expect(packet.events[0]).toMatchObject({
+      move: 'clock',
+      seat: null,
+      injected: true,
+      atMs: 250,
+      ts: 1_250,
+    });
+    expect(injected.getSession().state.score).toBe(251);
+    const replayed = replaySession(game, 5, injected.getSession().log, { config, seats: 2 });
+    expect(replayed.state).toEqual(injected.getSession().state);
+  });
+
   it('adopts a non-default host config on join', () => {
     const hostConfig: TestConfig = { openingScore: 7, doubleMoves: true };
     const guest = authority();
