@@ -782,7 +782,7 @@ export class MultiplayerRoomSession {
 
   private prepare(settings: RoomSettings, signaling?: NostrSignaling): void {
     if (this.transport) throw new Error('this session already has an active room');
-    const seed = this.dependencies.seed ?? randomSeed();
+    const seed = normalizeSeed(this.dependencies.seed ?? randomSeed());
     this.seed = seed;
     const runtime = createRoomRuntime(settings, seed, (seat, bot) => this.acceptSeatBot(seat, bot));
     this.authority = runtime.authority;
@@ -979,10 +979,29 @@ export function multiplayerProfile(name: string, avatarId: string): MultiplayerP
   return { name: name || 'Player', avatarId, profileId };
 }
 
+/**
+ * A room seed is unsigned, and this is the only place that is guaranteed.
+ *
+ * `| 0` reads a `Uint32Array` slot back as a *signed* int32, so half of every
+ * room's seeds were negative — and a negative seed is not a wire value.
+ * `isReplaySnapshot` bounds it to 0…0xffffffff, so the `welcome` carrying it
+ * was refused as a malformed packet and the guest never adopted the host's
+ * deal. Presence carries no seed, so the guest still appeared in the host's
+ * lobby, took a seat, and played a deal of its own: one table, two games.
+ *
+ * It survived a full test suite because every test injects its own positive
+ * seed, so nothing ever ran the generator. The normalisation is applied to the
+ * injected seed too, so the invariant holds no matter where the number came
+ * from.
+ */
+export function normalizeSeed(seed: number): number {
+  return seed >>> 0;
+}
+
 function randomSeed(): number {
   const bytes = new Uint32Array(1);
   crypto.getRandomValues(bytes);
-  return bytes[0]! | 0;
+  return normalizeSeed(bytes[0]!);
 }
 
 /**

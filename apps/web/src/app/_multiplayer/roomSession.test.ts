@@ -283,6 +283,43 @@ describe('multiplayer route composition', () => {
     );
   });
 
+  // Regression: room seeds came off `Uint32Array` through `| 0`, so half of
+  // them were negative — and the wire bounds a snapshot seed to 0…0xffffffff.
+  // The welcome carrying one was refused as malformed, the guest never adopted
+  // the host's deal, and because presence carries no seed it still took a seat
+  // and played a deal of its own. Every other test injects a positive seed,
+  // which is exactly why nothing caught it.
+  it('deals a room whose seed lands in the negative half of int32', async () => {
+    const broker = new MockSignalingBroker();
+    const rtc = new MockRtcNetwork();
+    const host = new MultiplayerRoomSession(
+      { name: 'Host', avatarId: 'ember', profileId: 'seed-host' },
+      {
+        signaling: broker.signaling('seed-host-peer'),
+        peerConnection: rtc.factory('seed-host'),
+        seed: -1465448351,
+      },
+    );
+    const guest = new MultiplayerRoomSession(
+      { name: 'Guest', avatarId: 'cobalt', profileId: 'seed-guest' },
+      { signaling: broker.signaling('seed-guest-peer'), peerConnection: rtc.factory('seed-guest'), seed: 7 },
+    );
+    sessions.push(host, guest);
+
+    const room = await host.create({ seats: 2 });
+    await guest.join(room.code);
+    await eventually(() => expect(guest.getSnapshot().localSeat).toBe(1));
+
+    expect(guest.getSnapshot().error).toBeNull();
+    // The guest is playing the host's deal, not one of its own.
+    await eventually(() =>
+      expect(guest.getSnapshot().session?.seed).toBe(host.getSnapshot().session?.seed),
+    );
+    expect(stateHash(guest.getSnapshot().session?.state)).toBe(
+      stateHash(host.getSnapshot().session?.state),
+    );
+  });
+
   // Regression: a seated guest used to be pushed straight onto the table while
   // the host was still in the lobby, so it played the placeholder deal the host
   // was about to replace — one screen dealing, the other still waiting, and the
