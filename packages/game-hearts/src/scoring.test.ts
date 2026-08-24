@@ -1,11 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { QUEEN_SPADES } from './cards';
-import {
-  adjustedHandPoints,
-  handResult,
-  moonShooterOf,
-  rawHandPoints,
-} from './scoring';
+import { adjustedHandPoints, handResult, moonShooterOf, rawHandPoints } from './scoring';
 
 const rules = (overrides: Partial<Parameters<typeof adjustedHandPoints>[1]> = {}) => ({
   jackDiamonds: false,
@@ -26,7 +21,6 @@ describe('raw points', () => {
 
 describe('shooting the moon', () => {
   const thirteenHearts = Array.from({ length: 13 }, (_, i) => `H${i + 1}`);
-  const moonTaken = [thirteenHearts, [], [], []];
 
   it('detects only a complete thirteen-hearts-plus-queen capture', () => {
     expect(moonShooterOf([thirteenHearts, [], [], []])).toBeNull();

@@ -1,13 +1,6 @@
 'use client';
 
-import {
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type CSSProperties,
-  type RefObject,
-} from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type RefObject } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import type { FxEvent, MatchResult } from '@parlour/engine';
 import { getAvatar } from '@/lib/avatars';
@@ -52,7 +45,23 @@ export function HeartsTableScreen(props: HeartsTableScreenProps) {
   const { view, error } = props;
   const rootRef = useRef<HTMLElement>(null);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [selectedPass, setSelectedPass] = useState<readonly string[]>([]);
+  // Pass picks are keyed to the fx round: a new deal/wall resets them without
+  // an effect (derived state keeps renders cascade-free).
+  const [passState, setPassState] = useState<{ key: string; picks: readonly string[] }>({
+    key: '',
+    picks: [],
+  });
+  const roundKey = String(props.fxKey);
+  const selectedPass = passState.key === roundKey ? passState.picks : [];
+  const togglePass = (card: string) =>
+    setPassState({
+      key: roundKey,
+      picks: selectedPass.includes(card)
+        ? selectedPass.filter((c) => c !== card)
+        : selectedPass.length >= PASS_SIZE
+          ? selectedPass
+          : [...selectedPass, card],
+    });
   const deal = useDealPresentation(props.fx, props.fxKey);
   useTableAudio(props.fx, props.fxKey, HEARTS_SFX_PACK.id);
 
@@ -61,10 +70,6 @@ export function HeartsTableScreen(props: HeartsTableScreenProps) {
     running: Boolean(view) && view?.activeSeat !== null,
   });
   useMusicMood(tense ? 'tense' : null);
-
-  useEffect(() => {
-    setSelectedPass([]);
-  }, [props.fxKey]);
 
   useEffect(() => {
     const gameWindow = window as Window & { render_game_to_text?: () => string };
@@ -160,21 +165,22 @@ export function HeartsTableScreen(props: HeartsTableScreenProps) {
           view={view}
           busy={localBusy}
           selectedPass={selectedPass}
-          onTogglePass={(card) =>
-            setSelectedPass((current) =>
-              current.includes(card)
-                ? current.filter((c) => c !== card)
-                : current.length >= PASS_SIZE
-                  ? current
-                  : [...current, card],
-            )
-          }
+          onTogglePass={togglePass}
           onPlayCard={props.onPlayCard}
           deal={deal}
         />
-        <HeartsFxLayer fx={props.fx} fxKey={props.fxKey} localSeat={view.localSeat} rootRef={rootRef} />
+        <HeartsFxLayer
+          fx={props.fx}
+          fxKey={props.fxKey}
+          localSeat={view.localSeat}
+          rootRef={rootRef}
+        />
         {view.decision === 'pass' && !localBusy && (
-          <div className={heartsStyles.passBanner} role="group" aria-label="Choose three cards to pass">
+          <div
+            className={heartsStyles.passBanner}
+            role="group"
+            aria-label="Choose three cards to pass"
+          >
             <div className={heartsStyles.passCount} aria-hidden="true">
               {[0, 1, 2].map((index) => (
                 <span
@@ -214,11 +220,7 @@ export function HeartsTableScreen(props: HeartsTableScreenProps) {
       </div>
 
       {props.handEnd && (
-        <HandEndOverlay
-          info={props.handEnd}
-          players={view.players}
-          onNextHand={props.onNextHand}
-        />
+        <HandEndOverlay info={props.handEnd} players={view.players} onNextHand={props.onNextHand} />
       )}
 
       <TableMenu
@@ -306,9 +308,7 @@ function TableBadges({ view }: { view: HeartsTableView }) {
           {directionArrow[view.passDirection] ?? '·'} {view.passDirection}
         </span>
       )}
-      {view.heartsBroken && (
-        <span className={heartsStyles.brokenChip}>hearts broken</span>
-      )}
+      {view.heartsBroken && <span className={heartsStyles.brokenChip}>hearts broken</span>}
     </div>
   );
 }
@@ -362,8 +362,7 @@ function LocalHand({
     >
       <AnimatePresence initial={false} mode="popLayout">
         {visibleHand.map((card, index) => {
-          const playable =
-            passing || (canPlayCards && view.playableCards.includes(card));
+          const playable = passing || (canPlayCards && view.playableCards.includes(card));
           const picked = selectedPass.includes(card);
           return (
             <HandRailCard
@@ -486,7 +485,12 @@ export function HandEndOverlay({
 }) {
   const ordered = [...info.result.rankings].sort((a, b) => a.rank - b.rank || a.seat - b.seat);
   return (
-    <div className={heartsStyles.handEnd} role="dialog" aria-label="Hand scored" data-testid="hand-end">
+    <div
+      className={heartsStyles.handEnd}
+      role="dialog"
+      aria-label="Hand scored"
+      data-testid="hand-end"
+    >
       <div className={`${heartsStyles.handEndPanel} panel-soft`}>
         <strong className="font-display text-lg font-extrabold text-hearth-50">
           {info.matchOver ? 'Match over' : 'Hand scored'}

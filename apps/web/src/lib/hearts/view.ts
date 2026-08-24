@@ -43,11 +43,6 @@ export interface HeartsTableView {
   handPoints: readonly number[];
 }
 
-function payloadCards(move: LegalMove): readonly string[] | null {
-  const cards = (move.payload as { cards?: unknown } | undefined)?.cards;
-  return Array.isArray(cards) && cards.every((c) => typeof c === 'string') ? (cards as string[]) : null;
-}
-
 /**
  * Pure match-session → render model. `legal` must be the moves offered to the
  * local seat right now; empty while bots act.

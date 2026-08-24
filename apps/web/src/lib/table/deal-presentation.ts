@@ -83,17 +83,19 @@ export function useDealPresentation(
   const [landedCueIds, setLandedCueIds] = useState<ReadonlySet<string>>(() => new Set());
 
   useLayoutEffect(() => {
+    // State changes ride a microtask so the effect body itself never sets
+    // state synchronously (react-hooks/set-state-in-effect).
     if (!plan) {
-      setLandedCueIds(new Set());
+      queueMicrotask(() => setLandedCueIds(new Set()));
       return;
     }
     const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
     if (reduced) {
-      setLandedCueIds(new Set(plan.cues.map(({ id }) => id)));
+      queueMicrotask(() => setLandedCueIds(new Set(plan.cues.map(({ id }) => id))));
       return;
     }
 
-    setLandedCueIds(new Set());
+    queueMicrotask(() => setLandedCueIds(new Set()));
     const timers = plan.cues.map((cue) =>
       window.setTimeout(() => {
         setLandedCueIds((current) => {

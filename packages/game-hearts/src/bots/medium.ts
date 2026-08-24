@@ -1,4 +1,4 @@
-import type { BotPolicy, LegalMove, Rng } from '@parlour/engine';
+import type { BotPolicy, LegalMove } from '@parlour/engine';
 import { choosePassCards, legalPlayCards, pickPlay } from './shared';
 import type { HeartsState } from '../state';
 

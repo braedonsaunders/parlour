@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { Fx } from '@parlour/engine';
 import { QUEEN_SPADES, TWO_CLUBS, isHeart } from './cards';
 import { heartsConfigSchema, type HeartsRules } from './config';
-import { GAME_ID, heartsGame, phaseFor } from './game';
+import { GAME_ID, phaseFor } from './game';
 import { driveHand, openSession, step } from './test-util';
 
 describe('setup', () => {
@@ -62,7 +62,7 @@ describe('trick one', () => {
   });
 
   it('rejects off-turn plays', () => {
-    let session = pastPass();
+    const session = pastPass();
     const other = (session.state.turn + 1) % 4;
     const card = session.state.hands[other]![0]!;
     expect(step(session, other, 'playCard', { card }).rejected).toBe('not-your-turn');
@@ -110,7 +110,8 @@ describe('hearts breaking', () => {
     for (let index = 0; index < plays.length; index += 4) {
       const lead = plays[index]! as { card: string };
       if (index > 0 && isHeart(lead.card)) expect(broken).toBe(true);
-      if (plays.slice(index, index + 4).some((play: { card: string }) => isHeart(play.card))) broken = true;
+      if (plays.slice(index, index + 4).some((play: { card: string }) => isHeart(play.card)))
+        broken = true;
     }
     expect(finished.state.heartsBroken).toBe(true);
   });
@@ -136,9 +137,7 @@ describe('full hand flow', () => {
 
   it('keeps every captured point accounted for', () => {
     const finished = driveHand(openSession({ seed: 12 }));
-    const takenHearts = finished.state.taken
-      .flat()
-      .filter(isHeart).length;
+    const takenHearts = finished.state.taken.flat().filter(isHeart).length;
     expect(takenHearts).toBe(13);
     expect(finished.state.taken.flat()).toContain(QUEEN_SPADES);
   });

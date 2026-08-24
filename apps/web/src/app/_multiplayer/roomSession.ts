@@ -715,6 +715,14 @@ function resolveRoomSettings(settings: RoomSettings): RoomSettings {
       security,
     };
   }
+  if (settings.gameId === 'hearts') {
+    return {
+      gameId: 'hearts',
+      seats: settings.seats,
+      config: heartsConfigSchema.resolve(settings.config as Partial<HeartsRules>),
+      security,
+    };
+  }
   throw new Error(`unsupported room game: ${settings.gameId}`);
 }
 
@@ -731,6 +739,17 @@ function createRoomRuntime(
   const veiled = settings.security === 'veil' && deckOrder !== undefined;
   const veil = veiled ? { veiled: true, deckOrder } : {};
   const runtimeSettings: RoomSettings = veiled ? settings : { ...settings, security: 'open' };
+  if (settings.gameId === 'hearts') {
+    const config = settings.config as HeartsRules;
+    const session = createSession(heartsGame, { seed, config, seats: settings.seats, ...veil });
+    const authority = new EngineAuthority({
+      def: heartsGame,
+      session,
+      settings: runtimeSettings,
+      onSeatBot,
+    });
+    return { session, authority };
+  }
   if (settings.gameId === 'wildpile') {
     const config = settings.config as WildpileRules;
     const session = createSession(wildpileGame, { seed, config, seats: settings.seats, ...veil });

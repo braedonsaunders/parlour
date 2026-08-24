@@ -1,5 +1,5 @@
 import type { CardId, CardFace, DeckDef } from '@parlour/engine';
-import { faceRules, type TrickRules } from '@parlour/tricks';
+import type { TrickRules } from '@parlour/tricks';
 
 /**
  * Std-deck facts for Hearts. Every lookup tolerates Veil handles by returning

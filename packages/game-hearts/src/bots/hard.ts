@@ -1,7 +1,6 @@
-import type { BotPolicy, LegalMove, Rng, SeatId } from '@parlour/engine';
+import type { BotPolicy, LegalMove, SeatId } from '@parlour/engine';
 import { QUEEN_SPADES, suitOfCard } from '../cards';
-import { queenStillOut, spadesSeen } from './evaluate';
-import { choosePassCards, legalPlayCards, lowestOfSuit, pickPlay, rankOf } from './shared';
+import { choosePassCards, legalPlayCards, pickPlay, rankOf } from './shared';
 import type { HeartsState } from '../state';
 
 /**

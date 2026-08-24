@@ -2,9 +2,7 @@ import {
   createSession,
   sessionApply,
   type AppliedEvent,
-  type GameDef,
   type GameSession,
-  type RuleValues,
   type SeatId,
 } from '@parlour/engine';
 import { heartsConfigSchema, type HeartsRules } from './config';
@@ -95,9 +93,7 @@ export function driveHand(
 }
 
 function legalPlayCardsFor(session: HeartsSession, seat: SeatId): string[] {
-  const moves =
-    heartsGame.flow.legalMovesFor?.(session.state, session.phase, seat) ??
-    [];
+  const moves = heartsGame.flow.legalMovesFor?.(session.state, session.phase, seat) ?? [];
   return moves.flatMap((move) =>
     move.id === 'playCard' &&
     typeof (move.payload as { card?: unknown } | undefined)?.card === 'string'
@@ -111,6 +107,3 @@ function lowestOf(cards: readonly string[]): string | undefined {
     (a, b) => Number.parseInt(a.slice(1), 10) - Number.parseInt(b.slice(1), 10),
   )[0];
 }
-
-export const configSchema = <C extends RuleValues>() => heartsConfigSchema as unknown;
-export type { GameDef };

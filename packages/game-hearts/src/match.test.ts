@@ -1,14 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import {
-  createMatch,
-  matchApply,
-  matchNextRound,
-  replayMatch,
-  roundSeed,
-} from '@parlour/engine';
+import { createMatch, matchApply, matchNextRound, replayMatch, roundSeed } from '@parlour/engine';
 import { heartsConfigSchema, passDirectionFor, type HeartsRules } from './config';
 import { createHeartsMatchDef } from './match';
-import type { HeartsState } from './state';
 
 const def = createHeartsMatchDef();
 
@@ -28,7 +21,8 @@ function playHand(session: MatchSession): MatchSession {
   while (current.status === 'playing' && guard++ < 600) {
     if (current.round.phase.phase === 'pass') {
       const seat = current.round.state.selections.findIndex((pick) => pick === null);
-      if (seat === undefined || seat === null || seat < 0) throw new Error('pass phase with no pending seat');
+      if (seat === undefined || seat === null || seat < 0)
+        throw new Error('pass phase with no pending seat');
       const hand = [...(current.round.state.hands[seat] ?? [])].sort();
       const outcome = matchApply(def, current, seat, 'passCards', { cards: hand.slice(-3) });
       if (outcome.rejected) throw new Error(`matchApply rejected: ${outcome.rejected.code}`);
@@ -39,7 +33,8 @@ function playHand(session: MatchSession): MatchSession {
     const moves =
       current.round.def.flow.legalMovesFor?.(current.round.state, current.round.phase, seat) ?? [];
     const cardMoves = moves.filter(
-      (move) => move.id === 'playCard' && typeof (move.payload as { card?: unknown })?.card === 'string',
+      (move) =>
+        move.id === 'playCard' && typeof (move.payload as { card?: unknown })?.card === 'string',
     );
     if (cardMoves.length === 0) break;
     const chosen = (cardMoves as { payload: { card: string } }[])
@@ -74,7 +69,7 @@ describe('hearts match composition', () => {
     }
     // the fold's running totals equal the sum of hand results
     for (const [seat, total] of totals) {
-      expect((session.match.scores[seat] ?? -999)).toBe(total);
+      expect(session.match.scores[seat] ?? -999).toBe(total);
     }
   });
 

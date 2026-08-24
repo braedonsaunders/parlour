@@ -13,19 +13,65 @@ import type { HeartsState } from './state';
 const config: HeartsRules = heartsConfigSchema.resolve({});
 
 const FACE_ORDER = [
-  'C1', 'C10', 'C11', 'C12', 'C13', 'C2', 'C3', 'C4', 'C5', 'C6', 'C7', 'C8', 'C9',
-  'D1', 'D10', 'D11', 'D12', 'D13', 'D2', 'D3', 'D4', 'D5', 'D6', 'D7', 'D8', 'D9',
-  'H1', 'H10', 'H11', 'H12', 'H13', 'H2', 'H3', 'H4', 'H5', 'H6', 'H7', 'H8', 'H9',
-  'S1', 'S10', 'S11', 'S12', 'S13', 'S2', 'S3', 'S4', 'S5', 'S6', 'S7', 'S8', 'S9',
+  'C1',
+  'C10',
+  'C11',
+  'C12',
+  'C13',
+  'C2',
+  'C3',
+  'C4',
+  'C5',
+  'C6',
+  'C7',
+  'C8',
+  'C9',
+  'D1',
+  'D10',
+  'D11',
+  'D12',
+  'D13',
+  'D2',
+  'D3',
+  'D4',
+  'D5',
+  'D6',
+  'D7',
+  'D8',
+  'D9',
+  'H1',
+  'H10',
+  'H11',
+  'H12',
+  'H13',
+  'H2',
+  'H3',
+  'H4',
+  'H5',
+  'H6',
+  'H7',
+  'H8',
+  'H9',
+  'S1',
+  'S10',
+  'S11',
+  'S12',
+  'S13',
+  'S2',
+  'S3',
+  'S4',
+  'S5',
+  'S6',
+  'S7',
+  'S8',
+  'S9',
 ] as const;
 
 const SUIT_LETTER: Record<string, string> = { clubs: 'C', diamonds: 'D', hearts: 'H', spades: 'S' };
 
 /** A veiled session whose handle→face map the TEST controls. */
 function veiledSession(seed = 8_000) {
-  const deckOrder = heartsGame.veil
-    ? Array.from({ length: 52 }, (_, index) => `v#${index}`)
-    : [];
+  const deckOrder = heartsGame.veil ? Array.from({ length: 52 }, (_, index) => `v#${index}`) : [];
   const faceOf = new Map<string, string>();
   FACE_ORDER.forEach((id, index) => faceOf.set(deckOrder[index]!, id));
 
@@ -64,11 +110,7 @@ function runPasses(session: Veiled): Veiled {
 }
 
 /** Chooses a card for `seat`; `cheat` makes the first off-suit throw illegal-but-accepted. */
-function driveVeiledHand(
-  start: Veiled,
-  faceOf: Map<string, string>,
-  cheatSeat?: number,
-): Veiled {
+function driveVeiledHand(start: Veiled, faceOf: Map<string, string>, cheatSeat?: number): Veiled {
   let current = runPasses(start);
   let cheated = false;
   let guard = 0;
@@ -130,9 +172,7 @@ function driveVeiledHand(
     const hand = current.state.hands[seat] ?? [];
     const hidden = hand.filter((h) => h.startsWith('v#'));
     if (hidden.length === 0 && current.state.openedUp[seat]) continue;
-    const reveals = (hidden.length > 0 ? hidden : hand).map(
-      (h) => [h, faceOf.get(h)!] as const,
-    );
+    const reveals = (hidden.length > 0 ? hidden : hand).map((h) => [h, faceOf.get(h)!] as const);
     const out = openMove(current, seat, 'showdown.open', undefined, reveals);
     if (out.rejected) throw new Error(`showdown ${seat}: ${out.rejected.code}`);
     current = out.session;
@@ -165,12 +205,10 @@ describe('hearts under Veil', () => {
 
   it('rejects wrong leads on trick one without logging them', () => {
     const { session, faceOf } = veiledSession(8_020);
-    let current = runPasses(session);
+    const current = runPasses(session);
 
     for (const seat of [0, 1, 2, 3]) {
-      const impostor = (current.state.hands[seat] ?? []).find(
-        (h) => faceOf.get(h) !== 'C2',
-      );
+      const impostor = (current.state.hands[seat] ?? []).find((h) => faceOf.get(h) !== 'C2');
       if (!impostor) continue;
       const outcome = openMove(current, seat, 'playCard', { card: faceOf.get(impostor) }, [
         [impostor, faceOf.get(impostor)!],

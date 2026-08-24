@@ -113,7 +113,7 @@ describe('simultaneous pass', () => {
   });
 
   it('rejects duplicate or foreign cards', () => {
-    let session = openSession({ seed: 25 });
+    const session = openSession({ seed: 25 });
     const hand = session.state.hands[0] ?? [];
     expect(step(session, 0, 'passCards', { cards: [hand[0], hand[0], hand[1]] }).rejected).toBe(
       'bad-pass',

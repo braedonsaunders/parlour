@@ -1,6 +1,5 @@
 'use client';
 
-import { heartsHowToPlay } from '@parlour/game-hearts';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
@@ -19,7 +18,7 @@ export default function CreateHeartsRoomPage() {
   const name = useProfileStore((state) => state.name);
   const avatarId = useProfileStore((state) => state.avatarId);
   const mode = useHeartsSetupStore((state) => state.mode);
-  const overrides = useHeartsSetupStore((state) => state.overrides);
+  const overridesRef = useHeartsSetupStore((state) => state.overrides);
   const sessionRef = useRef<MultiplayerRoomSession | null>(null);
   const [session, setSession] = useState<MultiplayerRoomSession | null>(null);
 
@@ -32,19 +31,14 @@ export default function CreateHeartsRoomPage() {
       .create({
         gameId: 'hearts',
         seats: 4,
-        config: heartsRulesFor(mode, overrides),
+        config: heartsRulesFor(mode, overridesRef),
       })
       .then(() => activateMultiplayerSession(next))
       .catch(() => undefined);
-  }, [avatarId, mode, name]);
+  }, [avatarId, mode, name, overridesRef]);
 
   if (!session) return <LobbyLoading />;
-  return (
-    <ActiveLobby
-      session={session}
-      onStarted={() => router.push('/hearts/table')}
-    />
-  );
+  return <ActiveLobby session={session} onStarted={() => router.push('/hearts/table')} />;
 }
 
 function ActiveLobby({

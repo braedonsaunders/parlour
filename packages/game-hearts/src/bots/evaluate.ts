@@ -1,5 +1,5 @@
 import type { CardId, SeatId } from '@parlour/engine';
-import { QUEEN_SPADES, isHeart, suitOfCard } from '../cards';
+import { JACK_DIAMONDS, QUEEN_SPADES, isHeart, suitOfCard } from '../cards';
 import type { HeartsRules } from '../config';
 import type { HeartsState } from '../state';
 
@@ -33,25 +33,37 @@ export interface TrickRead {
 export function readTrick(
   plays: readonly { seat: SeatId; card: CardId }[],
   rankOf: (card: CardId) => number,
-  jackDiamonds: boolean,
+  jackDiamonds: boolean = false,
 ): TrickRead {
+  let points = 0;
   if (plays.length === 0) {
-    return { ledSuit: null, winningSeat: null, winningRank: -1, pointsOnTable: 0, heartsOnTable: 0 };
+    return {
+      ledSuit: null,
+      winningSeat: null,
+      winningRank: -1,
+      pointsOnTable: 0,
+      heartsOnTable: 0,
+    };
   }
   const ledSuit = suitOfCard(plays[0]!.card);
   let winningSeat = plays[0]!.seat;
   let winningRank = rankOf(plays[0]!.card);
-  let points = 0;
   let hearts = 0;
   for (const play of plays) {
-    if (isHeart(play.card)) hearts += 1;
+    if (isHeart(play.card)) {
+      hearts += 1;
+      points += 1;
+    } else if (play.card === QUEEN_SPADES) {
+      points += 13;
+    } else if (jackDiamonds && play.card === JACK_DIAMONDS) {
+      points -= 10;
+    }
     if (suitOfCard(play.card) !== ledSuit) continue;
     if (rankOf(play.card) > winningRank) {
       winningRank = rankOf(play.card);
       winningSeat = play.seat;
     }
   }
-  void jackDiamonds;
   return { ledSuit, winningSeat, winningRank, pointsOnTable: points, heartsOnTable: hearts };
 }
 
@@ -78,7 +90,10 @@ export function voidBonus(hand: readonly CardId[], card: CardId): number {
   const suit = suitOfCard(card);
   if (!suit || suit === 'spades') return 0;
   const inSuit = hand.filter((other) => suitOfCard(other) === suit);
-  if (inSuit.length <= 2 && inSuit.every((other) => (Number.parseInt(other.slice(1), 10) || 0) <= 6)) {
+  if (
+    inSuit.length <= 2 &&
+    inSuit.every((other) => (Number.parseInt(other.slice(1), 10) || 0) <= 6)
+  ) {
     return 4 - inSuit.length;
   }
   return 0;

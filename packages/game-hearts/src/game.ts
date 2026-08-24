@@ -26,15 +26,7 @@ import {
   trickCards,
 } from '@parlour/tricks';
 import { auditFollowSuit } from './audit';
-import {
-  QUEEN_SPADES,
-  TWO_CLUBS,
-  heartsTrickRules,
-  isHeart,
-  isPenaltyCard,
-  suitOfCard,
-  trickPoints,
-} from './cards';
+import { QUEEN_SPADES, TWO_CLUBS, heartsTrickRules, isHeart, isPenaltyCard } from './cards';
 import { heartsConfigSchema, passOffset, type HeartsRules } from './config';
 import { HEARTS_BOTS } from './bots';
 import { heartsHowToPlay } from './howto';
@@ -86,7 +78,11 @@ function payloadPass(payload: unknown): PassPayload | null {
 function payloadPlay(payload: unknown): PlayPayload | null {
   const record = (payload ?? {}) as { card?: unknown; claim?: unknown };
   if (typeof record.card !== 'string') return null;
-  if (record.claim !== undefined && record.claim !== 'all-hearts' && record.claim !== 'all-penalty') {
+  if (
+    record.claim !== undefined &&
+    record.claim !== 'all-hearts' &&
+    record.claim !== 'all-penalty'
+  ) {
     return null;
   }
   return { card: record.card, claim: record.claim as PlayClaim | undefined };
@@ -176,7 +172,10 @@ const passCards = {
       transfers.push({ from: giver, to: receiver, cards: [...cards] });
     }
     const mergedHands = hands.map((cards, index) => [...cards, ...(received[index] ?? [])]);
-    const holder = Math.max(0, mergedHands.findIndex((cards) => cards.includes(TWO_CLUBS)));
+    const holder = Math.max(
+      0,
+      mergedHands.findIndex((cards) => cards.includes(TWO_CLUBS)),
+    );
     ctx.fx.emit('hearts.pass.reveal', { direction: state.rules.passDirection, transfers });
     ctx.fx.emit(Fx.TurnRing, { seat: holder }, 640);
     return {
@@ -292,9 +291,7 @@ const playCard = {
     const taken = state.taken.map((pile, index) =>
       index === winner ? [...pile, ...cards] : pile.slice(),
     );
-    const tricksWon = state.tricksWon.map((count, index) =>
-      index === winner ? count + 1 : count,
-    );
+    const tricksWon = state.tricksWon.map((count, index) => (index === winner ? count + 1 : count));
     const tricksPlayed = state.tricksPlayed + 1;
     const swept: HeartsState = {
       ...base,
@@ -455,7 +452,12 @@ export const heartsGame: GameDef<HeartsState, HeartsRules> = {
     const passing = ctx.config.passDirection !== 'hold';
     // Open tables know who holds the two of clubs; Veil tables find out when
     // someone's opened two lands on the table.
-    const holder = ctx.veiled ? 0 : Math.max(0, hands.findIndex((cards) => cards.includes(TWO_CLUBS)));
+    const holder = ctx.veiled
+      ? 0
+      : Math.max(
+          0,
+          hands.findIndex((cards) => cards.includes(TWO_CLUBS)),
+        );
 
     return {
       seats: ctx.seats,
