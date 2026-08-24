@@ -18,7 +18,6 @@ const eslintConfig = [
       '**/coverage/',
       '**/.vercel/',
       'research/',
-      'apps/web/src/lib/scenes/parlour-diorama.ts',
     ],
   },
 
