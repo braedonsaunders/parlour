@@ -98,7 +98,7 @@ export class EngineAuthority<S, C extends RuleValues> implements AuthorityAdapte
     });
     if (stateHash(replayed.state) !== snapshot.stateHash) throw new Error('snapshot hash mismatch');
     this.authorityState = {
-      session: replayed,
+      session: { ...replayed, log: [...snapshot.log] },
       settings: { ...snapshot.settings, config },
     };
   }

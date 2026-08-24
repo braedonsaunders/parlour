@@ -30,6 +30,12 @@ export type ReplaySnapshot = {
   settings: RoomSettings;
 };
 
+export type SnapshotNotification = {
+  kind: 'snapshot';
+  reason: 'divergence';
+  snapshot: ReplaySnapshot;
+};
+
 export type PresenceEvent =
   | { kind: 'peer.joined'; peerId: PeerId; seat: SeatId }
   | { kind: 'peer.left'; peerId: PeerId; seat: SeatId; bot: true }
@@ -62,6 +68,7 @@ export interface Transport {
   send(action: PlayerAction): void;
   sendEmote(emote: Emote): boolean;
   onEvent(cb: (event: AppliedPacket) => void): () => void;
+  onSnapshot(cb: (notification: SnapshotNotification) => void): () => void;
   onPresence(cb: (presence: PresenceEvent) => void): () => void;
   onEmote(cb: (peerId: PeerId, emote: Emote) => void): () => void;
 }
