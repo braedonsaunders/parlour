@@ -6,11 +6,19 @@
     <meta name="theme-color" content="#152833" />
     <title>parlour · offline</title>
     <style>
+      :root {
+        --app-height: 100dvh;
+      }
+      @media (display-mode: standalone), (display-mode: fullscreen) {
+        :root {
+          --app-height: 100lvh;
+        }
+      }
       * {
         box-sizing: border-box;
       }
       body {
-        min-height: 100dvh;
+        min-height: var(--app-height);
         margin: 0;
         display: grid;
         place-items: center;

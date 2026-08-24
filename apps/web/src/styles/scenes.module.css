@@ -1,7 +1,10 @@
 .stage {
   position: fixed;
-  inset: 0;
+  top: 0;
+  left: 0;
   z-index: 0;
+  width: 100%;
+  height: var(--app-height);
   overflow: hidden;
   pointer-events: none;
   background: #0a161e;

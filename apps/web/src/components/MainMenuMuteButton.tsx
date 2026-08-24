@@ -10,7 +10,7 @@ export function MainMenuMuteButton() {
   return (
     <button
       type="button"
-      className="btn-fat btn-fat--ghost fixed left-5 top-5 z-30 h-12 min-w-12 px-3 sm:left-8 sm:top-8"
+      className="btn-fat btn-fat--ghost chrome-nw fixed z-30 h-12 min-w-12 px-3"
       aria-label={muted ? 'Unmute sound' : 'Mute sound'}
       aria-pressed={muted}
       onClick={() => toggleMuted('master')}

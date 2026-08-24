@@ -36,7 +36,7 @@ describe('mode picker screen fit', () => {
   it('pins the setup screen to the viewport instead of letting it scroll', () => {
     const screen = declarationsFor('.fitScreen');
 
-    expect(screen).toMatch(/height:\s*100dvh;/);
+    expect(screen).toMatch(/height:\s*var\(--app-height\);/);
     expect(screen).toMatch(/overflow:\s*hidden;/);
   });
 

@@ -3,6 +3,7 @@
 @tailwind utilities;
 
 :root {
+  --app-height: 100dvh;
   --parlour-bg: #152833;
   --parlour-amber: #e29349;
   --parlour-teal: #2f86a1;
@@ -36,10 +37,25 @@
   --dur-flight: 200ms;
 }
 
+@media (display-mode: standalone), (display-mode: fullscreen) {
+  :root {
+    --app-height: 100lvh;
+  }
+}
+
+@supports (-webkit-touch-callout: none) {
+  @media (display-mode: standalone), (display-mode: fullscreen) {
+    :root {
+      --app-height: -webkit-fill-available;
+    }
+  }
+}
+
 @layer base {
   html,
   body {
     height: 100%;
+    min-height: var(--app-height);
     background: var(--parlour-bg);
     color: var(--ink);
     overscroll-behavior: none;
@@ -140,6 +156,37 @@
 }
 
 @layer utilities {
+  .min-h-dvh {
+    min-height: var(--app-height);
+  }
+
+  .chrome-nw {
+    top: max(1.25rem, env(safe-area-inset-top));
+    left: max(1.25rem, env(safe-area-inset-left));
+  }
+
+  .chrome-ne {
+    top: max(1.25rem, env(safe-area-inset-top));
+    right: max(1.25rem, env(safe-area-inset-right));
+  }
+
+  .chrome-sw {
+    bottom: max(1.25rem, env(safe-area-inset-bottom));
+    left: max(1.25rem, env(safe-area-inset-left));
+  }
+
+  @media (min-width: 640px) {
+    .chrome-nw {
+      top: max(2rem, env(safe-area-inset-top));
+      left: max(2rem, env(safe-area-inset-left));
+    }
+
+    .chrome-ne {
+      top: max(2rem, env(safe-area-inset-top));
+      right: max(2rem, env(safe-area-inset-right));
+    }
+  }
+
   .ease-pop {
     transition-timing-function: var(--ease-pop);
   }

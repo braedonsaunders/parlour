@@ -49,6 +49,12 @@ const config: Config = {
         pop: 'cubic-bezier(0.34, 1.56, 0.64, 1)',
         settle: 'cubic-bezier(0.2, 0.8, 0.3, 1)',
       },
+      height: {
+        dvh: 'var(--app-height)',
+      },
+      minHeight: {
+        dvh: 'var(--app-height)',
+      },
     },
   },
   plugins: [],

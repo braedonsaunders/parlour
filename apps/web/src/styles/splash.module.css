@@ -1,6 +1,9 @@
 .overlay {
   position: fixed;
-  inset: 0;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: var(--app-height);
   z-index: 60;
   display: grid;
   place-items: center;
@@ -171,7 +174,7 @@
 .hint {
   position: absolute;
   left: 50%;
-  bottom: 4.5%;
+  bottom: max(4.5%, calc(env(safe-area-inset-bottom) + 0.75rem));
   transform: translateX(-50%);
   font-size: 11px;
   font-weight: 600;

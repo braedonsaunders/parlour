@@ -3,7 +3,7 @@ import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { getInstallPlatform, isStandaloneDisplay, isTauriRuntime } from './pwa';
+import { getInstallPlatform, isStandaloneDisplay, isTauriRuntime, syncAppViewportHeight } from './pwa';
 
 describe('installable offline shell', () => {
   it('declares maskable 192px and 512px PNG icons', () => {
@@ -104,6 +104,19 @@ describe('installable offline shell', () => {
     }
   });
 
+  it('sizes the standalone shell to the real window instead of 100dvh', () => {
+    const globals = readFileSync(join(process.cwd(), 'src/app/globals.css'), 'utf8');
+    const scenes = readFileSync(join(process.cwd(), 'src/styles/scenes.module.css'), 'utf8');
+
+    expect(globals).toContain('--app-height: 100dvh');
+    expect(globals).toContain('--app-height: 100lvh');
+    expect(globals).toContain('--app-height: -webkit-fill-available');
+    expect(globals).toContain('env(safe-area-inset-top)');
+    expect(globals).toMatch(/\.chrome-nw\s*\{[^}]*safe-area-inset-top/s);
+    expect(globals).toMatch(/\.chrome-ne\s*\{[^}]*safe-area-inset-top/s);
+    expect(scenes).toMatch(/height:\s*var\(--app-height\)/);
+  });
+
   it('removes production service workers and parlour caches during development', () => {
     const layout = readFileSync(join(process.cwd(), 'src/app/layout.tsx'), 'utf8');
 
@@ -144,5 +157,43 @@ describe('PWA runtime detection', () => {
 
     expect(isStandaloneDisplay(standaloneWindow, {} as Navigator)).toBe(true);
     expect(isTauriRuntime(tauriWindow)).toBe(true);
+  });
+
+  it('pins --app-height to the real window in standalone and clears it in the browser', () => {
+    const styles = new Map<string, string>();
+    const standaloneWindow = {
+      innerHeight: 390,
+      document: {
+        documentElement: {
+          style: {
+            setProperty: (name: string, value: string) => styles.set(name, value),
+            removeProperty: (name: string) => styles.delete(name),
+          },
+        },
+      },
+      matchMedia: () => ({ matches: true }),
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+      requestAnimationFrame: (callback: FrameRequestCallback) => {
+        callback(0);
+        return 1;
+      },
+      cancelAnimationFrame: () => undefined,
+      setTimeout: () => 1,
+      clearTimeout: () => undefined,
+      visualViewport: null,
+    } as unknown as Window;
+
+    const stopStandalone = syncAppViewportHeight(standaloneWindow, {} as Navigator);
+    expect(styles.get('--app-height')).toBe('390px');
+    stopStandalone();
+    expect(styles.has('--app-height')).toBe(false);
+
+    const browserWindow = {
+      ...standaloneWindow,
+      matchMedia: () => ({ matches: false }),
+    } as unknown as Window;
+    syncAppViewportHeight(browserWindow, {} as Navigator);
+    expect(styles.has('--app-height')).toBe(false);
   });
 });

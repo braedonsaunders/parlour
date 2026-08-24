@@ -83,7 +83,7 @@ function ActiveGinLobby({
       <Link
         href="/gin"
         onClick={leave}
-        className="pill-soft absolute left-5 top-5 text-sm font-bold text-dusk-100 hover:text-hearth-200"
+        className="pill-soft chrome-nw absolute z-30 text-sm font-bold text-dusk-100 hover:text-hearth-200"
       >
         ← Leave
       </Link>

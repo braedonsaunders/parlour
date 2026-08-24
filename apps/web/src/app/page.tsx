@@ -30,13 +30,13 @@ export default function TitlePage() {
   const avatarId = useProfileStore((s) => s.avatarId);
 
   return (
-    <main className="flex min-h-dvh flex-col items-center justify-center gap-5 px-6 text-center">
+    <main className="relative flex min-h-dvh flex-col items-center justify-center gap-5 px-6 text-center">
       <MainMenuMuteButton />
 
       <Link
         href="/profile"
         aria-label="Open your profile"
-        className="pill-soft absolute right-5 top-5 flex items-center gap-2 transition-transform duration-150 ease-pop hover:-translate-y-0.5"
+        className="pill-soft chrome-ne absolute z-30 flex items-center gap-2 transition-transform duration-150 ease-pop hover:-translate-y-0.5"
       >
         <AvatarBadge avatarId={avatarId} size={28} />
         <span className="max-w-[9rem] truncate text-sm font-semibold text-dusk-100">

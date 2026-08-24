@@ -91,7 +91,7 @@ export default function JoinPage() {
     <main className="flex min-h-dvh flex-col items-center justify-center gap-6 px-6 py-8 text-center">
       <Link
         href="/"
-        className="pill-soft absolute left-5 top-5 text-sm font-bold text-dusk-100 hover:text-hearth-200"
+        className="pill-soft chrome-nw absolute z-30 text-sm font-bold text-dusk-100 hover:text-hearth-200"
       >
         ← Back
       </Link>

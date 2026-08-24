@@ -17,7 +17,7 @@ export function ScenePicker() {
 
   return (
     <div
-      className="pill-soft absolute bottom-5 left-5 flex items-center gap-1"
+      className="pill-soft chrome-sw absolute z-30 flex items-center gap-1"
       role="radiogroup"
       aria-label="Background scene"
     >

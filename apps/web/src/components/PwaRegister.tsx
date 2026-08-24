@@ -1,13 +1,15 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { isTauriRuntime } from '@/lib/pwa';
+import { isTauriRuntime, syncAppViewportHeight } from '@/lib/pwa';
 
 export function PwaRegister() {
   const [online, setOnline] = useState(true);
   const [waitingWorker, setWaitingWorker] = useState<ServiceWorker | null>(null);
   const [applyingUpdate, setApplyingUpdate] = useState(false);
   const reloadForUpdate = useRef(false);
+
+  useEffect(() => syncAppViewportHeight(), []);
 
   useEffect(() => {
     const syncConnection = () => setOnline(navigator.onLine);

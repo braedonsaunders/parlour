@@ -116,6 +116,7 @@ describe('hand rail keyboard surface', () => {
 describe('table chrome', () => {
   it('keeps status and primary game actions in opposing bottom thumb zones', () => {
     expect(declarationsFor('.screen')).toMatch(/min-height:\s*min\(420px,\s*100dvh\);/);
+    expect(declarationsFor('.screen')).toMatch(/height:\s*var\(--app-height, 100dvh\);/);
     expect(declarationsFor('.ownerStatusRail')).toMatch(/left:[^;]+;/);
     expect(declarationsFor('.ownerStatusRail')).toMatch(/bottom:[^;]+;/);
     expect(declarationsFor('.actionRail')).toMatch(/right:[^;]+;/);

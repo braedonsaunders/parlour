@@ -32,6 +32,7 @@ describe('MainMenuMuteButton', () => {
     await act(async () => root.render(createElement(MainMenuMuteButton)));
 
     const button = container.querySelector('button');
+    expect(button?.className).toContain('chrome-nw');
     expect(button?.getAttribute('aria-pressed')).toBe('false');
     expect(button?.getAttribute('aria-label')).toBe('Mute sound');
 

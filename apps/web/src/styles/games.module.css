@@ -3,7 +3,7 @@
 
 .page {
   display: flex;
-  min-height: 100dvh;
+  min-height: var(--app-height);
   flex-direction: column;
   overflow-x: clip;
   padding-bottom: max(1.25rem, env(safe-area-inset-bottom));

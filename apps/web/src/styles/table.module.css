@@ -2,6 +2,7 @@
   position: relative;
   width: 100vw;
   height: 100dvh;
+  height: var(--app-height, 100dvh);
   min-height: min(420px, 100dvh);
   overflow: hidden;
   isolation: isolate;

@@ -320,8 +320,8 @@
    carousel, footer — instead of a document that scrolls a hair past the fold.
    Nothing here changes the plain carousel used by the game shelf. */
 .fitScreen {
-  height: 100dvh;
-  min-height: min(480px, 100dvh);
+  height: var(--app-height);
+  min-height: min(480px, var(--app-height));
   overflow: hidden;
 }
 

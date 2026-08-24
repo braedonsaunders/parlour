@@ -16,8 +16,8 @@ describe('game library layout', () => {
     const page = declarationsFor('.page');
     const grid = declarationsFor('.gameGrid');
 
-    expect(page).toMatch(/min-height:\s*100dvh;/);
-    expect(page).not.toMatch(/(?:^|[;\s])height:\s*100dvh;/);
+    expect(page).toMatch(/min-height:\s*var\(--app-height\);/);
+    expect(page).not.toMatch(/(?:^|[;\s])height:\s*(?:100dvh|var\(--app-height\));/);
     expect(grid).toMatch(/display:\s*grid;/);
     expect(grid).toMatch(/grid-auto-flow:\s*row;/);
     expect(grid).toMatch(/grid-template-columns:\s*repeat\(4, minmax\(0, 1fr\)\);/);
