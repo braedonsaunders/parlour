@@ -249,6 +249,7 @@ button.pileButton {
   font:
     800 2rem/1 var(--font-display),
     sans-serif;
+  pointer-events: none;
 }
 
 .actions {

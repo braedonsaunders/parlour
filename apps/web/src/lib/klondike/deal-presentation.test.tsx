@@ -73,6 +73,24 @@ describe('useKlondikeDealPresentation', () => {
     expect(vi.getTimerCount()).toBe(0);
   });
 
+  it('settles a live partial deal when calm motion is enabled and never replays it', () => {
+    vi.useFakeTimers();
+    const fx = openingFx();
+    act(() => root.render(<Probe fx={fx} />));
+    act(() => void vi.advanceTimersByTime(500));
+    expect(seen.current!.dealing).toBe(true);
+
+    act(() => root.render(<Probe fx={fx} reduced />));
+    expect(seen.current!.visibleByColumn).toEqual([1, 2, 3, 4, 5, 6, 7]);
+    expect(seen.current!.dealing).toBe(false);
+    expect(vi.getTimerCount()).toBe(0);
+
+    act(() => root.render(<Probe fx={fx} />));
+    expect(seen.current!.visibleByColumn).toEqual([1, 2, 3, 4, 5, 6, 7]);
+    expect(seen.current!.dealing).toBe(false);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
   it('gates nothing for an ordinary move timeline', () => {
     act(() =>
       root.render(

@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -14,6 +16,8 @@ import {
 import { KlondikeTransport } from '@/lib/solo/KlondikeTransport';
 import { DEFAULT_PROFILE_SETTINGS, useProfileStore } from '@/stores/profile';
 import { KlondikeTableScreen } from './KlondikeTableScreen';
+
+const KLONDIKE_STYLES = readFileSync(join(process.cwd(), 'src/styles/klondike.module.css'), 'utf8');
 
 let container: HTMLDivElement;
 let root: Root;
@@ -140,6 +144,26 @@ describe('KlondikeTableScreen', () => {
     expect(textSurface().hint).toBeNull();
   });
 
+  it('highlights the stock and waste zones for draw and recycle hints', () => {
+    const { view } = table();
+    render({
+      ...view,
+      hint: { move: { id: 'stock.draw' }, reason: 'Turn the stock.' },
+    });
+    act(() => container.querySelector<HTMLButtonElement>('[data-testid="klondike-hint"]')!.click());
+    expect(container.querySelector('[data-zone="stock"]')!.getAttribute('data-hint')).toBe('true');
+
+    render({
+      ...view,
+      stockCount: 0,
+      waste: ['S13'],
+      hint: { move: { id: 'stock.recycle' }, reason: 'Recycle the waste.' },
+    });
+    act(() => container.querySelector<HTMLButtonElement>('[data-testid="klondike-hint"]')!.click());
+    expect(container.querySelector('[data-zone="stock"]')!.getAttribute('data-hint')).toBe('true');
+    expect(container.querySelector('[data-zone="waste"]')!.getAttribute('data-hint')).toBe('true');
+  });
+
   it('selects a public card then dispatches its ordinary legal destination', () => {
     let chosen:
       | {
@@ -181,6 +205,22 @@ describe('KlondikeTableScreen', () => {
     expect(
       container.querySelector<HTMLButtonElement>('[data-testid="klondike-undo"]')!.disabled,
     ).toBe(true);
+  });
+
+  it('keeps the empty-column King marker decorative so taps reach the target button', () => {
+    const { view } = table();
+    render({
+      ...view,
+      waste: ['S13'],
+      tableau: view.tableau.map((column, index) => (index === 0 ? { down: [], up: [] } : column)),
+      legal: [...view.legal, { id: 'waste.toTableau', payload: { to: 0 } }],
+    });
+    const empty = container.querySelector<HTMLElement>(
+      '[data-zone="tableau:0"] span[aria-hidden="true"]',
+    );
+    expect(empty).not.toBeNull();
+    expect(empty!.className).toContain('emptyColumn');
+    expect(KLONDIKE_STYLES).toMatch(/\.emptyColumn\s*\{[^}]*pointer-events:\s*none;/s);
   });
 
   it('collapses the real opening layout and all flights for profile calm motion', () => {

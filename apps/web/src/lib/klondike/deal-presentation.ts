@@ -34,29 +34,45 @@ export function useKlondikeDealPresentation(
   const isOpening = plan.length === 28;
   const complete = !isOpening || reduced;
   const initial = complete ? fullCounts() : emptyCounts();
-  const [progress, setProgress] = useState<{ key: string | number; counts: readonly number[] }>(
-    () => ({
-      key: fxKey,
-      counts: initial,
-    }),
-  );
-  const visibleByColumn = progress.key === fxKey ? progress.counts : initial;
+  const [progress, setProgress] = useState<{
+    key: string | number;
+    counts: readonly number[];
+    settled: boolean;
+  }>(() => ({
+    key: fxKey,
+    counts: initial,
+    settled: complete,
+  }));
+  const currentProgress =
+    progress.key === fxKey ? progress : { key: fxKey, counts: initial, settled: complete };
+  const settledProgress =
+    complete && !currentProgress.settled
+      ? { key: fxKey, counts: fullCounts(), settled: true }
+      : currentProgress;
+  if (settledProgress !== progress) setProgress(settledProgress);
+
+  const progressSettled = settledProgress.settled;
+  const visibleByColumn = complete || progressSettled ? fullCounts() : settledProgress.counts;
 
   useEffect(() => {
-    if (complete) return;
+    if (complete || progressSettled) return;
     const timers = plan.map((cue) =>
       window.setTimeout(() => {
         setProgress((current) => {
           const counts = current.key === fxKey ? current.counts : emptyCounts();
+          const next = counts.map((count, column) =>
+            column === cue.column ? Math.min(column + 1, count + 1) : count,
+          );
           return {
             key: fxKey,
-            counts: counts.map((count, column) => (column === cue.column ? count + 1 : count)),
+            counts: next,
+            settled: next.every((count, column) => count >= column + 1),
           };
         });
       }, cue.landsAt),
     );
     return () => timers.forEach((timer) => window.clearTimeout(timer));
-  }, [complete, fxKey, plan]);
+  }, [complete, fxKey, plan, progressSettled]);
 
   return {
     sequence: isOpening,

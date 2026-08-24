@@ -236,6 +236,7 @@ function ReadyKlondikeTable({
                   className={styles.pileButton}
                   data-zone="stock"
                   data-zone-face
+                  data-hint={hintSource === 'stock' || hintTarget === 'stock' || undefined}
                   data-testid="klondike-stock"
                   onClick={() => stockMove && onDispatch?.(stockMove.id, stockMove.payload)}
                   disabled={!ready || !stockMove}
@@ -254,7 +255,12 @@ function ReadyKlondikeTable({
                 </button>
               </PileLabel>
               <PileLabel label={`Waste · ${view.waste.length}`}>
-                <div className={styles.pileButton} data-zone="waste" data-zone-face>
+                <div
+                  className={styles.pileButton}
+                  data-zone="waste"
+                  data-zone-face
+                  data-hint={hintSource === 'waste' || hintTarget === 'waste' || undefined}
+                >
                   {view.waste.at(-1) ? (
                     <div
                       data-card={view.waste.at(-1)}
@@ -550,7 +556,7 @@ function TableauColumn({
             </div>
           ))
         : null}
-      {visible === 0 ? (
+      {down === 0 && up.length === 0 ? (
         <span className={styles.emptyColumn} aria-hidden="true">
           K
         </span>
