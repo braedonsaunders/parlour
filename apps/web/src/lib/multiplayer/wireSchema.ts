@@ -1,7 +1,14 @@
 import type { AppliedEvent, FxEvent, SeatId } from '@parlour/engine';
 import { EMOTES } from './emotes';
-import type { SeatPresence } from './resilience';
-import type { AppliedPacket, Emote, PlayerAction, ReplaySnapshot } from './types';
+import type {
+  AppliedPacket,
+  Emote,
+  MigrationSnapshot,
+  PlayerAction,
+  PresenceSnapshot,
+  ReplaySnapshot,
+  SeatPresence,
+} from './types';
 
 const MAX_WIRE_BYTES = 512_000;
 const MAX_ID_LENGTH = 128;
@@ -29,17 +36,17 @@ export type WireMessage =
       type: 'welcome';
       hostId: string;
       seat: SeatId;
-      seats: Array<[SeatId, SeatPresence]>;
       peers: PeerDescriptor[];
-      snapshot: ReplaySnapshot;
+      snapshot: MigrationSnapshot;
     }
   | { type: 'mesh.peers'; peers: PeerDescriptor[] }
+  | { type: 'presence.state'; presence: PresenceSnapshot }
   | { type: 'intent'; action: PlayerAction }
   | { type: 'applied'; packet: AppliedPacket }
   | { type: 'heartbeat'; sentAt: number }
-  | { type: 'host.changed'; hostId: string; stateHash: string }
+  | { type: 'host.changed'; hostId: string; snapshot: MigrationSnapshot }
   | { type: 'sync.request'; expectedSeq: number }
-  | { type: 'sync.snapshot'; snapshot: ReplaySnapshot }
+  | { type: 'sync.snapshot'; snapshot: MigrationSnapshot }
   | { type: 'emote'; emote: Emote };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -152,6 +159,16 @@ function isSeats(value: unknown): value is Array<[SeatId, SeatPresence]> {
   return true;
 }
 
+function isPresenceSnapshot(value: unknown, maxSeats: number): value is PresenceSnapshot {
+  return (
+    isRecord(value) &&
+    hasOnlyKeys(value, ['version', 'seats']) &&
+    isBoundedInteger(value.version, MAX_SEQUENCE) &&
+    isSeats(value.seats) &&
+    value.seats.every(([seat]) => seat < maxSeats)
+  );
+}
+
 function isPlayerAction(value: unknown): value is PlayerAction {
   return (
     isRecord(value) &&
@@ -228,6 +245,15 @@ function isReplaySnapshot(value: unknown): value is ReplaySnapshot {
   );
 }
 
+function isMigrationSnapshot(value: unknown): value is MigrationSnapshot {
+  return (
+    isRecord(value) &&
+    hasOnlyKeys(value, ['replay', 'presence']) &&
+    isReplaySnapshot(value.replay) &&
+    isPresenceSnapshot(value.presence, value.replay.settings.seats)
+  );
+}
+
 function isAppliedPacket(value: unknown): value is AppliedPacket {
   return (
     isRecord(value) &&
@@ -254,20 +280,22 @@ function isWireMessage(value: unknown): value is WireMessage {
       return hasOnlyKeys(value, ['type', 'profileId']) && isBoundedString(value.profileId);
     case 'welcome': {
       if (
-        !hasOnlyKeys(value, ['type', 'hostId', 'seat', 'seats', 'peers', 'snapshot']) ||
+        !hasOnlyKeys(value, ['type', 'hostId', 'seat', 'peers', 'snapshot']) ||
         !isBoundedString(value.hostId) ||
         !isSeat(value.seat) ||
-        !isSeats(value.seats) ||
         !isPeerDescriptors(value.peers) ||
-        !isReplaySnapshot(value.snapshot)
+        !isMigrationSnapshot(value.snapshot)
       ) {
         return false;
       }
-      const roomSeats = value.snapshot.settings.seats;
-      return value.seat < roomSeats && value.seats.every(([seat]) => seat < roomSeats);
+      return value.seat < value.snapshot.replay.settings.seats;
     }
     case 'mesh.peers':
       return hasOnlyKeys(value, ['type', 'peers']) && isPeerDescriptors(value.peers);
+    case 'presence.state':
+      return (
+        hasOnlyKeys(value, ['type', 'presence']) && isPresenceSnapshot(value.presence, MAX_SEATS)
+      );
     case 'intent':
       return hasOnlyKeys(value, ['type', 'action']) && isPlayerAction(value.action);
     case 'applied':
@@ -278,9 +306,9 @@ function isWireMessage(value: unknown): value is WireMessage {
       );
     case 'host.changed':
       return (
-        hasOnlyKeys(value, ['type', 'hostId', 'stateHash']) &&
+        hasOnlyKeys(value, ['type', 'hostId', 'snapshot']) &&
         isBoundedString(value.hostId) &&
-        isBoundedString(value.stateHash, MAX_HASH_LENGTH)
+        isMigrationSnapshot(value.snapshot)
       );
     case 'sync.request':
       return (
@@ -288,7 +316,7 @@ function isWireMessage(value: unknown): value is WireMessage {
         isBoundedInteger(value.expectedSeq, MAX_SEQUENCE)
       );
     case 'sync.snapshot':
-      return hasOnlyKeys(value, ['type', 'snapshot']) && isReplaySnapshot(value.snapshot);
+      return hasOnlyKeys(value, ['type', 'snapshot']) && isMigrationSnapshot(value.snapshot);
     case 'emote':
       return (
         hasOnlyKeys(value, ['type', 'emote']) &&

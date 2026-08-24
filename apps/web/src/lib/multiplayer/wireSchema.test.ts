@@ -8,17 +8,25 @@ const snapshot = {
   settings: { gameId: 'blitz', seats: 4, config: { lives: 3, honorRound: false } },
 };
 
+const migration = {
+  replay: snapshot,
+  presence: {
+    version: 1,
+    seats: [[0, { peerId: 'host', profileId: 'profile', bot: false }]],
+  },
+};
+
 const validMessages = [
   { type: 'hello', profileId: 'profile' },
   {
     type: 'welcome',
     hostId: 'host',
     seat: 1,
-    seats: [[0, { peerId: 'host', profileId: 'profile', bot: false }]],
     peers: [{ peerId: 'host', profileId: 'profile' }],
-    snapshot,
+    snapshot: migration,
   },
   { type: 'mesh.peers', peers: [{ peerId: 'peer', profileId: 'profile' }] },
+  { type: 'presence.state', presence: migration.presence },
   { type: 'intent', action: { id: 'action', seat: 1, move: 'draw', payload: null } },
   {
     type: 'applied',
@@ -30,9 +38,9 @@ const validMessages = [
     },
   },
   { type: 'heartbeat', sentAt: 1 },
-  { type: 'host.changed', hostId: 'host', stateHash: 'hash' },
+  { type: 'host.changed', hostId: 'host', snapshot: migration },
   { type: 'sync.request', expectedSeq: 2 },
-  { type: 'sync.snapshot', snapshot },
+  { type: 'sync.snapshot', snapshot: migration },
   { type: 'emote', emote: 'gg' },
 ] as const;
 
@@ -52,16 +60,21 @@ describe('wire message schema', () => {
         type: 'welcome',
         hostId: 'host',
         seat: 1,
-        seats: [[4, { peerId: 'host', profileId: 'profile', bot: false }]],
         peers: [],
-        snapshot,
+        snapshot: {
+          ...migration,
+          presence: {
+            version: 1,
+            seats: [[4, { peerId: 'host', profileId: 'profile', bot: false }]],
+          },
+        },
       },
     ],
     ['fractional seat', { type: 'intent', action: { id: 'a', seat: 1.5, move: 'draw' } }],
     ['out-of-range seat', { type: 'intent', action: { id: 'a', seat: 4, move: 'draw' } }],
     ['negative sequence', { type: 'sync.request', expectedSeq: -1 }],
     ['non-finite timestamp', '{"type":"heartbeat","sentAt":1e400}'],
-    ['empty host change identity', { type: 'host.changed', hostId: '', stateHash: 'hash' }],
+    ['empty host change identity', { type: 'host.changed', hostId: '', snapshot: migration }],
     ['unsupported emote', { type: 'emote', emote: 'raw chat' }],
     [
       'too many peers',
@@ -77,7 +90,10 @@ describe('wire message schema', () => {
       'invalid nested snapshot',
       {
         type: 'sync.snapshot',
-        snapshot: { ...snapshot, settings: { ...snapshot.settings, seats: 5 } },
+        snapshot: {
+          ...migration,
+          replay: { ...snapshot, settings: { ...snapshot.settings, seats: 5 } },
+        },
       },
     ],
     [

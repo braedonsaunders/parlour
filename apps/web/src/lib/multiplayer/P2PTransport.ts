@@ -1,13 +1,15 @@
 import { createRoomCode, roomJoinUrl, validateRoomCode } from '../rooms/code';
 import { NostrSignaling, type SignalPayload } from './NostrSignaling';
-import { HEARTBEAT_INTERVAL_MS, MultiplayerState } from './resilience';
+import { HEARTBEAT_INTERVAL_MS, MultiplayerState, validatePresenceSnapshot } from './resilience';
 import { validateEmote } from './emotes';
 import { dispatchWireData, type PeerDescriptor, type WireMessage } from './wireSchema';
 import type {
   AppliedPacket,
   AuthorityAdapter,
   Emote,
+  MigrationSnapshot,
   PlayerAction,
+  PresenceSnapshot,
   PresenceEvent,
   RoomHandle,
   RoomSettings,
@@ -263,24 +265,28 @@ export class P2PTransport implements Transport {
         return;
       case 'hello':
         this.profiles.set(peerId, message.profileId.slice(0, 128));
-        if (this.isHost()) this.welcome(peerId, message.profileId);
+        if (this.isHost()) this.welcome(peerId, message.profileId.slice(0, 128));
         return;
       case 'welcome':
-        if (peerId !== this.resilience?.hostId) return;
+        if (peerId !== this.resilience?.hostId || message.hostId !== peerId) return;
         this.resilience.hostId = message.hostId;
-        for (const [seat, occupant] of message.seats) {
-          this.resilience.seats.set(seat, occupant);
+        await this.importMigration(message.snapshot);
+        const occupant = this.resilience.seats.get(message.seat);
+        if (
+          !occupant ||
+          occupant.peerId !== this.signaling.publicKey ||
+          occupant.profileId !== this.profileId ||
+          occupant.bot
+        ) {
+          throw new Error('welcome seat does not match joining profile');
         }
-        await this.authority.importSnapshot(message.snapshot);
         await this.connectMesh(message.peers);
-        this.emitPresence({
-          kind: 'peer.joined',
-          peerId: this.signaling.publicKey,
-          seat: message.seat,
-        });
         return;
       case 'mesh.peers':
         await this.connectMesh(message.peers);
+        return;
+      case 'presence.state':
+        if (peerId === this.resilience?.hostId) this.applyPresence(message.presence);
         return;
       case 'intent':
         if (this.isHost() && this.seatForPeer(peerId) === message.action.seat) {
@@ -306,27 +312,21 @@ export class P2PTransport implements Transport {
       }
       case 'sync.request':
         if (this.isHost())
-          this.sendTo(peerId, { type: 'sync.snapshot', snapshot: this.authority.exportSnapshot() });
+          this.sendTo(peerId, { type: 'sync.snapshot', snapshot: this.exportMigration() });
         return;
       case 'sync.snapshot':
         if (peerId === this.resilience?.hostId && this.pendingResync) {
-          await this.authority.importSnapshot(message.snapshot);
+          await this.importMigration(message.snapshot);
           const snapshot = this.authority.exportSnapshot();
           this.pendingResync = false;
           this.emitSnapshot({ kind: 'snapshot', reason: 'divergence', snapshot });
         }
         return;
       case 'host.changed':
-        if (peerId !== message.hostId || message.hostId !== this.lowestConnectedPeer()) return;
-        this.resilience!.hostId = message.hostId;
+        this.resilience!.expireAndElect(this.now());
+        if (peerId !== message.hostId || message.hostId !== this.resilience!.hostId) return;
+        await this.importMigration(message.snapshot);
         this.emitPresence({ kind: 'host.changed', hostId: message.hostId });
-        if (this.authority.exportSnapshot().stateHash !== message.stateHash) {
-          this.pendingResync = true;
-          this.sendTo(peerId, {
-            type: 'sync.request',
-            expectedSeq: this.authority.exportSnapshot().log.length,
-          });
-        }
         return;
       case 'emote': {
         const verdict = validateEmote(
@@ -356,11 +356,11 @@ export class P2PTransport implements Transport {
       type: 'welcome',
       hostId: this.resilience!.hostId,
       seat,
-      seats: [...this.resilience!.seats],
       peers: this.peerDescriptors(),
-      snapshot: this.authority.exportSnapshot(),
+      snapshot: this.exportMigration(),
     });
     this.broadcast({ type: 'mesh.peers', peers: this.peerDescriptors() });
+    this.broadcastPresence();
     this.emitPresence(
       reclaimed === null
         ? { kind: 'peer.joined', peerId, seat }
@@ -379,14 +379,6 @@ export class P2PTransport implements Transport {
       if (occupant.peerId === peerId && !occupant.bot) return seat;
     }
     return null;
-  }
-
-  private lowestConnectedPeer(): string {
-    const peers = [this.signaling.publicKey];
-    for (const [peerId, link] of this.links) {
-      if (link.channel?.readyState === 'open') peers.push(peerId);
-    }
-    return peers.sort()[0]!;
   }
 
   private peerDescriptors(): PeerDescriptor[] {
@@ -421,6 +413,7 @@ export class P2PTransport implements Transport {
     if (!this.resilience) return;
     this.broadcast({ type: 'heartbeat', sentAt: this.now() });
     const before = new Map(this.resilience.seats);
+    const beforePresence = this.resilience.exportPresence();
     const election = this.resilience.expireAndElect(this.now());
     for (const [seat, occupant] of this.resilience.seats) {
       if (!before.get(seat)?.bot && occupant.bot) {
@@ -429,15 +422,54 @@ export class P2PTransport implements Transport {
       }
     }
     if (election.changed) {
-      const snapshot = this.authority.exportSnapshot();
       this.broadcast({
         type: 'host.changed',
         hostId: election.hostId,
-        stateHash: snapshot.stateHash,
+        snapshot: this.exportMigration(),
       });
       this.emitPresence({ kind: 'host.changed', hostId: election.hostId });
       for (const action of election.resend) this.send(action);
+    } else if (
+      this.isHost() &&
+      beforePresence.version !== this.resilience.exportPresence().version
+    ) {
+      this.broadcastPresence();
     }
+  }
+
+  private exportMigration(): MigrationSnapshot {
+    return {
+      replay: this.authority.exportSnapshot(),
+      presence: this.resilience!.exportPresence(),
+    };
+  }
+
+  private async importMigration(snapshot: MigrationSnapshot): Promise<void> {
+    validatePresenceSnapshot(snapshot.presence, snapshot.replay.settings.seats);
+    await this.authority.importSnapshot(snapshot.replay);
+    this.applyPresence(snapshot.presence, snapshot.replay.settings.seats);
+  }
+
+  private applyPresence(presence: PresenceSnapshot, maxSeats?: number): void {
+    const before = new Map(this.resilience!.seats);
+    const seats = maxSeats ?? this.authority.exportSnapshot().settings.seats;
+    if (!this.resilience!.applyPresence(presence, seats)) return;
+    for (const [seat, occupant] of this.resilience!.seats) {
+      const previous = before.get(seat);
+      if (!previous) {
+        this.emitPresence({ kind: 'peer.joined', peerId: occupant.peerId, seat });
+      } else if (!previous.bot && occupant.bot) {
+        this.authority.setSeatBot(seat, true);
+        this.emitPresence({ kind: 'peer.left', peerId: occupant.peerId, seat, bot: true });
+      } else if (previous.bot && !occupant.bot) {
+        this.authority.setSeatBot(seat, false);
+        this.emitPresence({ kind: 'seat.reclaimed', peerId: occupant.peerId, seat });
+      }
+    }
+  }
+
+  private broadcastPresence(): void {
+    this.broadcast({ type: 'presence.state', presence: this.resilience!.exportPresence() });
   }
 
   private isHost(): boolean {

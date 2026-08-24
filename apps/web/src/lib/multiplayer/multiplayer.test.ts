@@ -26,6 +26,78 @@ describe('room identity', () => {
 });
 
 describe('resilience state', () => {
+  it('broadcasts versioned seats to every guest and preserves them through host loss', () => {
+    const host = new MultiplayerState('peer-a', 'peer-a');
+    host.assignSeat(0, 'peer-a', 'profile-a');
+    host.assignSeat(1, 'peer-b', 'profile-b');
+    host.assignSeat(2, 'peer-c', 'profile-c');
+
+    const guests = ['peer-b', 'peer-c', 'peer-d'].map(
+      (peerId) => new MultiplayerState(peerId, 'peer-a'),
+    );
+    for (const guest of guests) guest.applyPresence(host.exportPresence(), 4);
+
+    host.assignSeat(3, 'peer-d', 'profile-d');
+    const joined = host.exportPresence();
+    for (const guest of guests) guest.applyPresence(joined, 4);
+
+    for (const guest of guests) {
+      expect(guest.seats.get(3)).toEqual({
+        peerId: 'peer-d',
+        profileId: 'profile-d',
+        bot: false,
+      });
+      guest.seePeer('peer-a', 0);
+      for (const peerId of ['peer-b', 'peer-c', 'peer-d']) guest.seePeer(peerId, 1_000);
+    }
+
+    for (const guest of guests) {
+      expect(guest.expireAndElect(HEARTBEAT_TIMEOUT_MS + 1).hostId).toBe('peer-b');
+    }
+    const migration = guests[0]!.exportPresence();
+    for (const guest of guests.slice(1)) guest.applyPresence(migration, 4);
+
+    for (const guest of guests) {
+      expect([...guest.seats]).toEqual([
+        [0, { peerId: 'peer-a', profileId: 'profile-a', bot: true }],
+        [1, { peerId: 'peer-b', profileId: 'profile-b', bot: false }],
+        [2, { peerId: 'peer-c', profileId: 'profile-c', bot: false }],
+        [3, { peerId: 'peer-d', profileId: 'profile-d', bot: false }],
+      ]);
+      expect(guest.exportPresence()).toEqual(guests[0]!.exportPresence());
+    }
+  });
+
+  it('rejects malformed and same-version conflicting presence snapshots', () => {
+    const state = new MultiplayerState('peer-b', 'peer-a');
+    state.applyPresence(
+      {
+        version: 1,
+        seats: [[0, { peerId: 'peer-a', profileId: 'profile-a', bot: false }]],
+      },
+      4,
+    );
+
+    expect(() =>
+      state.applyPresence(
+        {
+          version: 1,
+          seats: [[0, { peerId: 'peer-z', profileId: 'profile-z', bot: false }]],
+        },
+        4,
+      ),
+    ).toThrow('conflicting presence snapshot');
+    expect(() =>
+      state.applyPresence(
+        {
+          version: 2,
+          seats: [[4, { peerId: 'peer-z', profileId: 'profile-z', bot: false }]],
+        },
+        4,
+      ),
+    ).toThrow('invalid presence snapshot');
+  });
+
   it('deduplicates actions with a bounded cache and resends pending work after host election', () => {
     const state = new MultiplayerState('peer-c', 'peer-a');
     expect(state.acceptAction('action-1')).toBe(true);
@@ -157,8 +229,9 @@ describe('divergence recovery', () => {
     });
     expect(observations).toEqual([]);
 
-    await harness.receiveWire('host', { type: 'sync.snapshot', snapshot: corrected });
-    await harness.receiveWire('host', { type: 'sync.snapshot', snapshot: corrected });
+    const migration = { replay: corrected, presence: { version: 0, seats: [] } };
+    await harness.receiveWire('host', { type: 'sync.snapshot', snapshot: migration });
+    await harness.receiveWire('host', { type: 'sync.snapshot', snapshot: migration });
 
     expect(observations).toEqual([
       {
