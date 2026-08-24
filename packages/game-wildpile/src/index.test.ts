@@ -302,7 +302,9 @@ describe('wildpile moves and flow', () => {
     expect(stack.session.phase).toMatchObject({ phase: 'choose-color', actor: 1 });
 
     // The eight only lands once the color is called, and seat 2 cannot stack.
-    const resolved = sessionApply(wildpileGame, stack.session, 1, 'chooseColor', { color: 'green' });
+    const resolved = sessionApply(wildpileGame, stack.session, 1, 'chooseColor', {
+      color: 'green',
+    });
     expect(resolved.session.state.pendingDraw).toBe(0);
     expect(resolved.session.state.hands[2]).toHaveLength(9);
     expect(resolved.session.state.turn).toBe(0);
@@ -486,8 +488,11 @@ describe('wildpile moves and flow', () => {
 
   it('deals the swap wilds only when the table turns them on', () => {
     const off = createSession(wildpileGame, { seed: 3, config: defaults, seats: 4 });
-    const inPlay = (session: GameSession<WildpileState>) =>
-      [...session.state.stock, ...session.state.hands.flat(), ...session.state.discard];
+    const inPlay = (session: GameSession<WildpileState>) => [
+      ...session.state.stock,
+      ...session.state.hands.flat(),
+      ...session.state.discard,
+    ];
     expect(inPlay(off).some((id) => WILDPILE_SWAP_CARD_IDS.includes(id))).toBe(false);
     expect(inPlay(off)).toHaveLength(108);
 

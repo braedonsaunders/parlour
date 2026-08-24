@@ -131,9 +131,16 @@ describe('veiled sessions', () => {
 describe('reveals through sessionApply', () => {
   it('opens a handle before validation so a hidden card becomes playable', () => {
     const { session } = veiledSession();
-    const outcome = sessionApply(toy, session, 0, 'play', { card: 'H4' }, {
-      reveals: [['v#1', 'H4']],
-    });
+    const outcome = sessionApply(
+      toy,
+      session,
+      0,
+      'play',
+      { card: 'H4' },
+      {
+        reveals: [['v#1', 'H4']],
+      },
+    );
     expect(outcome.rejected).toBeUndefined();
     expect(outcome.session.state.hands[0]).toEqual(['v#0', 'v#2']);
     expect(outcome.session.state.discard).toEqual(['H4', 'S12']);
@@ -141,9 +148,16 @@ describe('reveals through sessionApply', () => {
 
   it('records the opening on the event so the log stays self-contained', () => {
     const { session } = veiledSession();
-    const outcome = sessionApply(toy, session, 0, 'play', { card: 'H4' }, {
-      reveals: [['v#1', 'H4']],
-    });
+    const outcome = sessionApply(
+      toy,
+      session,
+      0,
+      'play',
+      { card: 'H4' },
+      {
+        reveals: [['v#1', 'H4']],
+      },
+    );
     expect(outcome.events[0]?.reveals).toEqual([['v#1', 'H4']]);
   });
 
@@ -155,34 +169,62 @@ describe('reveals through sessionApply', () => {
 
   it('rejects an opening whose face is not a card in the deck', () => {
     const { session } = veiledSession();
-    const outcome = sessionApply(toy, session, 0, 'play', { card: 'JOKER' }, {
-      reveals: [['v#1', 'JOKER']],
-    });
+    const outcome = sessionApply(
+      toy,
+      session,
+      0,
+      'play',
+      { card: 'JOKER' },
+      {
+        reveals: [['v#1', 'JOKER']],
+      },
+    );
     expect(outcome.rejected?.code).toBe('card-not-in-deck');
   });
 
   it('rejects an opening of a handle that is not in play', () => {
     const { session } = veiledSession();
-    const outcome = sessionApply(toy, session, 0, 'play', { card: 'H4' }, {
-      reveals: [['v#500', 'H4']],
-    });
+    const outcome = sessionApply(
+      toy,
+      session,
+      0,
+      'play',
+      { card: 'H4' },
+      {
+        reveals: [['v#500', 'H4']],
+      },
+    );
     expect(outcome.rejected?.code).toBe('unknown-handle');
   });
 
   it('rejects an opening that duplicates a visible card', () => {
     const { session } = veiledSession();
-    const outcome = sessionApply(toy, session, 0, 'play', { card: 'S12' }, {
-      reveals: [['v#1', 'S12']],
-    });
+    const outcome = sessionApply(
+      toy,
+      session,
+      0,
+      'play',
+      { card: 'S12' },
+      {
+        reveals: [['v#1', 'S12']],
+      },
+    );
     expect(outcome.rejected?.code).toBe('card-already-open');
   });
 
   it('refuses reveals in an open room, where they would be a free card swap', () => {
     const open = createSession(toy, { seed: 3, config: toyConfig.defaults(), seats: 2 });
     const held = open.state.hands[0]![0] as CardId;
-    const outcome = sessionApply(toy, open, 0, 'play', { card: held }, {
-      reveals: [['v#0', 'H4']],
-    });
+    const outcome = sessionApply(
+      toy,
+      open,
+      0,
+      'play',
+      { card: held },
+      {
+        reveals: [['v#0', 'H4']],
+      },
+    );
     expect(outcome.rejected?.code).toBe('not-veiled');
   });
 });
@@ -215,9 +257,16 @@ describe('replay of a veiled round', () => {
 
   it('leaves cards that were never opened veiled after replay', () => {
     const { deckOrder, session } = veiledSession();
-    const played = sessionApply(toy, session, 0, 'play', { card: 'H4' }, {
-      reveals: [['v#1', 'H4']],
-    }).session;
+    const played = sessionApply(
+      toy,
+      session,
+      0,
+      'play',
+      { card: 'H4' },
+      {
+        reveals: [['v#1', 'H4']],
+      },
+    ).session;
     const replayed = replaySession(toy, 3, played.log, {
       config: toyConfig.defaults(),
       seats: 2,
@@ -230,9 +279,16 @@ describe('replay of a veiled round', () => {
 
   it('diverges loudly when a replay is handed the wrong ceremony order', () => {
     const { session } = veiledSession();
-    const played = sessionApply(toy, session, 0, 'play', { card: 'H4' }, {
-      reveals: [['v#1', 'H4']],
-    }).session;
+    const played = sessionApply(
+      toy,
+      session,
+      0,
+      'play',
+      { card: 'H4' },
+      {
+        reveals: [['v#1', 'H4']],
+      },
+    ).session;
     const wrong = replaySession(toy, 3, played.log, {
       config: toyConfig.defaults(),
       seats: 2,

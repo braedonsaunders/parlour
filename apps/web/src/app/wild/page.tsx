@@ -3,13 +3,22 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { wildpileConfig } from '@parlour/game-wildpile';
+import { RuleSettings } from '@/components/settings/RuleSettings';
 import { useCenteredCarousel } from '@/hooks/useCenteredCarousel';
 import { WILD_MODES, type WildModeDef } from '@/lib/wild/modes';
-import { useWildSetupStore } from '@/stores/wildSetup';
+import { useWildSetupStore, wildRulesFor } from '@/stores/wildSetup';
 import styles from '@/styles/modes.module.css';
 import gameStyles from '@/styles/games.module.css';
 
 const SEAT_OPTIONS = [2, 3, 4] as const;
+
+/** Two cards that read as the mode at a glance, behind the shared 7. */
+const PREVIEW_CARDS: Record<string, readonly [string, string]> = {
+  classic: ['↻', '⊘'],
+  party: ['+4', '⚡'],
+  houseRules: ['⇄', '0'],
+};
 
 export default function WildSetupPage() {
   const router = useRouter();
@@ -17,6 +26,9 @@ export default function WildSetupPage() {
   const seats = useWildSetupStore((s) => s.seats);
   const setMode = useWildSetupStore((s) => s.setMode);
   const setSeats = useWildSetupStore((s) => s.setSeats);
+  const overrides = useWildSetupStore((s) => s.overrides);
+  const setRule = useWildSetupStore((s) => s.setRule);
+  const resetRules = useWildSetupStore((s) => s.resetRules);
   const [starting, setStarting] = useState(false);
   const carouselRef = useCenteredCarousel(mode);
 
@@ -87,6 +99,14 @@ export default function WildSetupPage() {
           </div>
         </div>
 
+        <RuleSettings
+          schema={wildpileConfig}
+          values={wildRulesFor(mode, overrides)}
+          onChange={setRule}
+          onReset={resetRules}
+          label="Advanced options"
+        />
+
         <div className="mx-auto flex w-full max-w-xl flex-wrap justify-center gap-3">
           <button
             type="button"
@@ -145,8 +165,11 @@ function ModeTile({
       <span className={styles.tileGlow} />
       <span className={styles.preview}>
         <span className={gameStyles.wildCard}>7</span>
-        <span className={gameStyles.wildCard}>{def.id === 'party' ? '+4' : '↻'}</span>
-        <span className={gameStyles.wildCard}>{def.id === 'party' ? '⚡' : '⊘'}</span>
+        {(PREVIEW_CARDS[def.id] ?? PREVIEW_CARDS.classic ?? []).map((pip, index) => (
+          <span key={index} className={gameStyles.wildCard}>
+            {pip}
+          </span>
+        ))}
       </span>
       <span className={styles.tagline}>{def.tagline}</span>
       <h2 className={styles.modeName}>{def.name}</h2>

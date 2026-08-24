@@ -210,7 +210,7 @@ describe('multiplayer route composition', () => {
 
     expect(host.getSnapshot()).toMatchObject({ gameId: 'wildpile' });
     expect(guest.getSnapshot()).toMatchObject({ gameId: 'wildpile' });
-    expect(guest.getSnapshot().settings?.config).toMatchObject({ stacking: true, jumpIn: true });
+    expect(guest.getSnapshot().settings?.config).toMatchObject({ stackDrawTwo: true, stackDrawFour: true, jumpIn: true });
 
     const hostSession = wildMultiplayerSession(host.getSnapshot());
     expect(hostSession).not.toBeNull();

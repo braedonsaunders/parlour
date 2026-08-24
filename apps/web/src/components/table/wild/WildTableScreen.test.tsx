@@ -17,6 +17,16 @@ const VIEW: WildTableView = {
       handCount: 2,
       isLocal: true,
       isBot: false,
+      lastCardArmed: false,
+    },
+    {
+      seat: 1,
+      name: 'Slate',
+      avatarId: 'slate',
+      handCount: 5,
+      isLocal: false,
+      isBot: true,
+      lastCardArmed: false,
     },
   ],
   localSeat: 0,
@@ -29,11 +39,16 @@ const VIEW: WildTableView = {
   phaseLabel: 'party pile · one deal',
   hand: ['red-7-0', 'blue-2-0'],
   decision: 'play',
+  lastCardArmed: false,
+  drawnCard: null,
   legal: {
     playCards: ['red-7-0'],
     draw: true,
     declineJump: false,
     chooseColor: false,
+    callLastCard: false,
+    pass: false,
+    swapTargets: [],
   },
 };
 
@@ -165,6 +180,170 @@ describe('WildTableScreen turn affordances', () => {
       ),
     );
     expect(getMusicController().getState().mood).toBeNull();
+  });
+
+  it('draws from the deck itself and ships no draw button', () => {
+    const onDraw = vi.fn();
+    act(() =>
+      root.render(createElement(WildTableScreen, { view: VIEW, fx: [], fxKey: 0, onDraw })),
+    );
+
+    const buttons = [...container.querySelectorAll('button')].map((button) => button.textContent);
+    expect(buttons.some((label) => label?.trim() === 'Draw')).toBe(false);
+
+    const stock = container.querySelector<HTMLButtonElement>('[data-zone="stock"]');
+    expect(stock?.getAttribute('data-can-draw')).toBe('true');
+    act(() => stock?.click());
+    expect(onDraw).toHaveBeenCalledOnce();
+  });
+
+  it('offers last-card protection only when the engine does, then shows it armed', () => {
+    const onCallLastCard = vi.fn();
+    act(() => root.render(createElement(WildTableScreen, { view: VIEW, fx: [], fxKey: 0 })));
+    expect(container.querySelector('[data-testid="call-last-card"]')).toBeNull();
+
+    act(() =>
+      root.render(
+        createElement(WildTableScreen, {
+          view: { ...VIEW, legal: { ...VIEW.legal, callLastCard: true } },
+          fx: [],
+          fxKey: 0,
+          onCallLastCard,
+        }),
+      ),
+    );
+    act(() =>
+      container.querySelector<HTMLButtonElement>('[data-testid="call-last-card"]')?.click(),
+    );
+    expect(onCallLastCard).toHaveBeenCalledOnce();
+
+    act(() =>
+      root.render(
+        createElement(WildTableScreen, {
+          view: { ...VIEW, lastCardArmed: true },
+          fx: [],
+          fxKey: 1,
+        }),
+      ),
+    );
+    expect(container.querySelector('[data-testid="last-card-armed"]')).not.toBeNull();
+  });
+
+  it('announces skips, reverses and penalties instead of only playing a sound', () => {
+    act(() =>
+      root.render(
+        createElement(WildTableScreen, {
+          view: { ...VIEW, direction: -1 },
+          fx: [
+            { kind: 'wildpile.skip', payload: { seat: 1 } },
+            { kind: 'wildpile.reverse', payload: { direction: -1, seat: 0 } },
+            { kind: 'wildpile.caught', payload: { seat: 1, amount: 2 }, at: 300 },
+          ],
+          fxKey: 'calls',
+        }),
+      ),
+    );
+
+    const announcer = container.querySelector('[data-testid="wild-announcer"]');
+    expect(announcer?.textContent).toContain('Reverse');
+    expect(announcer?.textContent).toContain('Skipped');
+    expect(announcer?.textContent).toContain('Caught!');
+    expect(announcer?.textContent).toContain('Slate loses a turn');
+    expect(container.querySelector('[data-seat="1"] [data-stamp]')).not.toBeNull();
+    expect(container.querySelector('[data-direction="-1"]')).not.toBeNull();
+  });
+
+  it('calls the color on a quartered wheel', () => {
+    const onChooseColor = vi.fn();
+    act(() =>
+      root.render(
+        createElement(WildTableScreen, {
+          view: { ...VIEW, decision: 'choose-color', legal: { ...VIEW.legal, chooseColor: true } },
+          fx: [],
+          fxKey: 0,
+          onChooseColor,
+        }),
+      ),
+    );
+
+    const wheel = container.querySelector('[data-testid="color-wheel"]');
+    const wedges = wheel?.querySelectorAll<HTMLButtonElement>('[data-wedge]') ?? [];
+    expect(wedges).toHaveLength(4);
+    expect([...wedges].map((wedge) => wedge.dataset.color)).toEqual([
+      'red',
+      'yellow',
+      'green',
+      'blue',
+    ]);
+
+    act(() => wedges[2]?.click());
+    expect(onChooseColor).toHaveBeenCalledWith('green');
+  });
+
+  it('names a hand to take when a swap card lands', () => {
+    const onChooseTarget = vi.fn();
+    act(() =>
+      root.render(
+        createElement(WildTableScreen, {
+          view: {
+            ...VIEW,
+            decision: 'choose-target',
+            legal: { ...VIEW.legal, playCards: [], draw: false, swapTargets: [1] },
+          },
+          fx: [],
+          fxKey: 0,
+          onChooseTarget,
+        }),
+      ),
+    );
+
+    const target = container.querySelector<HTMLButtonElement>(
+      '[data-testid="swap-chooser"] button',
+    );
+    expect(target?.getAttribute('aria-label')).toBe('Swap hands with Slate, 5 cards');
+    act(() => target?.click());
+    expect(onChooseTarget).toHaveBeenCalledWith(1);
+  });
+
+  it('lifts the card just drawn and offers to keep it', () => {
+    const onPass = vi.fn();
+    act(() =>
+      root.render(
+        createElement(WildTableScreen, {
+          view: {
+            ...VIEW,
+            drawnCard: 'blue-2-0',
+            legal: { ...VIEW.legal, playCards: ['blue-2-0'], draw: false, pass: true },
+          },
+          fx: [],
+          fxKey: 0,
+          onPass,
+        }),
+      ),
+    );
+
+    expect(
+      container.querySelector('[aria-label="Play blue 2"]')?.closest('[data-just-drawn]'),
+    ).not.toBeNull();
+    act(() =>
+      container.querySelector<HTMLButtonElement>('[data-testid="pass-drawn-card"]')?.click(),
+    );
+    expect(onPass).toHaveBeenCalledOnce();
+  });
+
+  it('throws a card-drop flourish when a card lands on the pile', () => {
+    act(() =>
+      root.render(
+        createElement(WildTableScreen, {
+          view: VIEW,
+          fx: [{ kind: Fx.DiscardCard, payload: { card: 'red-reverse-0', seat: 1 }, at: 0 }],
+          fxKey: 'drop',
+        }),
+      ),
+    );
+
+    const layer = container.querySelector('[data-testid="card-drop-fx"]');
+    expect(layer?.querySelector('[data-shape="swirl"]')).not.toBeNull();
   });
 
   it('keeps Wild cards full size during center-to-hand flights', () => {

@@ -1,47 +1,223 @@
-# parlour
+<div align="center">
 
-A web card-game platform: a reusable TypeScript card-game engine plus a beautiful, fast, animated player-facing app. Static Vercel deploy, zero backend — solo vs CPU works offline; live play is friends-only P2P via room codes.
+<img src="docs/parlour-logo.svg" alt="parlour" width="640" />
 
-Game #1: **Blitz** (the 31/Scat family game). Game #2 (engine proof): **Wildpile**, an UNO-like shedding game.
+### A deterministic card-game engine — and the cozy table it deals on.
 
-## Architecture
+One pure TypeScript engine. A growing shelf of card games on top of it.
+Solo against bots or with friends on a four-letter room code — no accounts, no servers, no install.
+
+[![Play now](https://img.shields.io/badge/▶_Play_now-parlour-e29349?style=for-the-badge)](https://parlour-liart.vercel.app)
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Next.js](https://img.shields.io/badge/Next.js-static_export-black?logo=next.js)](https://nextjs.org/)
+[![P2P](https://img.shields.io/badge/multiplayer-WebRTC_+_Nostr-2f86a1)](#multiplayer-comes-with-the-engine)
+[![Backend](https://img.shields.io/badge/backend-none-54a06e)](#why-there-is-no-server)
+
+[Play now](https://parlour-liart.vercel.app) · [The engine](#one-engine-many-tables) · [The shelf](#the-shelf) · [Multiplayer](#multiplayer-comes-with-the-engine) · [Add a game](#adding-a-game) · [Run it locally](#run-it-locally)
+
+</div>
+
+<img src="docs/shots/title.png" alt="parlour title screen — a campfire under the northern lights" width="100%" />
+
+---
+
+## One engine, many tables
+
+parlour is a card-game engine first. The app you can play is the proof that it works.
+
+**The engine is pure.** No React, no DOM, no network, no `Date.now()`, no `Math.random()`. Randomness comes only from a seeded RNG, and ESLint fails the build if anything sneaks in.
+
+```
+state = replay(seed, eventLog)
+```
+
+That one line pays for everything downstream. Same seed plus the same events means byte-identical state on every machine, so replays, reconnects, host migration, spectating, and desync-proof multiplayer all fall out of the design instead of being bolted on.
+
+- **Moves are pure reducers** that emit an ordered **fx timeline**. The UI animates _only_ from fx events — it never diffs state to guess what happened. That is why deals cascade card by card and cards arc between piles instead of teleporting.
+- **Simultaneous phases and single-seat turns share one reducer path.** A slap window, a jump-in interrupt, and an ordinary turn are all the same kind of thing to the engine — which is how a real-time slapping game and a patient trick-taker live under one runtime.
+- **`MatchDef` composes rounds** into lives, cumulative scores, dealer rotation, match clocks, and sudden death, without any game needing to know how a match is shaped.
+- **Veiled decks are supported at the engine layer.** A veiled room deals opaque handles instead of card faces; reveals record their `(handle, card)` mapping in the log so replay still reproduces the round exactly.
+- **Games are packages, not engine branches.** Every game on the shelf was written against the public engine API.
+
+### What a new game gets for free
+
+Write a rules module and you inherit the whole table:
+
+|                    |                                                           |
+| ------------------ | --------------------------------------------------------- |
+| 🎬 **Animation**   | fx timeline → deal cascades, card flights, arrival glints |
+| 🤖 **Bots**        | seat-fillable bot policies with difficulty tiers          |
+| 🌐 **Multiplayer** | room codes, WebRTC mesh, host authority, rejoin           |
+| ⏪ **Replay**      | deterministic log replay for reconnect, spectate, debug   |
+| 🏆 **Matches**     | lives, scores, clocks, sudden death, podium celebration   |
+| 🔊 **Audio**       | per-game SFX pack keyed to your fx events                 |
+| 📖 **How to play** | structured rules doc rendered by the in-app help modal    |
+| 📊 **Stats**       | lifetime records and friend head-to-head, stored locally  |
+
+## The shelf
+
+<img src="docs/shots/shelf.png" alt="The parlour game shelf" width="100%" />
+
+| Game                         | What it is                                                                                     | Status              |
+| ---------------------------- | ---------------------------------------------------------------------------------------------- | ------------------- |
+| **Blitz** · the 31 game      | Draw, swap, and knock your way to 31 in one suit. Classic, Fast, and Timed formats.            | **Playable**        |
+| **Wild** · the shedding game | 108 cards of skips, reverses, draw-fours, and jump-ins. Classic or Party house rules.          | **Playable**        |
+| **Egyptian Ratscrew**        | Flip, challenge on face cards, and slap doubles and sandwiches inside a real-time slap window. | Rules module landed |
+| **Gin Rummy**                | Meld, knock, go gin — and undercut the player who knocked too soon.                            | In the build        |
+| **Hearts**                   | Pass three, dodge the Queen, break hearts, or shoot the moon.                                  | In the build        |
+| **Euchre**                   | Order it up, name trump, go alone, and march the hand.                                         | In the build        |
+| **Cribbage**                 | Peg the board, count the show, and try not to get skunked.                                     | In the build        |
+| **President**                | Slam sets, clear the pile, and trade cards between President and Scum.                         | In the build        |
+
+### Blitz · the 31 game
+
+Knock too early and you hand the round away; chase the perfect 31 and someone else knocks first. Six bot personalities, three formats, one very loud celebration.
+
+| Mode        | Shape                                                     |
+| ----------- | --------------------------------------------------------- |
+| **Classic** | 3 lives each, last one standing, ~5–10 min                |
+| **Fast**    | First to 3 round wins, no eliminations, ~2–4 min          |
+| **Timed**   | 3:00 match clock, 7-second turn timers, sudden-death ties |
+
+<img src="docs/shots/blitz-table.png" alt="A Blitz table mid-round" width="100%" />
+
+### Wild · the shedding game
+
+Same warm table, much louder deck. **Classic** plays it by the book; **Party** turns on draw-stacking and lets anyone slam an exact match down out of turn.
+
+<img src="docs/shots/wild-modes.png" alt="Choosing between Wild's Classic and Party rule sets" width="100%" />
+
+Playable cards lift and light up. Everything else dims. You never have to guess what is legal.
+
+<img src="docs/shots/wild-table.png" alt="A Wild table — legal cards lit, illegal cards dimmed" width="100%" />
+
+### Every match ends on a podium
+
+<img src="docs/shots/podium.png" alt="Match podium" width="100%" />
+
+## Multiplayer comes with the engine
+
+1. **Create Room** — you get a four-character code from an unambiguous alphabet (no `0`/`O`, no `1`/`I`).
+2. Send it. Your friend types it in, or opens your share link.
+3. Play.
+
+Under that: **Nostr relays for signaling only**, then a **WebRTC data-channel mesh** carrying the game itself. The host is authoritative, and because every peer can replay the log, the table survives real life:
+
+- **Host election** — if the host closes their laptop, the table picks a new one and play continues.
+- **Bot takeover** — a seat that drops gets played by a bot until its human comes back.
+- **Rejoin** — reconnecting replays the event log and you land exactly where you left off.
+
+No game server exists. Nothing to sign up for and nothing to leak, because there is no account and no database.
+
+> **Honest about the crypto:** in an ordinary room, hidden hands are _honest UI_ — the same trust model as playing cards at a kitchen table, which is the right call for friends play. The engine now carries the veiled-deck primitives for rooms that want more; the cryptographic reveal layer lives in the transport, not the rules.
+
+## The bots are tested like a game, not like a function
+
+Blitz ships a headless simulator that plays **10,000 games per gate** and fails the build if the bot ladder stops making sense:
+
+```
+gate 1 — Hard vs Easy head-to-head
+  hard 73.3% vs easy 26.7% over 10000 games — PASS
+
+gate 2 — persona win-rate band in 4-seat mixed games
+  rookie-roo 20.7% · poker-pat 22.4% · knuckles 24.0%
+  benny-blitz 25.3% · steady-marge 26.4% · nan-peg 31.2% — PASS
+```
+
+Six personalities that feel different, none of them a punching bag, none of them unbeatable.
+
+## Why there is no server
+
+The whole app is a **static export**. It builds to a folder of files and sits on a CDN. Solo play works offline. Multiplayer borrows public relays for a handshake and then talks directly between browsers.
+
+There is no backend to run, to scale, to pay for, or to breach.
+
+## Adding a game
+
+A game is one package exporting one object. The engine handles the rest.
+
+```ts
+export const myGame: GameDef<MyState, MyConfig> = {
+  id: 'mygame',
+  configSchema, // rule toggles + named presets the UI renders for you
+  howToPlay, // structured rules doc for the in-app help modal
+  setup: ({ config, seats, rng }) => initialState(config, seats, rng),
+  moves: {
+    playCard: {
+      validate: (state, seat, payload) =>
+        isLegal(state, seat, payload) ? true : { code: 'illegal-card', message: 'not playable' },
+      apply: (state, seat, payload, ctx) => {
+        ctx.fx.emit('card.move', { from: 'hand', to: 'pile' });
+        return next(state, seat, payload);
+      },
+    },
+  },
+  flow, // whose turn, and when a round ends
+  playerView: (state, seat) => redactOtherHands(state, seat),
+  end: (state) => (finished(state) ? result(state) : null),
+  bots: [easy, medium, hard],
+};
+```
+
+No engine changes, no forked runtime. Wild, Ratscrew, and everything after them were built exactly this way.
+
+## It is a phone game too
+
+Installable PWA, offline-capable, and laid out for one thumb.
+
+<div align="center">
+<img src="docs/shots/mobile.png" alt="parlour on mobile" width="320" />
+</div>
+
+## Your table, your regulars
+
+No account, but not anonymous either. Everything lives in your browser: a name, a character, lifetime stats, and a running head-to-head record against every friend you have played.
+
+<img src="docs/shots/profile.png" alt="Profile screen with lifetime stats and rivalries" width="100%" />
+
+## Run it locally
+
+```bash
+pnpm install
+pnpm dev                      # Next dev server
+pnpm -r test                  # vitest across every package
+pnpm -r build                 # typecheck + build everything
+pnpm sim -- --games 10000     # headless Blitz bot simulation
+```
+
+Built and CI-gated against Node 26 and pnpm 10.
+
+## Repo layout
 
 ```
 parlour/
   packages/
-    engine/        # @parlour/engine — pure, deterministic, transport-agnostic core
-    game-blitz/    # @parlour/game-blitz — 31 rules module
-    game-wildpile/ # @parlour/game-wildpile — UNO-like (M5)
+    engine/          # pure, deterministic, transport-agnostic core
+    game-blitz/      # 31 rules + bot personalities + simulator
+    game-wildpile/   # the Wild rules module
+    game-ratscrew/   # Egyptian Ratscrew, slap windows and all
   apps/
-    web/           # the parlour app (Next.js, static export on Vercel)
-```
-
-- Seeded deterministic engine: same seed + same event log ⇒ identical state on every peer. Enables replays, reconnect, host migration, spectate-later.
-- Single-seat and simultaneous phases share one reducer path; authority-normalized event time is logged and replayed instead of read inside game code.
-- `MatchDef` composes deterministic round sessions into lives, cumulative scores, dealer rotation, timed formats, and sudden death.
-- Moves are pure reducers that emit an ordered **fx timeline**; the UI animates only from fx events, never by diffing state.
-- P2P multiplayer: Nostr signaling → WebRTC DataChannel mesh, host-authoritative with full resilience (host election, bot takeover, rejoin). Redaction is honest-UI, not cryptography — fine for friends play. The opt-in cryptographic direction is specified in [Parlour Veil](docs/VEILED-DECK-PROTOCOL.md).
-- Local profiles keep account-free lifetime stats and stable friend-vs-friend head-to-head history. See the popularity-informed [next-game shortlist](docs/NEXT-GAME-SHORTLIST.md).
-
-## Quickstart
-
-```
-pnpm install
-pnpm dev            # Next dev server
-pnpm -r build       # typecheck + build all packages
-pnpm -r test       # vitest everywhere
-pnpm sim -- --games 10000   # headless Blitz bot sims
+    web/             # the app — Next.js, static export
 ```
 
 ## Roadmap
 
-- [x] M0 — monorepo scaffold, CI gates
-- [ ] M1 — engine + Blitz rules headless (10k-game sim clean, replay hash-stable)
-- [ ] M2 — solo vertical slice: the feel milestone (live on Vercel)
-- [ ] M3 — art + audio + meta (final diorama pass, SFX/music, profile/stats, PWA)
-- [ ] M4 — P2P multiplayer (lobby codes, share links, resilience)
-- [ ] M5 — Wildpile prototype (engine generalization proof)
+- [x] Deterministic engine, gated by a 10,000-game headless simulation
+- [x] The feel milestone — fx-driven animation, art, audio, celebrations
+- [x] Local profiles, lifetime stats, friend head-to-head history, PWA
+- [x] P2P multiplayer — room codes, share links, host election, bot takeover, rejoin
+- [x] Second and third games built entirely on the public engine API
+- [x] Veiled-deck primitives in the engine
+- [ ] The rest of the shelf: Gin, Hearts, Euchre, Cribbage, President
 
 ## License
 
 MIT — see [LICENSE](LICENSE).
+
+<div align="center">
+
+**[Pull up a chair →](https://parlour-liart.vercel.app)**
+
+</div>

@@ -209,9 +209,7 @@ function isRealCard(card: CardId): boolean {
  * asks for them, so a classic pile stays exactly 108 cards.
  */
 function wildpileDealtDeck(config: WildpileRules): DeckDef {
-  return config.swapCards
-    ? wildpileDeck
-    : { ...wildpileDeck, cardIds: WILDPILE_BASE_CARD_IDS };
+  return config.swapCards ? wildpileDeck : { ...wildpileDeck, cardIds: WILDPILE_BASE_CARD_IDS };
 }
 
 function error(code: string, message: string): RuleError {
@@ -579,11 +577,7 @@ const draw: Move<WildpileState> = {
     // Draw-until-playable is bounded by the cards in play, so a pile nothing
     // matches still terminates instead of spinning.
     const ceiling = state.stock.length + state.discard.length;
-    const count = forced
-      ? state.pendingDraw
-      : state.rules.drawToMatch
-        ? Math.max(1, ceiling)
-        : 1;
+    const count = forced ? state.pendingDraw : state.rules.drawToMatch ? Math.max(1, ceiling) : 1;
     // A forced pickup trails the card that caused it; a voluntary draw is instant.
     const drawn = drawCards(state, seat, count, ctx, {
       delayMs: forced ? FORCED_DRAW_DELAY_MS : 0,
@@ -680,7 +674,8 @@ const chooseColor: Move<WildpileState> = {
 /** Nominates the hand to take — Wild Swap Hands, or a seven under 7-0. */
 const chooseTarget: Move<WildpileState> = {
   validate(state, seat, payload) {
-    if (state.awaitingSwap !== seat) return error('swap-not-awaited', 'seat is not choosing a hand');
+    if (state.awaitingSwap !== seat)
+      return error('swap-not-awaited', 'seat is not choosing a hand');
     const target = payloadSeat(payload);
     if (target === null || target < 0 || target >= state.seats) {
       return error('bad-target', 'expected a seated opponent');
