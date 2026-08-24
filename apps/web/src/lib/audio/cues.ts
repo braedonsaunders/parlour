@@ -124,6 +124,8 @@ export function wildpileCuesForFx(fx: readonly FxEvent[]): SoundCue[] {
             atMs: atMs + (hasActionCard ? 950 : 320),
           },
         ];
+      case 'wildpile.caught':
+        return [{ id: 'wildpile.caught', atMs }];
       default:
         return [];
     }

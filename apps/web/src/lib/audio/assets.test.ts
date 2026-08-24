@@ -23,6 +23,7 @@ const REQUIRED_SOUNDS = [
   'wildpile.skip',
   'wildpile.draw-stack',
   'wildpile.color',
+  'wildpile.caught',
   'wildpile.voice.reverse',
   'wildpile.voice.skip',
   'wildpile.voice.draw-two',

@@ -108,6 +108,15 @@ describe('fx-driven table audio', () => {
     ]);
   });
 
+  it('sounds the missed last-card penalty at the engine-authored moment', () => {
+    expect(
+      soundCuesForFx(
+        [{ kind: 'wildpile.caught', payload: { seat: 0, amount: 2 }, at: 240 }],
+        'wildpile',
+      ),
+    ).toEqual([{ id: 'wildpile.caught', atMs: 240 }]);
+  });
+
   it('authors Hearts pass, penalty, trick, broken-heart, and moon moments', () => {
     expect(
       soundCuesForFx(

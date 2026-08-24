@@ -155,7 +155,7 @@ export const wildpileConfig = defineConfig<WildpileRules>(
       label: 'Seconds per turn',
       min: 5,
       max: 60,
-      default: 20,
+      default: 15,
       advanced: true,
       group: 'Timing',
       help: 'When the clock runs out, the table makes a legal play for that seat.',

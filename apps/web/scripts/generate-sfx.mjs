@@ -127,6 +127,13 @@ const sounds = [
       'One color selection accent: tiny paper card flick followed by a single clean prismatic glass ping and a very short warm shimmer. Precise, bright, no melody.',
   },
   {
+    name: 'wild-caught',
+    duration: 0.7,
+    outputDuration: 0.5,
+    prompt:
+      'Half-second playful caught-you penalty sting: sharp card-edge snap first, two descending muted brass and wood notes spaced across the middle, then one tiny prismatic pop near the end. Fill the duration, cheeky, clear, never harsh.',
+  },
+  {
     name: 'hearts-pass-commit',
     duration: 0.5,
     outputDuration: 0.38,
@@ -480,6 +487,7 @@ const masterTargets = {
   'skip-swipe': -21,
   'draw-stack': -19,
   'color-select': -22,
+  'wild-caught': -19,
   'hearts-pass-commit': -16,
   'hearts-trick-sweep': -16,
   'hearts-point-heart': -16,

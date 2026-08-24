@@ -721,11 +721,13 @@
   font-size: 0.64rem;
 }
 
-.turnClock {
-  display: inline-flex;
-  gap: 0.45rem;
-  align-items: baseline;
+.matchClock {
+  display: grid;
+  justify-items: center;
+  min-width: 5.25rem;
   margin-left: auto;
+  margin-right: 0.65rem;
+  padding-inline: 0.8rem;
   color: rgba(255, 239, 211, 0.78);
   font-family: var(--font-display), sans-serif;
   font-size: 0.66rem;
@@ -733,9 +735,86 @@
   text-transform: uppercase;
 }
 
-.turnClock strong {
+.matchClock strong {
   color: #ffd17e;
   font-size: 0.94rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.turnClock {
+  --turn-clock-color: #77d7c4;
+  position: absolute;
+  z-index: 9;
+  left: 50%;
+  top: calc(46% + 4.2rem);
+  display: grid;
+  grid-template-rows: auto auto;
+  place-content: center;
+  justify-items: center;
+  width: 3.4rem;
+  aspect-ratio: 1;
+  translate: -50% 0;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(17, 42, 48, 0.96) 52%, rgba(9, 22, 28, 0.98) 54%);
+  color: #ddfff7;
+  box-shadow:
+    0 0 0 2px rgba(255, 246, 228, 0.2),
+    0 8px 20px rgba(3, 14, 20, 0.55);
+  font-family: var(--font-display), sans-serif;
+  line-height: 0.88;
+  pointer-events: none;
+}
+
+.turnClock[data-mine] {
+  --turn-clock-color: #ffd17e;
+  color: #fff1cc;
+}
+
+.turnClock svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  rotate: -90deg;
+  overflow: visible;
+}
+
+.turnClockTrack,
+.turnClockProgress {
+  fill: none;
+  stroke-width: 3.5;
+}
+
+.turnClockTrack {
+  stroke: rgba(255, 246, 228, 0.16);
+}
+
+.turnClockProgress {
+  stroke: var(--turn-clock-color);
+  stroke-linecap: round;
+  stroke-dasharray: 1;
+  transition: stroke-dashoffset 100ms linear;
+  filter: drop-shadow(0 0 3px var(--turn-clock-color));
+}
+
+.turnClock span {
+  z-index: 1;
+  font-size: 0.5rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.turnClock strong {
+  z-index: 1;
+  margin-top: 0.12rem;
+  font-size: 1.05rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.turnClock[data-warning] {
+  --turn-clock-color: #ff715f;
+  animation: turnClockUrgent 700ms ease-in-out infinite;
 }
 
 @keyframes stockBeckon {
@@ -758,11 +837,25 @@
   }
 }
 
+@keyframes turnClockUrgent {
+  50% {
+    scale: 1.08;
+    box-shadow:
+      0 0 0 5px rgba(255, 113, 95, 0.12),
+      0 0 20px rgba(255, 113, 95, 0.45);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .stockPile[data-can-draw='true'],
   .lastCardButton,
-  .pickup[data-mine] {
+  .pickup[data-mine],
+  .turnClock[data-warning] {
     animation: none;
+  }
+
+  .turnClockProgress {
+    transition: none;
   }
 }
 
@@ -774,5 +867,20 @@
   }
   .announcer {
     top: 8%;
+  }
+  .turnClock {
+    top: calc(50.5% + 2.9rem);
+    width: 2.9rem;
+  }
+  .turnClock span {
+    font-size: 0.43rem;
+  }
+  .turnClock strong {
+    font-size: 0.9rem;
+  }
+  .matchClock {
+    min-width: 4.6rem;
+    margin-right: 0.45rem;
+    padding-inline: 0.55rem;
   }
 }

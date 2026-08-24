@@ -258,6 +258,63 @@ describe('WildTableScreen turn affordances', () => {
     expect(getMusicController().getState().mood).toBe('tense');
   });
 
+  it('keeps the game clock visible and counts the turn down on a circular progress ring', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-24T12:00:00Z'));
+    act(() =>
+      root.render(
+        createElement(WildTableScreen, {
+          view: VIEW,
+          fx: [],
+          fxKey: 0,
+          matchEndsAt: Date.now() + 300_000,
+          turnDurationMs: 15_000,
+          turnClockKey: '0:0',
+        }),
+      ),
+    );
+
+    expect(container.querySelector('[aria-label="Game clock"]')?.textContent).toBe('Game5:00');
+    expect(container.querySelector('[data-testid="turn-clock"]')?.textContent).toBe('You15');
+    const progress = container.querySelector<SVGCircleElement>(
+      '[data-testid="turn-clock-progress"]',
+    );
+    expect(Number(progress?.style.strokeDashoffset)).toBe(0);
+
+    act(() => vi.advanceTimersByTime(1_000));
+    expect(container.querySelector('[aria-label="Game clock"]')?.textContent).toBe('Game4:59');
+    expect(container.querySelector('[data-testid="turn-clock"]')?.textContent).toBe('You14');
+    expect(Number(progress?.style.strokeDashoffset)).toBeGreaterThan(0);
+  });
+
+  it('places a two-player opponent directly across from every local seat', () => {
+    act(() => root.render(createElement(WildTableScreen, { view: VIEW, fx: [], fxKey: 0 })));
+    expect(container.querySelector('[data-seat="0"]')?.getAttribute('data-table-position')).toBe(
+      '0',
+    );
+    expect(container.querySelector('[data-seat="1"]')?.getAttribute('data-table-position')).toBe(
+      '2',
+    );
+
+    const oppositeView: WildTableView = {
+      ...VIEW,
+      localSeat: 1,
+      players: VIEW.players.map((player) => ({
+        ...player,
+        isLocal: player.seat === 1,
+      })),
+    };
+    act(() =>
+      root.render(createElement(WildTableScreen, { view: oppositeView, fx: [], fxKey: 1 })),
+    );
+    expect(container.querySelector('[data-seat="1"]')?.getAttribute('data-table-position')).toBe(
+      '0',
+    );
+    expect(container.querySelector('[data-seat="0"]')?.getAttribute('data-table-position')).toBe(
+      '2',
+    );
+  });
+
   it('renders swap cards flying between the two correct hand zones', () => {
     act(() =>
       root.render(

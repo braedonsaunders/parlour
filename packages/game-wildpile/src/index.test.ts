@@ -70,6 +70,10 @@ function fixture(overrides: Partial<WildpileState> = {}): GameSession<WildpileSt
 }
 
 describe('wildpile deck and setup', () => {
+  it('keeps the default decision window brisk', () => {
+    expect(defaults.turnTimeSeconds).toBe(15);
+  });
+
   it('ships one policy per shared difficulty tier', () => {
     expect(WILDPILE_BOTS.map((bot) => bot.tier)).toEqual([1, 2, 3]);
     expect([1, 2, 3].map((tier) => wildpileTierBot(tier as 1 | 2 | 3).tier)).toEqual([1, 2, 3]);

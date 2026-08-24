@@ -111,6 +111,9 @@ export function WildTableScreen(props: WildTableScreenProps) {
         localSeat: view?.localSeat ?? null,
         activeSeat: view?.activeSeat ?? null,
         decision: view?.decision ?? null,
+        matchRemainingSeconds: remainingMs === null ? null : Math.ceil(remainingMs / 1_000),
+        turnDurationSeconds:
+          props.turnDurationMs === undefined ? null : props.turnDurationMs / 1_000,
         stockCount: view ? view.stockCount + deal.pendingStockCards : null,
         discardTop: view && deal.discardReady ? view.discard.at(-1) : null,
         hand: view
@@ -124,7 +127,7 @@ export function WildTableScreen(props: WildTableScreenProps) {
         delete gameWindow.render_game_to_text;
       }
     };
-  }, [deal, error, view]);
+  }, [deal, error, props.turnDurationMs, remainingMs, view]);
 
   if (error) {
     return (
@@ -163,13 +166,7 @@ export function WildTableScreen(props: WildTableScreenProps) {
           <span className={tableStyles.eyebrow}>Wild</span>
           <strong>{view.phaseLabel}</strong>
         </div>
-        {props.turnDurationMs !== undefined && view.activeSeat !== null && (
-          <TurnClock
-            key={props.turnClockKey}
-            durationMs={props.turnDurationMs}
-            mine={view.activeSeat === view.localSeat}
-          />
-        )}
+        {remainingMs !== null && <MatchClock remainingMs={remainingMs} />}
         <button
           type="button"
           className={`${tableStyles.menuButton} btn-fat btn-fat--ghost`}
@@ -189,6 +186,7 @@ export function WildTableScreen(props: WildTableScreenProps) {
           <Seat
             key={player.seat}
             player={player}
+            position={tablePosition(player.seat, view.localSeat, view.players.length)}
             active={view.activeSeat === player.seat}
             displayCount={deal.visibleCount(player.seat, player.handCount)}
             stamp={seatStamp(calls, player.seat)}
@@ -199,6 +197,13 @@ export function WildTableScreen(props: WildTableScreenProps) {
           <LiveStandings players={view.players} remainingMs={remainingMs} />
         )}
         <Piles view={view} busy={localBusy} onDraw={props.onDraw} deal={deal} />
+        {props.turnDurationMs !== undefined && view.activeSeat !== null && (
+          <TurnClock
+            key={props.turnClockKey}
+            durationMs={props.turnDurationMs}
+            mine={view.activeSeat === view.localSeat}
+          />
+        )}
         <LocalHand view={view} busy={localBusy} onPlay={props.onPlay} deal={deal} />
         <WildFxLayer
           fx={props.fx}
@@ -321,20 +326,55 @@ function LiveStandings({
   );
 }
 
+function MatchClock({ remainingMs }: { remainingMs: number }) {
+  const totalSeconds = Math.ceil(remainingMs / 1_000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return (
+    <div className={`${wildStyles.matchClock} pill-soft`} aria-label="Game clock">
+      <span>Game</span>
+      <strong>
+        {minutes}:{String(seconds).padStart(2, '0')}
+      </strong>
+    </div>
+  );
+}
+
 function TurnClock({ durationMs, mine }: { durationMs: number; mine: boolean }) {
   const [remainingMs, setRemainingMs] = useState(durationMs);
 
   useEffect(() => {
     const startedAt = Date.now();
     const sync = () => setRemainingMs(Math.max(0, durationMs - (Date.now() - startedAt)));
-    const timer = window.setInterval(sync, 250);
+    sync();
+    const timer = window.setInterval(sync, 100);
     return () => window.clearInterval(timer);
   }, [durationMs]);
 
+  const seconds = Math.ceil(remainingMs / 1_000);
+  const progress = durationMs <= 0 ? 0 : remainingMs / durationMs;
   return (
-    <div className={`${wildStyles.turnClock} pill-soft`} aria-label="Turn clock">
-      <span>{mine ? 'Your clock' : 'Turn clock'}</span>
-      <strong>{Math.ceil(remainingMs / 1_000)}s</strong>
+    <div
+      className={wildStyles.turnClock}
+      aria-label="Turn clock"
+      data-testid="turn-clock"
+      data-mine={mine || undefined}
+      data-warning={seconds <= 5 || undefined}
+    >
+      <svg viewBox="0 0 48 48" aria-hidden="true">
+        <circle className={wildStyles.turnClockTrack} cx="24" cy="24" r="20" pathLength="1" />
+        <circle
+          className={wildStyles.turnClockProgress}
+          data-testid="turn-clock-progress"
+          cx="24"
+          cy="24"
+          r="20"
+          pathLength="1"
+          style={{ strokeDashoffset: 1 - progress }}
+        />
+      </svg>
+      <span>{mine ? 'You' : 'Turn'}</span>
+      <strong>{seconds}</strong>
     </div>
   );
 }
@@ -353,11 +393,13 @@ function seatStamp(calls: readonly WildAnnouncement[], seat: number): WildAnnoun
 
 function Seat({
   player,
+  position,
   active,
   displayCount,
   stamp,
 }: {
   player: WildSeatView;
+  position: number;
   active: boolean;
   displayCount: number;
   stamp: WildAnnouncement | null;
@@ -371,7 +413,8 @@ function Seat({
     <motion.div
       layout
       data-seat={player.seat}
-      className={`${tableStyles.seat} ${tableStyles[`seat${player.seat}`]} ${active ? tableStyles.seatActive : ''}`}
+      data-table-position={position}
+      className={`${tableStyles.seat} ${tableStyles[`seat${position}`]} ${active ? tableStyles.seatActive : ''}`}
       style={style}
       animate={active ? { scale: [1, 1.06, 1.02] } : { scale: 1 }}
       transition={{ duration: 0.24, ease: [0.34, 1.56, 0.64, 1] }}
@@ -418,6 +461,15 @@ function Seat({
       </AnimatePresence>
     </motion.div>
   );
+}
+
+/** Viewer-relative table geometry; engine seat ids stay untouched for moves and FX. */
+function tablePosition(seat: number, localSeat: number, playerCount: number): number {
+  const offset = (seat - localSeat + playerCount) % playerCount;
+  if (offset === 0) return 0;
+  if (playerCount === 2) return 2;
+  if (playerCount === 3) return offset === 1 ? 1 : 3;
+  return offset;
 }
 
 /**
