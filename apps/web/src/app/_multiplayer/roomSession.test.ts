@@ -283,6 +283,41 @@ describe('multiplayer route composition', () => {
     );
   });
 
+  // Regression: a seated guest used to be pushed straight onto the table while
+  // the host was still in the lobby, so it played the placeholder deal the host
+  // was about to replace — one screen dealing, the other still waiting, and the
+  // guest's seat eventually handed to a bot.
+  it('holds a guest in the lobby until the host deals, then opens both tables', async () => {
+    const broker = new MockSignalingBroker();
+    const rtc = new MockRtcNetwork();
+    const host = new MultiplayerRoomSession(
+      { name: 'Host', avatarId: 'ember', profileId: 'stage-host' },
+      { signaling: broker.signaling('stage-host-peer'), peerConnection: rtc.factory('stage-host'), seed: 42 },
+    );
+    const guest = new MultiplayerRoomSession(
+      { name: 'Guest', avatarId: 'cobalt', profileId: 'stage-guest' },
+      { signaling: broker.signaling('stage-guest-peer'), peerConnection: rtc.factory('stage-guest'), seed: 7 },
+    );
+    sessions.push(host, guest);
+
+    const room = await host.create({ seats: 2 });
+    await guest.join(room.code);
+    await eventually(() => expect(guest.getSnapshot().localSeat).toBe(1));
+
+    // Seated, but nobody has dealt: both peers are still in the lobby.
+    expect(host.getSnapshot().stage).toBe('lobby');
+    expect(guest.getSnapshot().stage).toBe('lobby');
+
+    await host.start();
+
+    expect(host.getSnapshot().stage).toBe('table');
+    await eventually(() => expect(guest.getSnapshot().stage).toBe('table'));
+    // The opening position the host published is the one the guest is playing.
+    expect(stateHash(guest.getSnapshot().session?.state)).toBe(
+      stateHash(host.getSnapshot().session?.state),
+    );
+  });
+
   it('runs the live Veil ceremony with each peer in its assigned seat', async () => {
     const broker = new MockSignalingBroker();
     const rtc = new MockRtcNetwork();

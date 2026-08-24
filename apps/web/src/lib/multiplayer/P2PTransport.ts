@@ -45,6 +45,11 @@ export const DEFAULT_ICE_SERVERS: RTCIceServer[] = [
   },
 ];
 
+/** How long to wait before redialling a peer whose connection died. */
+const REDIAL_DELAY_MS = 1_000;
+/** Redials before a peer is treated as genuinely gone rather than flaky. */
+const MAX_REDIALS = 3;
+
 type PeerLink = {
   pc: RTCPeerConnection;
   channel?: RTCDataChannel;
@@ -89,6 +94,9 @@ export class P2PTransport implements Transport {
   private readonly emoteListeners = new Set<(peerId: string, emote: Emote) => void>();
   private readonly veilListeners = new Set<(peerId: string, message: VeilMessage) => void>();
   private readonly lastReceivedEmote = new Map<string, number>();
+  /** Redials spent on a peer since it last held an open channel. */
+  private readonly redials = new Map<string, number>();
+  private readonly redialTimers = new Set<ReturnType<typeof setTimeout>>();
   private resilience?: MultiplayerState;
   private roomCode?: string;
   private signalSubscription?: { close(): void };
@@ -269,6 +277,8 @@ export class P2PTransport implements Transport {
     if (this.closed) return;
     this.closed = true;
     if (this.heartbeatTimer) clearInterval(this.heartbeatTimer);
+    for (const timer of this.redialTimers) clearTimeout(timer);
+    this.redialTimers.clear();
     this.signalSubscription?.close();
     for (const link of this.links.values()) link.pc.close();
     this.links.clear();
@@ -294,6 +304,35 @@ export class P2PTransport implements Transport {
       shareUrl: roomJoinUrl(this.origin, code, this.signaling.publicKey),
       close: () => this.close(),
     };
+  }
+
+  /**
+   * Forgets a dead peer connection so the mesh is free to dial it again.
+   *
+   * Guarded on identity, because a link that has already been replaced by a
+   * newer dial must not be torn down by its predecessor's late state change.
+   * Only one end redials — the same convention `connectMesh` uses to pick an
+   * offerer — or the two offers collide. A guest always redials the host,
+   * mirroring the dial it made to join. Attempts are capped so a peer that has
+   * genuinely left does not have its chair rung forever.
+   */
+  private retire(peerId: string, pc: RTCPeerConnection): void {
+    if (this.closed) return;
+    const link = this.links.get(peerId);
+    if (!link || link.pc !== pc) return;
+    this.links.delete(peerId);
+    link.pc.close();
+
+    const spent = this.redials.get(peerId) ?? 0;
+    const dials = peerId === this.resilience?.hostId ? !this.isHost() : this.signaling.publicKey < peerId;
+    if (!dials || spent >= MAX_REDIALS) return;
+    this.redials.set(peerId, spent + 1);
+    const timer = setTimeout(() => {
+      this.redialTimers.delete(timer);
+      if (this.closed || this.links.has(peerId)) return;
+      void this.connect(peerId, true).catch(() => undefined);
+    }, REDIAL_DELAY_MS);
+    this.redialTimers.add(timer);
   }
 
   private async connect(peerId: string, initiator: boolean): Promise<void> {
@@ -322,6 +361,14 @@ export class P2PTransport implements Transport {
     pc.onconnectionstatechange = () => {
       if (pc.connectionState === 'failed' || pc.connectionState === 'closed') {
         this.emitPresence({ kind: 'connection', state: 'reconnecting' });
+        // "Reconnecting" used to be a label, not an act: the dead link stayed
+        // in `links`, and `connect` refuses to dial a peer it already has an
+        // entry for, so the peer was gone for the life of the session. On a
+        // phone that is a routine event — a Wi-Fi-to-cellular handoff or a
+        // locked screen is enough — and the host would then hear nothing,
+        // expire the seat, and hand the player's chair to a bot. Drop the
+        // corpse and redial, lowest peer id dialling to avoid glare.
+        this.retire(peerId, pc);
       }
     };
     return link;
@@ -332,6 +379,9 @@ export class P2PTransport implements Transport {
     if (!link) return;
     link.channel = channel;
     channel.onopen = () => {
+      // A peer that reaches an open channel has spent none of its redials: the
+      // cap is there for a peer that has left, not one on a flaky phone.
+      this.redials.delete(peerId);
       this.resilience?.seePeer(peerId, this.now());
       this.sendTo(peerId, { type: 'hello', profile: this.profile });
       this.emitPresence({ kind: 'connection', state: 'connected' });

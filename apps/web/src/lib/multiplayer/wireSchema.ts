@@ -469,6 +469,28 @@ function rejectionMessage(error: unknown): string {
   return error instanceof Error ? error.message : 'Unknown receiver error';
 }
 
+/**
+ * Names the packet that failed, when it named itself.
+ *
+ * A bare "Malformed multiplayer packet" is unactionable for the player seeing
+ * it and nearly as unhelpful in a bug report: every message on the mesh fails
+ * the same way. The `type` is the one field worth quoting, and it is untrusted
+ * input on its way to the screen, so it is bounded and stripped to the shape a
+ * real message type has.
+ */
+function describeMalformed(data: string): string {
+  try {
+    const value: unknown = JSON.parse(data);
+    if (isRecord(value) && typeof value.type === 'string') {
+      const type = value.type.replace(/[^a-zA-Z0-9.]/g, '').slice(0, 32);
+      if (type) return `Malformed multiplayer packet (${type})`;
+    }
+  } catch {
+    // Not JSON at all — nothing to name.
+  }
+  return 'Malformed multiplayer packet';
+}
+
 export function dispatchWireData(
   data: unknown,
   receive: (message: WireMessage) => void | Promise<void>,
@@ -487,7 +509,7 @@ export function dispatchWireData(
   }
   const message = parseWire(data);
   if (!message) {
-    safeReport('Malformed multiplayer packet');
+    safeReport(describeMalformed(data));
     return;
   }
   try {

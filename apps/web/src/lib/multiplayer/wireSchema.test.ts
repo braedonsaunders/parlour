@@ -195,7 +195,15 @@ describe('wire ingress dispatch', () => {
     const report = vi.fn();
     dispatchWireData('{"type":"intent","action":null}', receive, report);
     expect(receive).not.toHaveBeenCalled();
-    expect(report).toHaveBeenCalledWith('Malformed multiplayer packet');
+    // The type is quoted so a report says which message failed, not just that
+    // one did — every packet on the mesh fails this check the same way.
+    expect(report).toHaveBeenCalledWith('Malformed multiplayer packet (intent)');
+  });
+
+  it('does not let a hostile type smuggle text onto the screen', () => {
+    const report = vi.fn();
+    dispatchWireData(`{"type":"<img src=x>${'z'.repeat(200)}"}`, vi.fn(), report);
+    expect(report).toHaveBeenCalledWith(`Malformed multiplayer packet (imgsrcx${'z'.repeat(25)})`);
   });
 
   it('rejects non-text channel payloads at the same boundary', () => {

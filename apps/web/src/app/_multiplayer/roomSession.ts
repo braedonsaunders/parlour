@@ -331,7 +331,17 @@ export class MultiplayerRoomSession {
     if (this.snapshot.seats.length < (this.snapshot.settings?.seats ?? 2)) {
       throw new Error('every seat must be filled before the match starts');
     }
-    if (this.snapshot.security.tier === 'veil') await this.dealVeiled();
+    if (this.snapshot.security.tier === 'veil') {
+      // A veiled deal publishes the real position at the end of the ceremony.
+      await this.dealVeiled();
+    } else {
+      // An open room had no "the host dealt" signal at all, which is why a
+      // guest used to be pushed onto the table the moment it was seated. This
+      // is the same snapshot a veiled deal publishes, and peers only adopt an
+      // unsolicited one while their own log is still empty — so it opens the
+      // table for everyone without being able to rewrite a round in progress.
+      this.transport?.publishSnapshot();
+    }
     this.update({ stage: 'table' });
   }
 
@@ -879,7 +889,13 @@ export class MultiplayerRoomSession {
             ? (authoritativeSession.setupFx ?? [])
             : this.snapshot.fx,
         connection: 'connected',
-        stage: isLocal && !this.snapshot.isHost ? 'table' : this.snapshot.stage,
+        // Taking a seat is not the same as the match starting. This used to
+        // read `isLocal && !isHost ? 'table' : stage`, which walked a guest
+        // straight onto the table while the host was still in the lobby — so
+        // the guest played the placeholder deal the host intends to replace,
+        // and the two screens disagreed about what was happening. The host
+        // deals; everyone waits for `start` to say so.
+        stage: this.snapshot.stage,
       });
       if (
         isLocal &&
