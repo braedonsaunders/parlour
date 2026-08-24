@@ -10,6 +10,7 @@ import { GIN_MATCH_PACE_MS, type GinModeId } from '@/lib/gin/modes';
 import type { GinSeatView, GinTableView } from '@/lib/gin/view';
 import { useMatchTension } from '@/lib/audio/tension';
 import { useMusicMood } from '@/stores/audio';
+import { ArrivalProvider, useAdmittedHand } from '@/lib/table/arrival-presentation';
 import { type DealPresentation, useDealPresentation } from '@/lib/table/deal-presentation';
 import { type FxCue } from '@/lib/table/fx-motion';
 import styles from '@/styles/table.module.css';
@@ -17,6 +18,7 @@ import ginStyles from '@/styles/gin.module.css';
 import { discardRotation, useTableAudio } from '../fx-animation';
 import { HandRail, HandRailCard } from '../HandRail';
 import { PlayingCard } from '../PlayingCard';
+import { StockStack } from '../StockStack';
 import { TableMenu } from '../TableMenu';
 import {
   dealStateAttr,
@@ -125,6 +127,7 @@ export function GinTableScreen(props: GinTableScreenProps) {
   const meldedSet = new Set(view.meldPreview.flatMap((meld) => meld.cards));
 
   return (
+    <ArrivalProvider fx={props.fx} fxKey={props.fxKey} localSeat={view.localSeat}>
     <TableShell rootRef={rootRef} dealState={dealStateAttr(deal)}>
       <TableHud onOpenMenu={menu.open}>
         <TableTitlePill eyebrow="Gin" status={view.phaseLabel} className="flex items-center gap-2">
@@ -204,6 +207,7 @@ export function GinTableScreen(props: GinTableScreenProps) {
         onQuit={menu.quit}
       />
     </TableShell>
+    </ArrivalProvider>
   );
 }
 
@@ -286,7 +290,11 @@ function Piles({
         count={stockCount}
         disabled={!view.legal.drawStock || busy}
         onClick={() => onDraw?.('stock')}
-        card={<PlayingCard faceDown />}
+        card={
+          <StockStack count={stockCount}>
+            <PlayingCard faceDown />
+          </StockStack>
+        }
       />
       <DiscardPileButton
         disabled={
@@ -336,16 +344,18 @@ function LocalHand({
   onDiscard?: (card: string) => void;
 }) {
   const canChoose = view.legal.discardCards.length > 0 && !busy && view.decision === 'act';
-  const visibleHand = orderedHand(
+  const plannedHand = orderedHand(
     deal.visibleCards(view.hand, view.localSeat),
     ginCatalog.handOrder,
   );
+  const visibleHand = useAdmittedHand(plannedHand);
   return (
     <HandRail
       count={visibleHand.length}
       zone={`hand:${view.localSeat}`}
       label="Your hand"
       dealState={dealStateAttr(deal)}
+      fanPlan={plannedHand}
     >
       <AnimatePresence initial={false} mode="popLayout">
         {visibleHand.map((card, index) => {
@@ -356,7 +366,7 @@ function LocalHand({
               key={card}
               cardId={card}
               index={index}
-              count={view.hand.length}
+              count={visibleHand.length}
               playable={canChoose ? playable : undefined}
             >
               <span className={ginStyles.handCardShell}>

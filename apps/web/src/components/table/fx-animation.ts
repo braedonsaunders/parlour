@@ -5,6 +5,7 @@ import { type FxEvent } from '@parlour/engine';
 import { gsap } from 'gsap';
 import { getAudioManager } from '@/lib/audio/AudioManager';
 import { soundCuesForFx, soundDefsForSfxPack } from '@/lib/audio/sfx';
+import { calculateFanStep } from '@/components/table/HandRail';
 import { FX_TIMING, type FxCue, type Zone } from '@/lib/table/fx-motion';
 import styles from '@/styles/table.module.css';
 
@@ -56,8 +57,23 @@ export function useFxAnimation(
           cue.type === 'transfer' ||
           cue.type === 'layoff'
         ) {
-          const from = zonePoint(cue.from, root, bounds);
-          const to = zonePoint(cue.to, root, bounds);
+          const cueCard = 'card' in cue ? cue.card : undefined;
+          // Only live pickups/transfers seat into a fan slot. Deal flights have
+          // to stay zone-to-zone — the destination card is not in the rail yet,
+          // and the opening deal runs before the table has a stable layout.
+          const seatIntoFan = cue.type === 'draw' || cue.type === 'transfer';
+          const leaveFromFan =
+            (cue.type === 'discard' ||
+              cue.type === 'trick-play' ||
+              cue.type === 'layoff' ||
+              cue.type === 'transfer') &&
+            cue.from.startsWith('hand:');
+          const from = leaveFromFan || seatIntoFan
+            ? flightPoint(cue.from, root, bounds, cueCard, element)
+            : zonePoint(cue.from, root, bounds);
+          const to = seatIntoFan
+            ? flightPoint(cue.to, root, bounds, cueCard, element)
+            : zonePoint(cue.to, root, bounds);
           const card = element.querySelector<HTMLElement>('[data-flight-card]') ?? element;
           const trail = element.querySelector<HTMLElement>(`.${styles.cardTrail}`);
           const glint = element.querySelector<HTMLElement>(`.${styles.cardGlint}`);
@@ -68,15 +84,19 @@ export function useFxAnimation(
           const dx = to.x - from.x;
           const dy = to.y - from.y;
           const direction = dx < 0 ? -1 : 1;
-          const arcHeight = Math.min(118, Math.max(38, Math.hypot(dx, dy) * 0.18));
+          const distance = Math.hypot(dx, dy);
+          const arcHeight = Math.min(118, Math.max(38, distance * 0.18));
           const arcPeak = Math.min(from.y, to.y) - arcHeight;
           const apexAt = start + flightDuration * 0.48;
           const landingRotation =
-            cue.type === 'layoff'
-              ? 0
-              : cue.type === 'discard'
-                ? discardRotation(cue.card, 0)
-                : direction * 2;
+            to.handoff && to.rotate !== undefined
+              ? to.rotate
+              : cue.type === 'layoff'
+                ? 0
+                : cue.type === 'discard'
+                  ? discardRotation(cue.card, 0)
+                  : direction * 2;
+          const landingScale = to.scale ?? 1;
           element.style.setProperty('--flight-angle', `${Math.atan2(dy, dx)}rad`);
           timeline
             .set(element, { x: from.x, y: from.y, autoAlpha: 1 }, start)
@@ -101,10 +121,23 @@ export function useFxAnimation(
               start,
             )
             .to(element, { y: arcPeak, duration: flightDuration * 0.48, ease: 'power2.out' }, start)
-            .to(element, { y: to.y, duration: flightDuration * 0.52, ease: 'power2.in' }, apexAt)
+            .to(
+              element,
+              {
+                y: to.y,
+                duration: flightDuration * 0.52,
+                ease: to.handoff ? 'power2.inOut' : 'power2.in',
+              },
+              apexAt,
+            )
             .to(
               card,
-              { rotate: landingRotation, duration: flightDuration, ease: 'sine.inOut' },
+              {
+                rotate: landingRotation,
+                scale: landingScale,
+                duration: flightDuration,
+                ease: 'sine.inOut',
+              },
               start,
             )
             .fromTo(
@@ -117,39 +150,69 @@ export function useFxAnimation(
               trail,
               { autoAlpha: 0, duration: Math.min(0.1, flightDuration * 0.45) },
               start + flightDuration * 0.58,
-            )
-            .fromTo(
-              glint,
-              { autoAlpha: 0, scale: 0.45 },
-              {
-                autoAlpha: 0.9,
-                scale: 2.4,
-                duration: settleDuration,
-                ease: 'power2.out',
-              },
-              start + flightDuration,
-            )
-            .to(
-              card,
-              {
-                scaleX: 1.035,
-                scaleY: 0.965,
-                duration: settleDuration * 0.42,
-                ease: 'power2.in',
-              },
-              start + flightDuration,
-            )
-            .to(
-              card,
-              {
-                scaleX: 1,
-                scaleY: 1,
-                duration: settleDuration * 0.58,
-                ease: 'back.out(2.2)',
-              },
-              start + flightDuration + settleDuration * 0.42,
-            )
-            .set(element, { autoAlpha: 0 }, start + flightDuration + settleDuration);
+            );
+          if (to.handoff) {
+            // Seat into the waiting fan slot, then fade the flyer after the
+            // real card is already underneath it — one card, not a collision.
+            timeline
+              .to(
+                card,
+                {
+                  scale: landingScale * 1.08,
+                  duration: settleDuration * 0.4,
+                  ease: 'power2.out',
+                },
+                start + flightDuration,
+              )
+              .to(
+                card,
+                {
+                  scale: landingScale,
+                  duration: settleDuration * 0.6,
+                  ease: 'power2.inOut',
+                },
+                start + flightDuration + settleDuration * 0.4,
+              )
+              .to(
+                element,
+                { autoAlpha: 0, duration: settleDuration * 0.55, ease: 'power2.in' },
+                start + flightDuration + settleDuration * 0.45,
+              );
+          } else {
+            timeline
+              .fromTo(
+                glint,
+                { autoAlpha: 0, scale: 0.45 },
+                {
+                  autoAlpha: 0.9,
+                  scale: 2.4,
+                  duration: settleDuration,
+                  ease: 'power2.out',
+                },
+                start + flightDuration,
+              )
+              .to(
+                card,
+                {
+                  scaleX: 1.035,
+                  scaleY: 0.965,
+                  duration: settleDuration * 0.42,
+                  ease: 'power2.in',
+                },
+                start + flightDuration,
+              )
+              .to(
+                card,
+                {
+                  scaleX: 1,
+                  scaleY: 1,
+                  duration: settleDuration * 0.58,
+                  ease: 'back.out(2.2)',
+                },
+                start + flightDuration + settleDuration * 0.42,
+              )
+              .set(element, { autoAlpha: 0 }, start + flightDuration + settleDuration);
+          }
           if (cue.type === 'flip') {
             timeline.to(
               card,
@@ -211,6 +274,14 @@ export function useFxAnimation(
   }, [cues, rootRef, key]);
 }
 
+export type FlightPoint = {
+  x: number;
+  y: number;
+  rotate?: number;
+  scale?: number;
+  handoff?: boolean;
+};
+
 export function zonePoint(zone: Zone, root: HTMLElement, bounds: DOMRect) {
   const anchor =
     root.querySelector<HTMLElement>(`[data-zone="${zone}"]`) ??
@@ -218,7 +289,15 @@ export function zonePoint(zone: Zone, root: HTMLElement, bounds: DOMRect) {
       ? root.querySelector<HTMLElement>(`[data-seat="${zone.split(':')[1]}"]`)
       : null);
   if (anchor) {
-    const rect = anchor.getBoundingClientRect();
+    // Pile buttons are narrower than the card chassis, so the zone box sits
+    // left of the visible deck. Aim at the face inside the zone when we can.
+    // Hands must stay on the rail — the first .card is just the leftmost card.
+    const face = zone.startsWith('hand:')
+      ? anchor
+      : (anchor.querySelector<HTMLElement>('[data-zone-face]') ??
+        anchor.querySelector<HTMLElement>(`.${styles.card}`) ??
+        anchor);
+    const rect = face.getBoundingClientRect();
     if (rect.width > 0 || rect.height > 0) {
       return {
         x: rect.left + rect.width / 2 - bounds.left,
@@ -240,6 +319,101 @@ export function zonePoint(zone: Zone, root: HTMLElement, bounds: DOMRect) {
   };
   const [x, y] = points[zone] ?? [0.5, 0.5];
   return { x: x * bounds.width, y: y * bounds.height };
+}
+
+/**
+ * Prefer the actual fan slot for a named card so a draw lands on the waiting
+ * card instead of the rail's midpoint. Falls back to the zone center.
+ */
+export function flightPoint(
+  zone: Zone,
+  root: HTMLElement,
+  bounds: DOMRect,
+  card?: string,
+  flyer?: HTMLElement,
+): FlightPoint {
+  if (card && zone.startsWith('hand:')) {
+    const zoneRoot = root.querySelector<HTMLElement>(`[data-zone="${zone}"]`);
+    if (!zoneRoot) return zonePoint(zone, root, bounds);
+    const slot = findFlightSlot(zoneRoot, card);
+    const visual = slot?.querySelector<HTMLElement>('[data-hand-fan]') ?? slot;
+    if (visual) {
+      const rect = visual.getBoundingClientRect();
+      if (rect.width > 0 || rect.height > 0) {
+        const face = visual.querySelector<HTMLElement>(':scope > *');
+        const flyerFace = flyer?.querySelector<HTMLElement>('[data-flight-card] > *');
+        const scale =
+          face && flyerFace && flyerFace.offsetWidth > 0
+            ? face.offsetWidth / flyerFace.offsetWidth
+            : 1;
+        return {
+          x: rect.left + rect.width / 2 - bounds.left,
+          y: rect.top + rect.height / 2 - bounds.top,
+          rotate: elementRotationDeg(visual),
+          scale,
+          handoff: true,
+        };
+      }
+    }
+    const predicted = predictedFanSlot(zoneRoot, bounds, card, flyer);
+    if (predicted) return predicted;
+  }
+  return zonePoint(zone, root, bounds);
+}
+
+/** Where a card will sit once the fan opens a gap for it. */
+function predictedFanSlot(
+  rail: HTMLElement,
+  bounds: DOMRect,
+  card: string,
+  flyer?: HTMLElement,
+): FlightPoint | null {
+  const plan = (rail.dataset.fanPlan ?? '').split(',').filter(Boolean);
+  const index = plan.indexOf(card);
+  if (index < 0 || plan.length === 0) return null;
+  const sample = rail.querySelector<HTMLElement>('[data-hand-card]');
+  const cardWidth =
+    sample?.offsetWidth ||
+    Number.parseFloat(getComputedStyle(rail).getPropertyValue('--hand-card-width')) ||
+    0;
+  if (cardWidth <= 0) return null;
+  const rem = Number.parseFloat(getComputedStyle(rail).fontSize) || 16;
+  const step = calculateFanStep(rail.clientWidth, cardWidth, plan.length);
+  const fanN = Math.max(plan.length, 1);
+  const fanIndex = index - (plan.length - 1) / 2;
+  const fanUn = 1 / fanN;
+  const liftY =
+    Math.abs(fanIndex) * Math.min(0.48, 2.1 * fanUn) * rem -
+    (rail.dataset.fanLift === card ? 1.15 * rem : 0);
+  const railRect = rail.getBoundingClientRect();
+  const flyerFace = flyer?.querySelector<HTMLElement>('[data-flight-card] > *');
+  return {
+    x: railRect.left + railRect.width / 2 + fanIndex * step - bounds.left,
+    y: railRect.top + 0.9 * rem + (cardWidth * 7) / 10 + liftY - bounds.top,
+    rotate: fanIndex * Math.min(6, 24 * fanUn),
+    scale: flyerFace && flyerFace.offsetWidth > 0 ? cardWidth / flyerFace.offsetWidth : 1,
+    handoff: true,
+  };
+}
+
+function findFlightSlot(root: HTMLElement, card: string): HTMLElement | null {
+  const escaped = cssEscape(card);
+  return (
+    root.querySelector<HTMLElement>(`[data-flight-target="${escaped}"]`) ??
+    root.querySelector<HTMLElement>(`[data-hand-card][data-card-id="${escaped}"]`)
+  );
+}
+
+function cssEscape(value: string): string {
+  if (typeof CSS !== 'undefined' && typeof CSS.escape === 'function') return CSS.escape(value);
+  return value.replace(/"/g, '\\"');
+}
+
+function elementRotationDeg(el: HTMLElement): number {
+  const transform = getComputedStyle(el).transform;
+  if (!transform || transform === 'none') return 0;
+  const matrix = new DOMMatrix(transform);
+  return (Math.atan2(matrix.m21, matrix.m11) * 180) / Math.PI;
 }
 
 export function discardRotation(card: string, index: number) {

@@ -86,6 +86,9 @@ describe('TableScreen owner hand', () => {
       '44 cards remain',
     );
     expect(
+      container.querySelector('[data-zone="stock"] [data-stack-depth]')?.getAttribute('data-stack-depth'),
+    ).toBe('5');
+    expect(
       container.querySelector('[data-zone="discard"] [aria-label="3 of diamonds"]'),
     ).toBeNull();
 

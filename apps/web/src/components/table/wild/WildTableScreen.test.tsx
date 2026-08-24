@@ -6,6 +6,8 @@ import { getMusicController } from '@/lib/audio/MusicController';
 import { DEFAULT_TENSE_WINDOW_MS } from '@/lib/audio/tension';
 import { WILD_MATCH_PACE_MS } from '@/lib/wild/modes';
 import type { WildTableView } from '@/lib/wild/view';
+import { fanOpenAtMs } from '@/lib/table/arrival-presentation';
+import { FX_TIMING } from '@/lib/table/fx-motion';
 import { WildTableScreen } from './WildTableScreen';
 
 const VIEW: WildTableView = {
@@ -605,6 +607,48 @@ describe('WildTableScreen turn affordances', () => {
     // ...then it releases the table rather than sitting there.
     act(() => void vi.advanceTimersByTime(900));
     expect(counter()?.getAttribute('data-active')).toBe('false');
+  });
+
+  it('opens a fan gap late in the flight, then hands the card into that slot', () => {
+    vi.useFakeTimers();
+    act(() => {
+      root.render(
+        createElement(WildTableScreen, {
+          view: {
+            ...VIEW,
+            hand: [...VIEW.hand, 'green-4-0'],
+            drawnCard: 'green-4-0',
+          },
+          fx: [
+            { kind: Fx.DrawCard, payload: { card: 'green-4-0', seat: 0, from: 'stock' }, at: 0 },
+          ],
+          fxKey: 'draw-handoff',
+        }),
+      );
+    });
+
+    const slot = () => container.querySelector('[data-card-id="green-4-0"]');
+    const rail = () => container.querySelector('[data-zone="hand:0"]');
+    expect(slot()).toBeNull();
+    expect(rail()?.getAttribute('data-receiving')).toBe('true');
+    expect(rail()?.getAttribute('data-fan-plan')?.split(',')).toContain('green-4-0');
+
+    const openAt = fanOpenAtMs({ startMs: 0, durationMs: FX_TIMING.drawFlightMs });
+    act(() => void vi.advanceTimersByTime(openAt - 1));
+    expect(slot()).toBeNull();
+
+    act(() => void vi.advanceTimersByTime(1));
+    expect(slot()?.getAttribute('data-arriving')).toBe('true');
+    expect(slot()?.getAttribute('data-flight-target')).toBe('green-4-0');
+    expect(slot()?.getAttribute('aria-hidden')).toBe('true');
+
+    act(() => void vi.advanceTimersByTime(FX_TIMING.drawFlightMs - openAt - 1));
+    expect(slot()?.getAttribute('data-arriving')).toBe('true');
+
+    act(() => void vi.advanceTimersByTime(1));
+    expect(slot()?.getAttribute('data-arriving')).toBeNull();
+    expect(slot()?.getAttribute('aria-hidden')).toBeNull();
+    expect(slot()?.getAttribute('data-just-drawn')).toBe('true');
   });
 
   it('keeps Wild cards full size during center-to-hand flights', () => {

@@ -38,6 +38,21 @@ describe('calculateFanStep', () => {
     expect(declarationsFor('.handCard')).toMatch(/pointer-events:\s*none;/);
     expect(declarationsFor('.localHand .card')).toMatch(/pointer-events:\s*auto;/);
   });
+
+  it('hides an arriving fan card so the flyer can become it', () => {
+    expect(declarationsFor('.handCard[data-arriving] .card')).toMatch(/opacity:\s*0;/);
+  });
+
+  it('hides a departing fan card so the discard flyer can leave from its slot', () => {
+    expect(declarationsFor('.handCard[data-departing] .card')).toMatch(/opacity:\s*0;/);
+  });
+
+  it('eases the fan open without the pop curve while a card is coming in', () => {
+    expect(declarationsFor('.localHand[data-receiving] .handFan')).toMatch(
+      /cubic-bezier\(0\.22,\s*1,\s*0\.36,\s*1\)/,
+    );
+    expect(declarationsFor('.localHand[data-receiving] .handFan')).not.toMatch(/ease-pop/);
+  });
 });
 
 describe('hand rail keyboard surface', () => {
@@ -80,6 +95,9 @@ describe('hand rail keyboard surface', () => {
     expect(container.querySelectorAll('[role="listitem"]')).toHaveLength(2);
 
     const playableItem = container.querySelector('[data-hand-card][data-playable="true"]');
+    expect(playableItem?.getAttribute('data-card-id')).toBe('S1');
+    expect(playableItem?.getAttribute('data-flight-target')).toBe('S1');
+    expect(playableItem?.querySelector('[data-hand-fan]')).not.toBeNull();
     expect(playableItem?.getAttribute('tabindex')).toBeNull();
     expect(playableItem?.tagName).not.toBe('BUTTON');
 

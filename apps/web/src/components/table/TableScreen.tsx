@@ -6,12 +6,14 @@ import { blitzCatalog, blitzHowToPlay } from '@parlour/game-blitz';
 import { AnimatePresence, motion } from 'motion/react';
 import { getAvatar } from '@/lib/avatars';
 import { BLITZ_SFX_PACK } from '@/lib/audio/sfx';
+import { ArrivalProvider, useAdmittedHand } from '@/lib/table/arrival-presentation';
 import { type DealPresentation, useDealPresentation } from '@/lib/table/deal-presentation';
 import { type FxCue } from '@/lib/table/fx-motion';
 import { ownerCurrentCount } from '@/lib/table/owner-count';
 import { discardRotation, useTableAudio } from './fx-animation';
 import { HandRail, HandRailCard } from './HandRail';
 import { PlayingCard } from './PlayingCard';
+import { StockStack } from './StockStack';
 import { TableMenu } from './TableMenu';
 import {
   dealStateAttr,
@@ -113,48 +115,50 @@ export function TableScreen(props: TableScreenProps) {
   const localSeat = view.players.find(({ isLocal }) => isLocal)?.seat ?? 0;
 
   return (
-    <TableShell rootRef={rootRef} dealState={dealStateAttr(deal)}>
-      <TableHud onOpenMenu={menu.open}>
-        <TableTitlePill eyebrow="Blitz" status={view.phaseLabel} />
-      </TableHud>
+    <ArrivalProvider fx={props.fx} fxKey={props.fxKey} localSeat={localSeat}>
+      <TableShell rootRef={rootRef} dealState={dealStateAttr(deal)}>
+        <TableHud onOpenMenu={menu.open}>
+          <TableTitlePill eyebrow="Blitz" status={view.phaseLabel} />
+        </TableHud>
 
-      <TablePlayfield label="Blitz table" feltMark="31">
-        {view.players.map((player) => (
-          <Seat
-            key={player.seat}
-            player={player}
-            active={view.activeSeat === player.seat}
-            displayCount={deal.visibleCount(player.seat, player.handCount ?? player.hand.length)}
+        <TablePlayfield label="Blitz table" feltMark="31">
+          {view.players.map((player) => (
+            <Seat
+              key={player.seat}
+              player={player}
+              active={view.activeSeat === player.seat}
+              displayCount={deal.visibleCount(player.seat, player.handCount ?? player.hand.length)}
+            />
+          ))}
+          <Piles view={view} busy={tableBusy} onDraw={props.onDraw} deal={deal} />
+          <LocalHand {...props} view={view} busy={tableBusy} deal={deal} />
+          <TableFxLayer
+            fx={props.fx}
+            fxKey={props.fxKey}
+            rootRef={rootRef}
+            renderCue={(cue) => <Cue cue={cue} players={view.players} localSeat={localSeat} />}
           />
-        ))}
-        <Piles view={view} busy={tableBusy} onDraw={props.onDraw} deal={deal} />
-        <LocalHand {...props} view={view} busy={tableBusy} deal={deal} />
-        <TableFxLayer
-          fx={props.fx}
-          fxKey={props.fxKey}
-          rootRef={rootRef}
-          renderCue={(cue) => <Cue cue={cue} players={view.players} localSeat={localSeat} />}
+        </TablePlayfield>
+
+        <TableActionRail>
+          <button
+            type="button"
+            className="btn-fat"
+            disabled={!view.legal.knock || tableBusy}
+            onClick={props.onKnock}
+          >
+            Knock
+          </button>
+        </TableActionRail>
+
+        <TableMenu
+          open={menu.isOpen}
+          onClose={menu.close}
+          howToPlay={{ doc: blitzHowToPlay, title: 'Blitz', subtitle: 'the 31 game' }}
+          onQuit={menu.quit}
         />
-      </TablePlayfield>
-
-      <TableActionRail>
-        <button
-          type="button"
-          className="btn-fat"
-          disabled={!view.legal.knock || tableBusy}
-          onClick={props.onKnock}
-        >
-          Knock
-        </button>
-      </TableActionRail>
-
-      <TableMenu
-        open={menu.isOpen}
-        onClose={menu.close}
-        howToPlay={{ doc: blitzHowToPlay, title: 'Blitz', subtitle: 'the 31 game' }}
-        onQuit={menu.quit}
-      />
-    </TableShell>
+      </TableShell>
+    </ArrivalProvider>
   );
 }
 
@@ -225,7 +229,11 @@ function Piles({
         count={stockCount}
         disabled={!view.legal.drawStock || busy}
         onClick={() => onDraw?.('stock')}
-        card={<PlayingCard faceDown />}
+        card={
+          <StockStack count={stockCount}>
+            <PlayingCard faceDown />
+          </StockStack>
+        }
       />
       <DiscardPileButton
         disabled={!view.legal.drawDiscard || busy || visibleDiscard.length === 0}
@@ -247,12 +255,13 @@ function Piles({
 function LocalHand(props: TableScreenProps & { view: TableView; deal: DealPresentation }) {
   const player = props.view.players.find(({ isLocal }) => isLocal);
   if (!player) return null;
-  const visibleHand = orderedHand(
+  const plannedHand = orderedHand(
     props.deal.visibleCards(player.hand, player.seat),
     blitzCatalog.handOrder,
   );
+  const visibleHand = useAdmittedHand(plannedHand);
   const canChoose = props.view.legal.discardCards.length > 0 && !props.busy;
-  const currentCount = ownerCurrentCount([{ hand: visibleHand, isLocal: true }]);
+  const currentCount = ownerCurrentCount([{ hand: plannedHand, isLocal: true }]);
   return (
     <>
       <div className={styles.ownerStatusRail} aria-label="Your status">
@@ -274,6 +283,7 @@ function LocalHand(props: TableScreenProps & { view: TableView; deal: DealPresen
         zone={`hand:${player.seat}`}
         label="Your hand"
         dealState={dealStateAttr(props.deal)}
+        fanPlan={plannedHand}
       >
         <AnimatePresence initial={false} mode="popLayout">
           {visibleHand.map((card, index) => {

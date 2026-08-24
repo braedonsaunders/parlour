@@ -8,11 +8,13 @@ import { AvatarBadge } from '@/components/AvatarBadge';
 import { getAvatar } from '@/lib/avatars';
 import { CRIBBAGE_SFX_PACK } from '@/lib/audio/sfx';
 import type { CribbageSeatView, CribbageTableView } from '@/lib/cribbage/view';
+import { ArrivalProvider, useAdmittedHand } from '@/lib/table/arrival-presentation';
 import { type DealPresentation, useDealPresentation } from '@/lib/table/deal-presentation';
 import { type FxCue } from '@/lib/table/fx-motion';
 import { useTableAudio } from '../fx-animation';
 import { HandRail, HandRailCard } from '../HandRail';
 import { PlayingCard } from '../PlayingCard';
+import { StockStack } from '../StockStack';
 import { TableMenu } from '../TableMenu';
 import {
   dealStateAttr,
@@ -87,6 +89,7 @@ export function CribbageTableScreen(props: CribbageTableScreenProps) {
 
   const tableBusy = (props.busy ?? false) || deal.dealing;
   return (
+    <ArrivalProvider fx={props.fx} fxKey={props.fxKey} localSeat={view.localSeat}>
     <TableShell rootRef={rootRef} className={styles.screen} dealState={dealStateAttr(deal)}>
       <TableHud onOpenMenu={menu.open}>
         <TableTitlePill eyebrow="Cribbage" status={phaseCopy(view)} />
@@ -144,6 +147,7 @@ export function CribbageTableScreen(props: CribbageTableScreenProps) {
         onQuit={menu.quit}
       />
     </TableShell>
+    </ArrivalProvider>
   );
 }
 
@@ -220,8 +224,10 @@ function TableCards({ view, deal }: { view: CribbageTableView; deal: DealPresent
         data-zone="stock"
         aria-label={`${view.stockCount} cards in stock`}
       >
-        <PlayingCard compact faceDown />
-        <span>{view.stockCount + deal.pendingStockCards}</span>
+        <StockStack count={view.stockCount + deal.pendingStockCards} compact>
+          <PlayingCard compact faceDown />
+        </StockStack>
+        <span className={styles.stockCount}>{view.stockCount + deal.pendingStockCards}</span>
       </div>
       <div className={styles.starter} data-zone="discard" aria-label="Starter card">
         {view.starter ? (
@@ -270,10 +276,11 @@ function LocalHand(
   const { view } = props;
   const local = view.players.find((player) => player.isLocal);
   const [selected, setSelected] = useState<readonly string[]>([]);
-  const visibleHand = orderedHand(
+  const plannedHand = orderedHand(
     props.deal.visibleCards(view.hand, view.localSeat),
     cribbageCatalog.handOrder,
   );
+  const visibleHand = useAdmittedHand(plannedHand);
   const selectedVisible = selected.filter((card) => visibleHand.includes(card)).slice(0, 2);
   const discarding = view.legal.discardPairs.length > 0;
   const pair =
@@ -308,6 +315,7 @@ function LocalHand(
         zone={`hand:${view.localSeat}`}
         label="Your cribbage hand"
         dealState={dealStateAttr(props.deal)}
+        fanPlan={plannedHand}
       >
         <AnimatePresence initial={false} mode="popLayout">
           {visibleHand.map((card, index) => {

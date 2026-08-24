@@ -13,6 +13,7 @@ import { getAvatar } from '@/lib/avatars';
 import { WILDPILE_SFX_PACK } from '@/lib/audio/sfx';
 import { useMatchTension } from '@/lib/audio/tension';
 import { useMusicMood } from '@/stores/audio';
+import { ArrivalProvider, useAdmittedHand } from '@/lib/table/arrival-presentation';
 import { type DealPresentation, useDealPresentation } from '@/lib/table/deal-presentation';
 import { type FxCue } from '@/lib/table/fx-motion';
 import {
@@ -26,6 +27,7 @@ import { WILD_DROP_EFFECTS } from '@/lib/wild/drop-effects';
 import { CardDropFx } from '../CardDropFx';
 import { discardRotation, useTableAudio } from '../fx-animation';
 import { HandRail, HandRailCard } from '../HandRail';
+import { StockStack } from '../StockStack';
 import { TableMenu } from '../TableMenu';
 import {
   dealStateAttr,
@@ -150,6 +152,7 @@ export function WildTableScreen(props: WildTableScreenProps) {
   const calls = deal.dealing ? [] : wildAnnouncements(props.fx, view.players);
 
   return (
+    <ArrivalProvider fx={props.fx} fxKey={props.fxKey} localSeat={view.localSeat}>
     <TableShell rootRef={rootRef} dealState={dealStateAttr(deal)}>
       <TableHud onOpenMenu={menu.open}>
         <TableTitlePill eyebrow="Wild" status={view.phaseLabel} />
@@ -268,6 +271,7 @@ export function WildTableScreen(props: WildTableScreenProps) {
         onQuit={menu.quit}
       />
     </TableShell>
+    </ArrivalProvider>
   );
 }
 
@@ -524,7 +528,11 @@ function Piles({
         canDraw={view.legal.draw && !busy}
         disabled={!view.legal.draw || busy}
         onClick={onDraw}
-        card={<WildCard faceDown />}
+        card={
+          <StockStack count={stockCount}>
+            <WildCard faceDown />
+          </StockStack>
+        }
       >
         {view.legal.draw && !busy && (
           <span className={wildStyles.drawHint} aria-hidden="true">
@@ -556,10 +564,11 @@ function LocalHand({
   onPlay?: (card: string) => void;
   deal: DealPresentation;
 }) {
-  const visibleHand = orderedHand(
+  const plannedHand = orderedHand(
     deal.visibleCards(view.hand, view.localSeat),
     wildpileCatalog.handOrder,
   );
+  const visibleHand = useAdmittedHand(plannedHand);
   const canChoose = view.legal.playCards.length > 0 && !busy;
   const showLegality = !busy && view.decision !== null && view.decision !== 'choose-color';
   return (
@@ -568,6 +577,8 @@ function LocalHand({
       zone={`hand:${view.localSeat}`}
       label="Your hand"
       dealState={dealStateAttr(deal)}
+      fanPlan={plannedHand}
+      liftCard={view.drawnCard}
     >
       <AnimatePresence initial={false} mode="popLayout">
         {visibleHand.map((card, index) => {

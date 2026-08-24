@@ -282,18 +282,61 @@
 
 .pileButton {
   position: relative;
-  width: 5.5rem;
-  height: 7.8rem;
+  width: clamp(5.6rem, 8vw, 7.2rem);
+  aspect-ratio: 5 / 7;
+  height: auto;
   border: 0;
   background: transparent;
   padding: 0;
   perspective: 600px;
+  overflow: visible;
+}
+.pileButton:has([data-stack-depth]) {
+  width: auto;
+  aspect-ratio: auto;
 }
 .pileButton:not(:disabled):hover {
   transform: translateY(-5px) scale(1.04);
 }
 .pileButton:disabled {
   cursor: default;
+}
+.stockStack {
+  --stack-step-x: 0.28rem;
+  --stack-step-y: 0.22rem;
+  position: relative;
+  display: inline-block;
+  line-height: 0;
+  padding-right: calc((var(--stack-n) - 1) * var(--stack-step-x));
+  padding-bottom: calc((var(--stack-n) - 1) * var(--stack-step-y));
+}
+.stockStackLayer {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 0;
+  pointer-events: none;
+  translate: calc(var(--layer) * var(--stack-step-x)) calc(var(--layer) * var(--stack-step-y));
+}
+.stockStackLayer .card {
+  box-shadow: none;
+}
+.stockStackFace {
+  position: relative;
+  z-index: 1;
+  display: block;
+}
+.stockEmpty {
+  display: inline-block;
+  width: clamp(5.6rem, 8vw, 7.2rem);
+  aspect-ratio: 5 / 7;
+  border: 0.16rem dashed rgba(255, 250, 240, 0.28);
+  border-radius: 0.72rem;
+  background: rgba(8, 16, 20, 0.22);
+}
+.stockEmpty[data-compact] {
+  width: clamp(3rem, 4.2vw, 4rem);
+  border-radius: 0.5rem;
 }
 .pileCount {
   position: absolute;
@@ -445,6 +488,10 @@
   transition: transform 280ms var(--ease-pop);
 }
 
+.localHand[data-receiving] .handFan {
+  transition: transform 200ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
 .handCard[data-playable='true'] {
   --playable-y: -0.62rem;
 }
@@ -474,6 +521,21 @@
     0 16px 28px -8px rgba(3, 11, 15, 0.85),
     0 0 0 3px rgba(184, 255, 205, 0.75),
     0 0 26px rgba(140, 235, 175, 0.5);
+}
+
+/* In-flight arrivals occupy their fan slot invisibly so the flyer can land on
+   the real card instead of vanishing into the rail, then popping in beside it. */
+.handCard[data-arriving] .card {
+  opacity: 0;
+  pointer-events: none;
+  filter: none;
+  box-shadow: none;
+}
+.handCard[data-departing] .card {
+  opacity: 0;
+  pointer-events: none;
+  filter: none;
+  box-shadow: none;
 }
 
 @media (hover: hover) and (pointer: fine) {

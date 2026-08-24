@@ -2,13 +2,14 @@
 
 import {
   useCallback,
-  useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type CSSProperties,
   type ReactNode,
 } from 'react';
 import { motion } from 'motion/react';
+import { useCardArriving, useCardDeparting, useFanReceiving } from '@/lib/table/arrival-presentation';
 import styles from '@/styles/table.module.css';
 
 export type HandRailProps = {
@@ -16,6 +17,10 @@ export type HandRailProps = {
   zone: string;
   label: string;
   dealState?: 'dealing' | 'complete';
+  /** Full ordered hand, including cards still waiting for a gap. */
+  fanPlan?: readonly string[];
+  /** Card that should land in the lifted just-drawn seat. */
+  liftCard?: string | null;
   children: ReactNode;
 };
 
@@ -45,29 +50,49 @@ export function HandRailCard({
   justDrawn,
   children,
 }: HandRailCardProps) {
+  const arriving = useCardArriving(cardId);
+  const departing = useCardDeparting(cardId);
+  const receiving = useFanReceiving();
   const fanIndex = index - (count - 1) / 2;
   return (
     <motion.div
-      layout
+      layout={!receiving}
       layoutId={`card:${cardId}`}
       className={styles.handCard}
       role="listitem"
       data-hand-card
+      data-card-id={cardId}
+      data-flight-target={cardId}
+      data-fan-index={fanIndex}
       data-playable={playable}
       data-just-drawn={justDrawn || undefined}
+      data-arriving={arriving || undefined}
+      data-departing={departing || undefined}
+      aria-hidden={arriving || departing || undefined}
       style={{ '--fan-index': fanIndex, '--fan-abs': Math.abs(fanIndex) } as CSSProperties}
-      initial={{ y: 24, opacity: 0 }}
+      initial={arriving ? false : { y: 24, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       exit={{ y: -24, opacity: 0 }}
-      transition={{ duration: 0.22, ease: [0.2, 0.8, 0.3, 1] }}
+      transition={{ duration: receiving ? 0.2 : 0.22, ease: [0.22, 1, 0.36, 1] }}
     >
-      <div className={styles.handFan}>{children}</div>
+      <div className={styles.handFan} data-hand-fan>
+        {children}
+      </div>
     </motion.div>
   );
 }
 
 /** A cards-only fan; player HUD and controls belong in the table's side gutters. */
-export function HandRail({ count, zone, label, dealState, children }: HandRailProps) {
+export function HandRail({
+  count,
+  zone,
+  label,
+  dealState,
+  fanPlan,
+  liftCard,
+  children,
+}: HandRailProps) {
+  const receiving = useFanReceiving();
   const railRef = useRef<HTMLDivElement>(null);
   const [step, setStep] = useState(0);
 
@@ -82,7 +107,7 @@ export function HandRail({ count, zone, label, dealState, children }: HandRailPr
     setStep((current) => (Math.abs(current - next) < 0.25 ? current : next));
   }, [count]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const rail = railRef.current;
     if (!rail) return;
     updateStep();
@@ -112,6 +137,9 @@ export function HandRail({ count, zone, label, dealState, children }: HandRailPr
       }
       data-zone={zone}
       data-deal-state={dealState}
+      data-receiving={receiving || undefined}
+      data-fan-plan={fanPlan?.join(',') || undefined}
+      data-fan-lift={liftCard || undefined}
       aria-label={label}
     >
       <div className={styles.handTrack}>{children}</div>

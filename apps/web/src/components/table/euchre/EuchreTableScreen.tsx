@@ -9,6 +9,7 @@ import { EUCHRE_SFX_PACK } from '@/lib/audio/sfx';
 import { useMatchTension } from '@/lib/audio/tension';
 import { EUCHRE_MATCH_PACE_MS } from '@/lib/euchre/modes';
 import { useMusicMood } from '@/stores/audio';
+import { ArrivalProvider, useAdmittedHand } from '@/lib/table/arrival-presentation';
 import { type DealPresentation, useDealPresentation } from '@/lib/table/deal-presentation';
 import { suitName as suitLabel, type EuchreTableView } from '@/lib/euchre/view';
 import { useTableAudio } from '../fx-animation';
@@ -104,6 +105,7 @@ export function EuchreTableScreen(props: EuchreTableScreenProps) {
   const partner = view.players.find((player) => player.seat === (view.localSeat + 2) % 4);
 
   return (
+    <ArrivalProvider fx={props.fx} fxKey={props.fxKey} localSeat={view.localSeat}>
     <TableShell rootRef={rootRef} dealState={dealStateAttr(deal)}>
       <TableHud onOpenMenu={menu.open}>
         <section className={styles.hudCluster}>
@@ -183,6 +185,7 @@ export function EuchreTableScreen(props: EuchreTableScreenProps) {
 
       <TableMenu open={menu.isOpen} onClose={menu.close} onQuit={menu.quit} />
     </TableShell>
+    </ArrivalProvider>
   );
 }
 
@@ -311,11 +314,12 @@ function LocalHand({
   onDiscard?: (card: string) => void;
   deal: DealPresentation;
 }) {
-  const visibleHand = orderedHand(
+  const plannedHand = orderedHand(
     deal.visibleCards(view.hand, view.localSeat),
     euchreCatalog.handOrder,
     { trump: view.trump },
   );
+  const visibleHand = useAdmittedHand(plannedHand);
   const interactive = !busy && (burying || view.decision === 'play');
   const showLegality = !busy && view.decision === 'play';
   return (
@@ -324,6 +328,7 @@ function LocalHand({
       zone={`hand:${view.localSeat}`}
       label="Your hand"
       dealState={dealStateAttr(deal)}
+      fanPlan={plannedHand}
     >
       <AnimatePresence initial={false} mode="popLayout">
         {visibleHand.map((card, index) => {

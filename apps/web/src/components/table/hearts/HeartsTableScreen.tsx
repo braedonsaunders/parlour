@@ -10,6 +10,7 @@ import { useMatchTension } from '@/lib/audio/tension';
 import { useMusicMood } from '@/stores/audio';
 import { HEARTS_HAND_PACE_MS } from '@/lib/hearts/modes';
 import type { HeartsTableView } from '@/lib/hearts/view';
+import { ArrivalProvider, useAdmittedHand } from '@/lib/table/arrival-presentation';
 import { type DealPresentation, useDealPresentation } from '@/lib/table/deal-presentation';
 import { type FxCue } from '@/lib/table/fx-motion';
 import { discardRotation, useTableAudio } from '../fx-animation';
@@ -123,6 +124,7 @@ export function HeartsTableScreen(props: HeartsTableScreenProps) {
   const passReady = selectedPass.length === PASS_SIZE;
 
   return (
+    <ArrivalProvider fx={props.fx} fxKey={props.fxKey} localSeat={view.localSeat}>
     <TableShell rootRef={rootRef} dealState={dealStateAttr(deal)}>
       <TableHud onOpenMenu={menu.open}>
         <TableTitlePill eyebrow="Hearts" status={view.phaseLabel} />
@@ -199,6 +201,7 @@ export function HeartsTableScreen(props: HeartsTableScreenProps) {
 
       <TableMenu open={menu.isOpen} onClose={menu.close} onQuit={menu.quit} />
     </TableShell>
+    </ArrivalProvider>
   );
 }
 
@@ -307,11 +310,12 @@ function LocalHand({
   onPlayCard?: (card: string) => void;
   deal: DealPresentation;
 }) {
-  const visibleHand = orderedHand(
+  const plannedHand = orderedHand(
     deal.visibleCards(view.hand, view.localSeat),
     heartsCatalog.handOrder,
     { jackDiamonds: view.jackDiamonds },
   );
+  const visibleHand = useAdmittedHand(plannedHand);
   const passing = view.decision === 'pass' && !busy;
   const canPlayCards = view.decision === 'play' && !busy;
 
@@ -321,6 +325,7 @@ function LocalHand({
       zone={`hand:${view.localSeat}`}
       label="Your hand"
       dealState={dealStateAttr(deal)}
+      fanPlan={plannedHand}
     >
       <AnimatePresence initial={false} mode="popLayout">
         {visibleHand.map((card, index) => {

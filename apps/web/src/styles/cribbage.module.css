@@ -249,7 +249,7 @@
   min-width: 4rem;
 }
 
-.stock > span:first-of-type {
+.stockCount {
   position: absolute;
   right: -0.15rem;
   bottom: 1rem;

@@ -11,6 +11,7 @@ import { useMatchTension } from '@/lib/audio/tension';
 import { PRESIDENT_MATCH_PACE_MS } from '@/lib/president/modes';
 import { isValidLocalSet, type PresidentTableView } from '@/lib/president/view';
 import { useMusicMood } from '@/stores/audio';
+import { ArrivalProvider, useAdmittedHand } from '@/lib/table/arrival-presentation';
 import { type DealPresentation, useDealPresentation } from '@/lib/table/deal-presentation';
 import { discardRotation, useTableAudio } from '../fx-animation';
 import { HandRail, HandRailCard } from '../HandRail';
@@ -153,6 +154,7 @@ export function PresidentTableScreen(props: PresidentTableScreenProps) {
   const localBusy = (props.busy ?? false) || deal.dealing;
 
   return (
+    <ArrivalProvider fx={props.fx} fxKey={props.fxKey} localSeat={view.localSeat}>
     <TableShell rootRef={rootRef} dealState={dealStateAttr(deal)}>
       <TableHud onOpenMenu={menu.open}>
         <TableTitlePill eyebrow="President" status={view.phaseLabel} />
@@ -275,6 +277,7 @@ export function PresidentTableScreen(props: PresidentTableScreenProps) {
 
       <TableMenu open={menu.isOpen} onClose={menu.close} onQuit={menu.quit} />
     </TableShell>
+    </ArrivalProvider>
   );
 }
 
@@ -389,10 +392,11 @@ function LocalHand({
   onToggle: (card: string) => void;
   deal: DealPresentation;
 }) {
-  const visibleHand = orderedHand(
+  const plannedHand = orderedHand(
     deal.visibleCards(view.hand, view.localSeat),
     presidentCatalog.handOrder,
   );
+  const visibleHand = useAdmittedHand(plannedHand);
   const exchanging = view.decision === 'give' || view.decision === 'return';
   const canPick = !busy && (exchanging || view.decision === 'lead-or-follow');
   const showLegality = !busy && view.decision === 'lead-or-follow';
@@ -403,6 +407,7 @@ function LocalHand({
       zone={`hand:${view.localSeat}`}
       label="Your hand"
       dealState={dealStateAttr(deal)}
+      fanPlan={plannedHand}
     >
       <AnimatePresence initial={false} mode="popLayout">
         {visibleHand.map((card, index) => {
