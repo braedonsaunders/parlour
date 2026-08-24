@@ -1,10 +1,13 @@
 import {
+  VEILED_REDEAL_PENDING,
   type BotPolicy,
+  type CardId,
   type FlowAdvance,
   type GameDef,
   type Move,
   type MoveCtx,
   type PhaseState,
+  type RuleError,
   type SeatId,
 } from '@parlour/engine';
 import { BOX_BONUS_POINTS, type GinConfig } from './config';
@@ -20,9 +23,18 @@ import type { GinMatchState, GinState } from './state';
  * ready up during the hand-end window, and `next.hand` deals again from the
  * per-event rng stream (replay-stable like everything else).
  *
- * Veiled rooms play exactly one hand: a fresh shuffle ceremony cannot be minted
- * mid-session, so the match honestly ends at that hand's result.
+ * A veiled match deals every hand the same way it deals the first: the room
+ * runs a fresh shuffle ceremony and hands the deck to `next.hand`, which is why
+ * the move requires one rather than falling back to the session rng. It used to
+ * refuse to deal at all while veiled, so a private match ended after one hand.
  */
+
+/** The deck a veiled redeal must carry: handles the room's ceremony produced. */
+function isDeckOrder(payload: unknown): payload is { deckOrder: CardId[] } {
+  if (payload === null || typeof payload !== 'object') return false;
+  const order = (payload as { deckOrder?: unknown }).deckOrder;
+  return Array.isArray(order) && order.length > 0 && order.every((id) => typeof id === 'string');
+}
 
 /** Hand-level moves re-exposed verbatim by the match def. */
 const HAND_MOVES = [
@@ -96,11 +108,29 @@ export function createGinMatchDef(
   };
 
   moves['next.hand'] = {
-    validate(state) {
-      if (state.folded && matchEndResult(state) === null && !state.veiled) return true;
-      return { code: 'no-next-hand', message: 'the match is not waiting on another hand' };
+    validate(state, _seat, payload) {
+      if (!state.folded || matchEndResult(state) !== null) {
+        return { code: 'no-next-hand', message: 'the match is not waiting on another hand' };
+      }
+      if (state.veiled) {
+        // An open room deals the next hand for itself once the table readies
+        // up. A veiled one cannot: its deck has to be shuffled by a ceremony
+        // first, so the move waits here and reports what it is waiting for.
+        // Dealing from the session rng instead would hand every seat a readable
+        // deck halfway through a private match.
+        if (!allReadied(state)) {
+          return { code: 'awaiting-ready', message: 'the table has not readied up' };
+        }
+        if (!isDeckOrder(payload)) {
+          return {
+            code: VEILED_REDEAL_PENDING,
+            message: 'a veiled hand needs its own shuffled deck',
+          };
+        }
+      }
+      return true;
     },
-    apply(state, _seat, _payload, ctx: MoveCtx) {
+    apply(state, _seat, payload, ctx: MoveCtx) {
       const next = dealHand(
         {
           config: state.rules,
@@ -108,6 +138,7 @@ export function createGinMatchDef(
           rng: ctx.rng,
           fx: ctx.fx,
           veiled: state.veiled,
+          deckOrder: isDeckOrder(payload) ? payload.deckOrder : undefined,
         },
         ((state.dealer + 1) % state.seats) as SeatId,
       );
@@ -137,7 +168,9 @@ export function createGinMatchDef(
     },
   };
 
-  const flow = matchFlow(hand);
+  const flow = matchFlow(hand, (state, payload) =>
+    moves['next.hand']!.validate(state, 0 as SeatId, payload),
+  );
 
   return {
     id: 'gin',
@@ -185,7 +218,11 @@ export function createGinMatchDef(
 // flow delegation
 // ---------------------------------------------------------------------------
 
-function matchFlow(hand: GameDef<GinState, GinConfig>): GameDef<GinMatchState, GinConfig>['flow'] {
+function matchFlow(
+  hand: GameDef<GinState, GinConfig>,
+  /** the redeal move's own validation, so injection cannot bypass the rules */
+  canDealNext: (state: GinMatchState, payload: unknown) => true | RuleError,
+): GameDef<GinMatchState, GinConfig>['flow'] {
   const inner = hand.flow;
 
   /** The hand def derives its present phase purely from state. */
@@ -196,6 +233,23 @@ function matchFlow(hand: GameDef<GinState, GinConfig>): GameDef<GinMatchState, G
 
   return {
     start: liveStart,
+
+    /**
+     * The one system event a gin match accepts: the next veiled deal.
+     *
+     * An open match deals itself the next hand, so nothing is injected. A
+     * veiled one cannot — its deck has to come out of a shuffle ceremony the
+     * room runs — so the host injects the move with that deck. The gate is
+     * narrow on purpose: only this move, only while the match is actually
+     * waiting for it, and the move's own validation still has to pass, so an
+     * injected event cannot deal a hand the rules would not.
+     */
+    canInject(state, _phase, moveId, payload) {
+      if (moveId !== 'next.hand') {
+        return { code: 'not-injectable', message: `gin does not accept injected ${moveId}` };
+      }
+      return canDealNext(state, payload);
+    },
 
     legalMoves(state, phase) {
       if (phase.phase === 'hand-end' || phase.phase === 'over') return [];
@@ -221,14 +275,14 @@ function matchFlow(hand: GameDef<GinState, GinConfig>): GameDef<GinMatchState, G
       }
 
       if (state.folded) {
-        // 2. veiled rooms end at their single hand — no re-ceremony mid-session
-        if (state.veiled) {
-          return { phase: overPhase(state), ended: matchEndResult(state)! };
-        }
-
-        // 3. open rooms pause in a ready window, then deal the next hand
         const ended = matchEndResult(state);
         if (ended) return { phase: overPhase(state), ended };
+        // 2. a veiled room waits: the next deck has to come out of a shuffle
+        // ceremony, so the room injects `next.hand` once it has one. Auto-
+        // playing it here would deal from the session rng and unveil the match.
+        if (state.veiled) return { phase: handEndPhase(state) };
+
+        // 3. open rooms pause in a ready window, then deal the next hand
         if (allReadied(state)) {
           return {
             phase: livePhase(state),
@@ -281,15 +335,9 @@ function allReadied(state: GinMatchState): boolean {
  * playing. Veiled rooms end with their single hand's result once folded.
  */
 export function matchEndResult(state: GinMatchState) {
-  if (state.veiled) {
-    if (!state.folded || !state.lastOutcome) return null;
-    return {
-      winner: state.lastOutcome.scorer,
-      rankings: buildRankings(state),
-      reason: state.lastOutcome.reason,
-    };
-  }
-
+  // A veiled match used to end the moment its first hand folded, because a
+  // second deck could not be shuffled mid-session. It can now, so a private
+  // match is played to the same point target as any other.
   let leader = 0;
   for (let seat = 1; seat < state.seats; seat++) {
     if ((state.scores[seat] ?? 0) > (state.scores[leader] ?? 0)) leader = seat;

@@ -333,7 +333,29 @@ export interface VeilSupport {
   publicSetupFrom(seats: number, config: RuleValues): number;
   /** true when the cards opened from that index onward are enough to deal */
   publicSetupReady(opened: readonly CardId[], seats: number, config: RuleValues): boolean;
+  /**
+   * The move that deals this game another hand inside the same session, for
+   * games whose match spans several deals.
+   *
+   * A veiled deal is one shuffle ceremony over one deck, so a second hand needs
+   * a second ceremony — which is why a veiled match used to stop after one.
+   * Naming the move here is what lets the room run that ceremony first and hand
+   * the fresh deck to the move, instead of each multi-deal game inventing its
+   * own way to say "not while veiled".
+   */
+  redealMove?: string;
 }
+
+/**
+ * How a veiled game says "I am ready to deal again, and I need a deck for it".
+ *
+ * The room cannot read a game's state to know a hand is over — that is the
+ * whole point of the pack boundary — so the redeal move reports it through the
+ * ordinary validation path instead. Seeing this code, and only this code, is
+ * the host's cue to run a shuffle ceremony and inject the move with the deck it
+ * produced. Any other rule error means the game is not waiting on one.
+ */
+export const VEILED_REDEAL_PENDING = 'no-veiled-deck';
 
 /** Ceiling on public setup openings, so a malformed game cannot open the deck. */
 export const MAX_PUBLIC_SETUP_OPENS = 16;
@@ -361,6 +383,8 @@ export interface VeilPack {
    * until some condition holds (Wildpile needs a number card).
    */
   publicSetup?: 'none' | 'one' | ((opened: readonly CardId[], config: RuleValues) => boolean);
+  /** See {@link VeilSupport.redealMove} — the move that deals another hand. */
+  redealMove?: string;
 }
 
 function resolveDeck(pack: VeilPack, config: RuleValues): DeckDef {
@@ -372,6 +396,7 @@ export function veilSupport(pack: VeilPack): VeilSupport {
   const mode = pack.publicSetup ?? 'none';
   return {
     deck: (config) => resolveDeck(pack, config),
+    redealMove: pack.redealMove,
     publicSetupFrom(seats, config) {
       if (mode === 'none') return resolveDeck(pack, config).cardIds.length;
       const size =

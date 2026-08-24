@@ -38,6 +38,10 @@ export const ginVeil = veilSupport({
   deck: DECK,
   handSize: HAND_SIZE,
   publicSetup: 'one',
+  // A gin match is many hands in one session, and each veiled hand needs its
+  // own shuffle ceremony. Naming the move lets the room run that ceremony and
+  // hand the fresh deck over; a veiled match used to simply stop after one.
+  redealMove: 'next.hand',
 });
 
 // ---------------------------------------------------------------------------

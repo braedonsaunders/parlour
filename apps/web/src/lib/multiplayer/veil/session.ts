@@ -477,6 +477,38 @@ export class VeilSession {
     };
   }
 
+  /**
+   * The deck order for a hand dealt from a later epoch.
+   *
+   * The opening deal can use `veilHandles(size)` because its handles start at
+   * zero. Every epoch after it is numbered from where the last one stopped, so
+   * a redeal has to name its own positions — otherwise a second hand would
+   * issue handles that collide with the first one's spent cards, and the engine
+   * refuses those precisely so this cannot happen quietly.
+   */
+  redealPlan(
+    epoch: number,
+    support: VeilSupport,
+    publicSetup: readonly CardId[],
+  ): VeilDealPlan {
+    const current = this.epochs.get(epoch);
+    if (!current) throw new Error(`deck epoch ${epoch} has not been opened`);
+    if (!support.publicSetupReady(publicSetup, this.options.seats, this.options.config)) {
+      throw new Error('veiled redeal needs more public openings');
+    }
+    const from = support.publicSetupFrom(this.options.seats, this.options.config);
+    if (from + publicSetup.length > current.cards.length) {
+      throw new Error('veiled redeal opening falls outside the deck');
+    }
+    const deckOrder = Array.from({ length: current.cards.length }, (_, position) =>
+      handleForPosition(current, position),
+    );
+    publicSetup.forEach((card, offset) => {
+      deckOrder[from + offset] = card;
+    });
+    return { deckOrder, publicSetup: [...publicSetup] };
+  }
+
   /** First deck position the room must open in public before it can deal. */
   publicSetupPositions(support: VeilSupport, opened: number): number {
     return support.publicSetupFrom(this.options.seats, this.options.config) + opened;

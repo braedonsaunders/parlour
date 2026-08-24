@@ -75,7 +75,11 @@ import {
   type RoomSecurity,
   type RoomSettings,
 } from '@/lib/multiplayer';
-import { resolveVeiledState, stateContainsCardId } from '@parlour/engine';
+import {
+  resolveVeiledState,
+  stateContainsCardId,
+  VEILED_REDEAL_PENDING,
+} from '@parlour/engine';
 import {
   auditSummary,
   layerStream,
@@ -243,6 +247,8 @@ export class MultiplayerRoomSession {
   private dealRound = new DealSeedRound();
   private sequence = 0;
   private recycleActionPending = false;
+  /** a veiled redeal ceremony already under way, so it cannot start twice */
+  private redealPending = false;
   /** bot turns already scheduled, keyed by log position, so none fires twice */
   private readonly scheduledBotTurns = new Set<string>();
   /** seats being held open for a player who dropped, keyed by seat */
@@ -695,6 +701,81 @@ export class MultiplayerRoomSession {
   }
 
   /** Runs one new epoch and returns the unpaired exchange the engine logs. */
+  /**
+   * Deals a veiled game's next hand, once it says it is waiting for one.
+   *
+   * A match that spans several deals needs a ceremony per deal, and an open
+   * room simply deals itself the next hand from the session rng — which under
+   * Veil would hand every seat a readable deck halfway through a private match.
+   * So the game stops and reports {@link VEILED_REDEAL_PENDING}, and the host
+   * shuffles a fresh epoch and injects the move with the deck it produced.
+   *
+   * Host-only, because injection is: two peers shuffling at once would open two
+   * epochs for the same hand and neither would be the one that was dealt.
+   */
+  private maybeDealVeiledHand(): void {
+    if (!this.snapshot.isHost || !this.veil || !this.authority || this.redealPending) return;
+    const settings = this.snapshot.settings;
+    if (!settings) return;
+    const def = gameDefFor(settings);
+    const move = def.veil?.redealMove;
+    if (!move) return;
+    const verdict = def.moves[move]?.validate(
+      this.authority.getSession().state as never,
+      (this.snapshot.localSeat ?? 0) as SeatId,
+      undefined,
+    );
+    if (verdict === undefined || verdict === true) return;
+    if (verdict.code !== VEILED_REDEAL_PENDING) return;
+
+    this.redealPending = true;
+    void this.shuffleNextHand()
+      .then((deckOrder) => this.inject(move, { deckOrder }))
+      .catch((error: unknown) => {
+        this.update({
+          error: error instanceof Error ? error.message : 'The next hand could not be shuffled',
+        });
+      })
+      .finally(() => {
+        this.redealPending = false;
+      });
+  }
+
+  /**
+   * Runs a whole shuffle ceremony for the next hand and returns its deck.
+   *
+   * The same shape as the opening deal: open an epoch over the deck, let every
+   * connected seat lay a layer, turn the game's setup cards face up, and read
+   * the order off the epoch. The handles are numbered from where the last epoch
+   * stopped, so a second hand can never reissue a card the first one spent.
+   */
+  private async shuffleNextHand(): Promise<readonly string[]> {
+    const veil = this.veil;
+    const settings = this.snapshot.settings;
+    if (!veil || !settings) throw new Error('this room is not running Veil');
+    const support = gameDefFor(settings).veil;
+    if (!support) throw new Error(`${settings.gameId} cannot run a veiled room`);
+
+    const epoch = (veil.session.liveEpochs().at(-1) ?? -1) + 1;
+    const participants = this.snapshot.seats
+      .filter((seat) => seat.connected && !seat.bot)
+      .map((seat) => seat.seat)
+      .sort((left, right) => left - right);
+    if (participants.length === 0) throw new Error('no connected seat can shuffle the next hand');
+
+    await veil.room.startRecycle(epoch, support.deck(settings.config).cardIds, participants);
+    await waitForCeremony(veil.session, epoch, participants.length, () =>
+      this.publishCeremonyProgress(),
+    );
+
+    const from = veil.session.publicSetupPositions(support, 0);
+    const opened: string[] = [];
+    for (let step = 0; step < 8 && !veil.session.publicSetupSatisfied(support, opened); step++) {
+      opened.push(await veil.room.open(epoch, from + step, 'public'));
+    }
+    return veil.session.redealPlan(epoch, support, opened).deckOrder;
+  }
+
   private async reveil(cards: readonly string[]): Promise<CardRecycle> {
     const veil = this.veil;
     if (!veil) throw new Error('this room is not running Veil');
@@ -1091,6 +1172,9 @@ export class MultiplayerRoomSession {
     } else {
       this.driveBotSeats();
     }
+    // A hand that just settled may leave a veiled match waiting for its next
+    // deck. Nothing else notices, because dealing is the room's job here.
+    this.maybeDealVeiledHand();
   }
 
   private acceptPresence(presence: PresenceEvent): void {

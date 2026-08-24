@@ -2,8 +2,11 @@ import {
   createSession,
   replaySession,
   sessionApply,
+  sessionInject,
   stateHash,
   veiledDeckOrder,
+  veilHandles,
+  VEILED_REDEAL_PENDING,
   type CardId,
   type GameSession,
 } from '@parlour/engine';
@@ -173,7 +176,7 @@ describe('gin under Veil', () => {
     expect(replayed.result?.winner).toBe(0);
   });
 
-  it('plays exactly one hand in a veiled match room', () => {
+  it('deals a veiled match another hand once the room shuffles one', () => {
     const matchDef = createGinMatchDef();
     const deckOrder = veiledDeckOrder(matchDef.veil!, 2, ['S2'], DEFAULTS);
     let session = createSession(matchDef, {
@@ -200,10 +203,58 @@ describe('gin under Veil', () => {
       reveals: defenderHandles.map((h, i) => [h, DEFENDER_FACES[i]!] as [CardId, CardId]),
     }).session;
 
-    // the fold banks the single hand, then the veiled match honestly ends
-    expect(session.status).toBe('ended');
-    expect(session.result?.winner).not.toBe(null);
+    // The hand folds into the scores and the match stays live — a veiled match
+    // used to end here, because the next deck could not be shuffled mid-round.
+    expect(session.state.folded).toBe(true);
+    expect(session.status).toBe('playing');
     expect(session.state.handIndex).toBe(0);
+
+    session = sessionApply(matchDef, session, 0, 'ready').session;
+    session = sessionApply(matchDef, session, 1, 'ready').session;
+
+    // Still waiting, deliberately: an open room auto-deals from the session
+    // rng here, which under Veil would hand every seat a readable deck.
+    expect(session.state.handIndex).toBe(0);
+    const pending = matchDef.moves['next.hand']!.validate(session.state, 0, undefined);
+    expect(pending).toMatchObject({ code: VEILED_REDEAL_PENDING });
+
+    // The room shuffles a fresh epoch and hands the deck over. Its handles are
+    // numbered past the first deck's, which is what keeps a second hand from
+    // reissuing a card the first one spent.
+    const second = veilHandles(104).slice(52);
+    // Injected, not played: dealing is a system move the host authority makes,
+    // which is the seam the room hangs the ceremony on.
+    const dealt = sessionInject(matchDef, session, 'next.hand', { deckOrder: second });
+    expect(dealt.rejected).toBeUndefined();
+    session = dealt.session;
+    expect(session.state.handIndex).toBe(1);
+    expect(session.state.hand.hands[0]).toHaveLength(10);
+    expect(session.state.hand.hands[0]!.every((card) => second.includes(card))).toBe(true);
+    expect(session.state.dealer).toBe(1);
+  });
+
+  it('refuses a veiled redeal that brings no deck of its own', () => {
+    const matchDef = createGinMatchDef();
+    const deckOrder = veiledDeckOrder(matchDef.veil!, 2, ['S2'], DEFAULTS);
+    const session = createSession(matchDef, {
+      seed: 21,
+      config: DEFAULTS,
+      seats: 2,
+      veiled: true,
+      deckOrder,
+    });
+    const folded = {
+      ...session.state,
+      folded: true,
+      readied: [0, 1],
+    };
+    expect(matchDef.moves['next.hand']!.validate(folded, 0, undefined)).toMatchObject({
+      code: VEILED_REDEAL_PENDING,
+    });
+    // An open match is unaffected: it still deals itself the next hand.
+    expect(
+      matchDef.moves['next.hand']!.validate({ ...folded, veiled: false }, 0, undefined),
+    ).toBe(true);
   });
 
   it('resolves presets without the removed lock knob', () => {
