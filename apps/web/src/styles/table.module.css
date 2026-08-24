@@ -1036,14 +1036,48 @@ button.card:not(:disabled):hover {
     top: 48%;
     transform: translate(-50%, -50%) scale(0.85);
   }
+  /* Portrait fans the hand across the whole width, so the bottom corners are
+     card, not felt. Everything docked down there rides the same home-indicator
+     inset as the fan — that keeps the strip beneath the cards a fixed height on
+     every phone instead of shrinking to nothing on the notched ones. */
   .localHand {
     --hand-card-width: 5.1rem;
-    bottom: -0.4rem;
+    bottom: calc(env(safe-area-inset-bottom) - 0.4rem);
     width: min(30rem, 100vw);
+  }
+  .ownerStatusRail {
+    align-items: stretch;
+    bottom: calc(env(safe-area-inset-bottom) + 0.4rem);
+    gap: 0.4rem;
+  }
+  .ownerCount,
+  .ownerLives {
+    min-width: 4.4rem;
+    padding: 0.3rem 0.55rem 0.36rem;
+  }
+  .ownerCount span,
+  .ownerLives > span:first-child {
+    font-size: 0.58rem;
+  }
+  .ownerCount strong {
+    margin-top: 0.08rem;
+    font-size: 1.3rem;
+  }
+  .ownerLives {
+    align-content: center;
+    width: 4.4rem;
+    padding-block: 0.42rem;
+  }
+  /* The pips hang below the pill elsewhere; down here that would drop them onto
+     the home indicator, so they ride inside it instead. */
+  .ownerLifePips {
+    position: static;
+    margin-top: 0.26rem;
+    translate: none;
   }
   .actionRail {
     right: max(0.9rem, env(safe-area-inset-right));
-    bottom: max(0.9rem, env(safe-area-inset-bottom));
+    bottom: calc(env(safe-area-inset-bottom) + 0.9rem);
   }
 }
 
