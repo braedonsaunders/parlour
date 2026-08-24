@@ -1,4 +1,5 @@
 import type { AppliedEvent, FxEvent, SeatId } from '@parlour/engine';
+import { isDealDigest } from './dealSeed';
 import { EMOTES } from './emotes';
 import { isVeilMessage, type VeilMessage } from './veil/wire';
 import type {
@@ -58,11 +59,21 @@ export type WireMessage =
   | { type: 'sync.snapshot'; snapshot: MigrationSnapshot }
   | { type: 'emote'; emote: Emote }
   /**
+   * The collaborative deal: a seat's commitment, then the share it committed
+   * to. Neither carries a seat number — the receiver attributes them to the
+   * sender's own seat, so no peer can mix the shuffle on another's behalf.
+   */
+  | { type: 'deal.commit'; commit: string }
+  | { type: 'deal.reveal'; nonce: string }
+  /**
    * Parlour Veil traffic: the shuffle ceremony, private peels and the
    * match-end disclosure. Validated by the veil schema before it reaches any
    * cryptography — see veil/wire.ts.
    */
   | { type: 'veil'; to: string | null; message: VeilMessage };
+
+/** The collaborative-deal messages, as one type for the transport's API. */
+export type DealMessage = Extract<WireMessage, { type: 'deal.commit' | 'deal.reveal' }>;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -444,6 +455,10 @@ function isWireMessage(value: unknown): value is WireMessage {
         typeof value.emote === 'string' &&
         EMOTES.includes(value.emote as Emote)
       );
+    case 'deal.commit':
+      return hasOnlyKeys(value, ['type', 'commit']) && isDealDigest(value.commit);
+    case 'deal.reveal':
+      return hasOnlyKeys(value, ['type', 'nonce']) && isDealDigest(value.nonce);
     case 'veil':
       return (
         hasOnlyKeys(value, ['type', 'to', 'message']) &&

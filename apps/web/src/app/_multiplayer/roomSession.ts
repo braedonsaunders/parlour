@@ -9,6 +9,7 @@ import {
   type GameSession,
   type LegalMove,
   type RuleValues,
+  type SeatId,
 } from '@parlour/engine';
 import {
   blitzConfigSchema,
@@ -85,6 +86,11 @@ import {
 } from '@/lib/multiplayer/veil';
 import { botTurnKey, botTurns } from './botSeats';
 import { NostrSignaling, type RoomAnnouncement } from '@/lib/multiplayer/NostrSignaling';
+import {
+  createDealNonce,
+  dealCommitment,
+  DealSeedRound,
+} from '@/lib/multiplayer/dealSeed';
 import { validateRoomCode } from '@/lib/rooms/code';
 import { hasValidSeatCount, seatRangeFor } from '@/lib/rooms/seatRange';
 
@@ -166,6 +172,15 @@ type SessionDependencies = {
 
 type Listener = () => void;
 
+/**
+ * How long the host waits for every seat's shuffle share before giving up.
+ *
+ * Generous, because it covers a phone waking its radio, and finite, because a
+ * seat that never answers must produce an error rather than a table that hangs
+ * on "dealing…" forever.
+ */
+const DEAL_ROUND_TIMEOUT_MS = 10_000;
+
 type SessionAuthority = AuthorityAdapter & {
   getSession(): MultiplayerGameSession;
 };
@@ -208,6 +223,9 @@ export class MultiplayerRoomSession {
   /** Ordered DataChannel delivery still needs ordered async crypto completion. */
   private veilInbox: Promise<void> = Promise.resolve();
   private seed = 0;
+  /** This seat's shuffle share, minted once per room and revealed at the deal. */
+  private dealNonce: string | null = null;
+  private dealRound = new DealSeedRound();
   private sequence = 0;
   private recycleActionPending = false;
   /** bot turns already scheduled, keyed by log position, so none fires twice */
@@ -263,6 +281,7 @@ export class MultiplayerRoomSession {
         isHost: true,
       });
       if (settings.security === 'veil') this.attachVeil(settings, this.seed);
+      this.commitDealShare();
       return room;
     } catch (error) {
       this.fail(error, 'Could not create the room. Check your connection and try again.');
@@ -332,17 +351,124 @@ export class MultiplayerRoomSession {
       throw new Error('every seat must be filled before the match starts');
     }
     if (this.snapshot.security.tier === 'veil') {
-      // A veiled deal publishes the real position at the end of the ceremony.
+      // A veiled deal takes its unpredictability from the ceremony itself —
+      // every seat lays a layer on a deck nobody can read — so it needs no
+      // separate seed round, and it publishes the real position at the end.
       await this.dealVeiled();
     } else {
       // An open room had no "the host dealt" signal at all, which is why a
-      // guest used to be pushed onto the table the moment it was seated. This
-      // is the same snapshot a veiled deal publishes, and peers only adopt an
-      // unsolicited one while their own log is still empty — so it opens the
-      // table for everyone without being able to rewrite a round in progress.
-      this.transport?.publishSnapshot();
+      // guest used to be pushed onto the table the moment it was seated. The
+      // deal is rebuilt on the seed every seat mixed, then published: the same
+      // snapshot a veiled deal sends, and peers adopt an unsolicited one only
+      // while their own log is still empty, so it opens the table for everyone
+      // without being able to rewrite a round in progress.
+      await this.dealOpen();
     }
     this.update({ stage: 'table' });
+  }
+
+  /**
+   * Deals an open room on the seed every seat mixed.
+   *
+   * The host reveals first — it is the one who pressed the button — and every
+   * other seat reveals on seeing a reveal, so the round closes in one round
+   * trip. If a seat never answers, the deal does not happen and the room says
+   * which seat is missing: dealing on the host's own number instead would drop
+   * the guarantee silently, which is the one outcome worth refusing.
+   */
+  private async dealOpen(): Promise<void> {
+    const settings = this.snapshot.settings;
+    const code = this.snapshot.room?.code;
+    if (!settings || !code || !this.transport || !this.authority) {
+      throw new Error('the room is not ready to deal');
+    }
+    this.revealDealShare();
+    const seats = this.contributingSeats();
+    await this.waitForDealShares(seats);
+
+    const seed = await this.dealRound.resolve(code, seats);
+    this.seed = seed;
+    const runtime = createRoomRuntime(settings, seed, (seat, bot) => this.acceptSeatBot(seat, bot));
+    this.authority.importSnapshot(runtime.authority.exportSnapshot());
+    this.transport.publishSnapshot();
+    this.update({
+      session: this.presented(this.authority.getSession()),
+      fx: runtime.session.setupFx ?? [],
+      fxKey: this.snapshot.fxKey + 1,
+    });
+  }
+
+  /** Seats that owe a share: every seated peer, bots excluded — they have none. */
+  private contributingSeats(): SeatId[] {
+    return this.snapshot.seats
+      .filter((seat) => !seat.bot)
+      .map((seat) => seat.seat as SeatId)
+      .sort((left, right) => left - right);
+  }
+
+  /** Publishes this seat's commitment; safe to call whenever the table changes. */
+  private commitDealShare(): void {
+    const code = this.snapshot.room?.code;
+    const seat = this.snapshot.localSeat;
+    if (!this.transport || !code || seat === null) return;
+    this.dealNonce ??= createDealNonce();
+    const nonce = this.dealNonce;
+    void dealCommitment(code, seat as SeatId, nonce)
+      .then((commit) => {
+        this.dealRound.recordCommitment(seat as SeatId, commit);
+        this.transport?.sendDeal({ type: 'deal.commit', commit });
+      })
+      .catch(() => undefined);
+  }
+
+  private revealDealShare(): void {
+    const seat = this.snapshot.localSeat;
+    if (!this.transport || seat === null || !this.dealNonce) return;
+    if (this.dealRound.hasContribution(seat as SeatId)) return;
+    this.dealRound.recordContribution(seat as SeatId, this.dealNonce);
+    this.transport.sendDeal({ type: 'deal.reveal', nonce: this.dealNonce });
+  }
+
+  private async waitForDealShares(seats: readonly SeatId[]): Promise<void> {
+    const deadline = Date.now() + DEAL_ROUND_TIMEOUT_MS;
+    while (this.dealRound.missing(seats).length > 0) {
+      if (Date.now() > deadline) {
+        const missing = this.dealRound.missing(seats).map((seat) => `Seat ${seat + 1}`);
+        throw new Error(
+          `${missing.join(' and ')} never mixed the shuffle, so nobody could deal. Try again.`,
+        );
+      }
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+  }
+
+  /**
+   * Checks the deal the host published is the one the table's shares add up to.
+   *
+   * Without this the shares would be theatre: the host could collect them and
+   * then deal from whatever number it liked. A mismatch is stated rather than
+   * silently tolerated, because a table that cannot trust its own deal should
+   * be told so at the first hand rather than never.
+   */
+  private verifyPublishedDeal(): void {
+    const code = this.snapshot.room?.code;
+    const dealt = this.authority?.getSession().seed;
+    if (!code || dealt === undefined || this.snapshot.security.tier === 'veil') return;
+    const seats = this.contributingSeats();
+    if (seats.some((seat) => !this.dealRound.hasContribution(seat))) return;
+    void this.dealRound
+      .resolve(code, seats)
+      .then((expected) => {
+        if (expected === dealt) return;
+        this.update({
+          error:
+            'This deal does not match the shuffle the table mixed. The host dealt from its own ' +
+            'number, so the deck it handed out cannot be trusted.',
+        });
+      })
+      .catch((error: unknown) => {
+        this.update({ error: error instanceof Error ? error.message : 'the deal could not be checked' });
+      });
   }
 
   /**
@@ -798,8 +924,20 @@ export class MultiplayerRoomSession {
     });
     this.transport.onEvent((packet) => this.accept(packet));
     this.transport.onPresence((presence) => this.acceptPresence(presence));
+    this.transport.onDeal((seat, message) => {
+      if (message.type === 'deal.commit') {
+        this.dealRound.recordCommitment(seat, message.commit);
+        return;
+      }
+      this.dealRound.recordContribution(seat, message.nonce);
+      // Somebody has opened the reveal phase, so answer with this seat's share.
+      // The host reveals first when it deals; everyone else follows from here,
+      // which closes the round in a single round trip.
+      this.revealDealShare();
+    });
     this.transport.onSnapshot(() => {
-      // The host published the opening position (a veiled deal), so adopt it.
+      // The host published the opening position, so adopt it — and check the
+      // deal inside it is the one the table's shares add up to.
       this.update({
         session: this.presented(this.authority!.getSession()),
         fx: this.authority!.getSession().setupFx ?? [],
@@ -814,6 +952,7 @@ export class MultiplayerRoomSession {
           },
         },
       });
+      this.verifyPublishedDeal();
       void this.openMyHandles();
     });
     const tier: RoomSecurity = settings.security ?? 'open';
@@ -897,6 +1036,10 @@ export class MultiplayerRoomSession {
         // deals; everyone waits for `start` to say so.
         stage: this.snapshot.stage,
       });
+      // Publish this seat's commitment again whenever the table changes. It is
+      // the same share every time, and a peer that has just arrived has not
+      // heard the earlier ones.
+      this.commitDealShare();
       if (
         isLocal &&
         !this.veil &&

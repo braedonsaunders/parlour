@@ -283,6 +283,55 @@ describe('multiplayer route composition', () => {
     );
   });
 
+  // The point of the collaborative deal: the player who opens the table no
+  // longer decides the deck. Both rooms below are opened by a host with the
+  // same seed, so if the host's number still chose the shuffle they would deal
+  // identically.
+  it('deals from every seat’s share rather than the host’s own number', async () => {
+    async function dealtSeed(tag: string): Promise<number | undefined> {
+      const broker = new MockSignalingBroker();
+      const rtc = new MockRtcNetwork();
+      const host = new MultiplayerRoomSession(
+        { name: 'Host', avatarId: 'ember', profileId: `${tag}-host` },
+        {
+          signaling: broker.signaling(`${tag}-host-peer`),
+          peerConnection: rtc.factory(`${tag}-host`),
+          seed: 1234,
+        },
+      );
+      const guest = new MultiplayerRoomSession(
+        { name: 'Guest', avatarId: 'cobalt', profileId: `${tag}-guest` },
+        {
+          signaling: broker.signaling(`${tag}-guest-peer`),
+          peerConnection: rtc.factory(`${tag}-guest`),
+          seed: 1234,
+        },
+      );
+      sessions.push(host, guest);
+      const room = await host.create({ seats: 2 });
+      await guest.join(room.code);
+      await eventually(() => expect(guest.getSnapshot().localSeat).toBe(1));
+      await host.start();
+      // Both peers play the deal the shares agreed on, and neither complains.
+      await eventually(() =>
+        expect(guest.getSnapshot().session?.seed).toBe(host.getSnapshot().session?.seed),
+      );
+      expect(host.getSnapshot().error).toBeNull();
+      expect(guest.getSnapshot().error).toBeNull();
+      return host.getSnapshot().session?.seed;
+    }
+
+    const first = await dealtSeed('mix-a');
+    const second = await dealtSeed('mix-b');
+    expect(first).not.toBe(1234);
+    expect(first).not.toBe(second);
+    for (const seed of [first, second]) {
+      expect(Number.isSafeInteger(seed)).toBe(true);
+      expect(seed).toBeGreaterThanOrEqual(0);
+      expect(seed).toBeLessThanOrEqual(0xffff_ffff);
+    }
+  });
+
   // Regression: room seeds came off `Uint32Array` through `| 0`, so half of
   // them were negative — and the wire bounds a snapshot seed to 0…0xffffffff.
   // The welcome carrying one was refused as malformed, the guest never adopted

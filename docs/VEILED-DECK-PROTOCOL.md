@@ -16,13 +16,60 @@ promise; the room UI repeats those words rather than paraphrasing them.
 
 ## Product boundary
 
-Veil is the opt-in privacy tier for competitive friend rooms. It preserves
-Parlour's static Vercel deploy and WebRTC mesh: no database, account service,
+Veil is the privacy tier for competitive friend rooms. It preserves Parlour's
+static Vercel deploy and WebRTC mesh: no database, account service,
 long-running authority, or server-held round seed.
 
 The open room stays the fast default. Veil is a second tier because it adds a
 shuffle ceremony before the deal, a round trip per hidden card, and a different
 reconnect trade-off.
+
+**Players are not asked to choose between them.** The tier picker is gone. Every
+room now runs the collaborative deal below, which is always on and costs
+nothing; Veil is reserved for a competitive mode rather than offered as a
+question to somebody who wants to play cards. It is also still pre-review (slice
+8), which is its own reason not to enable it silently.
+
+## The collaborative deal — always on, every room
+
+The open room's real weakness between friends was never that a determined
+opponent could read a hand with a modified client. It was that the player who
+opens the table also picked the deck, and could keep reopening it until the deal
+suited them. That costs nothing to close, so it is closed for everybody.
+
+Before the deal, each seat commits to 32 random bytes:
+
+```text
+commit = SHA-256("parlour.deal/commit" || roomCode || seat || nonce)
+```
+
+Commitments are broadcast as seats arrive. When the host deals, it reveals its
+own share and every other seat answers with theirs; each is checked against the
+commitment it was published under, and the seed is
+`SHA-256("parlour.deal/mix" || roomCode || seat:nonce…)` over all of them in seat
+order. Because every seat committed before any revealed, no seat can pick its
+contribution after seeing the others: **one honest seat is enough to make the
+deck unpredictable to everyone, including the host.**
+
+Guests recompute the seed and compare it against the deal they were handed, so a
+host that deals from its own number is caught at the first hand rather than
+never. Neither message carries a seat number — the receiving peer attributes a
+share to whichever seat actually sent it, so no peer can contribute on another's
+behalf.
+
+**Limits, stated as plainly as the rest of this document.**
+
+- It does **not** hide hands. An open room still replays the whole game on every
+  device. That is what Veil is for, and the badge says so.
+- Whoever reveals last sees the other shares before sending its own. It cannot
+  steer the seed, only withhold — and withholding is visible, because the deal
+  does not happen and the room names the seat that is missing.
+- A veiled room does not run this round. Its unpredictability comes from the
+  ceremony itself, which is strictly stronger: every seat permutes a deck no
+  seat can read.
+
+Implementation: `apps/web/src/lib/multiplayer/dealSeed.ts`, wired through
+`deal.commit` / `deal.reveal` on the existing mesh.
 
 ## What it guarantees
 

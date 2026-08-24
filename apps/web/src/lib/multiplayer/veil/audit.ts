@@ -185,9 +185,10 @@ export function auditSummary(state: VeilAuditState): { label: string; detail: st
   switch (state) {
     case 'open':
       return {
-        label: 'Open table',
+        label: 'Fair deal',
         detail:
-          'Fast mode. Every peer replays the full game state, so a modified client could read ' +
+          'Every seat mixed the shuffle, so nobody chose this deck — not even the host. Hands ' +
+          'are not hidden: every peer replays the full game, so a modified client could read ' +
           'any hand. Fine among friends; not a competitive guarantee.',
       };
     case 'veiled':

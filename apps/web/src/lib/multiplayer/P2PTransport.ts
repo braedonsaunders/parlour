@@ -14,7 +14,12 @@ import {
 } from './resilience';
 import { validateEmote } from './emotes';
 import { DuplicateActionError } from './EngineAuthority';
-import { dispatchWireData, type PeerDescriptor, type WireMessage } from './wireSchema';
+import {
+  dispatchWireData,
+  type DealMessage,
+  type PeerDescriptor,
+  type WireMessage,
+} from './wireSchema';
 import type { SeatId } from '@parlour/engine';
 import type { VeilMessage } from './veil/wire';
 import type {
@@ -93,6 +98,7 @@ export class P2PTransport implements Transport {
   private readonly presenceListeners = new Set<(event: PresenceEvent) => void>();
   private readonly emoteListeners = new Set<(peerId: string, emote: Emote) => void>();
   private readonly veilListeners = new Set<(peerId: string, message: VeilMessage) => void>();
+  private readonly dealListeners = new Set<(seat: SeatId, message: DealMessage) => void>();
   private readonly lastReceivedEmote = new Map<string, number>();
   /** Redials spent on a peer since it last held an open channel. */
   private readonly redials = new Map<string, number>();
@@ -247,6 +253,23 @@ export class P2PTransport implements Transport {
   onVeil(callback: (peerId: string, message: VeilMessage) => void): () => void {
     this.veilListeners.add(callback);
     return () => this.veilListeners.delete(callback);
+  }
+
+  /** Broadcasts this seat's shuffle commitment or the share behind it. */
+  sendDeal(message: DealMessage): void {
+    this.assertReady();
+    this.broadcast(message);
+  }
+
+  /**
+   * Shuffle shares, already attributed to the seat that actually sent them.
+   *
+   * The seat comes from the mesh's own view of who is speaking, never from the
+   * packet, so a peer cannot contribute on somebody else's behalf.
+   */
+  onDeal(callback: (seat: SeatId, message: DealMessage) => void): () => void {
+    this.dealListeners.add(callback);
+    return () => this.dealListeners.delete(callback);
   }
 
   /** Seat/peer lookup the Veil ceremony needs to address a single seat. */
@@ -464,6 +487,15 @@ export class P2PTransport implements Transport {
       case 'mesh.peers':
         await this.connectMesh(message.peers);
         return;
+      case 'deal.commit':
+      case 'deal.reveal': {
+        // Attributed to the seat the mesh says is speaking. A peer with no seat
+        // has nothing to contribute to the deal, so it is simply ignored.
+        const seat = this.seatForPeer(peerId);
+        if (seat === null) return;
+        for (const listener of this.dealListeners) listener(seat, message);
+        return;
+      }
       case 'presence.state':
         if (peerId === this.resilience?.hostId) this.applyPresence(message.presence);
         return;

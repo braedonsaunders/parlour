@@ -4,8 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { RoomLobby } from '@/components/multiplayer/RoomLobby';
-import { SecurityBadge, SecurityPicker } from '@/components/multiplayer/TableSecurity';
-import type { RoomSecurity } from '@/lib/multiplayer';
+import { SecurityBadge } from '@/components/multiplayer/TableSecurity';
 import { useProfileStore } from '@/stores/profile';
 import {
   activateMultiplayerSession,
@@ -19,9 +18,6 @@ export default function CreateRoomPage() {
   const avatarId = useProfileStore((state) => state.avatarId);
   const sessionRef = useRef<MultiplayerRoomSession | null>(null);
   const [session, setSession] = useState<MultiplayerRoomSession | null>(null);
-  // The tier has to be settled before the room is announced: it is part of the
-  // round header every seat signs, so it cannot change once the table is open.
-  const [security, setSecurity] = useState<RoomSecurity>('open');
   const [opening, setOpening] = useState(false);
 
   useEffect(() => {
@@ -30,16 +26,18 @@ export default function CreateRoomPage() {
     sessionRef.current = next;
     setSession(next);
     void next
-      .create({ seats: 2, security })
+      .create({ seats: 2 })
       .then(() => activateMultiplayerSession(next))
       .catch(() => undefined);
-  }, [avatarId, name, opening, security]);
+  }, [avatarId, name, opening]);
 
+  // No privacy tier to pick. Every room mixes its shuffle across all the seats,
+  // so the fair-deal guarantee is simply on, and the badge in the room states
+  // what it does and does not cover rather than asking the player to choose it.
   if (!opening) {
     return (
       <main className="flex min-h-dvh flex-col items-center justify-center gap-5 px-6 py-8">
         <h1 className="text-2xl font-black text-dusk-50">Open a table</h1>
-        <SecurityPicker value={security} supported seats={2} onChange={setSecurity} />
         <button type="button" className="btn-fat" onClick={() => setOpening(true)}>
           Open the table
         </button>
