@@ -1,8 +1,14 @@
-import { createSession } from '@parlour/engine';
+import {
+  createSession,
+  defineConfig,
+  type ConfigFieldValue,
+  type Flow,
+  type GameDef,
+  type Move,
+} from '@parlour/engine';
 import { blitzConfigSchema, createBlitzDef } from '@parlour/game-blitz';
 import { describe, expect, it, vi } from 'vitest';
 import {
-  ACTION_CACHE_LIMIT,
   EMOTES,
   EngineAuthority,
   HEARTBEAT_TIMEOUT_MS,
@@ -14,6 +20,39 @@ import {
   validateRoomCode,
   validateEmote,
 } from './index';
+
+type CounterRules = Record<string, ConfigFieldValue>;
+type CounterState = { count: number };
+
+const counterConfig = defineConfig<CounterRules>([], []);
+const increment: Move<CounterState> = {
+  validate: () => true,
+  apply: (state) => ({ count: state.count + 1 }),
+};
+const counterFlow: Flow<CounterState> = {
+  start: () => ({ phase: 'play', actor: 0, round: 1 }),
+  legalMoves: () => [{ id: 'increment' }],
+  advance: () => ({ phase: { phase: 'play', actor: 0, round: 1 } }),
+};
+const counterGame: GameDef<CounterState, CounterRules> = {
+  id: 'counter',
+  configSchema: counterConfig,
+  setup: () => ({ count: 0 }),
+  moves: { increment },
+  flow: counterFlow,
+  playerView: (state) => state,
+  end: () => null,
+  bots: [],
+};
+
+function counterAuthority() {
+  return new EngineAuthority({
+    def: counterGame,
+    session: createSession(counterGame, { seed: 7, config: {}, seats: 2 }),
+    settings: { gameId: 'counter', seats: 2, config: {} },
+    now: () => 100,
+  });
+}
 
 describe('room identity', () => {
   it('normalizes input separately from validating an unambiguous four-character code', () => {
@@ -98,15 +137,8 @@ describe('resilience state', () => {
     ).toThrow('invalid presence snapshot');
   });
 
-  it('deduplicates actions with a bounded cache and resends pending work after host election', () => {
+  it('resends pending work after host election', () => {
     const state = new MultiplayerState('peer-c', 'peer-a');
-    expect(state.acceptAction('action-1')).toBe(true);
-    expect(state.acceptAction('action-1')).toBe(false);
-    for (let index = 2; index <= ACTION_CACHE_LIMIT + 2; index++) {
-      state.acceptAction(`action-${index}`);
-    }
-    expect(state.seenActionCount).toBe(ACTION_CACHE_LIMIT);
-
     state.trackPending({ id: 'pending-1', seat: 1, move: 'draw' });
     state.seePeer('peer-a', 0);
     state.seePeer('peer-b', 1_000);
@@ -116,6 +148,34 @@ describe('resilience state', () => {
       hostId: 'peer-b',
       resend: [{ id: 'pending-1', seat: 1, move: 'draw' }],
     });
+  });
+
+  it('rejects a delayed duplicate after host kill beyond the old cache bound', async () => {
+    const originalHost = counterAuthority();
+    await originalHost.apply({ id: 'delayed', seat: 0, move: 'increment' });
+    for (let index = 0; index < 2_049; index++) {
+      await originalHost.apply({ id: `later-${index}`, seat: 0, move: 'increment' });
+    }
+
+    const electedGuest = counterAuthority();
+    await electedGuest.importSnapshot(originalHost.exportSnapshot());
+    expect(() => electedGuest.apply({ id: 'delayed', seat: 0, move: 'increment' })).toThrow(
+      'duplicate action',
+    );
+    expect(electedGuest.getSession().state.count).toBe(2_050);
+    expect(electedGuest.exportSnapshot().acceptedActions).toHaveLength(2_050);
+  });
+
+  it('rejects snapshots whose accepted action history does not cover the replay log', async () => {
+    const host = counterAuthority();
+    await host.apply({ id: 'first', seat: 0, move: 'increment' });
+    await host.apply({ id: 'second', seat: 0, move: 'increment' });
+    const snapshot = host.exportSnapshot();
+    snapshot.acceptedActions.pop();
+
+    expect(() => counterAuthority().importSnapshot(snapshot)).toThrow(
+      'accepted action history does not cover replay log',
+    );
   });
 
   it('turns an expired human seat into a bot and lets its profile reclaim it', () => {
@@ -189,7 +249,10 @@ describe('divergence recovery', () => {
       payload: move.payload,
     });
     const corrected = host.exportSnapshot();
-    vi.spyOn(authority, 'applyRemote').mockReturnValue(initial.stateHash);
+    vi.spyOn(authority, 'applyRemote').mockReturnValue({
+      stateHash: initial.stateHash,
+      accepted: true,
+    });
     const importSnapshot = vi.spyOn(authority, 'importSnapshot');
     const signaling = new NostrSignaling({
       relays: [],

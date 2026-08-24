@@ -2,6 +2,7 @@ import { createRoomCode, roomJoinUrl, validateRoomCode } from '../rooms/code';
 import { NostrSignaling, type SignalPayload } from './NostrSignaling';
 import { HEARTBEAT_INTERVAL_MS, MultiplayerState, validatePresenceSnapshot } from './resilience';
 import { validateEmote } from './emotes';
+import { DuplicateActionError } from './EngineAuthority';
 import { dispatchWireData, type PeerDescriptor, type WireMessage } from './wireSchema';
 import type {
   AppliedPacket,
@@ -296,10 +297,10 @@ export class P2PTransport implements Transport {
       case 'applied': {
         this.resilience?.confirmAction(message.packet.actionId);
         if (this.isHost()) return;
-        const localHash = await this.authority.applyRemote(message.packet);
+        const remote = await this.authority.applyRemote(message.packet);
         const mismatch = this.resilience?.checkHash(
           message.packet.events.at(-1)?.seq ?? 0,
-          localHash,
+          remote.stateHash,
           message.packet.stateHash,
         );
         if (mismatch) {
@@ -307,7 +308,7 @@ export class P2PTransport implements Transport {
             this.pendingResync = true;
             this.sendTo(this.resilience!.hostId, { type: 'sync.request', ...mismatch });
           }
-        } else this.emitEvent(message.packet);
+        } else if (remote.accepted) this.emitEvent(message.packet);
         return;
       }
       case 'sync.request':
@@ -395,13 +396,13 @@ export class P2PTransport implements Transport {
   }
 
   private async applyAsHost(action: PlayerAction): Promise<void> {
-    if (!this.resilience?.acceptAction(action.id)) return;
     try {
       const packet = await this.authority.apply(action);
-      this.resilience.confirmAction(action.id);
+      this.resilience?.confirmAction(action.id);
       this.broadcast({ type: 'applied', packet });
       this.emitEvent(packet);
     } catch (error) {
+      if (error instanceof DuplicateActionError) return;
       this.emitPresence({
         kind: 'error',
         message: error instanceof Error ? error.message : 'Action rejected',

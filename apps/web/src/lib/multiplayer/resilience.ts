@@ -2,7 +2,6 @@ import type { PlayerAction, PresenceSnapshot, ProfileId, SeatPresence } from './
 
 export const HEARTBEAT_INTERVAL_MS = 1_000;
 export const HEARTBEAT_TIMEOUT_MS = 3_500;
-export const ACTION_CACHE_LIMIT = 2_048;
 
 export function validatePresenceSnapshot(snapshot: unknown, maxSeats: number): PresenceSnapshot {
   if (
@@ -66,17 +65,12 @@ export class MultiplayerState {
   readonly seats = new Map<number, SeatPresence>();
   private readonly lastSeen = new Map<string, number>();
   private readonly pending = new Map<string, PlayerAction>();
-  private readonly seenActions = new Set<string>();
   private presenceVersion = 0;
 
   constructor(
     readonly localPeerId: string,
     public hostId: string,
   ) {}
-
-  get seenActionCount(): number {
-    return this.seenActions.size;
-  }
 
   seePeer(peerId: string, now: number): void {
     this.lastSeen.set(peerId, now);
@@ -134,16 +128,6 @@ export class MultiplayerState {
 
   confirmAction(actionId: string): void {
     this.pending.delete(actionId);
-  }
-
-  acceptAction(actionId: string): boolean {
-    if (this.seenActions.has(actionId)) return false;
-    this.seenActions.add(actionId);
-    if (this.seenActions.size > ACTION_CACHE_LIMIT) {
-      const oldest = this.seenActions.values().next().value as string | undefined;
-      if (oldest) this.seenActions.delete(oldest);
-    }
-    return true;
   }
 
   checkHash(expectedSeq: number, localHash: string, remoteHash: string) {

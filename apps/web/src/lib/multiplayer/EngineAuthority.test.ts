@@ -66,6 +66,7 @@ function snapshot(config: TestConfig, seats = 3): ReplaySnapshot {
   return {
     seed: session.seed,
     log: [...session.log],
+    acceptedActions: [],
     stateHash: stateHash(session.state),
     settings: settings(config, seats),
   };

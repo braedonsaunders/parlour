@@ -33,6 +33,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 export class EngineAuthority<S, C extends RuleValues> implements AuthorityAdapter {
   private authorityState: AuthorityState<S, C>;
+  private acceptedActions = new Map<string, number>();
   private readonly def: GameDef<S, C>;
   private readonly now: () => number;
   private readonly onSeatBot?: (seat: number, bot: boolean) => void;
@@ -45,6 +46,7 @@ export class EngineAuthority<S, C extends RuleValues> implements AuthorityAdapte
   }
 
   apply(action: PlayerAction): AppliedPacket {
+    if (this.acceptedActions.has(action.id)) throw new DuplicateActionError(action.id);
     const { session, settings } = this.authorityState;
     const outcome = sessionApply(this.def, session, action.seat, action.move, action.payload);
     if (outcome.rejected) throw new Error(outcome.rejected.message);
@@ -52,6 +54,9 @@ export class EngineAuthority<S, C extends RuleValues> implements AuthorityAdapte
     const events = outcome.events.map((event) => ({ ...event, ts: timestamp }));
     const nextSession = { ...outcome.session, log: [...session.log, ...events] };
     this.authorityState = { session: nextSession, settings };
+    const lastSeq = events.at(-1)?.seq;
+    if (lastSeq === undefined) throw new Error('accepted action produced no replay event');
+    this.acceptedActions.set(action.id, lastSeq);
     return {
       actionId: action.id,
       events,
@@ -60,16 +65,22 @@ export class EngineAuthority<S, C extends RuleValues> implements AuthorityAdapte
     };
   }
 
-  applyRemote(packet: AppliedPacket): string {
+  applyRemote(packet: AppliedPacket): { stateHash: string; accepted: boolean } {
     const { session, settings } = this.authorityState;
+    if (this.acceptedActions.has(packet.actionId)) {
+      return { stateHash: stateHash(session.state), accepted: false };
+    }
     const firstSeq = packet.events[0]?.seq;
-    if (firstSeq === undefined || firstSeq !== session.log.length) return stateHash(session.state);
+    if (firstSeq === undefined || firstSeq !== session.log.length) {
+      return { stateHash: stateHash(session.state), accepted: false };
+    }
     const nextSession = replaySession(this.def, session.seed, [...session.log, ...packet.events], {
       config: session.config,
       seats: session.seats,
     });
     this.authorityState = { session: nextSession, settings };
-    return stateHash(nextSession.state);
+    this.acceptedActions.set(packet.actionId, packet.events.at(-1)!.seq);
+    return { stateHash: stateHash(nextSession.state), accepted: true };
   }
 
   exportSnapshot(): ReplaySnapshot {
@@ -77,6 +88,7 @@ export class EngineAuthority<S, C extends RuleValues> implements AuthorityAdapte
     return {
       seed: session.seed,
       log: [...session.log],
+      acceptedActions: [...this.acceptedActions].map(([id, seq]) => ({ id, seq })),
       stateHash: stateHash(session.state),
       settings: { ...settings, config: { ...settings.config } },
     };
@@ -97,10 +109,29 @@ export class EngineAuthority<S, C extends RuleValues> implements AuthorityAdapte
       seats: snapshot.settings.seats,
     });
     if (stateHash(replayed.state) !== snapshot.stateHash) throw new Error('snapshot hash mismatch');
+    const acceptedActions = new Map<string, number>();
+    let previousSeq = -1;
+    for (const action of snapshot.acceptedActions) {
+      if (
+        !action.id ||
+        !Number.isInteger(action.seq) ||
+        action.seq <= previousSeq ||
+        action.seq >= snapshot.log.length ||
+        acceptedActions.has(action.id)
+      ) {
+        throw new Error('invalid accepted action history');
+      }
+      acceptedActions.set(action.id, action.seq);
+      previousSeq = action.seq;
+    }
+    if (previousSeq !== snapshot.log.length - 1) {
+      throw new Error('accepted action history does not cover replay log');
+    }
     this.authorityState = {
       session: { ...replayed, log: [...snapshot.log] },
       settings: { ...snapshot.settings, config },
     };
+    this.acceptedActions = acceptedActions;
   }
 
   setSeatBot(seat: number, bot: boolean): void {
@@ -122,5 +153,12 @@ export class EngineAuthority<S, C extends RuleValues> implements AuthorityAdapte
       if (!Object.is(given, resolved[key])) throw new Error('invalid snapshot config');
     }
     return resolved;
+  }
+}
+
+export class DuplicateActionError extends Error {
+  constructor(actionId: string) {
+    super(`duplicate action: ${actionId}`);
+    this.name = 'DuplicateActionError';
   }
 }

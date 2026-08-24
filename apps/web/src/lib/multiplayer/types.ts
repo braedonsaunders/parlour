@@ -26,6 +26,7 @@ export type AppliedPacket = {
 export type ReplaySnapshot = {
   seed: number;
   log: AppliedEvent[];
+  acceptedActions: Array<{ id: string; seq: number }>;
   stateHash: string;
   settings: RoomSettings;
 };
@@ -52,6 +53,11 @@ export type MigrationSnapshot = {
   presence: PresenceSnapshot;
 };
 
+export type RemoteApplyResult = {
+  stateHash: string;
+  accepted: boolean;
+};
+
 export type PresenceEvent =
   | { kind: 'peer.joined'; peerId: PeerId; seat: SeatId }
   | { kind: 'peer.left'; peerId: PeerId; seat: SeatId; bot: true }
@@ -72,7 +78,7 @@ export type RoomHandle = {
 
 export interface AuthorityAdapter {
   apply(action: PlayerAction): AppliedPacket | Promise<AppliedPacket>;
-  applyRemote(packet: AppliedPacket): string | Promise<string>;
+  applyRemote(packet: AppliedPacket): RemoteApplyResult | Promise<RemoteApplyResult>;
   exportSnapshot(): ReplaySnapshot;
   importSnapshot(snapshot: ReplaySnapshot): void | Promise<void>;
   setSeatBot(seat: SeatId, bot: boolean): void;

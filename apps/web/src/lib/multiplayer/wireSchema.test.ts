@@ -4,6 +4,7 @@ import { dispatchWireData, parseWire } from './wireSchema';
 const snapshot = {
   seed: 42,
   log: [{ seq: 0, seat: 0, move: 'deal', payload: { card: 'HA' }, ts: 1 }],
+  acceptedActions: [{ id: 'deal-action', seq: 0 }],
   stateHash: 'hash',
   settings: { gameId: 'blitz', seats: 4, config: { lives: 3, honorRound: false } },
 };

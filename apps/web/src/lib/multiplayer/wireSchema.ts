@@ -233,16 +233,38 @@ function isRoomSettings(value: unknown): boolean {
 }
 
 function isReplaySnapshot(value: unknown): value is ReplaySnapshot {
-  return (
-    isRecord(value) &&
-    hasOnlyKeys(value, ['seed', 'log', 'stateHash', 'settings']) &&
-    isBoundedInteger(value.seed, 0xffff_ffff) &&
-    Array.isArray(value.log) &&
-    value.log.length <= MAX_SNAPSHOT_EVENTS &&
-    value.log.every((event, index) => isAppliedEvent(event) && event.seq === index) &&
-    isBoundedString(value.stateHash, MAX_HASH_LENGTH) &&
-    isRoomSettings(value.settings)
-  );
+  if (
+    !isRecord(value) ||
+    !hasOnlyKeys(value, ['seed', 'log', 'acceptedActions', 'stateHash', 'settings']) ||
+    !isBoundedInteger(value.seed, 0xffff_ffff) ||
+    !Array.isArray(value.log) ||
+    value.log.length > MAX_SNAPSHOT_EVENTS ||
+    !value.log.every((event, index) => isAppliedEvent(event) && event.seq === index) ||
+    !Array.isArray(value.acceptedActions) ||
+    value.acceptedActions.length > value.log.length ||
+    !isBoundedString(value.stateHash, MAX_HASH_LENGTH) ||
+    !isRoomSettings(value.settings)
+  ) {
+    return false;
+  }
+  const ids = new Set<string>();
+  let previousSeq = -1;
+  for (const action of value.acceptedActions) {
+    if (
+      !isRecord(action) ||
+      !hasOnlyKeys(action, ['id', 'seq']) ||
+      !isBoundedString(action.id) ||
+      ids.has(action.id) ||
+      !isBoundedInteger(action.seq, MAX_SEQUENCE) ||
+      action.seq <= previousSeq ||
+      action.seq >= value.log.length
+    ) {
+      return false;
+    }
+    ids.add(action.id);
+    previousSeq = action.seq;
+  }
+  return previousSeq === value.log.length - 1;
 }
 
 function isMigrationSnapshot(value: unknown): value is MigrationSnapshot {
