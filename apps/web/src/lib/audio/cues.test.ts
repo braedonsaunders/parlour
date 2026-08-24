@@ -108,6 +108,166 @@ describe('fx-driven table audio', () => {
     ]);
   });
 
+  it('authors Hearts pass, penalty, trick, broken-heart, and moon moments', () => {
+    expect(
+      soundCuesForFx(
+        [
+          { kind: 'hearts.pass.reveal', payload: {}, at: 0 },
+          { kind: 'tricks.collect', payload: {}, at: 100 },
+          { kind: 'hearts.trick.won', payload: {}, at: 100 },
+          { kind: 'hearts.point', payload: {}, at: 200 },
+          { kind: 'hearts.queen', payload: {}, at: 300 },
+          { kind: 'hearts.broken', payload: {}, at: 400 },
+          { kind: 'hearts.moon', payload: {}, at: 500 },
+        ],
+        'hearts',
+      ),
+    ).toEqual([
+      { id: 'hearts.pass-commit', atMs: 0 },
+      { id: 'hearts.trick-sweep', atMs: 100 },
+      { id: 'hearts.point-heart', atMs: 200 },
+      { id: 'hearts.queen-drop', atMs: 300 },
+      { id: 'hearts.hearts-broken', atMs: 400 },
+      { id: 'hearts.moon-shoot', atMs: 500 },
+    ]);
+    expect(soundCuesForFx([{ kind: 'hearts.trick.won', payload: {}, at: 25 }], 'hearts')).toEqual([
+      { id: 'hearts.trick-sweep', atMs: 25 },
+    ]);
+  });
+
+  it('branches Euchre calls and hand scores from their authored payloads', () => {
+    expect(
+      soundCuesForFx(
+        [
+          { kind: 'euchre.call', payload: { round: 1, alone: false }, at: 0 },
+          { kind: 'euchre.call', payload: { round: 2, alone: false }, at: 10 },
+          { kind: 'euchre.call', payload: { round: 1, alone: true }, at: 20 },
+          { kind: 'euchre.bid-pass', payload: {}, at: 30 },
+          { kind: 'euchre.pickup', payload: {}, at: 40 },
+          { kind: 'euchre.trick-collect', payload: {}, at: 50 },
+          { kind: 'euchre.hand-score', payload: { reason: 'euchred' }, at: 60 },
+          { kind: 'euchre.hand-score', payload: { reason: 'march-alone' }, at: 70 },
+          { kind: 'euchre.score-chip', payload: {}, at: 80 },
+        ],
+        'euchre',
+      ),
+    ).toEqual([
+      { id: 'euchre.order-up', atMs: 0 },
+      { id: 'euchre.trump-called', atMs: 10 },
+      { id: 'euchre.alone', atMs: 20 },
+      { id: 'euchre.pass', atMs: 30 },
+      { id: 'euchre.dealer-pickup', atMs: 40 },
+      { id: 'euchre.trick-collect', atMs: 170 },
+      { id: 'euchre.euchre-sting', atMs: 60 },
+      { id: 'euchre.march-fanfare', atMs: 70 },
+      { id: 'euchre.score-chime', atMs: 80 },
+    ]);
+  });
+
+  it('keeps Gin knock, gin, big-gin, and undercut accents game-specific', () => {
+    expect(
+      soundCuesForFx(
+        [
+          { kind: 'burst.knock', payload: {}, at: 0 },
+          { kind: 'gin.gin', payload: {}, at: 100 },
+          { kind: 'gin.big-gin', payload: {}, at: 200 },
+          { kind: 'gin.undercut', payload: {}, at: 300 },
+        ],
+        'gin',
+      ),
+    ).toEqual([
+      { id: 'gin.knock', atMs: 0 },
+      { id: 'gin.gin', atMs: 100 },
+      { id: 'gin.big-gin', atMs: 200 },
+      { id: 'gin.undercut', atMs: 420 },
+    ]);
+  });
+
+  it('maps Cribbage score reasons and weights larger sets with playback rate', () => {
+    expect(
+      soundCuesForFx(
+        [
+          { kind: 'cribbage.peg', payload: {}, at: 0 },
+          { kind: 'cribbage.score', payload: { reason: 'run' }, at: 10 },
+          { kind: 'cribbage.score', payload: { reason: 'fifteen' }, at: 20 },
+          { kind: 'cribbage.score', payload: { reason: 'pair' }, at: 30 },
+          { kind: 'cribbage.score', payload: { reason: 'trip' }, at: 40 },
+          { kind: 'cribbage.score', payload: { reason: 'quad' }, at: 50 },
+          { kind: 'cribbage.thirtyone', payload: {}, at: 60 },
+          { kind: 'cribbage.go', payload: {}, at: 70 },
+          { kind: 'cribbage.heels', payload: {}, at: 80 },
+          { kind: 'cribbage.crib.deal', payload: {}, at: 90 },
+          { kind: 'showdown.reveal', payload: {}, at: 100 },
+          { kind: 'cribbage.skunk', payload: {}, at: 110 },
+        ],
+        'cribbage',
+      ),
+    ).toEqual([
+      { id: 'cribbage.peg-move', atMs: 0 },
+      { id: 'cribbage.score-run', atMs: 10 },
+      { id: 'cribbage.score-fifteen', atMs: 20 },
+      { id: 'cribbage.score-pair', atMs: 30, rate: 1.02 },
+      { id: 'cribbage.score-pair', atMs: 40, rate: 0.96 },
+      { id: 'cribbage.score-pair', atMs: 50, rate: 0.9 },
+      { id: 'cribbage.thirtyone', atMs: 60 },
+      { id: 'cribbage.go-knock', atMs: 70 },
+      { id: 'cribbage.heels', atMs: 80 },
+      { id: 'cribbage.crib-slide', atMs: 90 },
+      { id: 'cribbage.show-reveal', atMs: 100 },
+      { id: 'cribbage.skunk', atMs: 110 },
+    ]);
+  });
+
+  it('maps every Ratscrew real-time accent from authority fx timing', () => {
+    expect(
+      soundCuesForFx(
+        [
+          { kind: 'ratscrew.slap', payload: {}, at: 0 },
+          { kind: 'ratscrew.misslap', payload: {}, at: 10 },
+          { kind: 'ratscrew.slap-window', payload: {}, at: 20 },
+          { kind: 'ratscrew.challenge', payload: {}, at: 30 },
+          { kind: 'ratscrew.pile-win', payload: {}, at: 40 },
+          { kind: 'ratscrew.burn', payload: {}, at: 50 },
+          { kind: 'ratscrew.comeback', payload: {}, at: 60 },
+        ],
+        'ratscrew',
+      ),
+    ).toEqual([
+      { id: 'ratscrew.slap-win', atMs: 0 },
+      { id: 'ratscrew.mislap', atMs: 10 },
+      { id: 'ratscrew.window-open', atMs: 20 },
+      { id: 'ratscrew.challenge', atMs: 150 },
+      { id: 'ratscrew.scoop', atMs: 40 },
+      { id: 'ratscrew.burn', atMs: 50 },
+      { id: 'ratscrew.comeback', atMs: 60 },
+    ]);
+  });
+
+  it('layers President set, pile, role, and exchange accents over shared cards', () => {
+    expect(
+      soundCuesForFx(
+        [
+          { kind: 'president.set', payload: {}, at: 0 },
+          { kind: 'president.pass', payload: {}, at: 10 },
+          { kind: 'president.pile-clear', payload: {}, at: 20 },
+          { kind: 'president.role', payload: { role: 'president' }, at: 30 },
+          { kind: 'president.role', payload: { role: 'scum' }, at: 40 },
+          { kind: 'president.role', payload: { role: 'vice-scum' }, at: 50 },
+          { kind: 'president.exchange', payload: {}, at: 60 },
+        ],
+        'president',
+      ),
+    ).toEqual([
+      { id: 'president.set-slam', atMs: 150 },
+      { id: 'president.pass', atMs: 10 },
+      { id: 'president.pile-clear', atMs: 80 },
+      { id: 'president.crown', atMs: 30 },
+      { id: 'president.scum', atMs: 40 },
+      { id: 'president.role-chime', atMs: 50 },
+      { id: 'president.exchange-swish', atMs: 60 },
+    ]);
+  });
+
   it('leaves celebration sounds to their authored choreography', () => {
     expect(
       soundCuesForFx(

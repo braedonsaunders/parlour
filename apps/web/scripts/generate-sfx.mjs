@@ -4,7 +4,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const API_URL = 'https://api.elevenlabs.io/v1/sound-generation?output_format=mp3_44100_128';
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', 'public', 'audio', 'sfx');
+const AUDIO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', 'public', 'audio');
 const STYLE =
   'Close-mic studio sound design for a premium cozy tabletop card game. Warm, tactile, polished, natural paperboard, felt, and wood. Start immediately. No speech, no crowd, no ambience, no long reverb tail.';
 
@@ -123,6 +123,338 @@ const sounds = [
     prompt:
       'One color selection accent: tiny paper card flick followed by a single clean prismatic glass ping and a very short warm shimmer. Precise, bright, no melody.',
   },
+  {
+    name: 'hearts-pass-commit',
+    duration: 0.5,
+    outputDuration: 0.38,
+    prompt:
+      'Exactly three playing cards slide briskly together across a wooden card table in one compact motion: warm paperboard whoosh with a crisp three-card edge flick at the end. Immediate and decisive.',
+  },
+  {
+    name: 'hearts-trick-sweep',
+    duration: 0.55,
+    outputDuration: 0.44,
+    prompt:
+      'Exactly four playing cards are gathered quickly off felt toward one player in a single sweep: tight paperboard scrape and slide, ending with one very soft satisfying glass chime. Compact and warm.',
+  },
+  {
+    name: 'hearts-point-heart',
+    duration: 0.5,
+    outputDuration: 0.3,
+    prompt:
+      'One low muted heartbeat-like pulse for receiving a penalty point in a cozy card game: ominous but soft, felt-damped and warm, with no harsh click and no ambience.',
+  },
+  {
+    name: 'hearts-queen-drop',
+    duration: 0.65,
+    outputDuration: 0.5,
+    prompt:
+      'A dark heavy playing-card thud on a wooden table followed immediately by a tiny minor-key two-note sting: a compact good-natured oh-no moment, weighty but not frightening.',
+  },
+  {
+    name: 'hearts-hearts-broken',
+    duration: 0.5,
+    outputDuration: 0.36,
+    prompt:
+      'One crisp dry snap like a paper seal breaking, transitioning instantly into a short airy card whoosh. Clear rule-unlocked signal, compact and polished, no glass breaking.',
+  },
+  {
+    name: 'hearts-moon-shoot',
+    duration: 1.2,
+    outputDuration: 0.95,
+    tempo: 0.5,
+    prompt:
+      'A one-second shoot-the-moon celebration: silver shimmer rises continuously for two-thirds, then one bright triumphant brass-and-card-fan hit lands near the end with a clean tail. Spectacular, no early finish.',
+  },
+  {
+    name: 'gin-knock-rap',
+    duration: 0.5,
+    outputDuration: 0.4,
+    prompt:
+      'Exactly two quick dry human knuckle raps on a solid wooden card table, close together, tight decay. Lighter than a fist knock, confident and unmistakable, with no reverb.',
+  },
+  {
+    name: 'gin-burst',
+    duration: 0.85,
+    outputDuration: 0.75,
+    tempo: 0.4,
+    prompt:
+      'A compact Gin Rummy celebration: a fast rising warm shimmer into one bright brass-and-playing-card fanfare hit, lighter and shorter than a full match victory, with a clean finish.',
+  },
+  {
+    name: 'gin-big-gin',
+    duration: 1.05,
+    outputDuration: 0.95,
+    prompt:
+      'A premium rare Big Gin celebration under one second: one bright fanfare hit, a brief dramatic beat, then a higher grander second hit with a short silver sparkle tail. Warm pub-game character.',
+  },
+  {
+    name: 'gin-undercut-sting',
+    duration: 0.6,
+    outputDuration: 0.5,
+    tempo: 0.6,
+    prompt:
+      'A compact playful gotcha sting for an undercut in Gin Rummy: two warm plucked notes descend with a tiny cheeky wooden pop at the end. Wry, friendly, never harsh.',
+  },
+  {
+    name: 'cribbage-peg-move',
+    outputPath: 'cribbage/peg-move.mp3',
+    duration: 0.5,
+    outputDuration: 0.12,
+    prompt:
+      'Two extremely quick dry wooden cribbage peg taps: lift click then set-down clack, with minuscule hardwood resonance. Tight, tactile, close-mic, and complete within one tenth of a second.',
+  },
+  {
+    name: 'cribbage-score-run',
+    outputPath: 'cribbage/score-run.mp3',
+    duration: 0.5,
+    outputDuration: 0.26,
+    prompt:
+      'A bright ascending three-note plucked arpeggio for scoring a run in cribbage, warm cozy pub timbre, fast and compact with no lingering reverb.',
+  },
+  {
+    name: 'cribbage-score-pair',
+    outputPath: 'cribbage/score-pair.mp3',
+    duration: 0.5,
+    outputDuration: 0.18,
+    prompt:
+      'One compact two-part score accent: a warm low wooden thunk immediately followed by a friendly higher pop. Tactile and pitchable for pair, trip, or quad scoring.',
+  },
+  {
+    name: 'cribbage-score-fifteen',
+    outputPath: 'cribbage/score-fifteen.mp3',
+    duration: 0.5,
+    outputDuration: 0.22,
+    prompt:
+      'A soft warm two-note chime for scoring exactly fifteen in cribbage, mid-register, rounded attack, cozy pub character, concise and non-digital.',
+  },
+  {
+    name: 'cribbage-count-thirtyone',
+    outputPath: 'cribbage/count-thirtyone.mp3',
+    duration: 0.55,
+    outputDuration: 0.35,
+    prompt:
+      'A very short rising paper-and-wood zip that resolves into one satisfying warm brass ding for reaching exactly thirty-one in cribbage. Immediate, clear, compact.',
+  },
+  {
+    name: 'cribbage-go-knock',
+    outputPath: 'cribbage/go-knock.mp3',
+    duration: 0.5,
+    outputDuration: 0.18,
+    prompt:
+      'Exactly one light friendly knuckle knock on a small wooden card table, dry and close, with a tiny natural resonance. Not a heavy fist thud.',
+  },
+  {
+    name: 'cribbage-heels-flourish',
+    outputPath: 'cribbage/heels-flourish.mp3',
+    duration: 0.55,
+    outputDuration: 0.4,
+    prompt:
+      'A jaunty two-note muted-brass and plucked-string flourish for his heels in cribbage, upbeat and cheeky, warm pub character, with a crisp compact ending.',
+  },
+  {
+    name: 'cribbage-crib-slide',
+    outputPath: 'cribbage/crib-slide.mp3',
+    duration: 0.5,
+    outputDuration: 0.2,
+    prompt:
+      'Exactly two face-down playing cards slide together a short distance onto felt, one soft compact paperboard friction swish ending in a muted settle. No voice or impact.',
+  },
+  {
+    name: 'cribbage-show-reveal',
+    outputPath: 'cribbage/show-reveal.mp3',
+    duration: 0.5,
+    outputDuration: 0.26,
+    prompt:
+      'One playing card flips face-up with a crisp paperboard snap, followed instantly by a tiny subtle warm sparkle tail. Clear hand-reveal accent, premium and compact.',
+  },
+  {
+    name: 'cribbage-skunk-sting',
+    outputPath: 'cribbage/skunk-sting.mp3',
+    duration: 0.65,
+    outputDuration: 0.55,
+    tempo: 0.6,
+    prompt:
+      'A short low comic bassoon-like wah-wah sting for being skunked in cribbage, two gently descending notes, cozy and good-natured, never harsh or humiliating.',
+  },
+  {
+    name: 'euchre-order-up',
+    duration: 0.5,
+    outputDuration: 0.32,
+    prompt:
+      'A confident compact euchre call: exactly two quick wooden table knocks followed immediately by a short ascending major-third pluck. Warm pub character, meaning pick it up.',
+  },
+  {
+    name: 'euchre-trump-called',
+    duration: 0.5,
+    outputDuration: 0.32,
+    prompt:
+      'A confident compact second-round euchre trump call: two close wooden ticks followed by a descending major-third pluck with a tiny bright tail. Same warm pub family as a bid.',
+  },
+  {
+    name: 'euchre-pass',
+    duration: 0.5,
+    outputDuration: 0.18,
+    prompt:
+      'One muted low brush tick for passing during a euchre bid, non-committal and understated, felt-damped, warm, and complete almost instantly.',
+  },
+  {
+    name: 'euchre-alone',
+    duration: 0.6,
+    outputDuration: 0.5,
+    prompt:
+      'A compact dramatic going-alone accent in euchre: low warm string swell blooms into a clear glassy shimmer, bold and confident, no voice and no long reverb.',
+  },
+  {
+    name: 'euchre-dealer-pickup',
+    duration: 0.5,
+    outputDuration: 0.34,
+    prompt:
+      'One playing card slides into a dealer hand with a neat paperboard scoop, followed by a very quick two-card riffle tail. Tactile, close, and concise.',
+  },
+  {
+    name: 'euchre-trick-collect',
+    duration: 0.55,
+    outputDuration: 0.4,
+    prompt:
+      'Four playing cards sweep together across felt toward a trick winner in one soft whoosh, resolving with one warm marimba-like wooden pluck. Compact and satisfying.',
+  },
+  {
+    name: 'euchre-euchre-sting',
+    duration: 0.75,
+    outputDuration: 0.7,
+    prompt:
+      'A short comic-tragic sting for getting euchred: two warm muted pub-instrument notes fall in a minor interval, followed by a tiny wooden punctuation. Wry, friendly, not harsh.',
+  },
+  {
+    name: 'euchre-march-fanfare',
+    duration: 0.7,
+    outputDuration: 0.65,
+    tempo: 0.7,
+    prompt:
+      'A triumphant compact euchre march fanfare: bright three-note ascending brass-and-plucked-string arpeggio into one confident hit, warm pub-game character and clean ending.',
+  },
+  {
+    name: 'euchre-score-chime',
+    duration: 0.5,
+    outputDuration: 0.22,
+    prompt:
+      'One warm concise scoring accent combining a small wooden peg click with a rounded single pluck. Designed to stack cleanly at short intervals, with no lingering tail.',
+  },
+  {
+    name: 'ratscrew-slap-win',
+    outputPath: 'sfx/ratscrew/slap-win.mp3',
+    duration: 0.5,
+    outputDuration: 0.22,
+    mono: true,
+    prompt:
+      'One big satisfying open-palm slap on a solid wooden card table: punchy close-mic thwack transient with a short warm tabletop body. Signature game hit, strong but not painful.',
+  },
+  {
+    name: 'ratscrew-mislap',
+    outputPath: 'sfx/ratscrew/mislap.mp3',
+    duration: 0.5,
+    outputDuration: 0.3,
+    mono: true,
+    prompt:
+      'One dull false palm slap on a wooden card table followed by a tiny low comic buzz tail. Disappointed and playful, felt-damped, compact, and never harsh.',
+  },
+  {
+    name: 'ratscrew-window-open',
+    outputPath: 'sfx/ratscrew/window-open.mp3',
+    duration: 0.5,
+    outputDuration: 0.16,
+    mono: true,
+    prompt:
+      'An extremely quick alerting rise made from a tiny paper-card whoosh into one crisp wooden tick. It draws attention to a slap window without sounding electronic or alarming.',
+  },
+  {
+    name: 'ratscrew-challenge',
+    outputPath: 'sfx/ratscrew/challenge.mp3',
+    duration: 0.5,
+    outputDuration: 0.24,
+    mono: true,
+    prompt:
+      'A compact tense two-note sting for a face-card challenge, moving from one low warm pluck to one higher tight pluck. Suspenseful, clear, and free of any long tail.',
+  },
+  {
+    name: 'ratscrew-scoop',
+    outputPath: 'sfx/ratscrew/scoop.mp3',
+    duration: 0.5,
+    outputDuration: 0.34,
+    mono: true,
+    prompt:
+      'A hand swiftly gathers a large loose pile of playing cards across felt: one broad paperboard swipe followed by a short dense card-edge riffle under the palm.',
+  },
+  {
+    name: 'ratscrew-burn',
+    outputPath: 'sfx/ratscrew/burn.mp3',
+    duration: 0.5,
+    outputDuration: 0.2,
+    mono: true,
+    prompt:
+      'One penalty playing card slides a short distance beneath a pile on felt and ends with a soft muted paperboard thock. Quick, tactile, and slightly sheepish.',
+  },
+  {
+    name: 'ratscrew-comeback',
+    outputPath: 'sfx/ratscrew/comeback.mp3',
+    duration: 0.5,
+    outputDuration: 0.24,
+    mono: true,
+    prompt:
+      'A tiny bright rising two-note chime blip for rejoining a frantic card game, warm and celebratory but deliberately small, with an immediate clean finish.',
+  },
+  {
+    name: 'president-set-slam',
+    duration: 0.5,
+    outputDuration: 0.25,
+    prompt:
+      'A small set of playing cards lands together hard on a felt-covered wooden table: one punchy layered paperboard slap with a bright edge snap tail. Bigger than a single-card landing.',
+  },
+  {
+    name: 'president-pass',
+    duration: 0.5,
+    outputDuration: 0.18,
+    prompt:
+      'A soft muted two-part pass accent: tiny low felt kick followed by a restrained wooden tap, casual nope energy, unobtrusive and designed for frequent play.',
+  },
+  {
+    name: 'president-pile-clear',
+    duration: 0.5,
+    outputDuration: 0.38,
+    prompt:
+      'A loose pile of playing cards sweeps quickly away across felt in one rising paperboard whoosh, ending with a neat soft gather. Clear pile-reset gesture, concise and satisfying.',
+  },
+  {
+    name: 'president-crown',
+    duration: 0.8,
+    outputDuration: 0.75,
+    tempo: 0.55,
+    prompt:
+      'A short triumphant coronation accent for becoming President: bright bell opens into one warm brass fanfare hit with a tiny sparkle finish. Celebratory but smaller than match victory.',
+  },
+  {
+    name: 'president-scum',
+    duration: 0.75,
+    outputDuration: 0.7,
+    tempo: 0.55,
+    prompt:
+      'A compact comedic descending wah-wah sting for receiving the lowest card-table role, using warm muted pub instruments. Good-natured, wry, and never harsh.',
+  },
+  {
+    name: 'president-role-chime',
+    duration: 0.5,
+    outputDuration: 0.35,
+    prompt:
+      'A neutral warm two-note role-announcement chime, balanced and friendly, made from rounded wood and soft brass tones with a short clean tail.',
+  },
+  {
+    name: 'president-exchange-swish',
+    duration: 0.5,
+    outputDuration: 0.3,
+    prompt:
+      'One or two playing cards are pushed firmly across a felt table between players: compact paper-textured slide swish with a soft decisive settle, no voice or flourish.',
+  },
 ];
 
 const masterTargets = {
@@ -145,6 +477,49 @@ const masterTargets = {
   'skip-swipe': -21,
   'draw-stack': -19,
   'color-select': -22,
+  'hearts-pass-commit': -16,
+  'hearts-trick-sweep': -16,
+  'hearts-point-heart': -16,
+  'hearts-queen-drop': -16,
+  'hearts-hearts-broken': -16,
+  'hearts-moon-shoot': -16,
+  'gin-knock-rap': -18,
+  'gin-burst': -18,
+  'gin-big-gin': -18,
+  'gin-undercut-sting': -18,
+  'cribbage-peg-move': -18,
+  'cribbage-score-run': -18,
+  'cribbage-score-pair': -18,
+  'cribbage-score-fifteen': -18,
+  'cribbage-count-thirtyone': -18,
+  'cribbage-go-knock': -18,
+  'cribbage-heels-flourish': -18,
+  'cribbage-crib-slide': -18,
+  'cribbage-show-reveal': -18,
+  'cribbage-skunk-sting': -18,
+  'euchre-order-up': -18,
+  'euchre-trump-called': -18,
+  'euchre-pass': -18,
+  'euchre-alone': -18,
+  'euchre-dealer-pickup': -18,
+  'euchre-trick-collect': -18,
+  'euchre-euchre-sting': -18,
+  'euchre-march-fanfare': -18,
+  'euchre-score-chime': -18,
+  'ratscrew-slap-win': -18,
+  'ratscrew-mislap': -18,
+  'ratscrew-window-open': -20,
+  'ratscrew-challenge': -18,
+  'ratscrew-scoop': -18,
+  'ratscrew-burn': -18,
+  'ratscrew-comeback': -18,
+  'president-set-slam': -18,
+  'president-pass': -20,
+  'president-pile-clear': -18,
+  'president-crown': -18,
+  'president-scum': -18,
+  'president-role-chime': -18,
+  'president-exchange-swish': -18,
 };
 
 function option(name) {
@@ -164,9 +539,20 @@ if (only && selected.length !== only.length) {
   throw new Error(`Unknown sound name(s): ${unknown.join(', ')}`);
 }
 
+for (const sound of selected) {
+  const promptLength = `${STYLE} ${sound.prompt}`.length;
+  if (promptLength > 450) {
+    throw new Error(
+      `Prompt for ${sound.name} is ${promptLength} characters; ElevenLabs allows 450`,
+    );
+  }
+}
+
 if (dryRun) {
   for (const sound of selected) {
-    console.log(`${sound.name}.mp3 (${sound.duration}s, ${masterTargets[sound.name]} LUFS)`);
+    console.log(
+      `${sound.outputPath ?? `sfx/${sound.name}.mp3`} (${sound.duration}s source, ${masterTargets[sound.name]} LUFS)`,
+    );
   }
   process.exit(0);
 }
@@ -174,17 +560,18 @@ if (dryRun) {
 const apiKey = process.env.ELEVENLABS_API_KEY;
 if (!masterOnly && !apiKey) throw new Error('ELEVENLABS_API_KEY is required');
 
-mkdirSync(ROOT, { recursive: true });
 let generated = 0;
 let skipped = 0;
 let characterCost = 0;
 
 for (const sound of selected) {
-  const output = join(ROOT, `${sound.name}.mp3`);
+  const relativeOutput = sound.outputPath ?? join('sfx', `${sound.name}.mp3`);
+  const output = join(AUDIO_ROOT, relativeOutput);
+  mkdirSync(dirname(output), { recursive: true });
   if (masterOnly) {
     if (!existsSync(output)) throw new Error(`Cannot master missing sound: ${sound.name}`);
     console.log(`master ${sound.name}`);
-    master(output, output, masterTargets[sound.name]);
+    master(output, output, masterTargets[sound.name], sound.outputDuration, sound.mono);
     continue;
   }
 
@@ -221,7 +608,14 @@ for (const sound of selected) {
   const source = `${output}.source.mp3`;
   try {
     writeFileSync(source, audio);
-    master(source, output, masterTargets[sound.name]);
+    master(
+      source,
+      output,
+      masterTargets[sound.name],
+      sound.outputDuration,
+      sound.mono,
+      sound.tempo,
+    );
   } finally {
     rmSync(source, { force: true });
   }
@@ -232,9 +626,19 @@ for (const sound of selected) {
 
 console.log(`done: ${generated} generated, ${skipped} skipped, character cost ${characterCost}`);
 
-function master(input, output, targetLufs) {
+function master(input, output, targetLufs, outputDuration, mono = false, tempo) {
   if (typeof targetLufs !== 'number') throw new Error(`Missing mastering target for ${output}`);
   const temporary = `${output}.master.mp3`;
+  const filters = [];
+  if (typeof tempo === 'number') filters.push(...atempoFilters(tempo));
+  if (typeof outputDuration === 'number') {
+    const fadeDuration = Math.min(0.04, outputDuration / 5);
+    filters.push(
+      `atrim=duration=${outputDuration}`,
+      `afade=t=out:st=${outputDuration - fadeDuration}:d=${fadeDuration}`,
+    );
+  }
+  filters.push(`loudnorm=I=${targetLufs}:TP=-1.5:LRA=7`);
   const result = spawnSync(
     'ffmpeg',
     [
@@ -245,9 +649,10 @@ function master(input, output, targetLufs) {
       '-i',
       input,
       '-af',
-      `loudnorm=I=${targetLufs}:TP=-1.5:LRA=7`,
+      filters.join(','),
       '-ar',
       '44100',
+      ...(mono ? ['-ac', '1'] : []),
       '-codec:a',
       'libmp3lame',
       '-b:a',
@@ -267,4 +672,16 @@ function master(input, output, targetLufs) {
   } finally {
     rmSync(temporary, { force: true });
   }
+}
+
+function atempoFilters(tempo) {
+  if (!Number.isFinite(tempo) || tempo <= 0) throw new Error(`Invalid audio tempo: ${tempo}`);
+  const filters = [];
+  let remaining = tempo;
+  while (remaining < 0.5) {
+    filters.push('atempo=0.5');
+    remaining /= 0.5;
+  }
+  filters.push(`atempo=${remaining}`);
+  return filters;
 }

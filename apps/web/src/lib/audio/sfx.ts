@@ -1,6 +1,14 @@
 import type { FxEvent } from '@parlour/engine';
 import type { SoundDef } from './AudioManager';
 import { parlourCuesForFx, wildpileCuesForFx, type SoundCue } from './cues';
+import {
+  cribbageCuesForFx,
+  euchreCuesForFx,
+  ginCuesForFx,
+  heartsCuesForFx,
+  presidentCuesForFx,
+  ratscrewCuesForFx,
+} from './game-cues';
 
 export type SfxPack = {
   /** Stable game/plugin id. Every owned sound id must use this as its namespace. */
@@ -48,6 +56,67 @@ export const WILDPILE_SFX = {
   voiceGreen: 'wildpile.voice.green',
   voiceBlue: 'wildpile.voice.blue',
   voiceLastCard: 'wildpile.voice.last-card',
+} as const;
+
+export const HEARTS_SFX = {
+  passCommit: 'hearts.pass-commit',
+  trickSweep: 'hearts.trick-sweep',
+  pointHeart: 'hearts.point-heart',
+  queenDrop: 'hearts.queen-drop',
+  heartsBroken: 'hearts.hearts-broken',
+  moonShoot: 'hearts.moon-shoot',
+} as const;
+
+export const EUCHRE_SFX = {
+  orderUp: 'euchre.order-up',
+  trumpCalled: 'euchre.trump-called',
+  pass: 'euchre.pass',
+  alone: 'euchre.alone',
+  dealerPickup: 'euchre.dealer-pickup',
+  trickCollect: 'euchre.trick-collect',
+  euchreSting: 'euchre.euchre-sting',
+  marchFanfare: 'euchre.march-fanfare',
+  scoreChime: 'euchre.score-chime',
+} as const;
+
+export const GIN_SFX = {
+  knock: 'gin.knock',
+  gin: 'gin.gin',
+  bigGin: 'gin.big-gin',
+  undercut: 'gin.undercut',
+} as const;
+
+export const CRIBBAGE_SFX = {
+  pegMove: 'cribbage.peg-move',
+  scoreRun: 'cribbage.score-run',
+  scorePair: 'cribbage.score-pair',
+  scoreFifteen: 'cribbage.score-fifteen',
+  thirtyone: 'cribbage.thirtyone',
+  goKnock: 'cribbage.go-knock',
+  heels: 'cribbage.heels',
+  cribSlide: 'cribbage.crib-slide',
+  showReveal: 'cribbage.show-reveal',
+  skunk: 'cribbage.skunk',
+} as const;
+
+export const RATSCREW_SFX = {
+  slapWin: 'ratscrew.slap-win',
+  mislap: 'ratscrew.mislap',
+  windowOpen: 'ratscrew.window-open',
+  challenge: 'ratscrew.challenge',
+  scoop: 'ratscrew.scoop',
+  burn: 'ratscrew.burn',
+  comeback: 'ratscrew.comeback',
+} as const;
+
+export const PRESIDENT_SFX = {
+  setSlam: 'president.set-slam',
+  pass: 'president.pass',
+  pileClear: 'president.pile-clear',
+  crown: 'president.crown',
+  scum: 'president.scum',
+  roleChime: 'president.role-chime',
+  exchangeSwish: 'president.exchange-swish',
 } as const;
 
 export const PARLOUR_SFX_PACK: SfxPack = {
@@ -103,8 +172,111 @@ export const WILDPILE_SFX_PACK: SfxPack = {
   cuesForFx: wildpileCuesForFx,
 };
 
+export const HEARTS_SFX_PACK: SfxPack = {
+  id: 'hearts',
+  label: 'Hearts',
+  sounds: [
+    sound(HEARTS_SFX.passCommit, '/audio/sfx/hearts-pass-commit.mp3', 0.78, 2, 100),
+    sound(HEARTS_SFX.trickSweep, '/audio/sfx/hearts-trick-sweep.mp3', 0.78, 2, 100),
+    sound(HEARTS_SFX.pointHeart, '/audio/sfx/hearts-point-heart.mp3', 0.72, 3, 80),
+    sound(HEARTS_SFX.queenDrop, '/audio/sfx/hearts-queen-drop.mp3', 0.86, 1, 250),
+    sound(HEARTS_SFX.heartsBroken, '/audio/sfx/hearts-hearts-broken.mp3', 0.8, 1, 250),
+    sound(HEARTS_SFX.moonShoot, '/audio/sfx/hearts-moon-shoot.mp3', 0.9, 1, 800),
+  ],
+  cuesForFx: heartsCuesForFx,
+};
+
+export const EUCHRE_SFX_PACK: SfxPack = {
+  id: 'euchre',
+  label: 'Euchre',
+  sounds: [
+    sound(EUCHRE_SFX.orderUp, '/audio/sfx/euchre-order-up.mp3', 0.76, 2, 100),
+    sound(EUCHRE_SFX.trumpCalled, '/audio/sfx/euchre-trump-called.mp3', 0.76, 2, 100),
+    sound(EUCHRE_SFX.pass, '/audio/sfx/euchre-pass.mp3', 0.58, 4, 60),
+    sound(EUCHRE_SFX.alone, '/audio/sfx/euchre-alone.mp3', 0.84, 1, 300),
+    sound(EUCHRE_SFX.dealerPickup, '/audio/sfx/euchre-dealer-pickup.mp3', 0.74, 2, 100),
+    sound(EUCHRE_SFX.trickCollect, '/audio/sfx/euchre-trick-collect.mp3', 0.76, 2, 100),
+    sound(EUCHRE_SFX.euchreSting, '/audio/sfx/euchre-euchre-sting.mp3', 0.86, 1, 500),
+    sound(EUCHRE_SFX.marchFanfare, '/audio/sfx/euchre-march-fanfare.mp3', 0.88, 1, 500),
+    sound(EUCHRE_SFX.scoreChime, '/audio/sfx/euchre-score-chime.mp3', 0.68, 6, 50),
+  ],
+  cuesForFx: euchreCuesForFx,
+};
+
+export const GIN_SFX_PACK: SfxPack = {
+  id: 'gin',
+  label: 'Gin Rummy',
+  sounds: [
+    sound(GIN_SFX.knock, '/audio/sfx/gin-knock-rap.mp3', 0.88, 1, 300),
+    sound(GIN_SFX.gin, '/audio/sfx/gin-burst.mp3', 0.88, 1, 700),
+    sound(GIN_SFX.bigGin, '/audio/sfx/gin-big-gin.mp3', 0.92, 1, 900),
+    sound(GIN_SFX.undercut, '/audio/sfx/gin-undercut-sting.mp3', 0.84, 1, 500),
+  ],
+  cuesForFx: ginCuesForFx,
+};
+
+export const CRIBBAGE_SFX_PACK: SfxPack = {
+  id: 'cribbage',
+  label: 'Cribbage',
+  sounds: [
+    sound(CRIBBAGE_SFX.pegMove, '/audio/cribbage/peg-move.mp3', 0.7, 5, 40),
+    sound(CRIBBAGE_SFX.scoreRun, '/audio/cribbage/score-run.mp3', 0.72, 3, 60),
+    sound(CRIBBAGE_SFX.scorePair, '/audio/cribbage/score-pair.mp3', 0.74, 3, 60),
+    sound(CRIBBAGE_SFX.scoreFifteen, '/audio/cribbage/score-fifteen.mp3', 0.7, 3, 60),
+    sound(CRIBBAGE_SFX.thirtyone, '/audio/cribbage/count-thirtyone.mp3', 0.82, 2, 120),
+    sound(CRIBBAGE_SFX.goKnock, '/audio/cribbage/go-knock.mp3', 0.72, 2, 100),
+    sound(CRIBBAGE_SFX.heels, '/audio/cribbage/heels-flourish.mp3', 0.82, 1, 300),
+    sound(CRIBBAGE_SFX.cribSlide, '/audio/cribbage/crib-slide.mp3', 0.72, 2, 100),
+    sound(CRIBBAGE_SFX.showReveal, '/audio/cribbage/show-reveal.mp3', 0.74, 3, 80),
+    sound(CRIBBAGE_SFX.skunk, '/audio/cribbage/skunk-sting.mp3', 0.84, 1, 500),
+  ],
+  cuesForFx: cribbageCuesForFx,
+};
+
+export const RATSCREW_SFX_PACK: SfxPack = {
+  id: 'ratscrew',
+  label: 'Egyptian Ratscrew',
+  sounds: [
+    sound(RATSCREW_SFX.slapWin, '/audio/sfx/ratscrew/slap-win.mp3', 0.94, 2, 80),
+    sound(RATSCREW_SFX.mislap, '/audio/sfx/ratscrew/mislap.mp3', 0.82, 2, 100),
+    sound(RATSCREW_SFX.windowOpen, '/audio/sfx/ratscrew/window-open.mp3', 0.56, 2, 80),
+    sound(RATSCREW_SFX.challenge, '/audio/sfx/ratscrew/challenge.mp3', 0.76, 2, 100),
+    sound(RATSCREW_SFX.scoop, '/audio/sfx/ratscrew/scoop.mp3', 0.8, 2, 100),
+    sound(RATSCREW_SFX.burn, '/audio/sfx/ratscrew/burn.mp3', 0.72, 2, 100),
+    sound(RATSCREW_SFX.comeback, '/audio/sfx/ratscrew/comeback.mp3', 0.8, 1, 250),
+  ],
+  cuesForFx: ratscrewCuesForFx,
+};
+
+export const PRESIDENT_SFX_PACK: SfxPack = {
+  id: 'president',
+  label: 'President',
+  sounds: [
+    sound(PRESIDENT_SFX.setSlam, '/audio/sfx/president-set-slam.mp3', 0.85, 2, 100),
+    sound(PRESIDENT_SFX.pass, '/audio/sfx/president-pass.mp3', 0.55, 2, 80),
+    sound(PRESIDENT_SFX.pileClear, '/audio/sfx/president-pile-clear.mp3', 0.72, 2, 100),
+    sound(PRESIDENT_SFX.crown, '/audio/sfx/president-crown.mp3', 0.85, 1, 600),
+    sound(PRESIDENT_SFX.scum, '/audio/sfx/president-scum.mp3', 0.78, 1, 600),
+    sound(PRESIDENT_SFX.roleChime, '/audio/sfx/president-role-chime.mp3', 0.68, 2, 120),
+    sound(PRESIDENT_SFX.exchangeSwish, '/audio/sfx/president-exchange-swish.mp3', 0.72, 2, 100),
+  ],
+  cuesForFx: presidentCuesForFx,
+};
+
 const packs = new Map<string, SfxPack>();
-for (const pack of [PARLOUR_SFX_PACK, BLITZ_SFX_PACK, WILDPILE_SFX_PACK]) registerSfxPack(pack);
+for (const pack of [
+  PARLOUR_SFX_PACK,
+  BLITZ_SFX_PACK,
+  WILDPILE_SFX_PACK,
+  HEARTS_SFX_PACK,
+  EUCHRE_SFX_PACK,
+  GIN_SFX_PACK,
+  CRIBBAGE_SFX_PACK,
+  RATSCREW_SFX_PACK,
+  PRESIDENT_SFX_PACK,
+]) {
+  registerSfxPack(pack);
+}
 
 /** Games/plugins call this once to contribute assets plus their fx-to-audio mapping. */
 export function registerSfxPack(pack: SfxPack): void {
