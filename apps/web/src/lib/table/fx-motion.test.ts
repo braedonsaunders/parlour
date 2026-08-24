@@ -65,4 +65,12 @@ describe('table fx timeline', () => {
       durationMs: 220,
     });
   });
+
+  it('lets a game direct a played card to its table-specific peg pile', () => {
+    const [discard] = buildFxTimeline([
+      { kind: Fx.DiscardCard, payload: { card: 'H5', seat: 1, to: 'peg' } },
+    ]);
+
+    expect(discard).toMatchObject({ type: 'discard', from: 'hand:1', to: 'peg' });
+  });
 });

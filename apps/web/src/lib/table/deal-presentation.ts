@@ -33,6 +33,8 @@ const LIVE_PRESENTATION: DealPresentation = {
   visibleCount: (_seat, finalCount) => finalCount,
 };
 
+const NO_LANDED_CUES: ReadonlySet<string> = new Set();
+
 function seatFromHandZone(zone: string): number | null {
   const match = /^hand:(\d+)$/.exec(zone);
   return match ? Number(match[1]) : null;
@@ -80,38 +82,32 @@ export function useDealPresentation(
       return null;
     }
   }, [events]);
-  const [landedCueIds, setLandedCueIds] = useState<ReadonlySet<string>>(() => new Set());
+  const [landed, setLanded] = useState<{
+    fxKey: string | number | null;
+    cueIds: ReadonlySet<string>;
+  }>(() => ({ fxKey: null, cueIds: NO_LANDED_CUES }));
+  const landedCueIds = landed.fxKey === fxKey ? landed.cueIds : NO_LANDED_CUES;
 
   useLayoutEffect(() => {
-    // State changes ride a microtask so the effect body itself never sets
-    // state synchronously (react-hooks/set-state-in-effect).
-    if (!plan) {
-      const clear = window.setTimeout(() => setLandedCueIds(new Set()), 0);
-      return () => window.clearTimeout(clear);
-    }
+    if (!plan) return;
     const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
     if (reduced) {
-      // reduced motion skips the choreography entirely; land everything at once
-      const markAll = window.setTimeout(
-        () => setLandedCueIds(new Set(plan.cues.map(({ id }) => id))),
+      const timer = window.setTimeout(
+        () => setLanded({ fxKey, cueIds: new Set(plan.cues.map(({ id }) => id)) }),
         0,
       );
-      return () => window.clearTimeout(markAll);
+      return () => window.clearTimeout(timer);
     }
-    const reset = window.setTimeout(() => setLandedCueIds(new Set()), 0);
     const timers = plan.cues.map((cue) =>
       window.setTimeout(() => {
-        setLandedCueIds((current) => {
-          const next = new Set(current);
+        setLanded((current) => {
+          const next = new Set(current.fxKey === fxKey ? current.cueIds : NO_LANDED_CUES);
           next.add(cue.id);
-          return next;
+          return { fxKey, cueIds: next };
         });
       }, cue.startMs + cue.durationMs),
     );
-    return () => {
-      window.clearTimeout(reset);
-      timers.forEach((timer) => window.clearTimeout(timer));
-    };
+    return () => timers.forEach((timer) => window.clearTimeout(timer));
   }, [fxKey, plan]);
 
   if (!plan) return LIVE_PRESENTATION;

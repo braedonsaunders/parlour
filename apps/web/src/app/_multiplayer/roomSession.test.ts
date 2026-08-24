@@ -6,6 +6,7 @@ import {
   makeRng,
   stateHash,
 } from '@parlour/engine';
+import { cribbageConfigSchema } from '@parlour/game-cribbage';
 import { createEuchreDef, euchreConfig, tierBot } from '@parlour/game-euchre';
 import { ginConfigSchema } from '@parlour/game-gin';
 import { presidentConfig } from '@parlour/game-president';
@@ -16,6 +17,7 @@ import { NostrSignaling, type SignalPayload } from '@/lib/multiplayer/NostrSigna
 import type { RoomSettings } from '@/lib/multiplayer/types';
 import {
   blitzMultiplayerSession,
+  cribbageMultiplayerSession,
   euchreMultiplayerSession,
   ginMultiplayerSession,
   MultiplayerRoomSession,
@@ -578,6 +580,76 @@ describe('multiplayer route composition', () => {
       },
       100,
       10,
+    );
+  });
+
+  it('runs a two-seat Cribbage room with replay-identical discard actions', async () => {
+    const broker = new MockSignalingBroker();
+    const rtc = new MockRtcNetwork();
+    const host = new MultiplayerRoomSession(
+      { name: 'Host', avatarId: 'ember', profileId: 'crib-host' },
+      {
+        signaling: broker.signaling('crib-host-peer'),
+        peerConnection: rtc.factory('crib-host'),
+        seed: 93,
+      },
+    );
+    const guest = new MultiplayerRoomSession(
+      { name: 'Guest', avatarId: 'mint', profileId: 'crib-guest' },
+      {
+        signaling: broker.signaling('crib-guest-peer'),
+        peerConnection: rtc.factory('crib-guest'),
+        seed: 8,
+      },
+    );
+    sessions.push(host, guest);
+
+    const room = await host.create({
+      gameId: 'cribbage',
+      seats: 2,
+      config: { ...cribbageConfigSchema.defaults, gamesToWin: 3 },
+    });
+    expect(host.getSnapshot().settings?.config).toMatchObject({ gamesToWin: 1 });
+    await guest.join(room.code);
+    await eventually(() => expect(guest.getSnapshot().localSeat).toBe(1));
+
+    const hostRound = cribbageMultiplayerSession(host.getSnapshot())!;
+    const hostDiscard = hostRound.def.flow.legalMovesFor!(hostRound.state, hostRound.phase, 0).find(
+      (move) => move.id === 'crib.discard',
+    )!;
+    host.send(hostDiscard.id, hostDiscard.payload);
+    await eventually(() => {
+      expect(cribbageMultiplayerSession(host.getSnapshot())?.log).toHaveLength(1);
+      expect(cribbageMultiplayerSession(guest.getSnapshot())?.log).toHaveLength(1);
+    });
+
+    const guestRound = cribbageMultiplayerSession(guest.getSnapshot())!;
+    const guestDiscard = guestRound.def.flow.legalMovesFor!(
+      guestRound.state,
+      guestRound.phase,
+      1,
+    ).find((move) => move.id === 'crib.discard')!;
+    guest.send(guestDiscard.id, guestDiscard.payload);
+    await eventually(() => {
+      expect(cribbageMultiplayerSession(host.getSnapshot())?.log).toHaveLength(2);
+      expect(cribbageMultiplayerSession(guest.getSnapshot())?.log).toHaveLength(2);
+    });
+
+    const hostSession = cribbageMultiplayerSession(host.getSnapshot())!;
+    const guestSession = cribbageMultiplayerSession(guest.getSnapshot())!;
+    expect(guestSession.log).toEqual(hostSession.log);
+    expect(stateHash(guestSession.state)).toBe(stateHash(hostSession.state));
+  });
+
+  it('rejects Cribbage room announcements with any seat count other than two', async () => {
+    const host = new MultiplayerRoomSession(
+      { name: 'Host', avatarId: 'ember', profileId: 'crib-host-invalid' },
+      { seed: 121 },
+    );
+    sessions.push(host);
+
+    await expect(host.create({ gameId: 'cribbage', seats: 3 })).rejects.toThrow(
+      'Cribbage rooms require exactly two seats',
     );
   });
 });

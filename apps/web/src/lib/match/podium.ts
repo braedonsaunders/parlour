@@ -14,6 +14,10 @@ export interface PodiumEntry extends SeatView {
   livesLeft: number | null;
   /** Wild's ranking detail: cards still in hand when the deal ended. */
   cardsLeft: number | null;
+  /** Cribbage match games won. */
+  gamesWon: number;
+  /** Cribbage's final peg total in the last game. */
+  pegTotal: number;
 }
 
 function detailNumber(
@@ -42,6 +46,8 @@ export function derivePodium(result: MatchResult, seats: readonly SeatInfo[]): P
       knockWins: detailNumber(ranking.detail, 'knockWins'),
       livesLeft: typeof livesRaw === 'number' && Number.isFinite(livesRaw) ? livesRaw : null,
       cardsLeft: typeof cardsRaw === 'number' && Number.isFinite(cardsRaw) ? cardsRaw : null,
+      gamesWon: detailNumber(ranking.detail, 'wins'),
+      pegTotal: detailNumber(ranking.detail, 'total'),
     });
   }
 

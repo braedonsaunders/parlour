@@ -123,13 +123,15 @@ export default function JoinPage() {
               ? '/wild/table'
               : gameId === 'euchre'
                 ? '/euchre/table'
-                : gameId === 'hearts'
-                  ? '/hearts/table'
-                  : gameId === 'gin'
-                    ? '/gin/table'
-                    : gameId === 'president'
-                      ? '/president/table'
-                      : '/table',
+                : gameId === 'cribbage'
+                  ? '/cribbage/table'
+                  : gameId === 'hearts'
+                    ? '/hearts/table'
+                    : gameId === 'gin'
+                      ? '/gin/table'
+                      : gameId === 'president'
+                        ? '/president/table'
+                        : '/table',
           )
         }
       />

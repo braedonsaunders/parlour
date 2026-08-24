@@ -17,6 +17,8 @@ export type PlayingCardProps = {
   disabled?: boolean;
   rotation?: number;
   onClick?: () => void;
+  /** Verb announced before the card name when this card is interactive. */
+  actionLabel?: string;
 };
 
 export function PlayingCard({
@@ -26,6 +28,7 @@ export function PlayingCard({
   disabled = false,
   rotation = 0,
   onClick,
+  actionLabel = 'Discard',
 }: PlayingCardProps) {
   const parsed = card ? parseCard(card) : null;
   const className = [
@@ -46,7 +49,9 @@ export function PlayingCard({
         style={style}
         onClick={onClick}
         disabled={disabled}
-        aria-label={faceDown ? 'Face-down card' : `Discard ${parsed?.label ?? card ?? 'card'}`}
+        aria-label={
+          faceDown ? 'Face-down card' : `${actionLabel} ${parsed?.label ?? card ?? 'card'}`
+        }
       >
         <CardContents parsed={parsed} faceDown={faceDown} />
       </button>
