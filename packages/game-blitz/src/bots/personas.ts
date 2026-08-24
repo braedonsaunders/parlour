@@ -1,19 +1,19 @@
 import type { BotPolicy } from '@parlour/engine';
 import type { BlitzState } from '../state';
-import type { BotParams } from './shared';
+import { HARD_BOT_DEFAULTS, type BotParams } from './shared';
 import { makeEasyBot } from './easy';
 import { makeMediumBot } from './medium';
 import { makeHardBot } from './hard';
 
 /** The six named characters (spec §9): tier + parameter skews + emote flavor. */
 export interface PersonaDef {
-  id: string;
-  name: string;
-  avatar: string;
-  blurb: string;
-  emotes: readonly string[];
-  tier: 1 | 2 | 3;
-  params: BotParams;
+  readonly id: string;
+  readonly name: string;
+  readonly avatar: string;
+  readonly blurb: string;
+  readonly emotes: readonly string[];
+  readonly tier: 1 | 2 | 3;
+  readonly params: BotParams;
 }
 
 const EASY_BASE: BotParams = {
@@ -24,6 +24,7 @@ const EASY_BASE: BotParams = {
   chaseBlitz: false,
   denial: 0,
   curationBias: 0,
+  hard: HARD_BOT_DEFAULTS,
 };
 
 const MEDIUM_BASE: BotParams = {
@@ -34,6 +35,7 @@ const MEDIUM_BASE: BotParams = {
   chaseBlitz: false,
   denial: 0.3,
   curationBias: 1,
+  hard: HARD_BOT_DEFAULTS,
 };
 
 const HARD_BASE: BotParams = {
@@ -44,6 +46,7 @@ const HARD_BASE: BotParams = {
   chaseBlitz: true,
   denial: 1.5,
   curationBias: 2,
+  hard: HARD_BOT_DEFAULTS,
 };
 
 export const PERSONAS: readonly PersonaDef[] = [

@@ -1,7 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { aggregateWinRates, runBotGame, simulateGames } from '@parlour/engine';
+import {
+  aggregateWinRates,
+  chooseBotMove,
+  makeRng,
+  runBotGame,
+  simulateGames,
+} from '@parlour/engine';
 import { PERSONAS, TIER_BOTS, makePersonaBot, personaById, tierBot } from './personas';
+import { blitzConfigSchema } from '../config';
 import { createBlitzDef } from '../rules';
+import type { BlitzState } from '../state';
 
 const def = createBlitzDef();
 
@@ -54,6 +62,40 @@ describe('policy legality', () => {
     expect(runBotGame(def, { seed: 5150, policies })).toEqual(
       runBotGame(def, { seed: 5150, policies }),
     );
+  });
+
+  it('makes the same hard choice from the same view, legal moves, and rng', () => {
+    const view: BlitzState = {
+      rules: blitzConfigSchema.defaults(),
+      seats: 2,
+      hands: [
+        ['S1', 'S10', 'H2'],
+        ['C2', 'C3', 'C4'],
+      ],
+      stock: ['D2'],
+      discard: ['S9'],
+      turn: 0,
+      knocker: 1,
+      postKnockTurns: 1,
+      drawnFromDiscard: null,
+      pickups: [],
+      outcome: null,
+    };
+    const legal = [{ id: 'draw.stock' }, { id: 'draw.discard' }];
+    const bot = makePersonaBot('poker-pat');
+    const previous = process.env.DESP_RESCUE;
+
+    try {
+      process.env.DESP_RESCUE = '100';
+      const first = chooseBotMove(bot, view, 0, legal, makeRng(90210));
+      process.env.DESP_RESCUE = '0';
+      const second = chooseBotMove(bot, view, 0, legal, makeRng(90210));
+
+      expect(second).toEqual(first);
+    } finally {
+      if (previous === undefined) delete process.env.DESP_RESCUE;
+      else process.env.DESP_RESCUE = previous;
+    }
   });
 });
 
