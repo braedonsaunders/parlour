@@ -6,6 +6,7 @@ import { ginCatalog } from '@parlour/game-gin';
 import { heartsCatalog } from '@parlour/game-hearts';
 import { klondikeCatalog } from '@parlour/game-klondike';
 import { ohhellCatalog } from '@parlour/game-ohhell';
+import { spiteCatalog } from '@parlour/game-spite';
 import { presidentCatalog } from '@parlour/game-president';
 import { wildpileCatalog } from '@parlour/game-wildpile';
 import { ratscrewCatalog } from '@parlour/game-ratscrew';
@@ -50,7 +51,8 @@ export type GameId =
   | 'president'
   | 'spades'
   | 'klondike'
-  | 'ohhell';
+  | 'ohhell'
+  | 'spite';
 
 const SHELF: readonly GameCatalogEntry[] = [
   shelfEntry(blitzCatalog),
@@ -60,6 +62,7 @@ const SHELF: readonly GameCatalogEntry[] = [
   shelfEntry(euchreCatalog),
   shelfEntry(spadesCatalog),
   shelfEntry(ohhellCatalog),
+  shelfEntry(spiteCatalog),
   shelfEntry(klondikeCatalog),
   shelfEntry(heartsCatalog),
   shelfEntry(ginCatalog),
