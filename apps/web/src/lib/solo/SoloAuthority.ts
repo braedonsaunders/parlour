@@ -124,10 +124,6 @@ export class SoloAuthority<TLive, TSnapshot, TView = never> {
     return this.live;
   }
 
-  setLive(live: TLive): void {
-    this.live = live;
-  }
-
   getSnapshot(): TSnapshot {
     return this.spec.snapshot(this.live);
   }
@@ -266,7 +262,7 @@ export class SoloAuthority<TLive, TSnapshot, TView = never> {
     let fx = [...result.fx];
     this.live = result.live;
     const extra = this.spec.afterApply?.({ live: this.live, events, fx });
-    if (extra?.live) this.live = extra.live;
+    if (extra?.live !== undefined) this.live = extra.live;
     if (extra?.events) events = [...extra.events];
     if (extra?.fx) fx = [...extra.fx];
     return this.publish({
