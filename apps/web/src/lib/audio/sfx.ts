@@ -3,12 +3,14 @@ import type { SoundDef } from './AudioManager';
 import { blitzCuesForFx, parlourCuesForFx, wildpileCuesForFx, type SoundCue } from './cues';
 import {
   cribbageCuesForFx,
+  eightsCuesForFx,
   euchreCuesForFx,
   ginCuesForFx,
   heartsCuesForFx,
   klondikeCuesForFx,
   presidentCuesForFx,
   ratscrewCuesForFx,
+  pokerCuesForFx,
   spadesCuesForFx,
 } from './game-cues';
 
@@ -102,6 +104,18 @@ export const SPADES_SFX = {
   scoreChime: 'spades.score-chime',
 } as const;
 
+export const POKER_SFX = {
+  chipsSoft: 'poker.chips-soft',
+  chipsHard: 'poker.chips-hard',
+  fold: 'poker.fold',
+  check: 'poker.check',
+  board: 'poker.board',
+  pot: 'poker.pot',
+  award: 'poker.award',
+  bust: 'poker.bust',
+  blindsUp: 'poker.blinds-up',
+} as const;
+
 export const KLONDIKE_SFX = {
   draw: 'klondike.draw',
   recycle: 'klondike.recycle',
@@ -139,6 +153,22 @@ export const RATSCREW_SFX = {
   scoop: 'ratscrew.scoop',
   burn: 'ratscrew.burn',
   comeback: 'ratscrew.comeback',
+} as const;
+
+/**
+ * Crazy Eights ships no new audio. Every id points at an existing parlour asset
+ * chosen for its gesture: `validatePack` only requires the `eights.` namespace,
+ * and `uniqueSounds` objects only when one id claims two different files.
+ */
+export const EIGHTS_SFX = {
+  wild: 'eights.wild',
+  suit: 'eights.suit',
+  skip: 'eights.skip',
+  reverse: 'eights.reverse',
+  drawStack: 'eights.draw-stack',
+  out: 'eights.out',
+  blocked: 'eights.blocked',
+  score: 'eights.score',
 } as const;
 
 export const PRESIDENT_SFX = {
@@ -256,6 +286,23 @@ export const SPADES_SFX_PACK: SfxPack = {
   cuesForFx: spadesCuesForFx,
 };
 
+export const POKER_SFX_PACK: SfxPack = {
+  id: 'poker',
+  label: 'Poker',
+  sounds: [
+    sound(POKER_SFX.chipsSoft, '/audio/sfx/poker-chips-soft.mp3', 0.8, 4, 55),
+    sound(POKER_SFX.chipsHard, '/audio/sfx/poker-chips-hard.mp3', 0.85, 3, 90),
+    sound(POKER_SFX.fold, '/audio/sfx/poker-fold.mp3', 0.78, 3, 60),
+    sound(POKER_SFX.check, '/audio/sfx/poker-check.mp3', 0.8, 2, 120),
+    sound(POKER_SFX.board, '/audio/sfx/poker-board.mp3', 0.82, 4, 60),
+    sound(POKER_SFX.pot, '/audio/sfx/poker-pot.mp3', 0.84, 2, 150),
+    sound(POKER_SFX.award, '/audio/sfx/poker-award.mp3', 0.86, 1, 500),
+    sound(POKER_SFX.bust, '/audio/sfx/poker-bust.mp3', 0.86, 1, 500),
+    sound(POKER_SFX.blindsUp, '/audio/sfx/poker-blinds-up.mp3', 0.8, 1, 500),
+  ],
+  cuesForFx: pokerCuesForFx,
+};
+
 export const KLONDIKE_SFX_PACK: SfxPack = {
   id: 'klondike',
   label: 'Klondike',
@@ -330,6 +377,22 @@ export const PRESIDENT_SFX_PACK: SfxPack = {
   cuesForFx: presidentCuesForFx,
 };
 
+export const EIGHTS_SFX_PACK: SfxPack = {
+  id: 'eights',
+  label: 'Crazy Eights',
+  sounds: [
+    sound(EIGHTS_SFX.wild, '/audio/sfx/wild-surge.mp3', 0.78, 2, 100),
+    sound(EIGHTS_SFX.suit, '/audio/sfx/color-select.mp3', 0.64, 2, 100),
+    sound(EIGHTS_SFX.skip, '/audio/sfx/skip-swipe.mp3', 0.72, 2, 100),
+    sound(EIGHTS_SFX.reverse, '/audio/sfx/reverse-whoosh.mp3', 0.72, 2, 100),
+    sound(EIGHTS_SFX.drawStack, '/audio/sfx/draw-stack.mp3', 0.78, 2, 100),
+    sound(EIGHTS_SFX.out, '/audio/sfx/blitz-burst.mp3', 0.88, 1, 700),
+    sound(EIGHTS_SFX.blocked, '/audio/sfx/euchre-euchre-sting.mp3', 0.82, 1, 500),
+    sound(EIGHTS_SFX.score, '/audio/sfx/euchre-score-chime.mp3', 0.68, 6, 50),
+  ],
+  cuesForFx: eightsCuesForFx,
+};
+
 const packs = new Map<string, SfxPack>();
 for (const pack of [
   PARLOUR_SFX_PACK,
@@ -338,11 +401,13 @@ for (const pack of [
   HEARTS_SFX_PACK,
   EUCHRE_SFX_PACK,
   SPADES_SFX_PACK,
+  POKER_SFX_PACK,
   KLONDIKE_SFX_PACK,
   GIN_SFX_PACK,
   CRIBBAGE_SFX_PACK,
   RATSCREW_SFX_PACK,
   PRESIDENT_SFX_PACK,
+  EIGHTS_SFX_PACK,
 ]) {
   registerSfxPack(pack);
 }

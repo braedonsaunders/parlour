@@ -1,0 +1,80 @@
+'use client';
+
+import { useState } from 'react';
+import { MAX_SEATS, MIN_SEATS } from '@parlour/game-poker';
+import { useWipeRouter } from '@/hooks/useWipeRouter';
+import { GameArt } from '@/components/GameArt';
+import {
+  BotDifficultyPicker,
+  GameSetupScreen,
+  SeatPicker,
+  SetupActions,
+  SetupPanel,
+} from '@/components/setup';
+import { POKER_MODES } from '@/lib/poker/modes';
+import { getGameMode } from '@/lib/games';
+import { usePokerSetupStore } from '@/stores/pokerSetup';
+
+const SEAT_OPTIONS = Array.from(
+  { length: MAX_SEATS - MIN_SEATS + 1 },
+  (_, index) => MIN_SEATS + index,
+);
+
+export default function PokerSetupPage() {
+  const router = useWipeRouter();
+  const mode = usePokerSetupStore((s) => s.mode);
+  const botTier = usePokerSetupStore((s) => s.botTier);
+  const seats = usePokerSetupStore((s) => s.seats);
+  const setMode = usePokerSetupStore((s) => s.setMode);
+  const setBotTier = usePokerSetupStore((s) => s.setBotTier);
+  const setSeats = usePokerSetupStore((s) => s.setSeats);
+  const [starting, setStarting] = useState(false);
+
+  const startSolo = () => {
+    if (starting) return;
+    setStarting(true);
+    router.push('/poker/table');
+  };
+
+  return (
+    <GameSetupScreen
+      title="Poker"
+      eyebrow="pick your table"
+      modes={POKER_MODES}
+      modesLabel="House rules"
+      selected={mode}
+      onSelect={(id) => setMode(id as typeof mode)}
+      renderArt={(def) => <GameArt cards={getGameMode('poker', def.id).art} />}
+    >
+      <SetupPanel>
+        <SeatPicker
+          options={SEAT_OPTIONS}
+          value={seats}
+          onChange={setSeats}
+          hint={`you plus ${seats - 1} ${seats === 2 ? 'opponent' : 'opponents'} — last stack standing wins`}
+        />
+        <BotDifficultyPicker value={botTier} onChange={setBotTier} />
+      </SetupPanel>
+
+      <SetupActions
+        busy={starting}
+        actions={[
+          {
+            label: 'Play solo',
+            busyLabel: 'Shuffling up…',
+            onClick: startSolo,
+            testId: 'deal-me-in',
+          },
+          {
+            label: 'Create friend room',
+            tone: 'teal',
+            onClick: () => router.push('/poker/create'),
+            testId: 'create-poker-room',
+          },
+          { label: 'Join with a code', tone: 'ghost', href: '/join' },
+        ]}
+        note="Chips are scorekeeping — there is nothing to buy and nothing to cash out."
+      />
+    </GameSetupScreen>
+  );
+}

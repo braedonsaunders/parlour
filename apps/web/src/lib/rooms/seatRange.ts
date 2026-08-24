@@ -22,6 +22,7 @@ export const DEFAULT_SEAT_RANGE: SeatRange = { min: 2, max: 4 };
 const SEAT_RANGES: Readonly<Record<string, SeatRange>> = {
   blitz: { min: 2, max: 4 },
   wildpile: { min: 2, max: 4 },
+  eights: { min: 2, max: 6 },
   ratscrew: { min: 2, max: 4 },
   hearts: { min: 2, max: 4 },
   gin: { min: 2, max: 4 },

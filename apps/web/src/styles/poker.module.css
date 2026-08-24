@@ -1,0 +1,360 @@
+/* Poker table furniture: the seat ring, the community board, the pot, and the
+   betting rail with its raise slider. */
+
+.screen {
+  --poker-felt: #17351f;
+  --poker-accent: #5fae7b;
+}
+
+.feltMark {
+  font-size: 8rem;
+  opacity: 0.14;
+}
+
+/* --- HUD ------------------------------------------------------------------ */
+
+.hudChips {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-left: 0.65rem;
+}
+
+.hudStat {
+  display: inline-flex;
+  flex-direction: column;
+  line-height: 1.1;
+}
+
+.hudStat small {
+  font-size: 0.52rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(253, 246, 234, 0.6);
+}
+
+.hudStat strong {
+  font-size: 0.86rem;
+  font-weight: 800;
+  color: #fdf6ea;
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- the ring of seats ---------------------------------------------------- */
+
+.seatRing {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* Opponents are spread across the top arc of the felt. The local seat sits
+   below it in its own strip, so the ring only ever has to place the others. */
+.seat {
+  position: absolute;
+  left: calc(50% + var(--seat-x, 0) * 1%);
+  top: var(--seat-y, 20%);
+  transform: translate(-50%, -50%);
+  display: grid;
+  justify-items: center;
+  gap: 0.3rem;
+  pointer-events: auto;
+  transition: opacity 180ms ease;
+}
+
+.seat[data-folded] {
+  opacity: 0.42;
+}
+
+.seat[data-out] {
+  opacity: 0.24;
+  filter: grayscale(1);
+}
+
+.seat[data-turn] .seatBadge {
+  box-shadow: 0 0 0 3px var(--poker-accent);
+}
+
+/* Slot 0..of-1 spread evenly across an arc. Computed here rather than in JS so
+   a resize never needs a re-render to stay centred. */
+.seat {
+  --seat-span: 74;
+  --seat-step: calc(var(--seat-span) / max(var(--seat-of, 1) - 1, 1));
+  --seat-x: calc(var(--seat-slot, 0) * var(--seat-step) - var(--seat-span) / 2);
+}
+
+.seat:only-child {
+  --seat-x: 0;
+}
+
+.seatCards {
+  display: flex;
+  gap: 0.18rem;
+}
+
+.seatBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.25rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(16, 24, 32, 0.78);
+  border: 2px solid rgba(253, 246, 234, 0.16);
+}
+
+.seatText {
+  display: grid;
+  line-height: 1.15;
+}
+
+.seatText strong {
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: #fdf6ea;
+}
+
+.seatText small {
+  font-size: 0.6rem;
+  color: rgba(253, 246, 234, 0.66);
+  font-variant-numeric: tabular-nums;
+}
+
+.buttonChip {
+  display: inline-grid;
+  place-items: center;
+  width: 1.15rem;
+  height: 1.15rem;
+  border-radius: 999px;
+  background: #fdf6ea;
+  color: #17351f;
+  font-size: 0.6rem;
+  font-weight: 900;
+}
+
+.actionBubble,
+.showdownLabel {
+  padding: 0.14rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  background: rgba(16, 24, 32, 0.9);
+  color: rgba(253, 246, 234, 0.86);
+}
+
+.showdownLabel {
+  background: var(--poker-accent);
+  color: #10201a;
+}
+
+.seatBet {
+  padding: 0.1rem 0.44rem;
+  border-radius: 999px;
+  background: rgba(240, 192, 78, 0.92);
+  color: #3a2a08;
+  font-size: 0.64rem;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- the middle ----------------------------------------------------------- */
+
+.centre {
+  position: absolute;
+  left: 50%;
+  top: 52%;
+  transform: translate(-50%, -50%);
+  display: grid;
+  justify-items: center;
+  gap: 0.6rem;
+}
+
+.board {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.boardSlot {
+  width: 2.6rem;
+  height: 3.7rem;
+  border-radius: 0.4rem;
+  border: 2px dashed rgba(253, 246, 234, 0.14);
+}
+
+.boardCard[data-in-hand] {
+  filter: drop-shadow(0 0 6px var(--poker-accent));
+}
+
+.pot {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  padding: 0.24rem 0.7rem;
+  border-radius: 999px;
+  background: rgba(16, 24, 32, 0.82);
+  border: 2px solid rgba(240, 192, 78, 0.55);
+}
+
+.pot small {
+  font-size: 0.56rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(253, 246, 234, 0.62);
+}
+
+.pot strong {
+  font-size: 1.05rem;
+  font-weight: 900;
+  color: #f0c04e;
+  font-variant-numeric: tabular-nums;
+}
+
+.handResult {
+  display: grid;
+  justify-items: center;
+  gap: 0.1rem;
+  padding: 0.35rem 0.85rem;
+  border-radius: 0.7rem;
+  background: rgba(16, 24, 32, 0.9);
+  border: 2px solid var(--poker-accent);
+}
+
+.handResult strong {
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: #fdf6ea;
+}
+
+.handResult small {
+  font-size: 0.66rem;
+  color: rgba(253, 246, 234, 0.7);
+}
+
+/* --- the local seat ------------------------------------------------------- */
+
+.localStrip {
+  display: grid;
+  justify-items: center;
+  gap: 0.3rem;
+  padding-top: 0.2rem;
+}
+
+.handLabel {
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: var(--poker-accent);
+  letter-spacing: 0.03em;
+}
+
+/* --- betting -------------------------------------------------------------- */
+
+.controls {
+  display: grid;
+  justify-items: center;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+.controlRow {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.raiseRow {
+  display: grid;
+  justify-items: center;
+  gap: 0.35rem;
+  width: min(30rem, 92vw);
+}
+
+.slider {
+  width: 100%;
+  accent-color: var(--poker-accent);
+}
+
+.ladder {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.3rem;
+}
+
+.ladderButton {
+  padding: 0.22rem 0.6rem;
+  border-radius: 999px;
+  border: 2px solid rgba(253, 246, 234, 0.2);
+  background: rgba(16, 24, 32, 0.7);
+  color: rgba(253, 246, 234, 0.82);
+  font-size: 0.66rem;
+  font-weight: 800;
+}
+
+.ladderButton[data-selected] {
+  border-color: var(--poker-accent);
+  color: #fdf6ea;
+}
+
+.waiting,
+.matchOver {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: rgba(253, 246, 234, 0.7);
+}
+
+.matchOver {
+  color: #f0c04e;
+  font-weight: 900;
+}
+
+/* --- your own money ------------------------------------------------------- */
+
+/* The stack is the number a player checks constantly, so it leads the HUD and
+   is repeated beside the hand where the eyes already are. */
+.hudStat[data-you] strong {
+  color: #f0c04e;
+  font-size: 1rem;
+}
+
+.localStack {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.stackReadout {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1.05;
+  padding: 0.18rem 0.6rem;
+  border-radius: 0.6rem;
+  background: rgba(16, 24, 32, 0.72);
+  border: 2px solid rgba(240, 192, 78, 0.45);
+}
+
+.stackReadout small {
+  font-size: 0.5rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(253, 246, 234, 0.6);
+}
+
+.stackReadout strong {
+  font-size: 1.05rem;
+  font-weight: 900;
+  color: #f0c04e;
+  font-variant-numeric: tabular-nums;
+}
+
+.stackReadout[data-wagered] {
+  border-color: rgba(253, 246, 234, 0.3);
+}
+
+.stackReadout[data-wagered] strong {
+  color: #fdf6ea;
+}

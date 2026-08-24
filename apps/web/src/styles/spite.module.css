@@ -1,0 +1,251 @@
+/* Spite & Malice furniture: the centre builds, each seat's payoff pile and
+   discards, and the take-then-place interaction. */
+
+.screen {
+  --spite-accent: #a074b8;
+}
+
+.feltMark {
+  font-size: 8rem;
+  opacity: 0.12;
+}
+
+.hudCluster {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.7rem;
+  margin-left: 0.6rem;
+}
+
+.hudStat {
+  display: inline-flex;
+  flex-direction: column;
+  line-height: 1.1;
+}
+
+.hudStat small {
+  font-size: 0.52rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(253, 246, 234, 0.6);
+}
+
+.hudStat strong {
+  font-size: 0.86rem;
+  font-weight: 800;
+  color: #fdf6ea;
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- opponents ------------------------------------------------------------ */
+
+.opponents {
+  position: absolute;
+  top: 6%;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 1.4rem;
+}
+
+.seat {
+  display: grid;
+  justify-items: center;
+  gap: 0.25rem;
+}
+
+.seat[data-turn] .seatBadge {
+  box-shadow: 0 0 0 3px var(--spite-accent);
+}
+
+.seatBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.22rem 0.5rem;
+  border-radius: 999px;
+  background: rgba(16, 24, 32, 0.78);
+  border: 2px solid rgba(253, 246, 234, 0.16);
+}
+
+.seatText {
+  display: grid;
+  line-height: 1.15;
+}
+
+.seatText strong {
+  font-size: 0.76rem;
+  font-weight: 800;
+  color: #fdf6ea;
+}
+
+.seatText small {
+  font-size: 0.58rem;
+  color: rgba(253, 246, 234, 0.66);
+  font-variant-numeric: tabular-nums;
+}
+
+.seatPiles {
+  display: flex;
+  gap: 0.2rem;
+}
+
+.seatDiscard {
+  display: inline-grid;
+}
+
+/* --- centre builds -------------------------------------------------------- */
+
+.centre {
+  position: absolute;
+  left: 50%;
+  top: 48%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  gap: 0.5rem;
+}
+
+.centrePile {
+  display: grid;
+  justify-items: center;
+  gap: 0.15rem;
+  padding: 0.25rem;
+  border-radius: 0.5rem;
+  border: 2px dashed rgba(253, 246, 234, 0.18);
+  background: rgba(16, 24, 32, 0.35);
+}
+
+.centrePile[data-target] {
+  border-style: solid;
+  border-color: var(--spite-accent);
+  box-shadow: 0 0 10px rgba(160, 116, 184, 0.6);
+}
+
+.centrePile:disabled {
+  cursor: default;
+}
+
+.centreEmpty {
+  display: grid;
+  place-items: center;
+  width: 2.6rem;
+  height: 3.7rem;
+  border-radius: 0.4rem;
+  background: rgba(253, 246, 234, 0.07);
+  color: rgba(253, 246, 234, 0.55);
+  font-size: 1.1rem;
+  font-weight: 900;
+}
+
+.needs {
+  font-size: 0.52rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(253, 246, 234, 0.55);
+}
+
+/* --- the local seat ------------------------------------------------------- */
+
+.localStrip {
+  display: grid;
+  justify-items: center;
+  gap: 0.35rem;
+  padding-top: 0.2rem;
+}
+
+.localPiles {
+  display: flex;
+  align-items: flex-end;
+  gap: 1.2rem;
+}
+
+.payoff,
+.discardRow {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.3rem;
+}
+
+.payoff {
+  flex-direction: column;
+  align-items: center;
+  gap: 0.12rem;
+}
+
+.payoff small {
+  font-size: 0.52rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(253, 246, 234, 0.6);
+}
+
+.payoffCard,
+.discardPile {
+  border-radius: 0.45rem;
+  padding: 0.1rem;
+  border: 2px solid transparent;
+}
+
+.payoffCard[data-held],
+.discardPile[data-held] {
+  border-color: #f0c04e;
+  box-shadow: 0 0 10px rgba(240, 192, 78, 0.6);
+}
+
+.discardPile[data-target] {
+  border-color: var(--spite-accent);
+  box-shadow: 0 0 10px rgba(160, 116, 184, 0.6);
+}
+
+.payoffCard:disabled,
+.discardPile:disabled {
+  cursor: default;
+  opacity: 0.75;
+}
+
+.payoffEmpty {
+  font-size: 0.68rem;
+  color: rgba(253, 246, 234, 0.45);
+}
+
+.discardEmpty {
+  display: inline-grid;
+  width: 2.6rem;
+  height: 3.7rem;
+  border-radius: 0.4rem;
+  background: rgba(253, 246, 234, 0.06);
+  border: 2px dashed rgba(253, 246, 234, 0.14);
+}
+
+/* --- prompts -------------------------------------------------------------- */
+
+.prompt {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: #fdf6ea;
+}
+
+.cancel {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: rgba(253, 246, 234, 0.6);
+  text-decoration: underline;
+}
+
+.waiting,
+.matchOver {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: rgba(253, 246, 234, 0.7);
+}
+
+.matchOver {
+  color: #f0c04e;
+  font-weight: 900;
+}

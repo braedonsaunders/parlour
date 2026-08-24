@@ -83,6 +83,41 @@ export function euchreCuesForFx(fx: readonly FxEvent[]): SoundCue[] {
   });
 }
 
+/**
+ * Poker's table sounds. Chips do the talking: a bet and a raise are the same
+ * chip stack at different weights, the pot slides once per hand, and a bust
+ * gets its own sting so a seat never vanishes silently.
+ */
+export function pokerCuesForFx(fx: readonly FxEvent[]): SoundCue[] {
+  return fx.flatMap((event) => {
+    const atMs = Math.max(0, event.at ?? 0);
+    switch (event.kind) {
+      case 'poker.blind':
+      case 'poker.ante':
+        return [{ id: 'poker.chips-soft', atMs }];
+      case 'poker.action': {
+        const kind = payloadRecord(event)?.kind;
+        if (kind === 'fold') return [{ id: 'poker.fold', atMs }];
+        if (kind === 'check') return [{ id: 'poker.check', atMs }];
+        if (kind === 'call') return [{ id: 'poker.chips-soft', atMs }];
+        return [{ id: 'poker.chips-hard', atMs }];
+      }
+      case 'poker.street':
+        return [{ id: 'poker.board', atMs }];
+      case 'poker.pot-collect':
+        return [{ id: 'poker.pot', atMs }];
+      case 'poker.award':
+        return [{ id: 'poker.award', atMs }];
+      case 'poker.bust':
+        return [{ id: 'poker.bust', atMs }];
+      case 'poker.blinds-up':
+        return [{ id: 'poker.blinds-up', atMs }];
+      default:
+        return [];
+    }
+  });
+}
+
 export function spadesCuesForFx(fx: readonly FxEvent[]): SoundCue[] {
   return fx.flatMap((event) => {
     const atMs = Math.max(0, event.at ?? 0);
@@ -215,6 +250,32 @@ export function presidentCuesForFx(fx: readonly FxEvent[]): SoundCue[] {
       }
       case 'president.exchange':
         return [{ id: 'president.exchange-swish', atMs }];
+      default:
+        return [];
+    }
+  });
+}
+
+export function eightsCuesForFx(fx: readonly FxEvent[]): SoundCue[] {
+  return fx.flatMap((event) => {
+    const atMs = Math.max(0, event.at ?? 0);
+    switch (event.kind) {
+      case 'eights.wild':
+        return [{ id: 'eights.wild', atMs }];
+      case 'eights.suit':
+        return [{ id: 'eights.suit', atMs }];
+      case 'eights.skip':
+        return [{ id: 'eights.skip', atMs }];
+      case 'eights.reverse':
+        return [{ id: 'eights.reverse', atMs }];
+      case 'eights.draw-stack':
+        return [{ id: 'eights.draw-stack', atMs }];
+      case 'eights.out':
+        return [{ id: 'eights.out', atMs }];
+      case 'eights.blocked':
+        return [{ id: 'eights.blocked', atMs }];
+      case 'eights.score':
+        return [{ id: 'eights.score', atMs: atMs + 200 }];
       default:
         return [];
     }

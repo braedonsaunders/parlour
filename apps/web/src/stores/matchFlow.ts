@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import type { MatchResult } from '@parlour/engine';
+import type { EightsModeId } from '@/lib/eights/modes';
 import type { EuchreModeId } from '@/lib/euchre/modes';
 import type { GameId } from '@/lib/games';
 import type { HeartsModeId } from '@/lib/hearts/modes';
@@ -10,6 +11,10 @@ import type { GinModeId } from '@/lib/gin/modes';
 import type { WildModeId } from '@/lib/wild/modes';
 import type { RatscrewModeId } from '@/lib/ratscrew/modes';
 import type { PresidentModeId } from '@/lib/president/modes';
+import type { OhHellModeId } from '@/lib/ohhell/modes';
+import type { ScopaModeId } from '@/lib/scopa/modes';
+import type { SpiteModeId } from '@/lib/spite/modes';
+import type { PokerModeId } from '@/lib/poker/modes';
 import type { SpadesModeId } from '@/lib/spades/modes';
 import type { RecordedSeat } from '@/stores/history';
 
@@ -32,12 +37,17 @@ export interface MatchSnapshot {
     | ModeId
     | CribbageModeId
     | WildModeId
+    | EightsModeId
     | RatscrewModeId
     | EuchreModeId
     | HeartsModeId
     | GinModeId
     | PresidentModeId
-    | SpadesModeId;
+    | SpadesModeId
+    | PokerModeId
+    | OhHellModeId
+    | ScopaModeId
+    | SpiteModeId;
   /** The human's seat, for jingle-vs-sting and the "you" framing; null when absent. */
   localSeat: number | null;
 }
