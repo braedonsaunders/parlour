@@ -1,179 +1,247 @@
 # Parlour Veil — private cards without a game server
 
-## Status and product boundary
+## Status
 
-Parlour Veil is the proposed opt-in privacy protocol for competitive friend
-rooms. It preserves Parlour's static Vercel deploy and WebRTC mesh: no database,
-account service, long-running authority, or server-held round seed is required.
+Built and under test, not yet independently reviewed.
 
-The current room protocol remains the fast default. Veil is a second security
-tier because it adds a shuffle ceremony, more peer messages, and a different
-reconnect trade-off. This document is a design, not a claim that the current P2P
-transport already protects hidden hands.
+- `packages/engine/src/veil.ts` — opaque card handles, reveals and re-veilings
+  recorded on the event log, the `veilSupport()` game-pack contract.
+- `apps/web/src/lib/multiplayer/veil/` — the commutative shuffle ceremony,
+  private dealing, the signed transcript, threshold recovery and the audit.
+- Blitz, Wild Pile and Rat Screw each opt in with one `veil:` block.
+
+Do not describe Veil as production-secure until the cryptographic review in
+slice 5 has happened. Everything below states plainly what it does and does not
+promise; the room UI repeats those words rather than paraphrasing them.
+
+## Product boundary
+
+Veil is the opt-in privacy tier for competitive friend rooms. It preserves
+Parlour's static Vercel deploy and WebRTC mesh: no database, account service,
+long-running authority, or server-held round seed.
+
+The open room stays the fast default. Veil is a second tier because it adds a
+shuffle ceremony before the deal, a round trip per hidden card, and a different
+reconnect trade-off.
 
 ## What it guarantees
 
-- No peer receives a round seed or full cleartext deck.
-- With at least two non-colluding peers, no single participant can map the
-  encrypted deck to card faces before cards are deliberately revealed.
-- A dealt private card is opened only to its owner.
-- Public cards and showdown hands carry proofs linking them to the committed
-  deck; invented or duplicated cards fail the reveal checks or after-match
-  audit.
-- Every ceremony, draw, reveal, and authority change is hash-chained and signed,
-  so the room can perform a full after-match audit.
-- The protocol uses browser-native Web Crypto primitives and DataChannels, so a
-  static Vercel export can run it.
+- No peer receives a round seed or a full cleartext deck.
+- With at least two non-colluding peers, no participant — including the host —
+  can map the encrypted deck to card faces before cards are deliberately opened.
+- A dealt private card is opened only to its owner. Not "only the owner is told
+  the answer": no other seat ever computes the plaintext.
+- Public cards carry openings that the engine checks for deck conservation, and
+  the whole ceremony is recomputed at match end.
+- Every ceremony step is hash-chained and signed, so the room can run a full
+  after-match audit.
+- Browser-native primitives only (`crypto.subtle` plus `BigInt`), so a static
+  export can run it.
 
-It does **not** make collusion impossible. If every other participant colludes,
-they can pool their secrets. Nor can a two-player room simultaneously promise
-perfect hand privacy, automatic recovery after either player disappears, and no
-third party: recovery requires somebody else to hold enough key material. Veil
-surfaces this honestly in the room's security badge.
+It does **not** make collusion impossible. If every other participant colludes
+they can pool their secrets. Nor does it prevent all cheating in real time — see
+"Detection, not prevention". Nor can a two-player room promise perfect hand
+privacy, automatic recovery when either player disappears, and no third party
+at once: recovery needs somebody else to hold key material.
 
 ## The protocol
 
 ### 1. Ephemeral room identities
 
-Each seat creates an ephemeral P-256 signing key and ECDH key for the room.
-Public keys, seat order, game definition hash, and rules hash form the signed
-round header. Long-lived local profile IDs are used only for seat reclaim and
-head-to-head history; they are not cryptographic keys.
+Each seat mints a P-256 signing key for the round. Public keys, seat order, game
+id, resolved-rules hash and the deck form the signed round header. Long-lived
+profile ids are used only for seat reclaim and head-to-head history; they are
+never cryptographic keys.
 
-All Veil messages extend the existing event chain:
-
-```text
-entryHash = SHA-256(previousHash || kind || canonicalPayload || signer)
-```
-
-The room rejects duplicate sequence numbers, invalid signatures, and a chain
-that does not extend its accepted head.
-
-### 2. Onion shuffle
-
-The canonical deck begins as tagged plaintext records:
+Every Veil message extends one hash chain:
 
 ```text
-{ gameId, roundId, cardId, cardNonce }
+entryHash = SHA-256("parlour.veil/entry" || canonical({seq, kind, seat, signer, previous, payload}))
 ```
 
-In deterministic seat order, every peer performs one layer:
+The transcript rejects out-of-order sequence numbers, entries that do not extend
+the accepted head, unregistered signers, altered payloads and bad signatures,
+and it leaves its head untouched when it rejects.
 
-1. Wrap every incoming blob with a fresh AES-GCM key and nonce.
-2. Index each private peel key by the SHA-256 hash of its output blob.
-3. Cryptographically shuffle the wrapped blobs with a private permutation.
-4. Broadcast the new opaque deck, its Merkle root, and a signed commitment to
-   the layer's peel table and permutation.
+### 2. The commutative shuffle
 
-The last shuffler knows the final ordering but cannot see card identities. The
-first shuffler may know the original identities but cannot follow later honest
-permutations. No shared seed ever exists.
+**This replaces the AES onion the first draft of this document described.**
 
-### 3. Private draw
+An onion of AES layers is peeled from the outside in, so somebody holds the
+innermost layer and computes the plaintext. Under that construction the first
+shuffler learns the face of every privately drawn card — which is exactly the
+guarantee above. The onion cannot deliver it, so Veil uses a commutative cipher
+instead.
 
-The public log consumes the top opaque handle. Its onion is peeled in reverse
-shuffle order over pairwise encrypted DataChannels. Every peeling peer signs a
-receipt containing the input and output hashes, but sends the intermediate blob
-only to the next peeler. The final plaintext and nonce go only to the receiving
-seat.
+SRA over a fixed 2048-bit safe prime (RFC 3526 group 14): each seat draws a
+secret exponent `e` coprime to `p - 1` and encrypts with `mᵉ mod p`. Because
+`E_a(E_b(m)) = E_b(E_a(m))`, layers come off in any order.
 
-The owner's engine view records a private card face. Other views record only the
-opaque handle and owner. This requires a `PrivateCardResolver` beside the pure
-engine; the ordinary public reducer continues to own turn order, counts, zones,
-and visible cards.
+1. Every peer computes the same starting deck: each card id maps deterministically
+   to a group element, squared so that every card is a quadratic residue. (SRA
+   leaks the Legendre symbol; a deck of mixed residues would split visibly in
+   two before a single layer came off.)
+2. In seat order, each seat encrypts every element under its layer, applies a
+   private permutation, and broadcasts the new deck plus a commitment to its key
+   and permutation.
+3. The last seat closes the epoch. No seat knows the mapping: a seat's own
+   permutation was applied to a deck it could not read, and later seats permuted
+   again on top.
 
-### 4. Public reveal and ownership proof
+Structural checks reject a layer laid out of turn, one that changes the deck
+size, one holding values outside the group, one that collapses two positions
+onto the same element, and one that passes the deck through untouched.
 
-When a card is discarded, melded, played to a trick, or shown down, its owner
-broadcasts the plaintext record, the per-handle layer keys, and the peel
-receipts. Peers replay each AES-GCM peel and verify:
+### 3. Private dealing
 
-- the handle was assigned to that seat and has not already been spent;
-- every onion hop matches the committed layer root;
-- the plaintext is a member of the canonical game deck; and
-- no `(cardId, cardNonce)` pair appears twice.
+To open deck position _p_ for a seat, every **other** seat removes its own layer
+in turn and hands the still-locked value to the next; the recipient removes the
+last layer itself. Exponents compose rather than combine, so this is a chain of
+`seats - 1` hops, not a broadcast — that latency is the real price of Veil.
 
-The public engine then receives a normal deterministic reveal move. Replays can
-render the card from that point onward without learning cards that remained
-private.
+Intermediate values are addressed to a single peer and never broadcast;
+publishing one would let any onlooker finish the chain. Each hop keeps a hash of
+the value it produced so a dishonest partial decryption can be attributed once
+keys are disclosed.
 
-### 5. Hidden-rule claims
+A partial decryption computed with the wrong exponent yields a value that
+decodes to no card at all, so it is caught the moment the chain completes rather
+than at the audit.
 
-Deck privacy and rule integrity are different problems. A peer that alone knows
-its hand could falsely claim "Blitz" or an eligible secret bid. Veil uses two
-levels:
+### 4. Opening a card in public
 
-- **Audited friends mode:** accept the signed claim immediately for low latency;
-  reveal the necessary cards at showdown or match end and mark the result
-  verified or disputed. A dispute prevents the result from entering trusted
-  head-to-head totals.
-- **Proof mode:** game modules may provide a small, rule-specific zero-knowledge
-  verifier for claims that must remain secret. This is practical for narrow
-  predicates such as set membership or a committed numeric total, but is not a
-  generic free feature for every future game.
+Playing, discarding, flipping or showing down a card makes it public. The acting
+client sends the move with the `[handle, cardId]` openings it needs, and the
+engine substitutes them **before** validation, so every existing rule keeps
+working unchanged. The engine enforces conservation itself: the handle must be
+in play, the face must be in the deck, and no opening may mint a card the table
+can already see. Openings are recorded on the applied event, so a veiled round
+replays bit-for-bit from `(seed, ceremony deck order, log)`.
 
-The UI must never label audited mode as cheat-proof. Preventing arbitrary hidden
-state lies in every possible game requires either those proofs or an independent
-referee.
+### 5. Recycling a spent discard
+
+Reshuffling a face-up discard pile back into the stock would make every
+remaining draw readable. A veiled room refuses that draw until the pile has been
+re-veiled: the cards start a fresh epoch with new handles and a new ceremony.
+The table still knows _which_ cards are in the stock — it does in a physical
+game too — but no longer their order.
+
+### 6. Hidden-rule claims
+
+Deck privacy and rule integrity are different problems. A seat that alone can
+read its hand could falsely claim a Blitz.
+
+- **Audited friends mode (what ships):** the claim opens exactly the cards it
+  needs and the table checks the arithmetic itself. Blitz's `blitz.claim` opens
+  the claimant's whole hand and is rejected outright if it is not 31, so a bluff
+  never enters the log. Legality stays public — it depends on card _counts_,
+  which everyone can see — so offering the move leaks nothing.
+- **Proof mode (not built):** a game module could supply a rule-specific
+  zero-knowledge verifier for claims that must stay secret. Practical for narrow
+  predicates; not a free feature for every future game.
+
+The UI must never label audited mode cheat-proof.
+
+## Detection, not prevention
+
+Two things the live protocol does not prove:
+
+- that a seat **shuffled** rather than substituted cards, and
+- that a partial decryption was computed honestly.
+
+Both are caught after the fact. At match end every seat discloses its layer
+exponents and permutation; the audit recomputes the entire ceremony and checks
+it against the signed transcript, verifies deck conservation, and re-derives
+every opening. A seat whose disclosure does not reproduce what it published is
+named in the findings.
+
+This is why only `verified` results should ever feed a competitive ladder.
 
 ## Disconnects and host migration
 
-The transcript and opaque deck are replicated to every peer, so host election
-works exactly as it does today. Peel secrets need a separate recovery policy:
+The transcript and locked deck are replicated to every peer, so host election
+works as it does today. Layer secrets need their own policy:
 
-- Each seat encrypts its peel table under a random recovery key.
-- Before play, it Shamir-splits that key among the other active seats and
-  commits to the encrypted table.
-- For 3–4 seats, a room-selected threshold can recover a disconnected peer's
-  layer. A higher threshold protects better against collusion; a lower threshold
-  recovers more reliably.
-- A returning peer rotates its recovery material for the next round.
-- In two-seat Veil, loss of either peer pauses or abandons the round. Automatic
-  recovery would give the opponent the missing decryption power and defeat the
-  privacy promise.
+- Each seat seals its layer secrets under a random recovery key.
+- That key is Shamir-split (GF(256)) among the other active seats.
+- **3–4 seats:** a room-selected threshold recovers a missing layer. Each seat
+  hands every other seat exactly one share, addressed — broadcasting the package
+  would give every peer every share and quietly reduce the threshold to one.
+  When a seat drops, the remaining seats collect a quorum, rebuild its layer,
+  and stand in for it on the peel chain so the round continues. The threshold is
+  exactly the number of seats who, colluding, could open a live hand — the room
+  states that number out loud rather than hiding it.
+- **2 seats:** no recovery. Any share that lets your opponent resume also lets
+  them read your hand, so the round pauses instead. `recoveryPolicyFor(2)`
+  returns `mode: 'none'` and says so.
 
-Bot takeover can continue public turn structure, but a bot cannot play a missing
-human's still-private hand until the room's recovery threshold opens that layer.
+**What recovery is actually for.** Every peel chain needs every seat's layer, so
+one missing seat blocks _everyone's_ cards, not just its own. Rebuilding the
+departed layer is what lets the remaining players keep drawing and playing their
+own hands. Reading the departed player's hand is a side effect of holding their
+layer, not the goal.
+
+**There is no bot takeover.** A seat that drops is marked as a bot in the room
+list, but nothing in the multiplayer path enumerates moves for it or submits
+them — in an open room or a veiled one. Its turn simply does not arrive. That is
+a pre-existing gap in the room layer, not something Veil introduced, and until
+it is closed a disconnect stalls the round at that seat's turn even when the
+cryptography has fully recovered.
+
+**Recovery is a privacy loss and is reported as one.** Rebuilding a departed
+seat's layer means whoever holds it can read every card that seat was dealt. The
+room names those seats in the badge for the rest of the round rather than
+letting the loss pass quietly, and a seat is only ever recovered after the room
+agrees it has actually gone. A seat that comes back rotates its material for the
+next round; the current round's layer stays open.
 
 ## Match-end audit
 
-At match end, peers may reveal their layer tables and permutations. The audit
-reconstructs the ceremony, verifies every draw/reveal receipt, and proves deck
-conservation. Unplayed private card faces can remain hidden by revealing only
-the keys needed for consumed handles; a full diagnostic replay is a separate,
-unanimous opt-in.
-
 Local history stores an audit state with each result:
 
-- `open` — ordinary current protocol;
-- `veiled` — hand privacy held, audit incomplete;
-- `verified` — transcript and required claims passed; or
-- `disputed` — at least one proof failed.
+- `open` — ordinary room; every peer replayed the full state.
+- `veiled` — hand privacy held, audit incomplete.
+- `verified` — the ceremony recomputed and every check passed.
+- `disputed` — at least one check failed.
 
-Only `verified` results should count in a future competitive ladder. The local
-friends W/L display may include all states with a visible badge.
+Only `verified` counts as ranked. The local friends W/L display may show all
+states with a visible badge.
 
 ## Vercel compatibility
 
-All live state resides in browsers and travels through the existing Nostr
-signaling plus WebRTC DataChannels. AES-GCM, ECDH/ECDSA P-256, SHA-256, random
-bytes, and key wrapping are supplied by `crypto.subtle`; static hosting serves
+All live state resides in browsers and travels over the existing Nostr signaling
+plus WebRTC DataChannels. SHA-256, ECDSA P-256, AES-GCM and random bytes come
+from `crypto.subtle`; the group arithmetic is `BigInt`. Static hosting serves
 only code and assets.
 
-An optional later **stateless referee** could run in a Vercel Function: clients
-would carry an encrypted, signed state token between calls, so the function
-needs no database. That is useful for stronger rule enforcement but is still a
-server authority and therefore is not the Veil default.
+An optional later **stateless referee** could run in a Vercel Function with
+clients carrying an encrypted, signed state token between calls, so the function
+needs no database. Useful for stronger rule enforcement, still a server
+authority, and therefore not the Veil default.
+
+## Cost, measured
+
+A 52-card ceremony is `seats × 52` modular exponentiations at 2048 bits — on the
+order of a second or two of main-thread work, which is why the lobby shows
+ceremony progress. Each hidden card costs one `seats - 1` hop chain. Both are
+stated in the tier picker before the room is opened.
 
 ## Implementation slices
 
-1. Add signed transcript, canonical encoding, Merkle helpers, and hostile-input
-   tests in `apps/web/src/lib/multiplayer/veil/`.
-2. Add the onion-shuffle ceremony and private draw/reveal harness with fixed
-   test vectors.
-3. Introduce opaque card handles and `PrivateCardResolver` without changing the
+1. ✅ Signed transcript, canonical encoding, hostile-input tests.
+2. ✅ Commutative shuffle ceremony and private draw/open, with a mesh harness.
+3. ✅ Opaque handles and reveal/conceal in the engine, without changing the
    public deterministic reducer contract.
-4. Integrate room security selection, ceremony progress, audit badges, and
-   explicit two-player disconnect messaging.
-5. Add threshold recovery for 3–4 seats, forced host-loss tests, and independent
-   cryptographic review before describing Veil as production-secure.
+4. ✅ Room security selection, ceremony progress, audit badge and explicit
+   two-player disconnect messaging.
+5. ✅ Threshold recovery wired into live seat loss (including the host), with
+   forced-disconnect integration tests over the mesh harness.
+6. ⬜ Bot takeover for a dropped seat. The room marks the seat as a bot but
+   nothing plays for it, in either tier, so a disconnect still stalls the round
+   at that seat's turn. Independent of Veil, but Veil cannot claim a disconnect
+   is survivable until it exists.
+7. ⬜ Re-veiling a recycled stock. `VeilSession.recycle()` and the engine's
+   `conceals` path are built and tested, but nothing calls them yet, so a round
+   that exhausts the stock hits the `stock-not-reveiled` guard and cannot draw.
+   Short rounds never reach it; a long Blitz round can.
+8. ⬜ Independent cryptographic review before calling Veil production-secure.

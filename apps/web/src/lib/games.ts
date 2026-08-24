@@ -1,3 +1,8 @@
+import type { HowToPlayDoc } from '@parlour/engine';
+import { blitzHowToPlay } from '@parlour/game-blitz';
+import { euchreHowToPlay } from '@parlour/game-euchre';
+import { wildpileHowToPlay } from '@parlour/game-wildpile';
+
 export type GameId = 'blitz' | 'wild' | 'euchre';
 
 export type GamePreviewKind = 'blitz-fan' | 'wild-fan' | 'euchre-fan';
@@ -14,6 +19,8 @@ export interface GameDef {
   preview: GamePreviewKind;
   /** Route choosing this game leads to; null while the game is still on the shelf. */
   href: string | null;
+  /** The pack's own instructions, rendered verbatim by the help sheet. */
+  howToPlay: HowToPlayDoc;
 }
 
 /**
@@ -33,6 +40,7 @@ export const GAMES: readonly GameDef[] = [
     shade: '#96471c',
     preview: 'blitz-fan',
     href: '/play',
+    howToPlay: blitzHowToPlay,
   },
   {
     id: 'wild',
@@ -46,6 +54,7 @@ export const GAMES: readonly GameDef[] = [
     shade: '#7c2c3e',
     preview: 'wild-fan',
     href: '/wild',
+    howToPlay: wildpileHowToPlay,
   },
   {
     id: 'euchre',
@@ -59,6 +68,7 @@ export const GAMES: readonly GameDef[] = [
     shade: '#2f6b48',
     preview: 'euchre-fan',
     href: '/euchre',
+    howToPlay: euchreHowToPlay,
   },
 ];
 

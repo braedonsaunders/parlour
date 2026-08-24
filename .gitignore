@@ -8,3 +8,22 @@ dist/
 coverage/
 .env*.local
 *.log
+
+# local-only working notes and agent scaffolding
+AGENTS.md
+CLAUDE.md
+BUILD-SPEC.md
+progress.md
+research/
+docs/*.md
+docs/music/
+# shipped engine + game code cites this spec by path, so it stays public
+!docs/VEILED-DECK-PROTOCOL.md
+apps/web/public/audio/README.md
+packages/*/README.md
+
+# local capture + scratch artifacts
+output/
+.playwright-cli/
+portrait.png
+scripts/shots*.mjs

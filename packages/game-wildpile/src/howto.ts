@@ -2,7 +2,8 @@ import type { HowToPlayDoc } from '@parlour/engine';
 
 /** Player-facing instructions rendered verbatim by the app's help modal. */
 export const wildpileHowToPlay: HowToPlayDoc = {
-  summary: 'A 108-card shedding riot — match the top of the pile, unleash action cards, and dump your hand first.',
+  summary:
+    'A 108-card shedding riot — match the top of the pile, unleash action cards, and dump your hand first.',
   objective:
     'Be the first player with no cards left. Action cards slow everyone else down — unless they fight back.',
   sections: [
@@ -21,7 +22,10 @@ export const wildpileHowToPlay: HowToPlayDoc = {
         { label: 'Draw Two', text: 'the next player picks up two and loses the turn' },
         { label: 'Wild', text: 'play it anytime and call the next color' },
         { label: 'Wild Draw Four', text: 'call the color AND hand the next player four cards' },
-        { label: 'Wild Swap Hands', text: 'call the color, then trade hands with anyone (optional card)' },
+        {
+          label: 'Wild Swap Hands',
+          text: 'call the color, then trade hands with anyone (optional card)',
+        },
         { label: 'Wild Shuffle Hands', text: 'pool every hand, shuffle, redeal (optional card)' },
       ],
     },
@@ -36,11 +40,27 @@ export const wildpileHowToPlay: HowToPlayDoc = {
       heading: 'House chaos',
       body: ['Every table setting lives under Advanced options before the deal:'],
       bullets: [
-        { label: 'Stacking', text: 'answer a Draw Two / Draw Four with the same card and the penalty piles up for the next victim' },
-        { label: 'Jump in', text: 'holding the exact same face as the card just played? Slam it down out of turn before anyone reacts' },
-        { label: 'Draw until playable', text: 'keep drawing until something matches instead of drawing one' },
+        {
+          label: 'Stacking',
+          text: 'answer a Draw Two / Draw Four with the same card and the penalty piles up for the next victim',
+        },
+        {
+          label: 'Jump in',
+          text: 'holding the exact same face as the card just played? Slam it down out of turn before anyone reacts',
+        },
+        {
+          label: 'Draw until playable',
+          text: 'keep drawing until something matches instead of drawing one',
+        },
         { label: 'Force play', text: 'a card you drew that can be played must be played' },
-        { label: 'Sevens and zeroes', text: 'a 7 swaps your hand with a player you name; a 0 passes every hand one seat along' },
+        {
+          label: 'Challenge Draw Fours',
+          text: 'a Draw Four is only honest with nothing in the old colour — call the bluff and they take the pile, get it wrong and you take two more',
+        },
+        {
+          label: 'Sevens and zeroes',
+          text: 'a 7 swaps your hand with a player you name; a 0 passes every hand one seat along',
+        },
         { label: 'Swap-hand wilds', text: 'deals in Wild Swap Hands and Wild Shuffle Hands' },
       ],
     },

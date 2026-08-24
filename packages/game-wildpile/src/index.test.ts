@@ -49,6 +49,7 @@ function fixture(overrides: Partial<WildpileState> = {}): GameSession<WildpileSt
     awaitingSwap: null,
     interrupt: null,
     drawnCard: null,
+    challenge: null,
     calledLastCard: [false, false, false],
     winner: null,
     rules: defaults,
@@ -302,7 +303,9 @@ describe('wildpile moves and flow', () => {
     expect(stack.session.phase).toMatchObject({ phase: 'choose-color', actor: 1 });
 
     // The eight only lands once the color is called, and seat 2 cannot stack.
-    const resolved = sessionApply(wildpileGame, stack.session, 1, 'chooseColor', { color: 'green' });
+    const resolved = sessionApply(wildpileGame, stack.session, 1, 'chooseColor', {
+      color: 'green',
+    });
     expect(resolved.session.state.pendingDraw).toBe(0);
     expect(resolved.session.state.hands[2]).toHaveLength(9);
     expect(resolved.session.state.turn).toBe(0);
@@ -484,10 +487,182 @@ describe('wildpile moves and flow', () => {
     expect(drew.session.state.drawnCard).toBe(card('4'));
   });
 
+  describe('Draw Four challenges', () => {
+    const challengeRules = { ...defaults, challengeDrawFour: true, stackDrawFour: false };
+    const drawFour = card('wild-draw-four');
+    // Deep enough that an eight-card pickup never runs the stock dry mid-test.
+    const deepStock = Array.from({ length: 18 }, (_, index) =>
+      card(String(Math.floor(index / 2) + 1), 'yellow', index % 2),
+    );
+
+    /** Seat 0 plays a Draw Four on a red pile and calls green; seat 1 is on the hook. */
+    function playDrawFour(seat0Hand: string[], rules = challengeRules) {
+      const played = sessionApply(
+        wildpileGame,
+        fixture({
+          rules,
+          activeColor: 'red',
+          discard: [card('3')],
+          stock: deepStock,
+          hands: [
+            [drawFour, ...seat0Hand],
+            [card('1', 'blue'), card('2', 'blue')],
+            [card('9', 'green'), card('8', 'green')],
+          ],
+        }),
+        0,
+        'playCard',
+        { card: drawFour },
+      );
+      expect(played.rejected).toBeUndefined();
+      return sessionApply(wildpileGame, played.session, 0, 'chooseColor', { color: 'green' });
+    }
+
+    it('holds the pickup open for the seat facing it instead of taking it for them', () => {
+      const pending = playDrawFour([card('5'), card('6', 'blue')]);
+
+      expect(pending.session.phase).toMatchObject({ phase: 'play', actor: 1 });
+      expect(pending.session.state.pendingDraw).toBe(4);
+      expect(pending.session.state.challenge).toMatchObject({ accused: 0, challenger: 1 });
+      expect(
+        wildpileGame.flow.legalMoves(pending.session.state, pending.session.phase).map((m) => m.id),
+      ).toContain('challengeDrawFour');
+    });
+
+    it('turns the pickup back on the bluffer, and leaves the challenger their turn', () => {
+      // Seat 0 still held a red card, so the Draw Four was a bluff.
+      const pending = playDrawFour([card('5'), card('6', 'blue')]);
+      const called = sessionApply(wildpileGame, pending.session, 1, 'challengeDrawFour');
+
+      expect(called.rejected).toBeUndefined();
+      expect(called.fx).toContainEqual(
+        expect.objectContaining({
+          kind: 'wildpile.challenge',
+          payload: expect.objectContaining({
+            challenger: 1,
+            accused: 0,
+            upheld: true,
+            amount: 4,
+            proof: [card('5')],
+          }),
+        }),
+      );
+      expect(called.session.state.hands[0]).toHaveLength(6);
+      expect(called.session.state.hands[1]).toHaveLength(2);
+      expect(called.session.state.pendingDraw).toBe(0);
+      expect(called.session.state.challenge).toBeNull();
+      expect(called.session.state.turn).toBe(1);
+    });
+
+    it('costs a bad call two extra cards and the turn', () => {
+      // Nothing red in hand, so the Draw Four was honest.
+      const pending = playDrawFour([card('6', 'blue'), card('7', 'green')]);
+      const called = sessionApply(wildpileGame, pending.session, 1, 'challengeDrawFour');
+
+      expect(called.fx).toContainEqual(
+        expect.objectContaining({
+          kind: 'wildpile.challenge',
+          payload: expect.objectContaining({ upheld: false, amount: 6, proof: [] }),
+        }),
+      );
+      expect(called.session.state.hands[1]).toHaveLength(8);
+      expect(called.session.state.hands[0]).toHaveLength(2);
+      expect(called.session.state.turn).toBe(2);
+    });
+
+    it('judges the colour that was live, not the one the bluffer called', () => {
+      // A green card is not evidence: green only became live after the play.
+      const pending = playDrawFour([card('6', 'green'), card('7', 'green')]);
+      const called = sessionApply(wildpileGame, pending.session, 1, 'challengeDrawFour');
+      expect(called.session.state.hands[1]).toHaveLength(8);
+
+      // Neither are other wilds, nor a red-matching number in another colour.
+      const wilds = playDrawFour([card('wild', 'red', 1), card('3', 'blue')]);
+      const alsoBad = sessionApply(wildpileGame, wilds.session, 1, 'challengeDrawFour');
+      expect(alsoBad.session.state.hands[1]).toHaveLength(8);
+    });
+
+    it('lets the seat accept by drawing, which closes the window', () => {
+      const pending = playDrawFour([card('5'), card('6', 'blue')]);
+      const taken = sessionApply(wildpileGame, pending.session, 1, 'draw');
+
+      expect(taken.session.state.hands[1]).toHaveLength(6);
+      expect(taken.session.state.challenge).toBeNull();
+      expect(taken.session.state.turn).toBe(2);
+    });
+
+    it('moves the accusation along with a stacked Draw Four', () => {
+      const stacking = { ...challengeRules, stackDrawFour: true };
+      const pending = playDrawFour([card('5'), card('6', 'blue')], stacking);
+      const stacked = sessionApply(
+        wildpileGame,
+        {
+          ...pending.session,
+          state: {
+            ...pending.session.state,
+            hands: pending.session.state.hands.map((cards, seat) =>
+              seat === 1 ? [card('wild-draw-four', 'red', 1), card('4', 'blue')] : cards,
+            ),
+          },
+        },
+        1,
+        'playCard',
+        { card: card('wild-draw-four', 'red', 1) },
+      );
+      const coloured = sessionApply(wildpileGame, stacked.session, 1, 'chooseColor', {
+        color: 'blue',
+      });
+
+      expect(coloured.session.state.pendingDraw).toBe(8);
+      expect(coloured.session.state.challenge).toMatchObject({ accused: 1, challenger: 2 });
+      // The live colour when seat 1 stacked was green, and they held no green.
+      expect(coloured.session.state.challenge?.colorAtPlay).toBe('green');
+      expect(coloured.session.state.challenge?.heldMatches).toEqual([]);
+    });
+
+    it('stays out of the way when the table has the rule off, or the room is veiled', () => {
+      const off = playDrawFour([card('5')], { ...defaults, stackDrawFour: false });
+      // No window, so the flow takes the pickup for seat 1 automatically.
+      expect(off.session.state.challenge).toBeNull();
+      expect(off.session.state.hands[1]).toHaveLength(6);
+      expect(off.session.state.turn).toBe(2);
+
+      const veiled = sessionApply(
+        wildpileGame,
+        fixture({
+          veiled: true,
+          rules: challengeRules,
+          activeColor: 'red',
+          discard: [card('3')],
+          stock: deepStock,
+          hands: [
+            [drawFour, card('5')],
+            [card('1', 'blue'), card('2', 'blue')],
+            [card('9', 'green')],
+          ],
+        }),
+        0,
+        'playCard',
+        { card: drawFour },
+      );
+      expect(veiled.session.state.challenge).toBeNull();
+    });
+
+    it('refuses a challenge from anyone but the seat on the hook', () => {
+      const pending = playDrawFour([card('5'), card('6', 'blue')]);
+      expect(
+        sessionApply(wildpileGame, pending.session, 2, 'challengeDrawFour').rejected?.code,
+      ).toBe('not-your-turn');
+    });
+  });
+
   it('deals the swap wilds only when the table turns them on', () => {
     const off = createSession(wildpileGame, { seed: 3, config: defaults, seats: 4 });
-    const inPlay = (session: GameSession<WildpileState>) =>
-      [...session.state.stock, ...session.state.hands.flat(), ...session.state.discard];
+    const inPlay = (session: GameSession<WildpileState>) => [
+      ...session.state.stock,
+      ...session.state.hands.flat(),
+      ...session.state.discard,
+    ];
     expect(inPlay(off).some((id) => WILDPILE_SWAP_CARD_IDS.includes(id))).toBe(false);
     expect(inPlay(off)).toHaveLength(108);
 

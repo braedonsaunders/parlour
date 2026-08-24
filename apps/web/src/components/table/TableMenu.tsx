@@ -1,8 +1,16 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import type { HowToPlayDoc } from '@parlour/engine';
+import { HowToPlayButton } from '@/components/HowToPlay';
 import { useAudioManager, useAudioStore } from '@/stores/audio';
 import { SCENE_IDS, SCENE_LABELS, useSceneStore, type SceneId } from '@/stores/scene';
+import {
+  DROP_EFFECT_LABELS,
+  DROP_EFFECT_LEVELS,
+  useTableFxStore,
+  type DropEffectLevel,
+} from '@/stores/tableFx';
 import { useProfileStore } from '@/stores/profile';
 import { MusicControls } from '@/components/MusicControls';
 import styles from '@/styles/table.module.css';
@@ -14,13 +22,17 @@ const SCENE_ICONS: Record<SceneId, string> = {
 };
 
 export type TableMenuProps = {
+  /** The running game's instructions, so rules stay reachable mid-match. */
+  howToPlay?: { doc: HowToPlayDoc; title: string; subtitle?: string };
   open: boolean;
   onClose: () => void;
   /** Fired only after the player confirms leaving the match. */
   onQuit: () => void;
 };
 
-export function TableMenu({ open, onClose, onQuit }: TableMenuProps) {
+export function TableMenu({ open, onClose, onQuit, howToPlay }: TableMenuProps) {
+  const dropEffects = useTableFxStore((state) => state.dropEffects);
+  const setDropEffects = useTableFxStore((state) => state.setDropEffects);
   const [confirmingQuit, setConfirmingQuit] = useState(false);
   const [wasOpen, setWasOpen] = useState(false);
   if (open !== wasOpen) {
@@ -129,6 +141,33 @@ export function TableMenu({ open, onClose, onQuit }: TableMenuProps) {
                 })}
               </div>
             </section>
+            <section aria-label="Card effects" data-testid="drop-effects-picker">
+              <p className="mb-1.5 text-center text-xs font-semibold uppercase tracking-[0.25em] text-dusk-200">
+                Card effects
+              </p>
+              <div role="radiogroup" className="flex items-center justify-center gap-1">
+                {DROP_EFFECT_LEVELS.map((level) => {
+                  const active = level === dropEffects;
+                  return (
+                    <button
+                      key={level}
+                      type="button"
+                      role="radio"
+                      aria-checked={active}
+                      data-testid={`drop-effects-${level}`}
+                      onClick={() => setDropEffects(level as DropEffectLevel)}
+                      className={`rounded-full px-2.5 py-1 text-xs font-semibold transition-all duration-150 ease-pop ${
+                        active
+                          ? 'bg-hearth-400/25 text-hearth-100'
+                          : 'text-dusk-200/70 hover:-translate-y-0.5 hover:text-dusk-100'
+                      }`}
+                    >
+                      {DROP_EFFECT_LABELS[level]}
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
             <section aria-label="Music" data-testid="music-section">
               <p className="mb-1 text-center text-xs font-semibold uppercase tracking-[0.25em] text-dusk-200">
                 Music
@@ -136,6 +175,14 @@ export function TableMenu({ open, onClose, onQuit }: TableMenuProps) {
               <MusicControls />
             </section>
             <div className={styles.menuActions}>
+              {howToPlay && (
+                <HowToPlayButton
+                  doc={howToPlay.doc}
+                  title={howToPlay.title}
+                  subtitle={howToPlay.subtitle}
+                  className={styles.menuHelp}
+                />
+              )}
               <button type="button" className="btn-fat" autoFocus onClick={onClose}>
                 Back to the table
               </button>

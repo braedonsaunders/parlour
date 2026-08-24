@@ -33,6 +33,8 @@ export interface WildTransportOptions {
   seats: SeatCount;
   seed: number;
   player: { name: string; avatarId: string };
+  /** Fully resolved table rules. Defaults to the mode's preset when omitted. */
+  rules?: WildpileRules;
 }
 
 export interface WildSnapshot {
@@ -64,7 +66,7 @@ export class WildTransport {
     this.options = options;
     this.session = createSession(this.def, {
       seed: options.seed | 0,
-      config: applyPreset(this.def.configSchema, options.mode),
+      config: options.rules ?? applyPreset(this.def.configSchema, options.mode),
       seats: options.seats,
     });
   }

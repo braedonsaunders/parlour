@@ -1,0 +1,163 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 560" width="720" height="560" role="img" aria-labelledby="title desc">
+  <title id="title">Parlour</title>
+  <desc id="desc">Three playing cards deal into a fan under a warm lamp glow, then the parlour wordmark draws itself on. Pull up a chair.</desc>
+  <style>
+    :root {
+      --bg: #152833;
+      --edge: #244a5c;
+      --cream: #fdf6ec;
+      --cream-2: #f2cfa4;
+      --amber: #e29349;
+      --amber-deep: #d97a2b;
+      --dusk: #2f86a1;
+      --dusk-soft: #7fc0d1;
+    }
+    .rise {
+      animation: rise 0.8s cubic-bezier(0.22, 1, 0.36, 1) 0.25s both;
+    }
+    @keyframes rise {
+      from { transform: translateY(46px); opacity: 0 }
+      to   { transform: translateY(0);    opacity: 1 }
+    }
+    .fan-l { transform: rotate(-16deg); animation: fanL 0.9s cubic-bezier(0.34, 1.56, 0.64, 1) 1.05s both }
+    .fan-r { transform: rotate(16deg);  animation: fanR 0.9s cubic-bezier(0.34, 1.56, 0.64, 1) 1.05s both }
+    .fan-m { transform: translateY(-14px); animation: fanM 0.9s cubic-bezier(0.34, 1.56, 0.64, 1) 1.05s both }
+    @keyframes fanL { from { transform: rotate(0deg) } to { transform: rotate(-16deg) } }
+    @keyframes fanR { from { transform: rotate(0deg) } to { transform: rotate(16deg) } }
+    @keyframes fanM { from { transform: translateY(0) } to { transform: translateY(-14px) } }
+    .rock   { animation: rock 6s ease-in-out 3.2s infinite }
+    .rock-b { animation: rockB 6s ease-in-out 3.2s infinite }
+    @keyframes rock  { 0%,100% { transform: rotate(0deg) } 50% { transform: rotate(1.4deg) } }
+    @keyframes rockB { 0%,100% { transform: rotate(0deg) } 50% { transform: rotate(-1.4deg) } }
+    .glow-in { animation: glowIn 1.2s ease-out both }
+    @keyframes glowIn { from { opacity: 0 } to { opacity: 1 } }
+    .breathe { animation: breathe 5s ease-in-out 1.2s infinite alternate }
+    @keyframes breathe { from { opacity: 0.16 } to { opacity: 0.28 } }
+    .ink {
+      stroke: var(--cream);
+      stroke-width: 15;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      fill: none;
+      stroke-dasharray: 1 2;
+      animation: draw 0.5s cubic-bezier(0.33, 0, 0.2, 1) var(--d, 1.5s) both;
+    }
+    @keyframes draw { from { stroke-dashoffset: 1 } to { stroke-dashoffset: 0 } }
+    .flourish {
+      stroke-dasharray: 1 2;
+      animation: draw 0.7s ease-out 2.75s both;
+    }
+    .settle { animation: settle 0.9s cubic-bezier(0.22, 1, 0.36, 1) 3s both }
+    @keyframes settle {
+      from { transform: translateY(12px); opacity: 0 }
+      to   { transform: translateY(0);    opacity: 1 }
+    }
+    .spark { opacity: 0; animation: spark 3.8s ease-in-out var(--d, 2.4s) infinite }
+    @keyframes spark {
+      0%, 18%, 100% { opacity: 0; transform: scale(0.4) }
+      8%            { opacity: 0.9; transform: scale(1) }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .rise, .fan-l, .fan-r, .fan-m, .rock, .rock-b, .glow-in, .breathe, .ink, .flourish, .settle, .spark {
+        animation: none;
+      }
+    }
+  </style>
+  <defs>
+    <radialGradient id="lamp" cx="50%" cy="42%" r="60%">
+      <stop offset="0%" stop-color="#e29349" stop-opacity="1"/>
+      <stop offset="55%" stop-color="#e29349" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#e29349" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="vignette" cx="50%" cy="46%" r="72%">
+      <stop offset="62%" stop-color="#08121a" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#08121a" stop-opacity="0.42"/>
+    </radialGradient>
+    <filter id="cardShadow" x="-40%" y="-40%" width="180%" height="180%">
+      <feDropShadow dx="0" dy="7" stdDeviation="7" flood-color="#08121a" flood-opacity="0.5"/>
+    </filter>
+  </defs>
+
+  <rect x="0.5" y="0.5" width="719" height="559" rx="30" fill="var(--bg)" stroke="var(--edge)"/>
+
+  <g class="glow-in">
+    <ellipse class="breathe" cx="360" cy="240" rx="290" ry="200" fill="url(#lamp)" opacity="0.22"/>
+  </g>
+
+  <!-- cards fan: pivot sits just below the card bottoms so they splay like a held hand -->
+  <g class="rise">
+    <g transform="translate(360 286)">
+      <g class="fan-l">
+        <g class="rock">
+          <g filter="url(#cardShadow)">
+            <rect x="-48" y="-154" width="96" height="134" rx="13" fill="var(--cream)" stroke="var(--amber)" stroke-width="4"/>
+          </g>
+          <rect x="-38" y="-144" width="76" height="114" rx="8" fill="none" stroke="var(--cream-2)" stroke-width="2"/>
+          <path transform="translate(0 -88)" fill="var(--dusk)"
+            d="M0 -19 C-11 -6 -17 -1 -17 6 A9.5 9.5 0 0 0 -2 13 C-2 16.5 -4.5 20 -8 22.5 H8 C4.5 20 2 16.5 2 13 A9.5 9.5 0 0 0 17 6 C17 -1 11 -6 0 -19 Z"/>
+        </g>
+      </g>
+      <g class="fan-r">
+        <g class="rock-b">
+          <g filter="url(#cardShadow)">
+            <rect x="-48" y="-154" width="96" height="134" rx="13" fill="var(--cream)" stroke="var(--amber)" stroke-width="4"/>
+          </g>
+          <rect x="-38" y="-144" width="76" height="114" rx="8" fill="none" stroke="var(--cream-2)" stroke-width="2"/>
+          <g transform="translate(0 -88)" fill="var(--dusk)">
+            <circle cx="0" cy="-9" r="8.5"/>
+            <circle cx="-8" cy="3.5" r="8.5"/>
+            <circle cx="8" cy="3.5" r="8.5"/>
+            <path d="M-2.5 2 C-2.5 12 -5.5 17.5 -9 21 H9 C5.5 17.5 2.5 12 2.5 2 Z"/>
+          </g>
+        </g>
+      </g>
+      <g class="fan-m">
+        <g class="rock">
+          <g filter="url(#cardShadow)">
+            <rect x="-48" y="-154" width="96" height="134" rx="13" fill="var(--cream)" stroke="var(--amber)" stroke-width="4"/>
+          </g>
+          <rect x="-38" y="-144" width="76" height="114" rx="8" fill="none" stroke="var(--cream-2)" stroke-width="2"/>
+          <path transform="translate(0 -88)" fill="var(--amber-deep)"
+            d="M0 21 C-15 7 -21.5 0 -21.5 -7.5 A11.5 11.5 0 0 1 0 -12.5 A11.5 11.5 0 0 1 21.5 -7.5 C21.5 0 15 7 0 21 Z"/>
+        </g>
+      </g>
+    </g>
+  </g>
+
+  <!-- wordmark: hand-drawn monoline "parlour", draws on letter by letter -->
+  <g transform="translate(130 318) scale(0.95)">
+    <path class="ink" style="--d:1.50s" pathLength="1" d="M20 52 V150"/>
+    <circle class="ink" style="--d:1.59s" pathLength="1" cx="49" cy="81" r="29"/>
+    <circle class="ink" style="--d:1.68s" pathLength="1" cx="127" cy="81" r="29"/>
+    <path class="ink" style="--d:1.77s" pathLength="1" d="M156 52 V110"/>
+    <path class="ink" style="--d:1.86s" pathLength="1" d="M176 52 V110"/>
+    <path class="ink" style="--d:1.95s" pathLength="1" d="M176 86 C176 62 196 50 218 58"/>
+    <path class="ink" style="--d:2.04s" pathLength="1" d="M242 20 V110"/>
+    <circle class="ink" style="--d:2.13s" pathLength="1" cx="295" cy="81" r="29"/>
+    <path class="ink" style="--d:2.22s" pathLength="1" d="M344 52 v29 a29 29 0 0 0 58 0 v-29"/>
+    <path class="ink" style="--d:2.31s" pathLength="1" d="M402 52 V110"/>
+    <path class="ink" style="--d:2.40s" pathLength="1" d="M422 52 V110"/>
+    <path class="ink" style="--d:2.49s" pathLength="1" d="M422 86 C422 62 442 50 464 58"/>
+  </g>
+
+  <path class="flourish" pathLength="1" d="M200 484 Q360 502 520 484"
+    fill="none" stroke="var(--amber)" stroke-width="5" stroke-linecap="round"/>
+
+  <g class="settle">
+    <text x="360" y="526" text-anchor="middle"
+      font-family="ui-rounded, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif"
+      font-size="17" font-weight="600" letter-spacing="6" fill="var(--dusk-soft)">PULL UP A CHAIR</text>
+  </g>
+
+  <!-- twinkles -->
+  <g fill="var(--cream-2)">
+    <g transform="translate(206 128)"><path class="spark" style="--d:2.2s" d="M0 -8 L2 -2 L8 0 L2 2 L0 8 L-2 2 L-8 0 L-2 -2 Z"/></g>
+    <g transform="translate(516 118)"><path class="spark" style="--d:3.1s" d="M0 -7 L1.8 -1.8 L7 0 L1.8 1.8 L0 7 L-1.8 1.8 L-7 0 L-1.8 -1.8 Z"/></g>
+    <g transform="translate(300 66)"><path class="spark" style="--d:4.0s" d="M0 -6 L1.5 -1.5 L6 0 L1.5 1.5 L0 6 L-1.5 1.5 L-6 0 L-1.5 -1.5 Z"/></g>
+    <g transform="translate(452 74)"><path class="spark" style="--d:2.7s" d="M0 -5 L1.3 -1.3 L5 0 L1.3 1.3 L0 5 L-1.3 1.3 L-5 0 L-1.3 -1.3 Z"/></g>
+    <g transform="translate(560 236)"><path class="spark" style="--d:3.6s" d="M0 -6 L1.5 -1.5 L6 0 L1.5 1.5 L0 6 L-1.5 1.5 L-6 0 L-1.5 -1.5 Z"/></g>
+    <g transform="translate(160 262)"><path class="spark" style="--d:4.4s" d="M0 -5 L1.3 -1.3 L5 0 L1.3 1.3 L0 5 L-1.3 1.3 L-5 0 L-1.3 -1.3 Z"/></g>
+  </g>
+
+  <rect x="0.5" y="0.5" width="719" height="559" rx="30" fill="url(#vignette)" pointer-events="none"/>
+</svg>

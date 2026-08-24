@@ -19,7 +19,8 @@ describe('WildTransport M5 acceptance', () => {
       expect(initial.players.slice(1).every((player) => player.isBot)).toBe(true);
       expect(initial.session.state.hands.every((hand) => hand.length === 7)).toBe(true);
       expect(initial.session.state.rules).toMatchObject({
-        stacking: mode === 'party',
+        stackDrawTwo: mode === 'party',
+        stackDrawFour: mode === 'party',
         jumpIn: mode === 'party',
       });
       expect(initial.session.setupFx?.some((event) => event.kind === Fx.DealCard)).toBe(true);
@@ -121,6 +122,69 @@ describe('wildTableView', () => {
       expect(view.decision).toBeNull();
       expect(view.legal.playCards).toHaveLength(0);
       expect(view.legal.draw).toBe(false);
+    }
+  });
+
+  it('surfaces a Draw Four challenge aimed at the human seat', () => {
+    // Sweep seeds until a bot puts a Draw Four on seat 0 with the rule on.
+    for (let seed = 1; seed < 400; seed++) {
+      const transport = new WildTransport({
+        mode: 'houseRules',
+        seats: 4,
+        seed,
+        player: { name: 'You', avatarId: 'ember' },
+      });
+
+      let guard = 0;
+      while (transport.getSnapshot().session.status === 'playing') {
+        if (guard++ >= 2000) break;
+        const snapshot = transport.getSnapshot();
+        if (snapshot.session.phase.actor !== 0) {
+          transport.playBotsUntilHuman();
+          continue;
+        }
+        const legal = transport.legalMoves();
+        const view = wildTableView(transport.getSnapshot(), legal);
+        if (view.legal.challengeDrawFour) {
+          expect(view.challenge).not.toBeNull();
+          expect(view.challenge?.accused).not.toBe(0);
+          expect(view.challenge?.amount).toBeGreaterThanOrEqual(4);
+          expect(view.challenge?.penalty).toBe(view.challenge!.amount + 2);
+          expect(view.pendingDraw).toBe(view.challenge?.amount);
+
+          const called = transport.dispatch('challengeDrawFour');
+          expect(called.rejected).toBeNull();
+          expect(called.fx.some((event) => event.kind === 'wildpile.challenge')).toBe(true);
+          expect(called.snapshot.session.state.challenge).toBeNull();
+          expect(called.snapshot.session.state.pendingDraw).toBe(0);
+          return;
+        }
+        const choice = legal[0]!;
+        transport.dispatch(choice.id, choice.payload);
+      }
+    }
+    throw new Error('no seed under 400 pointed a Draw Four at the human seat');
+  });
+
+  it('leaves the challenge off the table when the rule is off', () => {
+    const transport = new WildTransport({
+      mode: 'party',
+      seats: 4,
+      seed: 12,
+      player: { name: 'You', avatarId: 'ember' },
+    });
+    let guard = 0;
+    while (transport.getSnapshot().session.status === 'playing' && guard++ < 2000) {
+      const snapshot = transport.getSnapshot();
+      if (snapshot.session.phase.actor !== 0) {
+        transport.playBotsUntilHuman();
+        continue;
+      }
+      const view = wildTableView(snapshot, transport.legalMoves());
+      expect(view.legal.challengeDrawFour).toBe(false);
+      expect(view.challenge).toBeNull();
+      const choice = transport.legalMoves()[0]!;
+      transport.dispatch(choice.id, choice.payload);
     }
   });
 

@@ -202,9 +202,16 @@ describe('veiled replay', () => {
     const { deckOrder, session } = veiled();
     const drawn = sessionApply(def, session, 0, 'draw.stock').session;
     const handle = (drawn.state.hands[0] ?? [])[1] as CardId;
-    const discarded = sessionApply(def, drawn, 0, 'discard', { card: 'C9' }, {
-      reveals: [[handle, 'C9']],
-    }).session;
+    const discarded = sessionApply(
+      def,
+      drawn,
+      0,
+      'discard',
+      { card: 'C9' },
+      {
+        reveals: [[handle, 'C9']],
+      },
+    ).session;
     expect(discarded.state.discard[0]).toBe('C9');
     expect(discarded.state.hands[0]).toHaveLength(HAND_SIZE);
 

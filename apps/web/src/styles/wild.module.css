@@ -124,8 +124,24 @@
 
 .directionChip {
   composes: colorChip;
-  font-size: 0.95rem;
+  gap: 0.3rem;
   line-height: 1;
+}
+
+.directionChip i {
+  width: auto;
+  height: auto;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  font-size: 1.05rem;
+  font-style: normal;
+  line-height: 1;
+}
+
+.directionChip[data-direction='-1'] {
+  border-color: rgba(160, 210, 240, 0.8);
+  color: #cfe9f8;
 }
 
 .drawChip {
@@ -173,6 +189,128 @@
   transform: translateY(-4px) scale(1.06);
 }
 
+/* --- quartered color wheel ------------------------------------------------- */
+
+/* Four wedges laid out in a 2×2 grid, each rounded on its outer corner. Grid
+   cells beat clip-path here: the hit target matches the ink exactly. */
+.wheel {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  gap: 0.4rem;
+  width: clamp(14rem, 44vw, 19rem);
+  aspect-ratio: 1;
+  padding: 0.4rem;
+  border-radius: 50%;
+  background: rgba(6, 16, 22, 0.72);
+  box-shadow:
+    0 0 0 3px rgba(255, 246, 228, 0.35),
+    0 22px 46px -20px rgba(2, 8, 12, 0.95);
+}
+
+.wedge {
+  border: 0;
+  background: var(--wild-color);
+  box-shadow: inset 0 0 0 2px rgba(255, 250, 240, 0.35);
+  cursor: pointer;
+  transition:
+    transform 160ms var(--ease-pop),
+    filter 160ms ease;
+}
+
+.wedge[data-wedge='0'] {
+  border-radius: 100% 0 0 0;
+  transform-origin: 100% 100%;
+}
+.wedge[data-wedge='1'] {
+  border-radius: 0 100% 0 0;
+  transform-origin: 0 100%;
+}
+.wedge[data-wedge='2'] {
+  border-radius: 0 0 0 100%;
+  transform-origin: 100% 0;
+}
+.wedge[data-wedge='3'] {
+  border-radius: 0 0 100% 0;
+  transform-origin: 0 0;
+}
+
+.wedge:hover,
+.wedge:focus-visible {
+  transform: scale(1.07);
+  filter: brightness(1.15);
+  outline: none;
+  box-shadow:
+    inset 0 0 0 3px rgba(255, 250, 240, 0.9),
+    0 0 1.4rem var(--wild-color);
+}
+
+.wheelHub {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  display: grid;
+  place-items: center;
+  width: 33%;
+  aspect-ratio: 1;
+  translate: -50% -50%;
+  border-radius: 50%;
+  border: 3px solid rgba(255, 250, 240, 0.55);
+  background: rgba(6, 16, 22, 0.95);
+  color: #fff3dc;
+  font-family: var(--font-display), sans-serif;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  pointer-events: none;
+}
+
+/* --- swap-hands picker ----------------------------------------------------- */
+
+.swapRow {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.7rem;
+}
+
+.swapTarget {
+  display: grid;
+  justify-items: center;
+  gap: 0.2rem;
+  min-width: 6rem;
+  padding: 0.7rem 0.9rem;
+  border: 2px solid rgba(255, 246, 228, 0.35);
+  border-radius: 1rem;
+  background: rgba(10, 24, 30, 0.85);
+  color: #f3e7d4;
+  cursor: pointer;
+  transition: transform 140ms var(--ease-pop);
+}
+
+.swapTarget:hover,
+.swapTarget:focus-visible {
+  transform: translateY(-4px);
+  border-color: rgba(255, 246, 228, 0.85);
+  outline: none;
+}
+
+.swapTarget strong {
+  font-family: var(--font-display), sans-serif;
+  font-size: 0.86rem;
+  font-weight: 800;
+}
+
+.swapTarget small {
+  color: rgba(214, 226, 232, 0.7);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
 .jumpBanner {
   position: absolute;
   left: 50%;
@@ -186,7 +324,9 @@
 }
 
 .cardCount {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
   margin-top: 0.15rem;
   padding: 0.1rem 0.55rem;
   border-radius: 999px;
@@ -197,8 +337,337 @@
   font-weight: 800;
 }
 
+/* A seat holding one card with protection armed wears a small shield pip. */
+.cardCount[data-armed] {
+  background: rgba(56, 122, 78, 0.88);
+  color: #e9ffef;
+}
+
+.cardCount[data-armed] i {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
+  background: #b8ffcd;
+  box-shadow: 0 0 6px rgba(184, 255, 205, 0.9);
+}
+
+/* --- action calls --------------------------------------------------------- */
+
+.seatStamp {
+  position: absolute;
+  z-index: 8;
+  left: 50%;
+  top: 0.4rem;
+  translate: -50% 0;
+  padding: 0.24rem 0.7rem;
+  border: 2px solid rgba(255, 246, 228, 0.92);
+  border-radius: 0.5rem;
+  background: rgba(178, 60, 51, 0.95);
+  color: #fff6e4;
+  box-shadow: 0 8px 20px -8px rgba(4, 12, 18, 0.9);
+  font-family: var(--font-display), sans-serif;
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.seatStamp[data-stamp='caught'] {
+  background: rgba(140, 46, 100, 0.95);
+}
+
+.seatStamp[data-stamp='last-card'] {
+  background: rgba(61, 127, 86, 0.95);
+}
+
+.announcer {
+  position: absolute;
+  left: 50%;
+  top: 17%;
+  z-index: 26;
+  display: grid;
+  gap: 0.4rem;
+  justify-items: center;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.announcement {
+  display: grid;
+  justify-items: center;
+  gap: 0.1rem;
+  padding: 0.45rem 1.15rem;
+  border: 2px solid rgba(255, 246, 228, 0.55);
+  border-radius: 0.9rem;
+  background: linear-gradient(180deg, rgba(20, 40, 50, 0.94), rgba(9, 20, 26, 0.94));
+  box-shadow: 0 14px 30px -14px rgba(2, 8, 12, 0.95);
+  text-align: center;
+}
+
+.announcement strong {
+  font-family: var(--font-display), sans-serif;
+  font-size: clamp(1.15rem, 3.2vw, 1.75rem);
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  line-height: 1;
+  text-transform: uppercase;
+  color: #fff3dc;
+  text-shadow: 0 2px 0 rgba(6, 16, 22, 0.6);
+}
+
+.announcement small {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: rgba(243, 231, 212, 0.72);
+}
+
+.announcement[data-announcement='reverse'] {
+  border-color: rgba(120, 200, 235, 0.85);
+}
+.announcement[data-announcement='skip'] {
+  border-color: rgba(240, 150, 120, 0.85);
+}
+.announcement[data-announcement='draw-stack'] {
+  border-color: rgba(255, 195, 110, 0.9);
+}
+.announcement[data-announcement='last-card'] {
+  border-color: rgba(140, 235, 175, 0.9);
+}
+.announcement[data-announcement='caught'] {
+  border-color: rgba(235, 120, 175, 0.9);
+}
+
+/* --- pickup counter -------------------------------------------------------- */
+
+.pickupLayer {
+  position: absolute;
+  inset: 0;
+  z-index: 27;
+  display: grid;
+  /* Below the piles, not over them: the stock is where the cards are coming
+     from, so covering it hides the very thing being counted. */
+  align-items: end;
+  justify-items: center;
+  padding-bottom: 24%;
+  pointer-events: none;
+}
+
+.pickup {
+  display: grid;
+  justify-items: center;
+  gap: 0.24rem;
+  padding: 0.85rem 1.6rem;
+  border: 3px solid rgba(240, 150, 120, 0.85);
+  border-radius: 1.2rem;
+  background: linear-gradient(180deg, rgba(46, 20, 24, 0.96), rgba(14, 22, 28, 0.96));
+  box-shadow:
+    0 18px 40px -16px rgba(2, 8, 12, 0.95),
+    0 0 30px -6px rgba(240, 150, 120, 0.45);
+  text-align: center;
+}
+
+.pickup[data-reason='caught'] {
+  border-color: rgba(235, 120, 175, 0.9);
+}
+
+.pickup[data-reason='challenge'] {
+  border-color: rgba(160, 210, 240, 0.9);
+}
+
+/* Landing on you is the version that has to hurt. */
+.pickup[data-mine] {
+  border-width: 4px;
+  animation: pickupJolt 0.5s ease-out;
+}
+
+.pickupWho {
+  color: rgba(243, 231, 212, 0.72);
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.pickupCount {
+  display: block;
+  font-family: var(--font-display), sans-serif;
+  font-size: clamp(2.2rem, 7vw, 3.4rem);
+  font-weight: 800;
+  line-height: 1;
+  color: #fff3dc;
+  text-shadow: 0 3px 0 rgba(6, 16, 22, 0.55);
+}
+
+/* One pip per card, filling in as each one lands. */
+.pickupTrack {
+  display: flex;
+  gap: 0.24rem;
+  margin-top: 0.15rem;
+}
+
+.pickupTrack i {
+  width: 0.5rem;
+  height: 0.72rem;
+  border-radius: 0.12rem;
+  border: 1px solid rgba(255, 246, 228, 0.4);
+  background: rgba(255, 246, 228, 0.12);
+  transition:
+    background 160ms ease,
+    transform 160ms var(--ease-pop);
+}
+
+.pickupTrack i[data-landed] {
+  background: #f0966f;
+  border-color: rgba(255, 246, 228, 0.9);
+  transform: translateY(-2px);
+}
+
+.pickupProgress {
+  color: rgba(243, 231, 212, 0.66);
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+@keyframes pickupJolt {
+  0% {
+    transform: scale(1) rotate(0deg);
+  }
+  25% {
+    transform: scale(1.06) rotate(-1.2deg);
+  }
+  55% {
+    transform: scale(0.99) rotate(0.8deg);
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+/* --- Draw Four challenge --------------------------------------------------- */
+
+.challengePrompt {
+  position: absolute;
+  left: 50%;
+  bottom: 27%;
+  z-index: 28;
+  display: grid;
+  justify-items: center;
+  gap: 0.5rem;
+  width: min(24rem, 88vw);
+  padding: 0.9rem 1.1rem;
+  transform: translateX(-50%);
+  text-align: center;
+}
+
+.challengePrompt strong {
+  font-family: var(--font-display), sans-serif;
+  font-size: 0.98rem;
+  font-weight: 800;
+  color: #fff3dc;
+}
+
+.challengePrompt small {
+  color: rgba(214, 226, 232, 0.72);
+  font-size: 0.72rem;
+  line-height: 1.4;
+}
+
+.challengeActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.challengeButton {
+  background: linear-gradient(180deg, #d67ba0, #8c2e64);
+  border-color: rgba(255, 226, 240, 0.75);
+}
+
+/* --- draw + last-card affordances ----------------------------------------- */
+
+.stockPile[data-can-draw='true'] {
+  animation: stockBeckon 1.6s ease-in-out infinite;
+}
+
+.drawHint {
+  position: absolute;
+  left: 50%;
+  bottom: -1.5rem;
+  translate: -50% 0;
+  padding: 0.14rem 0.5rem;
+  border-radius: 999px;
+  background: rgba(9, 20, 26, 0.8);
+  color: rgba(255, 237, 207, 0.9);
+  font-family: var(--font-display), sans-serif;
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.lastCardButton {
+  background: linear-gradient(180deg, #6fc98d, #357a54);
+  border-color: rgba(220, 255, 232, 0.75);
+  animation: lastCardPulse 0.9s ease-in-out infinite;
+}
+
+.lastCardArmed {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.58rem 0.95rem;
+  border: 2px solid rgba(184, 255, 205, 0.6);
+  border-radius: 0.85rem;
+  background: rgba(24, 58, 40, 0.85);
+  color: #d6ffe4;
+  font-family: var(--font-display), sans-serif;
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+@keyframes stockBeckon {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 0 rgba(255, 205, 130, 0));
+  }
+  50% {
+    filter: drop-shadow(0 0 14px rgba(255, 205, 130, 0.75));
+  }
+}
+
+@keyframes lastCardPulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(140, 235, 175, 0.55);
+  }
+  70% {
+    box-shadow: 0 0 0 0.75rem rgba(140, 235, 175, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stockPile[data-can-draw='true'],
+  .lastCardButton,
+  .pickup[data-mine] {
+    animation: none;
+  }
+}
+
 @media (max-height: 560px) {
   .tableBadges {
     top: 30%;
+  }
+  .announcer {
+    top: 8%;
   }
 }

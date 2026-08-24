@@ -15,6 +15,11 @@ import type {
   RoomSettings,
 } from './types';
 
+/** A veiled room replays from the ceremony order, not from the seeded shuffle. */
+function veilOptions(settings: RoomSettings, deckOrder: readonly string[] | undefined) {
+  return settings.security === 'veil' ? { veiled: true, deckOrder } : {};
+}
+
 type EngineAuthorityOptions<S, C extends RuleValues> = {
   def: GameDef<S, C>;
   session: GameSession<S, C>;
@@ -55,6 +60,8 @@ export class EngineAuthority<S, C extends RuleValues> implements AuthorityAdapte
     const { timestamp, atMs } = this.authorityTime(session);
     const outcome = sessionApply(this.def, session, action.seat, action.move, action.payload, {
       atMs,
+      reveals: action.reveals,
+      conceals: action.conceals,
     });
     if (outcome.rejected) throw new Error(outcome.rejected.message);
     const events = outcome.events.map((event) => ({ ...event, ts: timestamp }));
@@ -103,6 +110,7 @@ export class EngineAuthority<S, C extends RuleValues> implements AuthorityAdapte
     const nextSession = replaySession(this.def, session.seed, [...session.log, ...packet.events], {
       config: session.config,
       seats: session.seats,
+      ...veilOptions(settings, session.deckOrder),
     });
     this.authorityState = { session: nextSession, settings };
     this.acceptedActions.set(packet.actionId, packet.events.at(-1)!.seq);
@@ -111,13 +119,15 @@ export class EngineAuthority<S, C extends RuleValues> implements AuthorityAdapte
 
   exportSnapshot(): ReplaySnapshot {
     const { session, settings } = this.authorityState;
-    return {
+    const snapshot: ReplaySnapshot = {
       seed: session.seed,
       log: [...session.log],
       acceptedActions: [...this.acceptedActions].map(([id, seq]) => ({ id, seq })),
       stateHash: stateHash(session.state),
       settings: { ...settings, config: { ...settings.config } },
     };
+    if (session.deckOrder) snapshot.deckOrder = [...session.deckOrder];
+    return snapshot;
   }
 
   importSnapshot(snapshot: ReplaySnapshot): void {
@@ -129,10 +139,14 @@ export class EngineAuthority<S, C extends RuleValues> implements AuthorityAdapte
     ) {
       throw new Error('invalid snapshot seats');
     }
+    if (snapshot.settings.security === 'veil' && !snapshot.deckOrder) {
+      throw new Error('a veiled snapshot must carry its ceremony deck order');
+    }
     const config = this.resolveSnapshotConfig(snapshot.settings.config);
     const replayed = replaySession(this.def, snapshot.seed, snapshot.log, {
       config,
       seats: snapshot.settings.seats,
+      ...veilOptions(snapshot.settings, snapshot.deckOrder),
     });
     if (stateHash(replayed.state) !== snapshot.stateHash) throw new Error('snapshot hash mismatch');
     const acceptedActions = new Map<string, number>();

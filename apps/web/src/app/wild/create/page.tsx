@@ -1,13 +1,12 @@
 'use client';
 
-import { applyPreset } from '@parlour/engine';
-import { wildpileConfig } from '@parlour/game-wildpile';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { RoomLobby } from '@/components/multiplayer/RoomLobby';
+import { SecurityBadge } from '@/components/multiplayer/TableSecurity';
 import { useProfileStore } from '@/stores/profile';
-import { useWildSetupStore } from '@/stores/wildSetup';
+import { useWildSetupStore, wildRulesFor } from '@/stores/wildSetup';
 import {
   activateMultiplayerSession,
   clearActiveMultiplayerSession,
@@ -21,6 +20,8 @@ export default function CreateWildRoomPage() {
   const avatarId = useProfileStore((state) => state.avatarId);
   const mode = useWildSetupStore((state) => state.mode);
   const seats = useWildSetupStore((state) => state.seats);
+  const overrides = useWildSetupStore((state) => state.overrides);
+  const rulesKey = JSON.stringify(wildRulesFor(mode, overrides));
   const sessionRef = useRef<MultiplayerRoomSession | null>(null);
   const [session, setSession] = useState<MultiplayerRoomSession | null>(null);
 
@@ -33,11 +34,11 @@ export default function CreateWildRoomPage() {
       .create({
         gameId: 'wildpile',
         seats,
-        config: applyPreset(wildpileConfig, mode),
+        config: JSON.parse(rulesKey),
       })
       .then(() => activateMultiplayerSession(next))
       .catch(() => undefined);
-  }, [avatarId, mode, name, seats]);
+  }, [avatarId, name, rulesKey, seats]);
 
   if (!session) return <WildLobbyLoading />;
   return (
@@ -107,10 +108,13 @@ function ActiveWildLobby({
           connected: seat.connected,
         }))}
         onStart={() => {
-          session.start();
-          onStarted();
+          void session
+            .start()
+            .then(onStarted)
+            .catch(() => undefined);
         }}
       />
+      <SecurityBadge security={snapshot.security} />
       <p className="max-w-xl text-center text-sm text-dusk-100/80">
         This {capacity}-seat pile starts when every chair is filled. Share the code with{' '}
         {capacity === 2 ? 'one friend' : `${capacity - 1} friends`}.

@@ -327,10 +327,7 @@ export interface VeilPack {
    * for a single face-up starter, or a predicate when the game keeps opening
    * until some condition holds (Wildpile needs a number card).
    */
-  publicSetup?:
-    | 'none'
-    | 'one'
-    | ((opened: readonly CardId[], config: RuleValues) => boolean);
+  publicSetup?: 'none' | 'one' | ((opened: readonly CardId[], config: RuleValues) => boolean);
 }
 
 function resolveDeck(pack: VeilPack, config: RuleValues): DeckDef {
