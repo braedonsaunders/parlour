@@ -185,6 +185,7 @@ function playResolved(
     index === seat ? removeFrom(cards, card) : cards.slice(),
   );
   ctx.fx.emit(Fx.DiscardCard, { card, seat, to: 'discard' });
+  if (hands[seat]?.length === 1) ctx.fx.emit('wildpile.last-card', { seat });
 
   let next: WildpileState = {
     ...state,

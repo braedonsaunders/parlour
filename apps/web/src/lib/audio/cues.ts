@@ -54,19 +54,63 @@ export function parlourCuesForFx(fx: readonly FxEvent[]): SoundCue[] {
 
 /** Wild Pile owns these namespaced engine events and their authored accents. */
 export function wildpileCuesForFx(fx: readonly FxEvent[]): SoundCue[] {
+  const hasWild = fx.some((event) => event.kind === 'wildpile.wild');
+  const hasActionCard = fx.some((event) =>
+    ['wildpile.wild', 'wildpile.reverse', 'wildpile.skip', 'wildpile.draw-stack'].includes(
+      event.kind,
+    ),
+  );
+
   return fx.flatMap((event) => {
     const atMs = Math.max(0, event.at ?? 0);
     switch (event.kind) {
       case 'wildpile.wild':
-        return [{ id: 'wildpile.wild.surge', atMs }];
+        return [
+          { id: 'wildpile.wild.surge', atMs: atMs + 120 },
+          ...(fx.some((candidate) => candidate.kind === 'wildpile.draw-stack')
+            ? []
+            : [{ id: 'wildpile.voice.wild', atMs: atMs + 320 }]),
+        ];
       case 'wildpile.reverse':
-        return [{ id: 'wildpile.reverse', atMs }];
+        return [
+          { id: 'wildpile.reverse', atMs: atMs + 120 },
+          { id: 'wildpile.voice.reverse', atMs: atMs + 300 },
+        ];
       case 'wildpile.skip':
-        return [{ id: 'wildpile.skip', atMs }];
-      case 'wildpile.draw-stack':
-        return [{ id: 'wildpile.draw-stack', atMs }];
-      case 'wildpile.color':
-        return [{ id: 'wildpile.color', atMs }];
+        return [
+          { id: 'wildpile.skip', atMs: atMs + 120 },
+          { id: 'wildpile.voice.skip', atMs: atMs + 300 },
+        ];
+      case 'wildpile.draw-stack': {
+        const amount = payloadNumber(event, 'amount') ?? 0;
+        const voice = hasWild
+          ? 'wildpile.voice.draw-four'
+          : amount <= 2
+            ? 'wildpile.voice.draw-two'
+            : 'wildpile.voice.stacked';
+        return [
+          { id: 'wildpile.draw-stack', atMs: atMs + 120 },
+          { id: voice, atMs: atMs + 320 },
+        ];
+      }
+      case 'wildpile.color': {
+        const color = payloadString(event, 'color');
+        const voice =
+          color && ['red', 'yellow', 'green', 'blue'].includes(color)
+            ? `wildpile.voice.${color}`
+            : null;
+        return [
+          { id: 'wildpile.color', atMs },
+          ...(voice ? [{ id: voice, atMs: atMs + 100 }] : []),
+        ];
+      }
+      case 'wildpile.last-card':
+        return [
+          {
+            id: 'wildpile.voice.last-card',
+            atMs: atMs + (hasActionCard ? 950 : 320),
+          },
+        ];
       default:
         return [];
     }
@@ -85,4 +129,12 @@ function payloadString(event: FxEvent, field: string): string | null {
   }
   const value = (event.payload as Record<string, unknown>)[field];
   return typeof value === 'string' ? value : null;
+}
+
+function payloadNumber(event: FxEvent, field: string): number | null {
+  if (typeof event.payload !== 'object' || event.payload === null || Array.isArray(event.payload)) {
+    return null;
+  }
+  const value = (event.payload as Record<string, unknown>)[field];
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
 }

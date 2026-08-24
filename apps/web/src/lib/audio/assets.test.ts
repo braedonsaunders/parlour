@@ -23,6 +23,17 @@ const REQUIRED_SOUNDS = [
   'wildpile.skip',
   'wildpile.draw-stack',
   'wildpile.color',
+  'wildpile.voice.reverse',
+  'wildpile.voice.skip',
+  'wildpile.voice.draw-two',
+  'wildpile.voice.draw-four',
+  'wildpile.voice.stacked',
+  'wildpile.voice.wild',
+  'wildpile.voice.red',
+  'wildpile.voice.yellow',
+  'wildpile.voice.green',
+  'wildpile.voice.blue',
+  'wildpile.voice.last-card',
 ] as const;
 
 describe('production audio suite', () => {

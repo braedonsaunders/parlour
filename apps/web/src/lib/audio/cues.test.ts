@@ -42,24 +42,69 @@ describe('fx-driven table audio', () => {
     ]);
   });
 
-  it('authors Wild Pile action-card accents from namespaced fx', () => {
+  it('layers Wild Pile action-card Foley with human callouts', () => {
     expect(
       soundCuesForFx(
         [
-          { kind: 'wildpile.wild', payload: {}, at: 10 },
           { kind: 'wildpile.reverse', payload: {}, at: 20 },
           { kind: 'wildpile.skip', payload: {}, at: 30 },
-          { kind: 'wildpile.draw-stack', payload: {}, at: 40 },
-          { kind: 'wildpile.color', payload: {}, at: 50 },
         ],
         'wildpile',
       ),
     ).toEqual([
-      { id: 'wildpile.wild.surge', atMs: 10 },
-      { id: 'wildpile.reverse', atMs: 20 },
-      { id: 'wildpile.skip', atMs: 30 },
-      { id: 'wildpile.draw-stack', atMs: 40 },
-      { id: 'wildpile.color', atMs: 50 },
+      { id: 'wildpile.reverse', atMs: 140 },
+      { id: 'wildpile.voice.reverse', atMs: 320 },
+      { id: 'wildpile.skip', atMs: 150 },
+      { id: 'wildpile.voice.skip', atMs: 330 },
+    ]);
+  });
+
+  it('distinguishes draw-two, stacked, and wild-draw-four announcements', () => {
+    expect(
+      soundCuesForFx([{ kind: 'wildpile.draw-stack', payload: { amount: 2 }, at: 0 }], 'wildpile'),
+    ).toEqual([
+      { id: 'wildpile.draw-stack', atMs: 120 },
+      { id: 'wildpile.voice.draw-two', atMs: 320 },
+    ]);
+
+    expect(
+      soundCuesForFx([{ kind: 'wildpile.draw-stack', payload: { amount: 6 }, at: 0 }], 'wildpile'),
+    ).toEqual([
+      { id: 'wildpile.draw-stack', atMs: 120 },
+      { id: 'wildpile.voice.stacked', atMs: 320 },
+    ]);
+
+    expect(
+      soundCuesForFx(
+        [
+          { kind: 'wildpile.draw-stack', payload: { amount: 4 }, at: 0 },
+          { kind: 'wildpile.wild', payload: {}, at: 0 },
+        ],
+        'wildpile',
+      ),
+    ).toEqual([
+      { id: 'wildpile.draw-stack', atMs: 120 },
+      { id: 'wildpile.voice.draw-four', atMs: 320 },
+      { id: 'wildpile.wild.surge', atMs: 120 },
+    ]);
+  });
+
+  it('announces wild color switches and the last-card moment', () => {
+    expect(
+      soundCuesForFx(
+        [
+          { kind: 'wildpile.wild', payload: {}, at: 0 },
+          { kind: 'wildpile.color', payload: { color: 'blue' }, at: 500 },
+          { kind: 'wildpile.last-card', payload: { seat: 0 }, at: 0 },
+        ],
+        'wildpile',
+      ),
+    ).toEqual([
+      { id: 'wildpile.wild.surge', atMs: 120 },
+      { id: 'wildpile.voice.wild', atMs: 320 },
+      { id: 'wildpile.color', atMs: 500 },
+      { id: 'wildpile.voice.blue', atMs: 600 },
+      { id: 'wildpile.voice.last-card', atMs: 950 },
     ]);
   });
 

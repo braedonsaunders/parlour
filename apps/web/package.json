@@ -8,9 +8,10 @@
     "start": "next start",
     "type-check": "tsc --noEmit",
     "test": "vitest run",
-    "generate:audio": "pnpm run generate:ambience && pnpm run generate:sfx",
+    "generate:audio": "pnpm run generate:ambience && pnpm run generate:sfx && pnpm run generate:voice",
     "generate:ambience": "node scripts/generate-ambience.mjs",
-    "generate:sfx": "node --env-file=../../.env.local scripts/generate-sfx.mjs"
+    "generate:sfx": "node --env-file=../../.env.local scripts/generate-sfx.mjs",
+    "generate:voice": "node --env-file=../../.env.local scripts/generate-voice.mjs"
   },
   "dependencies": {
     "@parlour/engine": "workspace:*",
