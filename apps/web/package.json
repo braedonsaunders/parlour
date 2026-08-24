@@ -16,8 +16,10 @@
   "dependencies": {
     "@parlour/engine": "workspace:*",
     "@parlour/game-blitz": "workspace:*",
-    "@parlour/game-hearts": "workspace:*",
+    "@parlour/game-cribbage": "workspace:*",
+    "@parlour/game-euchre": "workspace:*",
     "@parlour/game-gin": "workspace:*",
+    "@parlour/game-hearts": "workspace:*",
     "@parlour/game-president": "workspace:*",
     "@parlour/game-ratscrew": "workspace:*",
     "@parlour/game-wildpile": "workspace:*",

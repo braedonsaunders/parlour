@@ -41,10 +41,22 @@ export const ratscrewHowToPlay: HowToPlayDoc = {
       bullets: [
         { label: 'Double', text: 'two cards of the same rank back-to-back (7♦ 7♣)' },
         { label: 'Sandwich', text: 'same rank with one card between (7♦ Q♠ 7♥)' },
-        { label: 'Marriage', text: 'a King and Queen back-to-back, either order (K♦ Q♠) — house-rule toggle' },
-        { label: 'Ten', text: 'two consecutive pip cards summing to ten (3♦ 7♠) — house-rule toggle' },
-        { label: 'Top-bottom', text: 'the top card matches the very bottom card of the pile — house-rule toggle' },
-        { label: 'Run', text: 'three climbing or falling ranks in a row (4-5-6 or 9-8-7) — house-rule toggle' },
+        {
+          label: 'Marriage',
+          text: 'a King and Queen back-to-back, either order (K♦ Q♠) — house-rule toggle',
+        },
+        {
+          label: 'Ten',
+          text: 'two consecutive pip cards summing to ten (3♦ 7♠) — house-rule toggle',
+        },
+        {
+          label: 'Top-bottom',
+          text: 'the top card matches the very bottom card of the pile — house-rule toggle',
+        },
+        {
+          label: 'Run',
+          text: 'three climbing or falling ranks in a row (4-5-6 or 9-8-7) — house-rule toggle',
+        },
       ],
     },
     {
@@ -58,9 +70,18 @@ export const ratscrewHowToPlay: HowToPlayDoc = {
       body: ['Tune the chaos in room settings before you start:'],
       bullets: [
         { label: 'Doubles / Sandwiches', text: 'the classic slap patterns, both on by default' },
-        { label: 'Marriage / Tens / Top-bottom / Runs', text: 'extra patterns, all off by default for a classic table' },
-        { label: 'Mis-slap burns a card', text: 'on by default; turn it off and only live patterns can be slapped at all' },
-        { label: 'Slap back in when out', text: 'empty-handed players may still slap a live pattern to win the pile and re-enter' },
+        {
+          label: 'Marriage / Tens / Top-bottom / Runs',
+          text: 'extra patterns, all off by default for a classic table',
+        },
+        {
+          label: 'Mis-slap burns a card',
+          text: 'on by default; turn it off and only live patterns can be slapped at all',
+        },
+        {
+          label: 'Slap back in when out',
+          text: 'empty-handed players may still slap a live pattern to win the pile and re-enter',
+        },
         { label: 'Slap window', text: 'how long the race stays open — shorter means meaner' },
       ],
     },

@@ -3,10 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
-import {
-  ratscrewConfigSchema,
-  ratscrewHowToPlay,
-} from '@parlour/game-ratscrew';
+import { ratscrewConfigSchema, ratscrewHowToPlay } from '@parlour/game-ratscrew';
 import { GameArt } from '@/components/GameArt';
 import { getGame } from '@/lib/games';
 import { HowToPlayButton } from '@/components/HowToPlay';
@@ -49,11 +46,7 @@ export default function RatscrewSetupPage() {
         <h1 className="font-display text-xl font-extrabold tracking-tight text-hearth-50">
           Rat Screw <span className="text-dusk-100/80">· hands on the pile</span>
         </h1>
-        <HowToPlayButton
-          doc={ratscrewHowToPlay}
-          title="Rat Screw"
-          subtitle="the slap game"
-        />
+        <HowToPlayButton doc={ratscrewHowToPlay} title="Rat Screw" subtitle="the slap game" />
       </header>
 
       <div

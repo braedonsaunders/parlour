@@ -4,10 +4,7 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from '
 import { useRouter } from 'next/navigation';
 import type { FxEvent } from '@parlour/engine';
 import { RatscrewTableScreen } from '@/components/table/ratscrew/RatscrewTableScreen';
-import {
-  RatscrewTransport,
-  type RatscrewSnapshot,
-} from '@/lib/solo/RatscrewTransport';
+import { RatscrewTransport, type RatscrewSnapshot } from '@/lib/solo/RatscrewTransport';
 import { SLAP_GRACE_MS } from '@parlour/game-ratscrew';
 import { ratscrewModeForRules } from '@/lib/ratscrew/modes';
 import { ratscrewTableView } from '@/lib/ratscrew/view';
@@ -76,7 +73,9 @@ function LiveRatscrewTable({ transport }: { transport: RatscrewTransport }) {
   const recordResult = useProfileStore((state) => state.recordResult);
   const recordMatch = useHistoryStore((state) => state.recordMatch);
   const [, setTick] = useState(0);
-  const [fx, setFx] = useState<readonly FxEvent[]>(() => transport.getSnapshot().session.setupFx ?? []);
+  const [fx, setFx] = useState<readonly FxEvent[]>(
+    () => transport.getSnapshot().session.setupFx ?? [],
+  );
   const [fxKey, setFxKey] = useState(0);
   const reportedRef = useRef(false);
 
@@ -194,16 +193,13 @@ function ActiveMultiplayerRatscrewTable({ room }: { room: MultiplayerRoomSession
     if (armedClose.current === windowKey) return;
     armedClose.current = windowKey;
     if (closeTimer.current !== null) window.clearTimeout(closeTimer.current);
-    closeTimer.current = window.setTimeout(
-      () => {
-        try {
-          room.inject('windowClose');
-        } catch {
-          // room closing mid-race; the new host re-arms from its own effect
-        }
-      },
-      session.state.rules.slapWindowMs + SLAP_GRACE_MS,
-    );
+    closeTimer.current = window.setTimeout(() => {
+      try {
+        room.inject('windowClose');
+      } catch {
+        // room closing mid-race; the new host re-arms from its own effect
+      }
+    }, session.state.rules.slapWindowMs + SLAP_GRACE_MS);
     return () => {
       if (closeTimer.current !== null) {
         window.clearTimeout(closeTimer.current);

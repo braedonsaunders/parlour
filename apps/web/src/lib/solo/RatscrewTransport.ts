@@ -123,9 +123,7 @@ export class RatscrewTransport {
   /** Moves currently offered to the local seat — including the risk slap. */
   legalMoves(): readonly LegalMove[] {
     if (this.session.status !== 'playing') return [];
-    return (
-      ratscrewGame.flow.legalMovesFor?.(this.session.state, this.session.phase, 0) ?? []
-    );
+    return ratscrewGame.flow.legalMovesFor?.(this.session.state, this.session.phase, 0) ?? [];
   }
 
   /** Human intent (seat 0): flips, risk slaps, anything the flow offers. */
@@ -175,9 +173,7 @@ export class RatscrewTransport {
   }
 
   private apply(
-    attempt: () => ReturnType<
-      typeof sessionApply<RatscrewState, RatscrewConfig>
-    >,
+    attempt: () => ReturnType<typeof sessionApply<RatscrewState, RatscrewConfig>>,
   ): RatscrewDispatch {
     if (this.session.status !== 'playing') {
       return this.reject('match-ended', 'the match has ended');

@@ -376,9 +376,7 @@ const flow: Flow<RatscrewState> = {
     if (challenge && pileOf(state, challenge.target).length === 0) {
       return {
         phase: phaseFor(state),
-        autoMoves: [
-          { seat: null, move: 'challengeForfeit', reason: 'challenge-target-empty' },
-        ],
+        autoMoves: [{ seat: null, move: 'challengeForfeit', reason: 'challenge-target-empty' }],
       };
     }
     if (
@@ -441,7 +439,9 @@ export const houseBot: BotPolicy<RatscrewState> = {
   label: 'House Bot',
   tier: 2,
   chooseMove(_view, _seat, legal) {
-    return legal.find((move) => move.id === 'flip') ?? legal.find((move) => move.id === 'slap') ?? null;
+    return (
+      legal.find((move) => move.id === 'flip') ?? legal.find((move) => move.id === 'slap') ?? null
+    );
   },
 };
 

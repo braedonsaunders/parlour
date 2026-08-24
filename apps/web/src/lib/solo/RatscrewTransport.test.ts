@@ -38,9 +38,7 @@ describe('ratscrew solo transport (virtual clock)', () => {
   it('deals deterministically per seed and offers the human a flip', () => {
     const a = make({ seed: 5 });
     const b = make({ seed: 5 });
-    expect(stateHash(a.getSnapshot().session.state)).toBe(
-      stateHash(b.getSnapshot().session.state),
-    );
+    expect(stateHash(a.getSnapshot().session.state)).toBe(stateHash(b.getSnapshot().session.state));
     const legal = a.legalMoves();
     expect(legal.map((move) => move.id)).toEqual(['flip', 'slap']);
     a.dispose();

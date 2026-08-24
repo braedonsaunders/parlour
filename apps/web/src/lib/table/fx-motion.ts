@@ -13,7 +13,7 @@ export const FX_TIMING = {
   maxBurstMs: 1200,
 } as const;
 
-export type Zone = 'stock' | 'discard' | `hand:${number}` | `seat:${number}`;
+export type Zone = 'stock' | 'discard' | 'peg' | `hand:${number}` | `seat:${number}`;
 
 type BaseCue = {
   id: string;
@@ -30,7 +30,7 @@ export type FxCue =
       type: 'discard';
       card: string;
       from: `hand:${number}`;
-      to: 'discard';
+      to: Zone;
       seat: number;
     })
   | (BaseCue & {
@@ -94,6 +94,7 @@ function zoneField(event: FxEvent, field: string): Zone {
   if (
     value === 'stock' ||
     value === 'discard' ||
+    value === 'peg' ||
     /^hand:\d+$/.test(value) ||
     /^seat:\d+$/.test(value)
   ) {
@@ -142,12 +143,13 @@ function cueFor(event: FxEvent, index: number): FxCue | null {
     }
     case Fx.DiscardCard: {
       const seat = numberField(event, 'seat');
+      const to = payloadOf(event).to === undefined ? 'discard' : zoneField(event, 'to');
       return {
         ...base,
         type: 'discard',
         card: stringField(event, 'card'),
         from: `hand:${seat}`,
-        to: 'discard',
+        to,
         seat,
         durationMs: FX_TIMING.cardFlightMs + FX_TIMING.settleMs,
       };

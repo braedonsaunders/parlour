@@ -1,0 +1,306 @@
+/* Euchre-specific table furniture: trick zone, kitty, bid rail, team scores. */
+
+.teamScores {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.teamChip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  padding: 0.3rem 0.7rem;
+  border-radius: 999px;
+  background: rgba(16, 24, 32, 0.72);
+  border: 2px solid rgba(255, 255, 255, 0.08);
+  font-family: var(--font-display, inherit);
+}
+
+.teamChip[data-maker='true'] {
+  border-color: var(--team-accent, #5fae7b);
+  box-shadow: 0 0 12px -4px var(--team-accent, #5fae7b);
+}
+
+.teamChip strong {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #fdf6ea;
+  min-width: 1.2ch;
+  text-align: center;
+}
+
+.teamChip small {
+  font-size: 0.62rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(253, 246, 234, 0.66);
+}
+
+.trickZone {
+  position: absolute;
+  left: 50%;
+  top: 47%;
+  transform: translate(-50%, -50%);
+  width: clamp(9rem, 20vw, 13rem);
+  height: clamp(6.5rem, 14vw, 9rem);
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+
+.trickCard {
+  position: absolute;
+  transition: transform 160ms cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+.trickCard[data-seat='0'] {
+  transform: translate(0%, 26%) rotate(-3deg);
+}
+.trickCard[data-seat='1'] {
+  transform: translate(-58%, 0%) rotate(6deg);
+}
+.trickCard[data-seat='2'] {
+  transform: translate(0%, -30%) rotate(4deg);
+}
+.trickCard[data-seat='3'] {
+  transform: translate(58%, 0%) rotate(-5deg);
+}
+
+.kitty {
+  position: absolute;
+  left: 50%;
+  top: 47%;
+  transform: translate(-190%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.kittyStack {
+  position: relative;
+  width: clamp(3.4rem, 6vw, 4.6rem);
+  aspect-ratio: 2 / 3;
+}
+
+.kittyStack > * {
+  position: absolute;
+  inset: 0;
+}
+
+.kittyStack > *:nth-child(2) {
+  translate: 2px -2px;
+}
+.kittyStack > *:nth-child(3) {
+  translate: 4px -4px;
+}
+.kittyStack > *:nth-child(4) {
+  translate: 6px -6px;
+}
+
+.kittyLabel,
+.upcardLabel {
+  font-size: 0.6rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(253, 246, 234, 0.55);
+}
+
+.upcard {
+  position: absolute;
+  left: 50%;
+  top: 47%;
+  transform: translate(90%, -50%) rotate(6deg);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.trumpBadge {
+  position: absolute;
+  left: 50%;
+  top: 12%;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.35rem 0.85rem;
+  border-radius: 999px;
+  background: rgba(16, 24, 32, 0.78);
+  border: 2px solid var(--trump-color, #e29349);
+  color: #fdf6ea;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+
+.trumpBadge i {
+  width: 0.8rem;
+  height: 0.8rem;
+  display: inline-block;
+  color: var(--trump-color, #e29349);
+  font-style: normal;
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.dealerChip {
+  position: absolute;
+  right: 0.4rem;
+  bottom: -0.5rem;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #f0c04e, #c2891f);
+  color: #3b2707;
+  font-size: 0.58rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+}
+
+.seatSittingOut {
+  opacity: 0.38;
+  filter: saturate(0.4);
+}
+
+.bidRail {
+  position: fixed;
+  left: 50%;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 11.5rem);
+  transform: translateX(-50%);
+  z-index: 40;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 0.6rem;
+  max-width: min(92vw, 42rem);
+  padding: 0.7rem 0.9rem;
+  border-radius: 1.4rem;
+  background: rgba(12, 18, 26, 0.88);
+  border: 2px solid rgba(255, 255, 255, 0.09);
+  backdrop-filter: blur(6px);
+}
+
+.bidPrompt {
+  width: 100%;
+  text-align: center;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(253, 246, 234, 0.75);
+}
+
+.suitRow {
+  display: flex;
+  gap: 0.55rem;
+}
+
+.suitPick {
+  width: 2.9rem;
+  height: 2.9rem;
+  border-radius: 0.9rem;
+  border: 2px solid rgba(255, 255, 255, 0.14);
+  display: grid;
+  place-items: center;
+  font-size: 1.35rem;
+  color: var(--suit-color, #fdf6ea);
+  background: rgba(255, 255, 255, 0.05);
+  cursor: pointer;
+  transition:
+    transform 140ms ease-pop,
+    border-color 140ms ease;
+}
+
+.suitPick:hover {
+  transform: translateY(-2px) scale(1.06);
+  border-color: var(--suit-color, #fdf6ea);
+}
+
+.aloneToggle {
+  padding: 0.5rem 0.95rem;
+  border-radius: 999px;
+  border: 2px solid rgba(240, 192, 78, 0.65);
+  color: #f0c04e;
+  background: rgba(240, 192, 78, 0.08);
+  font-weight: 800;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.aloneToggle[data-on='true'] {
+  background: #f0c04e;
+  color: #3b2707;
+}
+
+.partnerNote {
+  position: absolute;
+  left: 50%;
+  top: 22%;
+  transform: translateX(-50%);
+  padding: 0.4rem 0.9rem;
+  border-radius: 999px;
+  background: rgba(12, 18, 26, 0.85);
+  border: 2px solid rgba(240, 192, 78, 0.5);
+  color: #f0c04e;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.fxSeatPop {
+  position: absolute;
+  padding: 0.35rem 0.8rem;
+  border-radius: 999px;
+  background: rgba(12, 18, 26, 0.92);
+  border: 2px solid var(--pop-accent, #e29349);
+  color: #fdf6ea;
+  font-weight: 800;
+  font-size: 0.86rem;
+  white-space: nowrap;
+  opacity: 0;
+  z-index: 60;
+  pointer-events: none;
+}
+
+.fxBanner {
+  position: absolute;
+  left: 50%;
+  top: 34%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  opacity: 0;
+  z-index: 70;
+  pointer-events: none;
+}
+
+.fxBanner strong {
+  display: block;
+  font-family: var(--font-display, inherit);
+  font-size: clamp(1.6rem, 4vw, 2.6rem);
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  color: var(--banner-accent, #e29349);
+  text-shadow:
+    0 2px 0 rgba(0, 0, 0, 0.4),
+    0 6px 22px rgba(0, 0, 0, 0.5);
+}
+
+.fxBanner span {
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(253, 246, 234, 0.8);
+}
+
+.flyingTrickCard {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  z-index: 55;
+  pointer-events: none;
+}

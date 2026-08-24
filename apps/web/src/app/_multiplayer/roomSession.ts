@@ -17,6 +17,12 @@ import {
   type BlitzState,
 } from '@parlour/game-blitz';
 import {
+  createEuchreDef,
+  euchreConfig,
+  type EuchreRules,
+  type EuchreState,
+} from '@parlour/game-euchre';
+import {
   presidentConfig,
   presidentGame,
   type PresidentRules,
@@ -34,6 +40,12 @@ import {
   type RatscrewConfig,
   type RatscrewState,
 } from '@parlour/game-ratscrew';
+import {
+  cribbageConfigSchema,
+  createCribbageDef,
+  type CribbageConfig,
+  type CribbageState,
+} from '@parlour/game-cribbage';
 import {
   heartsConfigSchema,
   heartsGame,
@@ -70,7 +82,8 @@ import { NostrSignaling, type RoomAnnouncement } from '@/lib/multiplayer/NostrSi
 import { validateRoomCode } from '@/lib/rooms/code';
 import { hasValidSeatCount, seatRangeFor } from '@/lib/rooms/seatRange';
 
-export type MultiplayerGameId = 'blitz' | 'wildpile' | 'ratscrew' | 'hearts' | 'gin' | 'president';
+export type MultiplayerGameId =
+  'blitz' | 'cribbage' | 'wildpile' | 'ratscrew' | 'euchre' | 'hearts' | 'gin' | 'president';
 
 /** What the room badge shows about privacy — see lib/multiplayer/veil. */
 export type MultiplayerSecurity = {
@@ -92,8 +105,10 @@ export type MultiplayerSecurity = {
 };
 export type MultiplayerGameSession =
   | GameSession<BlitzState, BlitzConfig>
+  | GameSession<CribbageState, CribbageConfig>
   | GameSession<WildpileState, WildpileRules>
   | GameSession<RatscrewState, RatscrewConfig>
+  | GameSession<EuchreState, EuchreRules>
   | GameSession<HeartsState, HeartsRules>
   | GameSession<GinMatchState, GinConfig>
   | GameSession<PresidentState, PresidentRules>;
@@ -960,6 +975,22 @@ export function wildMultiplayerSession(
     : null;
 }
 
+export function euchreMultiplayerSession(
+  snapshot: MultiplayerRoomSnapshot,
+): GameSession<EuchreState, EuchreRules> | null {
+  return snapshot.gameId === 'euchre'
+    ? (snapshot.session as GameSession<EuchreState, EuchreRules> | null)
+    : null;
+}
+
+export function cribbageMultiplayerSession(
+  snapshot: MultiplayerRoomSnapshot,
+): GameSession<CribbageState, CribbageConfig> | null {
+  return snapshot.gameId === 'cribbage'
+    ? (snapshot.session as GameSession<CribbageState, CribbageConfig> | null)
+    : null;
+}
+
 export function heartsMultiplayerSession(
   snapshot: MultiplayerRoomSnapshot,
 ): GameSession<HeartsState, HeartsRules> | null {
@@ -983,9 +1014,11 @@ function stateHolds(state: unknown, handle: string): boolean {
 /** The game pack a room's settings name. */
 function gameDefFor(settings: RoomSettings) {
   if (settings.gameId === 'ratscrew') return ratscrewGame;
+  if (settings.gameId === 'euchre') return createEuchreDef();
   if (settings.gameId === 'hearts') return heartsGame;
   if (settings.gameId === 'gin') return createGinMatchDef();
   if (settings.gameId === 'wildpile') return wildpileGame;
+  if (settings.gameId === 'cribbage') return createCribbageDef();
   if (settings.gameId === 'president') return presidentGame;
   return createBlitzDef();
 }
@@ -1047,6 +1080,30 @@ function resolveRoomSettings(settings: RoomSettings): RoomSettings {
       security,
     };
   }
+  if (settings.gameId === 'euchre') {
+    return {
+      gameId: 'euchre',
+      seats: settings.seats,
+      config: euchreConfig.resolve(settings.config as Partial<EuchreRules>),
+      security,
+    };
+  }
+  if (settings.gameId === 'cribbage') {
+    if (settings.seats !== 2) throw new Error('Cribbage rooms require exactly two seats');
+    if (security === 'veil') {
+      throw new Error('Cribbage friend rooms use open replay until multi-deal re-veiling ships');
+    }
+    const config = cribbageConfigSchema.resolve(settings.config as Partial<CribbageConfig>);
+    return {
+      gameId: 'cribbage',
+      seats: 2,
+      // Friend rooms currently represent one replayable GameSession. Match
+      // Play is deliberately solo until room snapshots carry MatchSession
+      // round logs, so never let a forged announcement imply best-of-three.
+      config: { ...config, gamesToWin: 1 },
+      security: 'open',
+    };
+  }
   if (settings.gameId === 'hearts') {
     return {
       gameId: 'hearts',
@@ -1096,6 +1153,13 @@ function createRoomRuntime(
     return { session, authority };
   }
 
+  if (settings.gameId === 'euchre') {
+    const def = createEuchreDef();
+    const config = settings.config as EuchreRules;
+    const session = createSession(def, { seed, config, seats: settings.seats, ...veil });
+    const authority = new EngineAuthority({ def, session, ...common });
+    return { session, authority };
+  }
   if (settings.gameId === 'hearts') {
     const config = settings.config as HeartsRules;
     const session = createSession(heartsGame, { seed, config, seats: settings.seats, ...veil });
@@ -1120,6 +1184,14 @@ function createRoomRuntime(
     const config = settings.config as PresidentRules;
     const session = createSession(presidentGame, { seed, config, seats: settings.seats, ...veil });
     const authority = new EngineAuthority({ def: presidentGame, session, ...common });
+    return { session, authority };
+  }
+
+  if (settings.gameId === 'cribbage') {
+    const def = createCribbageDef();
+    const config = settings.config as CribbageConfig;
+    const session = createSession(def, { seed, config, seats: 2 });
+    const authority = new EngineAuthority({ def, session, settings: runtimeSettings, onSeatBot });
     return { session, authority };
   }
 

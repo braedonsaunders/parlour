@@ -1,9 +1,6 @@
 import type { LegalMove } from '@parlour/engine';
 import type { RatscrewConfig, SlapPattern } from '@parlour/game-ratscrew';
-import type {
-  RatscrewState,
-  RatscrewWindow,
-} from '@parlour/game-ratscrew';
+import type { RatscrewState, RatscrewWindow } from '@parlour/game-ratscrew';
 import { ratscrewModeForRules, type RatscrewModeId } from '@/lib/ratscrew/modes';
 
 export interface RatscrewSeatView {
@@ -76,7 +73,11 @@ export function ratscrewTableView(
   snapshot: {
     mode: RatscrewModeId;
     players: readonly { seat: number; name: string; avatarId: string; isBot: boolean }[];
-    session: { state: RatscrewState; status: 'playing' | 'ended'; result: { winner: number | null } | null };
+    session: {
+      state: RatscrewState;
+      status: 'playing' | 'ended';
+      result: { winner: number | null } | null;
+    };
   },
   legal: readonly LegalMove[],
   localSeat = 0,

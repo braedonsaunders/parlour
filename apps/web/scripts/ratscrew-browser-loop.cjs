@@ -36,12 +36,24 @@ async function gameState(page) {
   // 1. shelf shows the ratscrew tile and routes to setup
   await page.goto(`${BASE}/games`, { waitUntil: 'networkidle' });
   await waitFor(
-    () => page.locator('[data-testid="game-ratscrew"]').count().then((n) => n > 0),
+    () =>
+      page
+        .locator('[data-testid="game-ratscrew"]')
+        .count()
+        .then((n) => n > 0),
     20_000,
     'ratscrew tile on /games',
   );
   await page.click('[data-testid="game-ratscrew"]');
-  await waitFor(() => page.getByTestId('deal-me-in').count().then((n) => n > 0), 15_000, 'setup CTA');
+  await waitFor(
+    () =>
+      page
+        .getByTestId('deal-me-in')
+        .count()
+        .then((n) => n > 0),
+    15_000,
+    'setup CTA',
+  );
 
   // 2. pick quick-reflex, 3 seats, deal in
   await page.getByRole('radio', { name: /Quick Reflex/ }).click();

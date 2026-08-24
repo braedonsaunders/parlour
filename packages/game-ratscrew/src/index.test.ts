@@ -12,12 +12,7 @@ import {
 } from '@parlour/engine';
 import { describe, expect, it } from 'vitest';
 import { ratscrewConfigSchema, type RatscrewConfig } from './config';
-import {
-  RATSCREW_MAX_SEATS,
-  SLAP_GRACE_MS,
-  ratscrewGame,
-  type RatscrewState,
-} from './game';
+import { RATSCREW_MAX_SEATS, SLAP_GRACE_MS, ratscrewGame, type RatscrewState } from './game';
 import { chancesFor, detectPattern, isFaceCard, isRun, rankOf } from './patterns';
 
 function defaults(): RatscrewConfig {
@@ -145,20 +140,12 @@ describe('flip reducer', () => {
   });
 
   it('skips empty seats when advancing the turn', () => {
-    const started = apply(
-      state({ piles: [['S2'], [], ['H9']], seats: 3 }),
-      0,
-      'flip',
-    ).next;
+    const started = apply(state({ piles: [['S2'], [], ['H9']], seats: 3 }), 0, 'flip').next;
     expect(started.turn).toBe(2);
   });
 
   it('opens a slap window on a double and pauses everything', () => {
-    const doubled = apply(
-      state({ center: ['D6'], piles: [['S6', 'S3'], ['H7']] }),
-      0,
-      'flip',
-    );
+    const doubled = apply(state({ center: ['D6'], piles: [['S6', 'S3'], ['H7']] }), 0, 'flip');
     expect(doubled.next.window).toEqual({ pattern: 'double', openedAtMs: null });
     expect(doubled.next.pendingWin).toBeNull();
     expect(doubled.fx.some((e) => e.kind === 'ratscrew.slap-window')).toBe(true);
@@ -236,7 +223,10 @@ describe('slap reducer', () => {
     const opened = apply(
       state({
         center: ['D6'],
-        piles: [['S6', 'S10'], ['C2', 'H5']],
+        piles: [
+          ['S6', 'S10'],
+          ['C2', 'H5'],
+        ],
         challenge: { challenger: 1, target: 0, chancesLeft: 2 },
         lastFlipper: 1,
       }),
@@ -274,11 +264,7 @@ describe('slap reducer', () => {
   });
 
   it('burns the slapper’s top card under the pile when no pattern is live', () => {
-    const missed = apply(
-      state({ piles: [['S3', 'S2'], ['H7']], center: ['D6'] }),
-      0,
-      'slap',
-    );
+    const missed = apply(state({ piles: [['S3', 'S2'], ['H7']], center: ['D6'] }), 0, 'slap');
     expect(missed.next.piles[0]).toEqual(['S2']);
     expect(missed.next.center).toEqual(['D6', 'S3']);
     expect(missed.next.turn).toBe(0);
@@ -424,10 +410,7 @@ describe('auto-resolved deadlocks', () => {
     // Hand-build a mid-challenge board through the public setup API.
     const forged = state({
       rules: config,
-      piles: [
-        ['S4', 'S3'],
-        ['H9'],
-      ],
+      piles: [['S4', 'S3'], ['H9']],
       center: ['H12'],
       turn: 1,
       challenge: { challenger: 0, target: 1, chancesLeft: 2 },
@@ -445,7 +428,12 @@ describe('auto-resolved deadlocks', () => {
     // …and the flow settles the stuck challenge automatically.
     const advance = ratscrewGame.flow.advance(burned, { seq: 1, seat: 1, move: 'slap' }, 2);
     expect(advance.autoMoves).toEqual([
-      { seat: null, move: 'challengeForfeit', payload: undefined, reason: 'challenge-target-empty' },
+      {
+        seat: null,
+        move: 'challengeForfeit',
+        payload: undefined,
+        reason: 'challenge-target-empty',
+      },
     ]);
 
     // through the runtime the forfeit is applied + logged as an automatic event
@@ -523,7 +511,9 @@ describe('flow & runtime integration', () => {
   }
 
   it('enters a multi-actor slap phase listing every eligible seat', () => {
-    const session = openWindow(createSession(ratscrewGame, { seed: 42, config: defaults(), seats: 2 }));
+    const session = openWindow(
+      createSession(ratscrewGame, { seed: 42, config: defaults(), seats: 2 }),
+    );
     expect(session.phase.phase).toBe('slap');
     expect(session.phase.actor).toBeNull();
     expect(session.phase.actors).toHaveLength(2);
@@ -532,7 +522,10 @@ describe('flow & runtime integration', () => {
   it('offers the turn rider a flip and everyone else only a risk slap', () => {
     const session = createSession(ratscrewGame, { seed: 1, config: defaults(), seats: 2 });
     const phase = session.phase;
-    expect(ratscrewGame.flow.legalMoves(session.state, phase)).toEqual([{ id: 'flip' }, { id: 'slap' }]);
+    expect(ratscrewGame.flow.legalMoves(session.state, phase)).toEqual([
+      { id: 'flip' },
+      { id: 'slap' },
+    ]);
     expect(ratscrewGame.flow.legalMovesFor!(session.state, phase, 1)).toEqual([{ id: 'slap' }]);
     // with burns off, non-turn seats get nothing between flips
     const calm = ratscrewConfigSchema.resolve({ misSlapBurn: false });
@@ -556,14 +549,16 @@ describe('flow & runtime integration', () => {
     const loserCards = (won.state as RatscrewState).piles[loser]!.length;
     const late = sessionApply(ratscrewGame, won, loser, 'slap');
     expect(late.rejected).toBeUndefined();
-    expect(((late.session.state as RatscrewState).piles[loser])!.length).toBe(loserCards - 1);
+    expect((late.session.state as RatscrewState).piles[loser]!.length).toBe(loserCards - 1);
     expect(late.fx.some((e) => e.kind === 'ratscrew.misslap')).toBe(true);
   });
 
   it('rejects out-of-turn flips outright', () => {
     const session = createSession(ratscrewGame, { seed: 1, config: defaults(), seats: 2 });
     expect(sessionApply(ratscrewGame, session, 1, 'flip').rejected?.code).toBe('illegal-move');
-    expect(sessionApply(ratscrewGame, session, 1, 'windowClose').rejected?.code).toBe('illegal-move');
+    expect(sessionApply(ratscrewGame, session, 1, 'windowClose').rejected?.code).toBe(
+      'illegal-move',
+    );
   });
 
   it('replays injected window-close events bit-for-bit', () => {
@@ -685,12 +680,12 @@ describe('config & contract', () => {
 
   it('caps the table at four seats', () => {
     expect(RATSCREW_MAX_SEATS).toBe(4);
-    expect(() =>
-      createSession(ratscrewGame, { seed: 1, config: defaults(), seats: 5 }),
-    ).toThrow(/2–4 seats/);
-    expect(() =>
-      createSession(ratscrewGame, { seed: 1, config: defaults(), seats: 1 }),
-    ).toThrow(/2–4 seats/);
+    expect(() => createSession(ratscrewGame, { seed: 1, config: defaults(), seats: 5 })).toThrow(
+      /2–4 seats/,
+    );
+    expect(() => createSession(ratscrewGame, { seed: 1, config: defaults(), seats: 1 })).toThrow(
+      /2–4 seats/,
+    );
   });
 
   it('exports the fairness grace window transports schedule against', () => {

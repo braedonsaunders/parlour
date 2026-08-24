@@ -11,6 +11,7 @@ export interface SeatRange {
 export const DEFAULT_SEAT_RANGE: SeatRange = { min: 2, max: 4 };
 
 const SEAT_RANGES: Readonly<Record<string, SeatRange>> = {
+  euchre: { min: 4, max: 4 },
   president: { min: 4, max: 8 },
 };
 

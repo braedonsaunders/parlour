@@ -116,7 +116,14 @@ export class EngineAuthority<S, C extends RuleValues> implements AuthorityAdapte
       seats: session.seats,
       ...veilOptions(settings, session.deckOrder),
     });
-    this.authorityState = { session: nextSession, settings };
+    // Replay reconstructs state/phase from the authoritative events, then keep
+    // the packets themselves as the replicated log. In particular, replay's
+    // reducer does not manufacture host wall-clock `ts` metadata; dropping it
+    // here made guest logs semantically equivalent but not byte-identical.
+    this.authorityState = {
+      session: { ...nextSession, log: [...session.log, ...packet.events] },
+      settings,
+    };
     this.acceptedActions.set(packet.actionId, packet.events.at(-1)!.seq);
     return { stateHash: stateHash(nextSession.state), accepted: true };
   }

@@ -1,14 +1,20 @@
 import { blitzCatalog } from '@parlour/game-blitz';
+import { cribbageCatalog } from '@parlour/game-cribbage';
+import { heartsCatalog } from '@parlour/game-hearts';
+import { ginCatalog } from '@parlour/game-gin';
+import { presidentCatalog } from '@parlour/game-president';
 import { wildpileCatalog } from '@parlour/game-wildpile';
 import { describe, expect, it } from 'vitest';
 import { GAMES, getGame, getGameMode, isGameId, isGameModeId, modePreset } from './games';
 
 describe('game shelf catalog', () => {
-  it('leads with blitz and keeps the shelf growing (spec §11)', () => {
+  it('leads with blitz and keeps the shelf growing', () => {
     expect(GAMES.map((g) => g.id)).toEqual([
       'blitz',
+      'cribbage',
       'wild',
       'ratscrew',
+      'euchre',
       'hearts',
       'gin',
       'president',
@@ -29,8 +35,10 @@ describe('game shelf catalog', () => {
 
   it('all shelf games are playable and route to their setup screens', () => {
     expect(getGame('blitz').href).toBe('/play');
+    expect(getGame('cribbage').href).toBe('/cribbage');
     expect(getGame('wild').href).toBe('/wild');
     expect(getGame('ratscrew').href).toBe('/ratscrew');
+    expect(getGame('euchre').href).toBe('/euchre');
     expect(getGame('hearts').href).toBe('/hearts');
     expect(getGame('gin').href).toBe('/gin');
     expect(getGame('president').href).toBe('/president');
@@ -38,7 +46,7 @@ describe('game shelf catalog', () => {
 
   it('getGame resolves known ids and throws on unknown ones', () => {
     expect(getGame('blitz').id).toBe('blitz');
-    expect(() => getGame('cribbage' as never)).toThrow(/unknown game id/);
+    expect(() => getGame('nope' as never)).toThrow(/unknown game id/);
   });
 
   it('isGameId guards arbitrary input', () => {
@@ -50,7 +58,11 @@ describe('game shelf catalog', () => {
 
   it('takes every entry from the pack that owns it', () => {
     expect(getGame('blitz')).toBe(blitzCatalog);
+    expect(getGame('cribbage')).toBe(cribbageCatalog);
     expect(getGame('wild')).toBe(wildpileCatalog);
+    expect(getGame('hearts')).toBe(heartsCatalog);
+    expect(getGame('gin')).toBe(ginCatalog);
+    expect(getGame('president')).toBe(presidentCatalog);
   });
 
   it('gives every shelved game what the picker screens need', () => {

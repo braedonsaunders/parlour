@@ -1,4 +1,9 @@
-import { RATSCREW_PERSONAS, PERSONA_BY_TIER, replaysIdentically, simulateRealtimeGame } from '../realtime';
+import {
+  RATSCREW_PERSONAS,
+  PERSONA_BY_TIER,
+  replaysIdentically,
+  simulateRealtimeGame,
+} from '../realtime';
 
 /**
  * Balance gates for the real-time persona field (spec §9 adapted to slap
@@ -49,7 +54,9 @@ interface Tally {
   credits: number;
 }
 
-function tally(records: readonly { seats: number; winners: readonly number[]; labels: readonly string[] }[]): Map<string, Tally> {
+function tally(
+  records: readonly { seats: number; winners: readonly number[]; labels: readonly string[] }[],
+): Map<string, Tally> {
   const rows = new Map<string, Tally>();
   for (const record of records) {
     for (let seat = 0; seat < record.seats; seat++) {
@@ -171,11 +178,7 @@ export function runBalanceGates(opts: { games: number; baseSeed?: number }): Gat
     stalls,
     avgEvents,
     thresholds: DEFAULT_THRESHOLDS,
-    passed:
-      headToHead.passes &&
-      personasPasses &&
-      deterministic &&
-      stalls === 0,
+    passed: headToHead.passes && personasPasses && deterministic && stalls === 0,
   };
 }
 

@@ -164,9 +164,11 @@ export function RatscrewTableScreen(props: RatscrewTableScreenProps) {
               <span className={styles.windowBar} aria-hidden="true">
                 <i
                   className={styles.windowBarFill}
-                  style={{
-                    animationDuration: `${Math.max(200, view.window.durationMs)}ms`,
-                  } as CSSProperties}
+                  style={
+                    {
+                      animationDuration: `${Math.max(200, view.window.durationMs)}ms`,
+                    } as CSSProperties
+                  }
                 />
               </span>
             </div>
@@ -239,10 +241,7 @@ function Seat({
       animate={active ? { scale: [1, 1.06, 1.02] } : { scale: 1 }}
       transition={{ duration: 0.24, ease: [0.34, 1.56, 0.64, 1] }}
     >
-      <div
-        className={tableStyles.opponentCards}
-        aria-label={`${displayCount} face-down cards`}
-      >
+      <div className={tableStyles.opponentCards} aria-label={`${displayCount} face-down cards`}>
         {Array.from({ length: visibleCards }, (_, index) => (
           <PlayingCard
             key={index}
@@ -327,7 +326,12 @@ function FxLayer({
             (cue.type === 'deal' && cue.to !== `hand:${localSeat}` && cue.to !== 'discard') ||
             (cue.type === 'draw' && cue.to !== `hand:${localSeat}`);
           return (
-            <div key={`${fxKey}:${cue.id}`} data-fx-cue={cue.id} data-card-flight className={tableStyles.flyingCard}>
+            <div
+              key={`${fxKey}:${cue.id}`}
+              data-fx-cue={cue.id}
+              data-card-flight
+              className={tableStyles.flyingCard}
+            >
               <i className={tableStyles.cardTrail} />
               <span data-flight-card className={tableStyles.flightCardVisual}>
                 <PlayingCard card={faceDown ? undefined : cue.card} faceDown={faceDown} compact />

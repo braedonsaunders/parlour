@@ -101,9 +101,7 @@ export function botPolicyFor(persona: SlapPersona): BotPolicy<RatscrewState> {
     },
     chooseMove(_view, _seat, legal) {
       return (
-        legal.find((move) => move.id === 'flip') ??
-        legal.find((move) => move.id === 'slap') ??
-        null
+        legal.find((move) => move.id === 'flip') ?? legal.find((move) => move.id === 'slap') ?? null
       );
     },
   };
@@ -182,7 +180,9 @@ function looksLikeAFake(center: readonly string[]): boolean {
 export function simulateRealtimeGame(opts: RealtimeGameOptions): RealtimeRecord {
   const seats = opts.seats;
   if (opts.personas.length !== seats) {
-    throw new Error(`simulateRealtimeGame: expected ${seats} personas, got ${opts.personas.length}`);
+    throw new Error(
+      `simulateRealtimeGame: expected ${seats} personas, got ${opts.personas.length}`,
+    );
   }
   const maxEvents = opts.maxEvents ?? 20_000;
   const config = ratscrewGame.configSchema.resolve(opts.config ?? {});
@@ -295,7 +295,9 @@ export function simulateRealtimeGame(opts: RealtimeGameOptions): RealtimeRecord 
     if (action.kind === 'flip') {
       const phase = session.phase;
       if (phase.phase !== 'flip' || phase.actor !== action.seat || session.state.window) return;
-      const outcome = sessionApply(ratscrewGame, session, action.seat!, 'flip', undefined, { atMs });
+      const outcome = sessionApply(ratscrewGame, session, action.seat!, 'flip', undefined, {
+        atMs,
+      });
       if (outcome.rejected) return; // turn moved underneath us; regenerate below
       const flippedFrom = action.seat!;
       const hadWindow = Boolean(session.state.window);
