@@ -557,7 +557,13 @@ function CribbageFxLayer({
 }
 
 function CribCue({ cue, localSeat }: { cue: FxCue; localSeat: number }) {
-  if (cue.type === 'deal' || cue.type === 'flip' || cue.type === 'draw' || cue.type === 'discard') {
+  if (
+    cue.type === 'deal' ||
+    cue.type === 'flip' ||
+    cue.type === 'draw' ||
+    cue.type === 'discard' ||
+    cue.type === 'layoff'
+  ) {
     return (
       <div data-fx-cue={cue.id} data-card-flight className={tableStyles.flyingCard}>
         <i className={tableStyles.cardTrail} />
