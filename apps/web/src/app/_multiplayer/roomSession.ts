@@ -17,6 +17,12 @@ import {
   type BlitzState,
 } from '@parlour/game-blitz';
 import {
+  createEuchreDef,
+  euchreConfig,
+  type EuchreRules,
+  type EuchreState,
+} from '@parlour/game-euchre';
+import {
   presidentConfig,
   presidentGame,
   type PresidentRules,
@@ -70,7 +76,8 @@ import { NostrSignaling, type RoomAnnouncement } from '@/lib/multiplayer/NostrSi
 import { validateRoomCode } from '@/lib/rooms/code';
 import { hasValidSeatCount, seatRangeFor } from '@/lib/rooms/seatRange';
 
-export type MultiplayerGameId = 'blitz' | 'cribbage' | 'wildpile' | 'hearts' | 'gin' | 'president';
+export type MultiplayerGameId =
+  'blitz' | 'cribbage' | 'wildpile' | 'euchre' | 'hearts' | 'gin' | 'president';
 
 /** What the room badge shows about privacy — see lib/multiplayer/veil. */
 export type MultiplayerSecurity = {
@@ -94,6 +101,7 @@ export type MultiplayerGameSession =
   | GameSession<BlitzState, BlitzConfig>
   | GameSession<CribbageState, CribbageConfig>
   | GameSession<WildpileState, WildpileRules>
+  | GameSession<EuchreState, EuchreRules>
   | GameSession<HeartsState, HeartsRules>
   | GameSession<GinMatchState, GinConfig>
   | GameSession<PresidentState, PresidentRules>;
@@ -952,6 +960,14 @@ export function wildMultiplayerSession(
     : null;
 }
 
+export function euchreMultiplayerSession(
+  snapshot: MultiplayerRoomSnapshot,
+): GameSession<EuchreState, EuchreRules> | null {
+  return snapshot.gameId === 'euchre'
+    ? (snapshot.session as GameSession<EuchreState, EuchreRules> | null)
+    : null;
+}
+
 export function cribbageMultiplayerSession(
   snapshot: MultiplayerRoomSnapshot,
 ): GameSession<CribbageState, CribbageConfig> | null {
@@ -982,6 +998,7 @@ function stateHolds(state: unknown, handle: string): boolean {
 
 /** The game pack a room's settings name. */
 function gameDefFor(settings: RoomSettings) {
+  if (settings.gameId === 'euchre') return createEuchreDef();
   if (settings.gameId === 'hearts') return heartsGame;
   if (settings.gameId === 'gin') return createGinMatchDef();
   if (settings.gameId === 'wildpile') return wildpileGame;
@@ -1036,6 +1053,14 @@ function resolveRoomSettings(settings: RoomSettings): RoomSettings {
       gameId: 'wildpile',
       seats: settings.seats,
       config: wildpileConfig.resolve(settings.config as Partial<WildpileRules>),
+      security,
+    };
+  }
+  if (settings.gameId === 'euchre') {
+    return {
+      gameId: 'euchre',
+      seats: settings.seats,
+      config: euchreConfig.resolve(settings.config as Partial<EuchreRules>),
       security,
     };
   }
@@ -1097,6 +1122,13 @@ function createRoomRuntime(
   const runtimeSettings: RoomSettings = veiled ? settings : { ...settings, security: 'open' };
   const seatsRange = seatRangeFor(settings.gameId);
   const common = { settings: runtimeSettings, onSeatBot, seatsRange };
+  if (settings.gameId === 'euchre') {
+    const def = createEuchreDef();
+    const config = settings.config as EuchreRules;
+    const session = createSession(def, { seed, config, seats: settings.seats, ...veil });
+    const authority = new EngineAuthority({ def, session, ...common });
+    return { session, authority };
+  }
   if (settings.gameId === 'hearts') {
     const config = settings.config as HeartsRules;
     const session = createSession(heartsGame, { seed, config, seats: settings.seats, ...veil });

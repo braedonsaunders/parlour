@@ -1,14 +1,24 @@
-import { applyPreset, isVeilHandle, stateHash } from '@parlour/engine';
+import {
+  applyPreset,
+  chooseBotMove,
+  createSession,
+  isVeilHandle,
+  makeRng,
+  stateHash,
+} from '@parlour/engine';
 import { cribbageConfigSchema } from '@parlour/game-cribbage';
+import { createEuchreDef, euchreConfig, tierBot } from '@parlour/game-euchre';
 import { ginConfigSchema } from '@parlour/game-gin';
 import { presidentConfig } from '@parlour/game-president';
 import { wildpileConfig } from '@parlour/game-wildpile';
 import { afterEach, describe, expect, it } from 'vitest';
+import { EngineAuthority } from '@/lib/multiplayer';
 import { NostrSignaling, type SignalPayload } from '@/lib/multiplayer/NostrSignaling';
 import type { RoomSettings } from '@/lib/multiplayer/types';
 import {
   blitzMultiplayerSession,
   cribbageMultiplayerSession,
+  euchreMultiplayerSession,
   ginMultiplayerSession,
   MultiplayerRoomSession,
   presidentMultiplayerSession,
@@ -284,6 +294,135 @@ describe('multiplayer route composition', () => {
     });
     expect(stateHash(wildMultiplayerSession(guest.getSnapshot())?.state)).toBe(
       stateHash(wildMultiplayerSession(host.getSnapshot())?.state),
+    );
+  });
+
+  it('discovers a Euchre room and keeps partnership state synchronized across peers', async () => {
+    const broker = new MockSignalingBroker();
+    const rtc = new MockRtcNetwork();
+    const host = new MultiplayerRoomSession(
+      { name: 'Host', avatarId: 'ember', profileId: 'euchre-host' },
+      {
+        signaling: broker.signaling('euchre-host-peer'),
+        peerConnection: rtc.factory('host'),
+        seed: 2026,
+      },
+    );
+    const guest = new MultiplayerRoomSession(
+      { name: 'Guest', avatarId: 'cobalt', profileId: 'euchre-guest' },
+      {
+        signaling: broker.signaling('euchre-guest-peer'),
+        peerConnection: rtc.factory('guest'),
+        seed: 7,
+      },
+    );
+    sessions.push(host, guest);
+
+    const created = await host.create({
+      gameId: 'euchre',
+      seats: 4,
+      config: applyPreset(euchreConfig, 'classic'),
+    });
+    await guest.join(created.code);
+    await eventually(() => expect(guest.getSnapshot().localSeat).toBe(1));
+
+    expect(host.getSnapshot()).toMatchObject({ gameId: 'euchre' });
+    expect(guest.getSnapshot()).toMatchObject({ gameId: 'euchre' });
+    expect(guest.getSnapshot().settings?.config).toMatchObject({
+      targetScore: 10,
+      stickDealer: true,
+      goingAlone: true,
+    });
+
+    // euchre opens with seat 1 (the guest) deciding left of the dealer
+    const def = createEuchreDef();
+    const before = euchreMultiplayerSession(host.getSnapshot())!;
+    const legal = def.flow.legalMoves(before.state, before.phase);
+    expect(legal.length).toBeGreaterThan(0);
+    guest.send(legal[0]!.id, legal[0]!.payload);
+
+    await eventually(() => {
+      const hostLog = euchreMultiplayerSession(host.getSnapshot())?.log ?? [];
+      const guestLog = euchreMultiplayerSession(guest.getSnapshot())?.log ?? [];
+      expect(guestLog.length).toBe(hostLog.length);
+      expect(guestLog.length).toBeGreaterThan(0);
+      expect(stateHash(euchreMultiplayerSession(guest.getSnapshot())?.state)).toBe(
+        stateHash(euchreMultiplayerSession(host.getSnapshot())?.state),
+      );
+    });
+
+    // the host answers for its own seat and the pair stay hash-identical
+    const afterGuest = euchreMultiplayerSession(host.getSnapshot())!;
+    const hostLegal =
+      afterGuest.status === 'playing' && afterGuest.phase.actor === 0
+        ? def.flow.legalMoves(afterGuest.state, afterGuest.phase)
+        : [];
+    if (hostLegal.length > 0) {
+      host.send(hostLegal[0]!.id, hostLegal[0]!.payload);
+      await eventually(() => {
+        expect(euchreMultiplayerSession(guest.getSnapshot())?.log.length).toBe(
+          euchreMultiplayerSession(host.getSnapshot())?.log.length,
+        );
+        expect(stateHash(euchreMultiplayerSession(guest.getSnapshot())?.state)).toBe(
+          stateHash(euchreMultiplayerSession(host.getSnapshot())?.state),
+        );
+      });
+    }
+  });
+
+  it('keeps host and guest authorities hash-identical across a full euchre hand', () => {
+    const def = createEuchreDef();
+    const config = euchreConfig.resolve({ targetScore: 5 });
+    const settings = { gameId: 'euchre', seats: 4, config };
+    const seed = 314;
+    const hostAuth = new EngineAuthority({
+      def,
+      session: createSession(def, { seed, config, seats: 4 }),
+      settings,
+    });
+    const guestAuth = new EngineAuthority({
+      def,
+      session: createSession(def, { seed, config, seats: 4 }),
+      settings,
+    });
+
+    // every seat is driven by the house bot; packets flow host -> guest
+    let guard = 0;
+    let packets = 0;
+    while (
+      guard++ < 400 &&
+      hostAuth.getSession().status === 'playing' &&
+      hostAuth.getSession().result === null
+    ) {
+      const session = hostAuth.getSession();
+      const seat = session.phase.actor;
+      if (seat === null) break;
+      const legal = def.flow.legalMoves(session.state, session.phase);
+      if (legal.length === 0) break;
+      const choice =
+        chooseBotMove(
+          tierBot(2),
+          def.playerView(session.state, seat),
+          seat,
+          legal,
+          makeRng(seed).fork(`ev:${session.log.length}`),
+        ) ?? legal[0]!;
+      const packet = hostAuth.apply({
+        id: `action:${guard}`,
+        seat,
+        move: choice.id,
+        payload: choice.payload,
+      });
+      packets += 1;
+      const verdict = guestAuth.applyRemote(packet);
+      expect(verdict.accepted).toBe(true);
+      expect(verdict.stateHash).toBe(packet.stateHash);
+    }
+
+    expect(packets).toBeGreaterThan(10);
+    expect(stateHash(guestAuth.getSession().state)).toBe(stateHash(hostAuth.getSession().state));
+    expect(guestAuth.getSession().log.map((event) => event.hash)).toEqual(
+      hostAuth.getSession().log.map((event) => event.hash),
     );
   });
 

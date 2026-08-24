@@ -98,7 +98,6 @@ export function useDealPresentation(
       );
       return () => window.clearTimeout(timer);
     }
-
     const timers = plan.cues.map((cue) =>
       window.setTimeout(() => {
         setLanded((current) => {
