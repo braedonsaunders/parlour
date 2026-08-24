@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { useCenteredCarousel } from '@/hooks/useCenteredCarousel';
 import { WILD_MODES, type WildModeDef } from '@/lib/wild/modes';
 import { useWildSetupStore } from '@/stores/wildSetup';
 import styles from '@/styles/modes.module.css';
@@ -17,6 +18,7 @@ export default function WildSetupPage() {
   const setMode = useWildSetupStore((s) => s.setMode);
   const setSeats = useWildSetupStore((s) => s.setSeats);
   const [starting, setStarting] = useState(false);
+  const carouselRef = useCenteredCarousel(mode);
 
   const startSolo = () => {
     if (starting) return;
@@ -39,7 +41,12 @@ export default function WildSetupPage() {
         <span className="w-16" aria-hidden="true" />
       </header>
 
-      <div className={styles.carousel} role="radiogroup" aria-label="House rules">
+      <div
+        ref={carouselRef}
+        className={`${styles.carousel} ${styles.centeredCarousel}`}
+        role="radiogroup"
+        aria-label="House rules"
+      >
         {WILD_MODES.map((modeDef) => (
           <ModeTile
             key={modeDef.id}

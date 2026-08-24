@@ -11,6 +11,18 @@
   display: none;
 }
 
+.centeredCarousel {
+  --mode-tile-width: min(21rem, calc(100vw - 3rem));
+  --mode-carousel-gutter: max(1.5rem, calc(50% - 10.5rem));
+
+  padding-inline: var(--mode-carousel-gutter);
+  scroll-padding-inline: var(--mode-carousel-gutter);
+}
+
+.centeredCarousel .tile {
+  width: var(--mode-tile-width);
+}
+
 .tile {
   position: relative;
   flex: none;

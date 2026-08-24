@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { useCenteredCarousel } from '@/hooks/useCenteredCarousel';
 import { MODES, type ModeDef, type PreviewKind } from '@/lib/modes';
 import { useSetupStore } from '@/stores/setup';
 import styles from '@/styles/modes.module.css';
@@ -23,6 +24,7 @@ export default function ModeSelectPage() {
   const setSeats = useSetupStore((s) => s.setSeats);
   const setBotTier = useSetupStore((s) => s.setBotTier);
   const [starting, setStarting] = useState(false);
+  const carouselRef = useCenteredCarousel(mode);
 
   const start = () => {
     if (starting) return;
@@ -45,7 +47,12 @@ export default function ModeSelectPage() {
         <span className="w-16" aria-hidden="true" />
       </header>
 
-      <div className={styles.carousel} role="radiogroup" aria-label="Match format">
+      <div
+        ref={carouselRef}
+        className={`${styles.carousel} ${styles.centeredCarousel}`}
+        role="radiogroup"
+        aria-label="Match format"
+      >
         {MODES.map((modeDef) => (
           <ModeTile
             key={modeDef.id}

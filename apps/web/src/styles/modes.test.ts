@@ -19,4 +19,13 @@ describe('mode picker artwork containment', () => {
     expect(preview).toMatch(/overflow:\s*hidden;/);
     expect(preview).toMatch(/isolation:\s*isolate;/);
   });
+
+  it('gives edge modes enough responsive gutter space to center in the viewport', () => {
+    const carousel = declarationsFor('.centeredCarousel');
+    const tile = declarationsFor('.centeredCarousel .tile');
+
+    expect(carousel).toMatch(/--mode-carousel-gutter:\s*max\(1\.5rem, calc\(50% - 10\.5rem\)\);/);
+    expect(carousel).toMatch(/scroll-padding-inline:\s*var\(--mode-carousel-gutter\);/);
+    expect(tile).toMatch(/width:\s*var\(--mode-tile-width\);/);
+  });
 });
