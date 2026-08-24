@@ -12,6 +12,31 @@ function isState(value: unknown): value is readonly number[] {
 /**
  * Seeded deterministic RNG (spec §4.1). pure-rand exposes xoroshiro128plus as its
  * xoroshiro family generator; there is no `++` variant in pure-rand v7.
+ *
+ * ## The 32-bit ceiling, stated out loud
+ *
+ * `seed | 0` is a deliberate narrowing, and it is load-bearing for replay: a
+ * seed has to survive JSON, a room announcement, and the 32-bit FNV-1a in
+ * `rngSeedFrom` that {@link Rng.fork} re-seeds through. So every stream in the
+ * engine — the opening shuffle, each per-event stream in runtime.ts, every
+ * bot's stream — is keyed by at most 32 bits.
+ *
+ * What that means, precisely:
+ *
+ * - There are at most 2^32 distinct deals per game, not 52! ~= 2^226. No player
+ *   will notice; a table would need billions of hands before a repeat was
+ *   likely.
+ * - It is NOT a fair shuffle in the cryptographic sense, and nothing in Parlour
+ *   may claim it is. Anyone holding the seed holds the whole deck. That is
+ *   exactly why an open room is described to players as readable by a modified
+ *   client (see components/multiplayer/TableSecurity.tsx), and why hiding hands
+ *   is Veil's job rather than this file's.
+ * - A seeded daily deal (Solitaire, a shared puzzle) is unaffected: 2^32 daily
+ *   seeds is about 11 million years of distinct puzzles, and publishing the
+ *   seed is the point in that mode.
+ *
+ * Widening this means widening `Rng.fork`'s hash and the wire seed together.
+ * Doing either one alone buys nothing.
  */
 export function makeRng(seed: number): Rng {
   let gen: RandomGenerator = xoroshiro128plus(seed | 0);

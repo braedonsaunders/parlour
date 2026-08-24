@@ -1050,7 +1050,7 @@ describe('multiplayer route composition', () => {
     sessions.push(host);
 
     await expect(host.create({ gameId: 'cribbage', seats: 3 })).rejects.toThrow(
-      'Cribbage rooms require exactly two seats',
+      'Cribbage rooms seat exactly 2.',
     );
   });
 });
@@ -1172,10 +1172,16 @@ describe('president rooms on the shared stack', () => {
       { signaling: broker.signaling('cap-peer'), peerConnection: rtc.factory('host'), seed: 1 },
     );
     sessions.push(host);
-    await expect(host.create({ gameId: 'president', seats: 3 })).rejects.toThrow(/4–8 seats/);
-    await expect(host.create({ gameId: 'president', seats: 9 })).rejects.toThrow(/4–8 seats/);
+    await expect(host.create({ gameId: 'president', seats: 3 })).rejects.toThrow(
+      /President rooms seat 4–8/,
+    );
+    await expect(host.create({ gameId: 'president', seats: 9 })).rejects.toThrow(
+      /President rooms seat 4–8/,
+    );
     // blitz keeps its own 2–4 ring
-    await expect(host.create({ gameId: 'blitz', seats: 6 })).rejects.toThrow(/2–4 seats/);
+    await expect(host.create({ gameId: 'blitz', seats: 6 })).rejects.toThrow(
+      /Blitz rooms seat 2–4/,
+    );
   });
 });
 
@@ -1286,9 +1292,15 @@ describe('spades rooms on the shared stack', () => {
       { seed: 2 },
     );
     sessions.push(host);
-    await expect(host.create({ gameId: 'spades', seats: 3 })).rejects.toThrow(/4–4 seats/);
-    await expect(host.create({ gameId: 'spades', seats: 5 })).rejects.toThrow(/4–4 seats/);
-    await expect(host.create({ gameId: 'spades', seats: 2 })).rejects.toThrow(/4–4 seats/);
+    await expect(host.create({ gameId: 'spades', seats: 3 })).rejects.toThrow(
+      /Spades rooms seat exactly 4/,
+    );
+    await expect(host.create({ gameId: 'spades', seats: 5 })).rejects.toThrow(
+      /Spades rooms seat exactly 4/,
+    );
+    await expect(host.create({ gameId: 'spades', seats: 2 })).rejects.toThrow(
+      /Spades rooms seat exactly 4/,
+    );
   });
 
   // Engine v1 Veil is gone. Saying so out loud beats quietly downgrading a

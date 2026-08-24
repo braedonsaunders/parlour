@@ -1,4 +1,4 @@
-import type { MultiplayerGameId } from '@/app/_multiplayer/roomSession';
+import { type MultiplayerGameId } from './gameIds';
 
 /**
  * Where a joined guest lands, per game.
@@ -7,6 +7,10 @@ import type { MultiplayerGameId } from '@/app/_multiplayer/roomSession';
  * fallback was the bug: a game missing from the chain did not fail, it quietly
  * sent every guest to the Blitz table. As a record, omitting a game is a
  * compile error, so the next one cannot be forgotten the same way.
+ *
+ * Kept as plain data, deliberately. The join page needs a route before it has
+ * any reason to load nine game packs, so this must not import the registry —
+ * the registry reads its routes from here instead.
  */
 const TABLE_ROUTES: Record<MultiplayerGameId, string> = {
   blitz: '/table',
