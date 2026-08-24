@@ -2,6 +2,7 @@ import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
   output: 'export',
+  allowedDevOrigins: ['127.0.0.1'],
   transpilePackages: ['@parlour/engine', '@parlour/game-blitz', '@parlour/game-wildpile'],
   images: { unoptimized: true },
   // Static export can't emit dynamic routes; the share URL /join/CODE is served
