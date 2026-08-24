@@ -6,6 +6,7 @@ import { Fx, isActingSeat, type FxEvent, type MatchResult } from '@parlour/engin
 import { RoundEndOverlay } from '@/components/celebration/RoundEndOverlay';
 import { TableScreen, type TableView } from '@/components/table/TableScreen';
 import { LocalTransport, type LocalDispatch, type SoloSnapshot } from '@/lib/solo/LocalTransport';
+import { delayUntilFxSettles } from '@/lib/table/fx-motion';
 import { botKey, buildMatchRecord, friendKey, useHistoryStore } from '@/stores/history';
 import { useMatchFlowStore } from '@/stores/matchFlow';
 import { useProfileStore } from '@/stores/profile';
@@ -239,7 +240,8 @@ function ActiveSoloTable({ transport }: { transport: LocalTransport }) {
     if (snapshot.session.status !== 'playing' || snapshot.session.phase.actor === 0) return;
     const botSeat = snapshot.session.phase.actor;
     if (botSeat === null) return;
-    const delay = snapshot.mode === 'timed' ? 120 : 480 + botSeat * 90;
+    const pace = snapshot.mode === 'timed' ? 120 : 480 + botSeat * 90;
+    const delay = delayUntilFxSettles(pace, fx);
     const timer = window.setTimeout(() => {
       try {
         accept(transport.playBotTurn());
@@ -250,6 +252,7 @@ function ActiveSoloTable({ transport }: { transport: LocalTransport }) {
     return () => window.clearTimeout(timer);
   }, [
     accept,
+    fx,
     snapshot.mode,
     snapshot.session.log.length,
     snapshot.session.phase.actor,

@@ -1,9 +1,9 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type RefObject } from 'react';
-import { type FxEvent } from '@parlour/engine';
+import { orderedHand, type FxEvent } from '@parlour/engine';
 import { AnimatePresence, motion } from 'motion/react';
-import { ginHowToPlay } from '@parlour/game-gin';
+import { ginCatalog, ginHowToPlay } from '@parlour/game-gin';
 import { getAvatar } from '@/lib/avatars';
 import { GIN_SFX_PACK } from '@/lib/audio/sfx';
 import { GIN_MATCH_PACE_MS, type GinModeId } from '@/lib/gin/modes';
@@ -81,7 +81,9 @@ export function GinTableScreen(props: GinTableScreenProps) {
         discardTop: view && deal.discardReady ? view.discard.at(-1) : null,
         hand: (() => {
           const local = view?.players.find((player) => player.isLocal);
-          return view && local ? deal.visibleCards(view.hand, local.seat) : [];
+          return view && local
+            ? orderedHand(deal.visibleCards(view.hand, local.seat), ginCatalog.handOrder)
+            : [];
         })(),
         deadwood: deal.dealing ? null : (view?.deadwood ?? null),
         canKnock: view?.canKnock ?? false,
@@ -375,15 +377,19 @@ function LocalHand({
   onDiscard?: (card: string) => void;
 }) {
   const canChoose = view.legal.discardCards.length > 0 && !busy && view.decision === 'act';
+  const visibleHand = orderedHand(
+    deal.visibleCards(view.hand, view.localSeat),
+    ginCatalog.handOrder,
+  );
   return (
     <HandRail
-      count={deal.visibleCards(view.hand, view.localSeat).length}
+      count={visibleHand.length}
       zone={`hand:${view.localSeat}`}
       label="Your hand"
       dealState={deal.sequence ? (deal.complete ? 'complete' : 'dealing') : undefined}
     >
       <AnimatePresence initial={false} mode="popLayout">
-        {deal.visibleCards(view.hand, view.localSeat).map((card, index) => {
+        {visibleHand.map((card, index) => {
           const playable = canChoose && view.legal.discardCards.includes(card);
           const melded = meldedSet.has(card);
           return (

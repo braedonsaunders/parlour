@@ -1,4 +1,5 @@
 import type { GameCatalogEntry } from '@parlour/engine';
+import { orderCribbageHand } from './cards';
 import { cribbageConfigSchema, type CribbageConfig } from './config';
 import { cribbageHowToPlay } from './howto';
 
@@ -28,6 +29,7 @@ export const cribbageCatalog: GameCatalogEntry<CribbageConfig> = {
   howToPlay: cribbageHowToPlay,
   seats: [2],
   configSchema: cribbageConfigSchema,
+  handOrder: orderCribbageHand,
   modes: [
     {
       id: 'classic-pub',

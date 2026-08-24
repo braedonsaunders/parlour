@@ -1,4 +1,5 @@
 import type { GameCatalogEntry } from '@parlour/engine';
+import { orderHeartsHand } from './cards';
 import { heartsConfigSchema, type HeartsRules } from './config';
 import { heartsHowToPlay } from './howto';
 
@@ -28,6 +29,7 @@ export const heartsCatalog: GameCatalogEntry<HeartsRules> = {
   howToPlay: heartsHowToPlay,
   seats: [4],
   configSchema: heartsConfigSchema,
+  handOrder: orderHeartsHand,
   modes: [
     {
       id: 'classic',

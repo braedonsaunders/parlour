@@ -89,7 +89,7 @@ describe('TableScreen owner hand', () => {
       container.querySelector('[data-zone="discard"] [aria-label="3 of diamonds"]'),
     ).toBeNull();
 
-    act(() => vi.advanceTimersByTime(180));
+    act(() => vi.advanceTimersByTime(220));
     expect(container.querySelectorAll('[data-hand-card]')).toHaveLength(1);
     expect(container.querySelector('[data-zone="stock"]')?.getAttribute('aria-label')).toContain(
       '43 cards remain',

@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type RefObject } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import type { FxEvent, MatchResult } from '@parlour/engine';
+import { orderedHand, type FxEvent, type MatchResult } from '@parlour/engine';
+import { heartsCatalog } from '@parlour/game-hearts';
 import { getAvatar } from '@/lib/avatars';
 import { HEARTS_SFX_PACK } from '@/lib/audio/sfx';
 import { useMatchTension } from '@/lib/audio/tension';
@@ -86,7 +87,11 @@ export function HeartsTableScreen(props: HeartsTableScreenProps) {
         ledSuit: view?.ledSuit ?? null,
         heartsBroken: view?.heartsBroken ?? false,
         awaitingPass: view?.awaitingPass ?? [],
-        hand: view ? deal.visibleCards(view.hand, view.localSeat) : [],
+        hand: view
+          ? orderedHand(deal.visibleCards(view.hand, view.localSeat), heartsCatalog.handOrder, {
+              jackDiamonds: view.jackDiamonds,
+            })
+          : [],
         playableCards: deal.dealing ? [] : (view?.playableCards ?? []),
         scores: view ? Object.fromEntries(view.players.map((p) => [p.seat, p.score])) : {},
       });
@@ -349,7 +354,11 @@ function LocalHand({
   onPlayCard?: (card: string) => void;
   deal: DealPresentation;
 }) {
-  const visibleHand = deal.visibleCards(view.hand, view.localSeat);
+  const visibleHand = orderedHand(
+    deal.visibleCards(view.hand, view.localSeat),
+    heartsCatalog.handOrder,
+    { jackDiamonds: view.jackDiamonds },
+  );
   const passing = view.decision === 'pass' && !busy;
   const canPlayCards = view.decision === 'play' && !busy;
 

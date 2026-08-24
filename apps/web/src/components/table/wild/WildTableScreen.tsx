@@ -1,8 +1,13 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type RefObject } from 'react';
-import { type FxEvent } from '@parlour/engine';
-import { WILDPILE_COLORS, wildpileHowToPlay, type WildpileColor } from '@parlour/game-wildpile';
+import { orderedHand, type FxEvent } from '@parlour/engine';
+import {
+  WILDPILE_COLORS,
+  wildpileCatalog,
+  wildpileHowToPlay,
+  type WildpileColor,
+} from '@parlour/game-wildpile';
 import { AnimatePresence, motion } from 'motion/react';
 import { getAvatar } from '@/lib/avatars';
 import { WILDPILE_SFX_PACK } from '@/lib/audio/sfx';
@@ -88,7 +93,9 @@ export function WildTableScreen(props: WildTableScreenProps) {
         decision: view?.decision ?? null,
         stockCount: view ? view.stockCount + deal.pendingStockCards : null,
         discardTop: view && deal.discardReady ? view.discard.at(-1) : null,
-        hand: view ? deal.visibleCards(view.hand, view.localSeat) : [],
+        hand: view
+          ? orderedHand(deal.visibleCards(view.hand, view.localSeat), wildpileCatalog.handOrder)
+          : [],
         playableCards: deal.dealing ? [] : (view?.legal.playCards ?? []),
       });
     gameWindow.render_game_to_text = renderGameToText;
@@ -459,7 +466,10 @@ function LocalHand({
   onPlay?: (card: string) => void;
   deal: DealPresentation;
 }) {
-  const visibleHand = deal.visibleCards(view.hand, view.localSeat);
+  const visibleHand = orderedHand(
+    deal.visibleCards(view.hand, view.localSeat),
+    wildpileCatalog.handOrder,
+  );
   const canChoose = view.legal.playCards.length > 0 && !busy;
   const showLegality = !busy && view.decision !== null && view.decision !== 'choose-color';
   return (

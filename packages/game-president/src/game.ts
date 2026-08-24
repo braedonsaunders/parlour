@@ -204,7 +204,7 @@ function dealHands(
     hands[seat]!.push(card);
     fx.emit(
       Fx.DealCard,
-      { card, from: 'stock', to: `hand:${seat}`, dur: 170 },
+      { card, from: 'stock', to: `hand:${seat}`, dur: 220 },
       cursor * DEAL_STAGGER_MS,
     );
   }

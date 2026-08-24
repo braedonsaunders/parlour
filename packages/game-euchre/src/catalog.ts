@@ -1,5 +1,6 @@
 import type { GameCatalogEntry } from '@parlour/engine';
 import { euchreConfig, type EuchreRules } from './config';
+import { orderEuchreHand } from './deck';
 import { euchreHowToPlay } from './howto';
 
 /**
@@ -27,6 +28,7 @@ export const euchreCatalog: GameCatalogEntry<EuchreRules> = {
   howToPlay: euchreHowToPlay,
   seats: [4],
   configSchema: euchreConfig,
+  handOrder: orderEuchreHand,
   modes: [
     {
       id: 'classic',

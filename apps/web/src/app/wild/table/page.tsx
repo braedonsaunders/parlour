@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { type FxEvent } from '@parlour/engine';
 import type { WildpileColor } from '@parlour/game-wildpile';
 import { WildTableScreen } from '@/components/table/wild/WildTableScreen';
-import { fxTimelineDurationMs } from '@/lib/table/fx-motion';
+import { delayUntilFxSettles } from '@/lib/table/fx-motion';
 import { WildTransport, type WildDispatch, type WildSnapshot } from '@/lib/solo/WildTransport';
 import { wildModeForRules } from '@/lib/wild/modes';
 import { wildTableView } from '@/lib/wild/view';
@@ -20,9 +20,6 @@ import {
   wildMultiplayerSession,
   type MultiplayerRoomSession,
 } from '../../_multiplayer/roomSession';
-
-/** Breath left after the last card lands before the next seat moves. */
-const FX_SETTLE_MS = 160;
 
 export default function WildTablePage() {
   const multiplayer = useSyncExternalStore(
@@ -233,7 +230,7 @@ function ActiveWildTable({ transport }: { transport: WildTransport }) {
     // Never act over the top of the previous burst. A stacked pickup takes over
     // a second to land, and cutting it off is what makes the table feel like it
     // dumped cards on you rather than dealt them.
-    const delay = Math.max(pace, fxTimelineDurationMs(fx) + FX_SETTLE_MS);
+    const delay = delayUntilFxSettles(pace, fx);
     const timer = window.setTimeout(() => {
       try {
         accept(transport.playBotTurn());

@@ -1,4 +1,11 @@
-import { isVeilHandle, stdDeck, type CardId, type DeckDef } from '@parlour/engine';
+import {
+  isVeilHandle,
+  stableCardOrder,
+  stdDeck,
+  type CardId,
+  type DeckDef,
+  type HandOrder,
+} from '@parlour/engine';
 
 /** President is played with the plain 52-card deck — no jokers in v1. */
 export const PRESIDENT_DECK: DeckDef = stdDeck();
@@ -30,6 +37,20 @@ export function tryOrder(card: CardId): number | null {
 }
 
 const SUIT_PRIORITY: Record<string, number> = { C: 0, D: 1, H: 2, S: 3 };
+
+/** Low-to-high table strength: threes first, then through aces and twos. */
+export const orderPresidentHand: HandOrder = (cards) =>
+  stableCardOrder(cards, (left, right) => {
+    const a = tryOrder(left);
+    const b = tryOrder(right);
+    if (a === null) return b === null ? 0 : 1;
+    if (b === null) return -1;
+    return (
+      a - b ||
+      (SUIT_PRIORITY[left[0] ?? ''] ?? 99) - (SUIT_PRIORITY[right[0] ?? ''] ?? 99) ||
+      left.localeCompare(right)
+    );
+  });
 
 /** Total order used only to pick the ceremonial lowest card: 3♣ < 3♦ < 3♥ < 3♠. */
 export function ceremonialLow(a: CardId, b: CardId): CardId {

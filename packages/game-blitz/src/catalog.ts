@@ -1,5 +1,6 @@
 import type { GameCatalogEntry } from '@parlour/engine';
 import { blitzConfigSchema, type BlitzConfig } from './config';
+import { orderBlitzHand } from './hand';
 import { blitzHowToPlay } from './howto';
 
 /**
@@ -23,6 +24,7 @@ export const blitzCatalog: GameCatalogEntry<BlitzConfig> = {
   howToPlay: blitzHowToPlay,
   seats: [2, 3, 4],
   configSchema: blitzConfigSchema,
+  handOrder: orderBlitzHand,
   modes: [
     {
       id: 'classic',

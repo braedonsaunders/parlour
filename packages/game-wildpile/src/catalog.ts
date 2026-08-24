@@ -1,4 +1,5 @@
 import type { GameCatalogEntry } from '@parlour/engine';
+import { orderWildpileHand } from './deck';
 import { wildpileConfig, type WildpileRules } from './game';
 import { wildpileHowToPlay } from './howto';
 
@@ -28,6 +29,7 @@ export const wildpileCatalog: GameCatalogEntry<WildpileRules> = {
   howToPlay: wildpileHowToPlay,
   seats: [2, 3, 4],
   configSchema: wildpileConfig,
+  handOrder: orderWildpileHand,
   modes: [
     {
       id: 'classic',

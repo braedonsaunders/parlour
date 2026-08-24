@@ -1,6 +1,6 @@
 import { Fx, type FxEvent } from '@parlour/engine';
 import { describe, expect, it } from 'vitest';
-import { buildFxTimeline, FX_TIMING } from './fx-motion';
+import { buildFxTimeline, delayUntilFxSettles, FX_TIMING } from './fx-motion';
 
 describe('table fx timeline', () => {
   it('turns unordered engine fx into a stable choreography for every table moment', () => {
@@ -28,7 +28,8 @@ describe('table fx timeline', () => {
     expect(timeline.map(({ startMs }) => startMs)).toEqual([0, 70, 210, 260, 310, 420, 600]);
     expect(
       timeline.filter(({ type }) => type === 'deal').map(({ durationMs }) => durationMs),
-    ).toEqual([FX_TIMING.cardFlightMs, FX_TIMING.cardFlightMs]);
+    ).toEqual([FX_TIMING.dealFlightMs, FX_TIMING.dealFlightMs]);
+    expect(FX_TIMING.dealFlightMs).toBeGreaterThan(FX_TIMING.cardFlightMs);
     expect(timeline.every(({ durationMs }) => durationMs <= FX_TIMING.maxBurstMs)).toBe(true);
   });
 
@@ -72,5 +73,18 @@ describe('table fx timeline', () => {
     ]);
 
     expect(discard).toMatchObject({ type: 'discard', from: 'hand:1', to: 'peg' });
+  });
+
+  it('holds the next actor until the final cue has landed and settled', () => {
+    const events: FxEvent[] = [
+      {
+        kind: Fx.DealCard,
+        payload: { card: 'H5', from: 'stock', to: 'hand:1', dur: 220 },
+        at: 900,
+      },
+    ];
+
+    expect(delayUntilFxSettles(420, events)).toBe(1_280);
+    expect(delayUntilFxSettles(1_500, events)).toBe(1_500);
   });
 });

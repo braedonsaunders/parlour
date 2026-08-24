@@ -8,7 +8,7 @@ import { CribbageTableScreen } from '@/components/table/cribbage/CribbageTableSc
 import { cribbageModeForRules } from '@/lib/cribbage/modes';
 import { cribbageTableView, type CribbageSnapshotLike } from '@/lib/cribbage/view';
 import { CribbageTransport, type CribbageDispatch } from '@/lib/solo/CribbageTransport';
-import { fxTimelineDurationMs } from '@/lib/table/fx-motion';
+import { delayUntilFxSettles } from '@/lib/table/fx-motion';
 import { botKey, buildMatchRecord, friendKey, useHistoryStore } from '@/stores/history';
 import { useMatchFlowStore } from '@/stores/matchFlow';
 import { useProfileStore } from '@/stores/profile';
@@ -20,8 +20,6 @@ import {
   subscribeActiveMultiplayerSession,
   type MultiplayerRoomSession,
 } from '../../_multiplayer/roomSession';
-
-const FX_SETTLE_MS = 160;
 
 export default function CribbageTablePage() {
   const multiplayer = useSyncExternalStore(
@@ -88,7 +86,7 @@ function ActiveSoloTable({ transport }: { transport: CribbageTransport }) {
   useEffect(() => {
     if (snapshot.match.status !== 'playing' || transport.humanCanAct() || !transport.botCanAct())
       return;
-    const waitMs = Math.max(420, fxTimelineDurationMs(fx) + FX_SETTLE_MS);
+    const waitMs = delayUntilFxSettles(420, fx);
     const timer = window.setTimeout(() => accept(transport.playBotTurn()), waitMs);
     return () => window.clearTimeout(timer);
   }, [accept, fx, snapshot, transport]);

@@ -443,7 +443,7 @@ export const heartsGame: GameDef<HeartsState, HeartsRules> = {
         hands[seat]?.push(card);
         ctx.fx.emit(
           Fx.DealCard,
-          { card, from: 'stock', to: `hand:${seat}`, dur: 170 },
+          { card, from: 'stock', to: `hand:${seat}`, dur: 220 },
           (cursor - 1) * DEAL_STAGGER_MS,
         );
       }

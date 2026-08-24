@@ -105,7 +105,7 @@ describe('WildTableScreen turn affordances', () => {
     );
     expect(container.querySelector('[data-zone="discard"] [aria-label="red 5"]')).toBeNull();
 
-    act(() => vi.advanceTimersByTime(180));
+    act(() => vi.advanceTimersByTime(220));
     expect(container.querySelectorAll('[data-hand-card]')).toHaveLength(1);
 
     act(() => vi.advanceTimersByTime(70));
@@ -135,6 +135,59 @@ describe('WildTableScreen turn affordances', () => {
     expect(invalid?.closest('[data-playable]')?.getAttribute('data-playable')).toBe('false');
     expect(container.querySelector('[data-local-turn="true"]')).not.toBeNull();
     expect(container.textContent).toContain('Your turn');
+  });
+
+  it('automatically inserts cards into the Wild mobile order as the hand changes', () => {
+    const hand = ['blue-9-0', 'red-skip-0', 'yellow-9-0', 'wild-0', 'red-3-0'];
+    const view = { ...VIEW, hand, legal: { ...VIEW.legal, playCards: [] } };
+    const labels = () =>
+      [...container.querySelectorAll('[data-hand-card] button')].map((card) =>
+        card.getAttribute('aria-label'),
+      );
+
+    act(() => root.render(createElement(WildTableScreen, { view, fx: [], fxKey: 0 })));
+    expect(labels()).toEqual([
+      'Play wild',
+      'Play red 3',
+      'Play red skip',
+      'Play yellow 9',
+      'Play blue 9',
+    ]);
+    const renderGameToText = (window as unknown as { render_game_to_text: () => string })
+      .render_game_to_text;
+    expect(JSON.parse(renderGameToText()).hand).toEqual([
+      'wild-0',
+      'red-3-0',
+      'red-skip-0',
+      'yellow-9-0',
+      'blue-9-0',
+    ]);
+
+    act(() =>
+      root.render(
+        createElement(WildTableScreen, {
+          view: {
+            ...view,
+            hand: [...hand, 'green-1-0'],
+            drawnCard: 'green-1-0',
+          },
+          fx: [],
+          fxKey: 1,
+        }),
+      ),
+    );
+
+    expect(labels()).toEqual([
+      'Play wild',
+      'Play red 3',
+      'Play red skip',
+      'Play yellow 9',
+      'Play green 1',
+      'Play blue 9',
+    ]);
+    expect(
+      container.querySelector('[aria-label="Play green 1"]')?.closest('[data-just-drawn]'),
+    ).not.toBeNull();
   });
 
   it('opens the shared table settings and confirms before quitting', () => {

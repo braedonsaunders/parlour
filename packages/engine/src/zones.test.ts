@@ -1,7 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import { makeRng } from './rng';
 import { stdDeck } from './types';
-import { addTo, addToBottom, drawFrom, peekTop, removeFrom, shuffledIds } from './zones';
+import {
+  addTo,
+  addToBottom,
+  drawFrom,
+  keepHandOrder,
+  orderedHand,
+  peekTop,
+  removeFrom,
+  shuffledIds,
+  stableCardOrder,
+} from './zones';
 
 describe('zones', () => {
   const zone = Object.freeze(['S1', 'H2', 'D3', 'C4']);
@@ -44,5 +54,25 @@ describe('zones', () => {
     expect(a).toEqual(b);
     expect(a).not.toEqual([...deck.cardIds]);
     expect([...a].sort()).toEqual([...deck.cardIds].sort());
+  });
+
+  it('orders a copied hand stably without touching the authoritative zone', () => {
+    const hand = Object.freeze(['H7', 'S2', 'D7', 'C3']);
+    const ordered = stableCardOrder(hand, (left, right) => {
+      const rank = (card: string) => Number(card.slice(1));
+      return rank(left) - rank(right);
+    });
+
+    expect(ordered).toEqual(['S2', 'C3', 'H7', 'D7']);
+    expect(hand).toEqual(['H7', 'S2', 'D7', 'C3']);
+    expect(ordered).not.toBe(hand);
+  });
+
+  it('validates game-pack hand orders as complete permutations', () => {
+    expect(orderedHand(zone, keepHandOrder)).toEqual(zone);
+    expect(() => orderedHand(zone, (cards) => cards.slice(1))).toThrow(/every card exactly once/);
+    expect(() => orderedHand(zone, (cards) => [...cards, cards[0]!])).toThrow(
+      /every card exactly once/,
+    );
   });
 });

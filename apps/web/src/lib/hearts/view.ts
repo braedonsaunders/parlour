@@ -33,6 +33,7 @@ export interface HeartsTableView {
   trick: readonly TrickCardView[];
   ledSuit: string | null;
   heartsBroken: boolean;
+  jackDiamonds: boolean;
   passDirection: string | null;
   /** seats still to pick in the pass phase */
   awaitingPass: readonly number[];
@@ -80,6 +81,7 @@ export function heartsTableView(input: {
     trick,
     ledSuit: state.trick?.ledSuit ?? null,
     heartsBroken: state.heartsBroken,
+    jackDiamonds: state.rules.jackDiamonds,
     passDirection: isPassPhase ? state.rules.passDirection : null,
     awaitingPass: isPassPhase
       ? state.selections.flatMap((picked, seat) => (picked === null ? [seat] : []))

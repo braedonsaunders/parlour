@@ -431,7 +431,7 @@ export function createBlitzDef(options: BlitzDefOptions = {}): GameDef<BlitzStat
           if (!card) continue;
           fx.emit(
             Fx.DealCard,
-            { card, from: 'stock', to: `hand:${seat}`, dur: 180 },
+            { card, from: 'stock', to: `hand:${seat}`, dur: 220 },
             dealIndex * DEAL_STAGGER_MS,
           );
           dealIndex += 1;

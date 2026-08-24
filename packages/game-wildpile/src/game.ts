@@ -1078,7 +1078,7 @@ export const wildpileGame: GameDef<WildpileState, WildpileRules> = {
         hands[seat]?.push(card);
         fx.emit(
           Fx.DealCard,
-          { card, from: 'stock', to: `hand:${seat}`, dur: 180 },
+          { card, from: 'stock', to: `hand:${seat}`, dur: 220 },
           (cursor - 1) * 70,
         );
       }

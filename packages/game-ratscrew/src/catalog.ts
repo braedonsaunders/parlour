@@ -1,4 +1,4 @@
-import type { GameCatalogEntry } from '@parlour/engine';
+import { keepHandOrder, type GameCatalogEntry } from '@parlour/engine';
 import { ratscrewConfigSchema, type RatscrewConfig } from './config';
 import { ratscrewHowToPlay } from './howto';
 
@@ -28,6 +28,8 @@ export const ratscrewCatalog: GameCatalogEntry<RatscrewConfig> = {
   howToPlay: ratscrewHowToPlay,
   seats: [2, 3, 4],
   configSchema: ratscrewConfigSchema,
+  // Rat Screw exposes a face-down pile, not a freely arranged hand.
+  handOrder: keepHandOrder,
   modes: [
     {
       id: 'classic',

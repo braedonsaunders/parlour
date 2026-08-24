@@ -464,7 +464,7 @@ export const ratscrewGame: GameDef<RatscrewState, RatscrewConfig> = {
       piles[index % seats]!.push(card);
       fx.emit(
         Fx.DealCard,
-        { card, from: 'stock', to: `hand:${index % seats}`, dur: 140 },
+        { card, from: 'stock', to: `hand:${index % seats}`, dur: 220 },
         index * 24,
       );
     }

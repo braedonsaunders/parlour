@@ -6,6 +6,7 @@ import { isActingSeat, type FxEvent } from '@parlour/engine';
 import type { HeartsModeId } from '@/lib/hearts/modes';
 import { heartsModeForRules } from '@/lib/hearts/modes';
 import { heartsTableView } from '@/lib/hearts/view';
+import { delayUntilFxSettles } from '@/lib/table/fx-motion';
 import {
   HeartsTransport,
   type HeartsDispatch,
@@ -97,15 +98,16 @@ function ActiveSoloHeartsTable({ transport }: { transport: HeartsTransport }) {
   // Bot seats decide at a humane pace; the pass wall resolves seat by seat.
   useEffect(() => {
     if (transport.humanPending()) return;
+    const delay = delayUntilFxSettles(BOT_THINK_MS, fx);
     const timer = window.setTimeout(() => {
       try {
         accept(transport.playBotTurn());
       } catch (caught) {
         setError(caught instanceof Error ? caught.message : 'The bot lost the thread.');
       }
-    }, BOT_THINK_MS);
+    }, delay);
     return () => window.clearTimeout(timer);
-  }, [accept, snapshot, transport]);
+  }, [accept, fx, snapshot, transport]);
 
   useEffect(() => {
     if (

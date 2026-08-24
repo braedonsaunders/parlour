@@ -7,6 +7,7 @@ import type { GinModeId } from '@/lib/gin/modes';
 import { GinTableScreen } from '@/components/table/gin/GinTableScreen';
 import { GinTransport, type GinDispatch, type GinSnapshot } from '@/lib/solo/GinTransport';
 import { ginTableView } from '@/lib/gin/view';
+import { delayUntilFxSettles } from '@/lib/table/fx-motion';
 import { botKey, buildMatchRecord, friendKey, useHistoryStore } from '@/stores/history';
 import { useMatchFlowStore } from '@/stores/matchFlow';
 import { useProfileStore } from '@/stores/profile';
@@ -89,8 +90,9 @@ function SoloGinTable({ transport }: { transport: GinTransport }) {
     const actor = snapshot.session.phase.actor;
     if (actor === null || actor === 0) return;
     // the ready window reads as a reflex; in-hand decisions keep human pace
-    const delay =
+    const pace =
       snapshot.session.state.folded && snapshot.session.phase.phase === 'hand-end' ? 420 : 520;
+    const delay = delayUntilFxSettles(pace, fx);
     const timer = window.setTimeout(() => {
       try {
         accept(transport.playBotTurn());
@@ -101,6 +103,7 @@ function SoloGinTable({ transport }: { transport: GinTransport }) {
     return () => window.clearTimeout(timer);
   }, [
     accept,
+    fx,
     snapshot.session.log.length,
     snapshot.session.phase.actor,
     snapshot.session.phase.phase,

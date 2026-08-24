@@ -1,4 +1,4 @@
-import { stdDeck, type CardId } from '@parlour/engine';
+import { stableCardOrder, stdDeck, type CardId, type HandOrder } from '@parlour/engine';
 import type { BlitzConfig } from './config';
 
 const DECK = stdDeck();
@@ -41,6 +41,50 @@ export function hasThreeOfAKind(hand: readonly CardId[]): boolean {
 }
 
 export const BLITZ_VALUE = 31;
+
+const SUIT_PRIORITY: Readonly<Record<string, number>> = {
+  spades: 0,
+  hearts: 1,
+  diamonds: 2,
+  clubs: 3,
+};
+
+/**
+ * Keeps a three-of-a-kind together when present; otherwise the suit carrying
+ * the highest live total comes first, with its strongest cards first.
+ */
+export const orderBlitzHand: HandOrder = (cards) => {
+  const rankCounts = new Map<number, number>();
+  const suitTotals = new Map<string, number>();
+  for (const card of cards) {
+    const face = DECK.faces[card];
+    if (!face || typeof face.rank !== 'number' || !face.suit) continue;
+    rankCounts.set(face.rank, (rankCounts.get(face.rank) ?? 0) + 1);
+    suitTotals.set(face.suit, (suitTotals.get(face.suit) ?? 0) + pipValue(card));
+  }
+  const tripleRank = [...rankCounts].find(([, count]) => count >= 3)?.[0] ?? null;
+  const suits = [...suitTotals.keys()].sort(
+    (left, right) =>
+      (suitTotals.get(right) ?? 0) - (suitTotals.get(left) ?? 0) ||
+      (SUIT_PRIORITY[left] ?? 99) - (SUIT_PRIORITY[right] ?? 99),
+  );
+  const suitPosition = new Map(suits.map((suit, index) => [suit, index]));
+
+  return stableCardOrder(cards, (left, right) => {
+    const a = DECK.faces[left];
+    const b = DECK.faces[right];
+    if (!a || typeof a.rank !== 'number' || !a.suit) return b ? 1 : 0;
+    if (!b || typeof b.rank !== 'number' || !b.suit) return -1;
+    if (tripleRank !== null) {
+      const tripleDiff = Number(b.rank === tripleRank) - Number(a.rank === tripleRank);
+      if (tripleDiff !== 0) return tripleDiff;
+    }
+    const suitDiff = (suitPosition.get(a.suit) ?? 99) - (suitPosition.get(b.suit) ?? 99);
+    if (suitDiff !== 0) return suitDiff;
+    const strength = (rank: number) => (rank === 1 ? 14 : rank);
+    return strength(b.rank) - strength(a.rank) || left.localeCompare(right);
+  });
+};
 
 /**
  * Hand value = max over suits of that suit's sum; three of a kind may count

@@ -26,6 +26,7 @@ function makeView(overrides: Partial<HeartsTableView> = {}): HeartsTableView {
     trick: [],
     ledSuit: null,
     heartsBroken: false,
+    jackDiamonds: false,
     passDirection: null,
     awaitingPass: [],
     hand: ['C2', 'H5', 'D11'],

@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type RefObject } from 'react';
-import { type FxEvent } from '@parlour/engine';
+import { orderedHand, type FxEvent } from '@parlour/engine';
+import { blitzCatalog, blitzHowToPlay } from '@parlour/game-blitz';
 import { AnimatePresence, motion } from 'motion/react';
 import { getAvatar } from '@/lib/avatars';
 import { BLITZ_SFX_PACK } from '@/lib/audio/sfx';
@@ -11,7 +12,6 @@ import { ownerCurrentCount } from '@/lib/table/owner-count';
 import { discardRotation, useFxAnimation, useTableAudio } from './fx-animation';
 import { HandRail, HandRailCard } from './HandRail';
 import { PlayingCard } from './PlayingCard';
-import { blitzHowToPlay } from '@parlour/game-blitz';
 import { TableMenu } from './TableMenu';
 import { AvatarBadge } from '@/components/AvatarBadge';
 import styles from '@/styles/table.module.css';
@@ -75,7 +75,9 @@ export function TableScreen(props: TableScreenProps) {
         discardTop: view && deal.discardReady ? view.discard.at(-1) : null,
         hand: (() => {
           const player = view?.players.find(({ isLocal }) => isLocal);
-          return player ? deal.visibleCards(player.hand, player.seat) : [];
+          return player
+            ? orderedHand(deal.visibleCards(player.hand, player.seat), blitzCatalog.handOrder)
+            : [];
         })(),
         legal: deal.dealing ? null : (view?.legal ?? null),
         activeFx: props.fx.map(({ kind, at }) => ({ kind, at: at ?? 0 })),
@@ -293,7 +295,10 @@ function Piles({
 function LocalHand(props: TableScreenProps & { view: TableView; deal: DealPresentation }) {
   const player = props.view.players.find(({ isLocal }) => isLocal);
   if (!player) return null;
-  const visibleHand = props.deal.visibleCards(player.hand, player.seat);
+  const visibleHand = orderedHand(
+    props.deal.visibleCards(player.hand, player.seat),
+    blitzCatalog.handOrder,
+  );
   const canChoose = props.view.legal.discardCards.length > 0 && !props.busy;
   const currentCount = ownerCurrentCount([{ hand: visibleHand, isLocal: true }]);
   return (

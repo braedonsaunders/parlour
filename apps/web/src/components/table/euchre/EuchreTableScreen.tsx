@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type RefObject } from 'react';
-import { type FxEvent } from '@parlour/engine';
-import type { EuchreSuit } from '@parlour/game-euchre';
+import { orderedHand, type FxEvent } from '@parlour/engine';
+import { euchreCatalog, type EuchreSuit } from '@parlour/game-euchre';
 import { AnimatePresence } from 'motion/react';
 import { getAvatar } from '@/lib/avatars';
 import { EUCHRE_SFX_PACK } from '@/lib/audio/sfx';
@@ -72,7 +72,11 @@ export function EuchreTableScreen(props: EuchreTableScreenProps) {
         handNo: view?.handNo ?? null,
         tricksPlayed: view?.tricksPlayed ?? null,
         upcard: deal.dealing ? null : (view?.upcard ?? null),
-        hand: view ? deal.visibleCards(view.hand, view.localSeat) : [],
+        hand: view
+          ? orderedHand(deal.visibleCards(view.hand, view.localSeat), euchreCatalog.handOrder, {
+              trump: view.trump,
+            })
+          : [],
         legalCards: deal.dealing ? [] : (view?.legalCards ?? []),
       });
     gameWindow.render_game_to_text = renderGameToText;
@@ -341,7 +345,11 @@ function LocalHand({
   onDiscard?: (card: string) => void;
   deal: DealPresentation;
 }) {
-  const visibleHand = deal.visibleCards(view.hand, view.localSeat);
+  const visibleHand = orderedHand(
+    deal.visibleCards(view.hand, view.localSeat),
+    euchreCatalog.handOrder,
+    { trump: view.trump },
+  );
   const interactive = !busy && (burying || view.decision === 'play');
   const showLegality = !busy && view.decision === 'play';
   return (

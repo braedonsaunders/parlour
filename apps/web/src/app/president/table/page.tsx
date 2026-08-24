@@ -12,6 +12,7 @@ import {
 } from '@/lib/solo/PresidentTransport';
 import { presidentModeForRules } from '@/lib/president/modes';
 import { presidentTableView } from '@/lib/president/view';
+import { delayUntilFxSettles } from '@/lib/table/fx-motion';
 import { botKey, buildMatchRecord, friendKey, useHistoryStore } from '@/stores/history';
 import { useMatchFlowStore } from '@/stores/matchFlow';
 import { useProfileStore } from '@/stores/profile';
@@ -239,7 +240,8 @@ function ActivePresidentTable({ transport }: { transport: PresidentTransport }) 
     const botSeat = snapshot.session.phase.actor;
     if (botSeat === null) return;
     // Exchange decisions read as deliberation; regular turns keep the human pace.
-    const delay = snapshot.session.phase.phase === 'play' ? 520 + botSeat * 80 : 420;
+    const pace = snapshot.session.phase.phase === 'play' ? 520 + botSeat * 80 : 420;
+    const delay = delayUntilFxSettles(pace, fx);
     const timer = window.setTimeout(() => {
       try {
         accept(transport.playBotTurn());
@@ -250,6 +252,7 @@ function ActivePresidentTable({ transport }: { transport: PresidentTransport }) 
     return () => window.clearTimeout(timer);
   }, [
     accept,
+    fx,
     snapshot.session.log.length,
     snapshot.session.phase.actor,
     snapshot.session.phase.phase,

@@ -1,6 +1,7 @@
 import type { GameCatalogEntry } from '@parlour/engine';
 import { ginConfigSchema, type GinConfig } from './config';
 import { ginHowToPlay } from './howto';
+import { orderGinHand } from './melds';
 
 /**
  * Gin Rummy's entry on the parlour shelf. Mode ids here match the config
@@ -27,6 +28,7 @@ export const ginCatalog: GameCatalogEntry<GinConfig> = {
   howToPlay: ginHowToPlay,
   seats: [2],
   configSchema: ginConfigSchema,
+  handOrder: orderGinHand,
   modes: [
     {
       id: 'classic',

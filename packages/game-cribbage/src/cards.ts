@@ -1,4 +1,4 @@
-import type { CardId } from '@parlour/engine';
+import { stableCardOrder, type CardId, type HandOrder } from '@parlour/engine';
 
 /**
  * Cribbage card arithmetic over the standard 52-card deck ids (`S1` = A♠,
@@ -32,3 +32,24 @@ export function cardValue(card: CardId): number {
 export function sumValues(cards: readonly CardId[]): number {
   return cards.reduce((total, card) => total + cardValue(card), 0);
 }
+
+const CRIBBAGE_SUIT_ORDER: Readonly<Record<SuitCode, number>> = {
+  C: 0,
+  D: 1,
+  H: 2,
+  S: 3,
+};
+
+/** Rank-first grouping makes pairs, runs, and fifteen-building neighbours easy to scan. */
+export const orderCribbageHand: HandOrder = (cards) =>
+  stableCardOrder(cards, (left, right) => {
+    const leftMatch = CARD_ID_PATTERN.test(left);
+    const rightMatch = CARD_ID_PATTERN.test(right);
+    if (!leftMatch) return rightMatch ? 1 : 0;
+    if (!rightMatch) return -1;
+    return (
+      rankOf(left) - rankOf(right) ||
+      CRIBBAGE_SUIT_ORDER[suitOf(left)] - CRIBBAGE_SUIT_ORDER[suitOf(right)] ||
+      left.localeCompare(right)
+    );
+  });

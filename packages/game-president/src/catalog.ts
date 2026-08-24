@@ -1,4 +1,5 @@
 import type { GameCatalogEntry } from '@parlour/engine';
+import { orderPresidentHand } from './deck';
 import { MAX_SEATS, MIN_SEATS } from './game';
 import { presidentConfig, type PresidentRules } from './config';
 import { presidentHowToPlay } from './howto';
@@ -29,6 +30,7 @@ export const presidentCatalog: GameCatalogEntry<PresidentRules> = {
   howToPlay: presidentHowToPlay,
   seats: [MIN_SEATS, 5, 6, 7, MAX_SEATS],
   configSchema: presidentConfig,
+  handOrder: orderPresidentHand,
   modes: [
     {
       id: 'classic',

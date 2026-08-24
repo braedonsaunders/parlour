@@ -12,6 +12,7 @@ import {
 } from '@/lib/solo/EuchreTransport';
 import { euchreModeForRules } from '@/lib/euchre/modes';
 import { euchreTableView, type EuchreTableView } from '@/lib/euchre/view';
+import { delayUntilFxSettles } from '@/lib/table/fx-motion';
 import { botKey, buildMatchRecord, friendKey, useHistoryStore } from '@/stores/history';
 import { useMatchFlowStore } from '@/stores/matchFlow';
 import { useProfileStore } from '@/stores/profile';
@@ -96,7 +97,8 @@ function ActiveSoloEuchreTable({ transport }: { transport: EuchreTransport }) {
     const botSeat = snapshot.session.phase.actor;
     if (botSeat === null || botSeat === 0) return;
     // bidding decisions read as conversation; trick play keeps a human beat
-    const delay = snapshot.session.state.stage === 'playing' ? 480 + botSeat * 90 : 320;
+    const pace = snapshot.session.state.stage === 'playing' ? 480 + botSeat * 90 : 320;
+    const delay = delayUntilFxSettles(pace, fx);
     const timer = window.setTimeout(() => {
       try {
         accept(transport.playBotTurn());
@@ -107,6 +109,7 @@ function ActiveSoloEuchreTable({ transport }: { transport: EuchreTransport }) {
     return () => window.clearTimeout(timer);
   }, [
     accept,
+    fx,
     snapshot.session.log.length,
     snapshot.session.phase.actor,
     snapshot.session.state.stage,

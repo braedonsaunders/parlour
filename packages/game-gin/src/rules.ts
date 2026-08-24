@@ -101,7 +101,7 @@ export function dealHand(
       if (!card) continue;
       ctx.fx.emit(
         Fx.DealCard,
-        { card, from: 'stock', to: `hand:${seat}`, dur: 170 },
+        { card, from: 'stock', to: `hand:${seat}`, dur: 220 },
         dealIndex * DEAL_STAGGER_MS,
       );
       dealIndex += 1;

@@ -2,6 +2,7 @@ import { Fx, type FxEvent } from '@parlour/engine';
 
 export const FX_TIMING = {
   cardFlightMs: 180,
+  dealFlightMs: 220,
   drawFlightMs: 200,
   settleMs: 80,
   dealStaggerMinMs: 60,
@@ -118,7 +119,7 @@ function cueFor(event: FxEvent, index: number): FxCue | null {
         card: stringField(event, 'card'),
         from: zoneField(event, 'from'),
         to: zoneField(event, 'to'),
-        durationMs: durationField(event, FX_TIMING.cardFlightMs),
+        durationMs: durationField(event, FX_TIMING.dealFlightMs),
       };
     case Fx.FlipCard:
       return {
@@ -303,4 +304,13 @@ export function fxTimelineDurationMs(events: readonly FxEvent[]): number {
     (longest, cue) => Math.max(longest, cue.startMs + cue.durationMs),
     0,
   );
+}
+
+/** Human pacing that never advances the table before the current burst settles. */
+export function delayUntilFxSettles(
+  paceMs: number,
+  events: readonly FxEvent[],
+  settleMs = 160,
+): number {
+  return Math.max(paceMs, fxTimelineDurationMs(events) + settleMs);
 }

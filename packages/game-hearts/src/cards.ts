@@ -1,4 +1,10 @@
-import type { CardId, CardFace, DeckDef } from '@parlour/engine';
+import {
+  stableCardOrder,
+  type CardId,
+  type CardFace,
+  type DeckDef,
+  type HandOrder,
+} from '@parlour/engine';
 import type { TrickRules } from '@parlour/tricks';
 
 /**
@@ -71,3 +77,27 @@ export function heartsTrickRules(deck?: DeckDef): TrickRules {
 export function facesOf(deck: DeckDef): Readonly<Record<CardId, CardFace>> {
   return deck.faces;
 }
+
+const HEARTS_HAND_SUIT_ORDER: Readonly<Record<string, number>> = {
+  [SUIT_CLUBS]: 0,
+  [SUIT_DIAMONDS]: 1,
+  [SUIT_SPADES]: 2,
+  [SUIT_HEARTS]: 3,
+};
+
+/** Groups follow-suit choices and leaves special scoring cards at their suit edge. */
+export const orderHeartsHand: HandOrder = (cards, context) =>
+  stableCardOrder(cards, (left, right) => {
+    const aSuit = suitOfCard(left);
+    const bSuit = suitOfCard(right);
+    if (aSuit === null) return bSuit === null ? 0 : 1;
+    if (bSuit === null) return -1;
+    const suitDiff = (HEARTS_HAND_SUIT_ORDER[aSuit] ?? 99) - (HEARTS_HAND_SUIT_ORDER[bSuit] ?? 99);
+    if (suitDiff !== 0) return suitDiff;
+    const specialKey = (card: CardId) =>
+      card === QUEEN_SPADES || (context.jackDiamonds === true && card === JACK_DIAMONDS) ? 1 : 0;
+    const specialDiff = specialKey(left) - specialKey(right);
+    if (specialDiff !== 0) return specialDiff;
+    const rankKey = (card: CardId) => (rankOfCard(card) === 1 ? 14 : rankOfCard(card));
+    return rankKey(left) - rankKey(right) || left.localeCompare(right);
+  });

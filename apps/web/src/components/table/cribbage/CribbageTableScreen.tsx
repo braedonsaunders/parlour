@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type RefObject } from 'react';
-import { type FxEvent } from '@parlour/engine';
-import { cribbageHowToPlay } from '@parlour/game-cribbage';
+import { orderedHand, type FxEvent } from '@parlour/engine';
+import { cribbageCatalog, cribbageHowToPlay } from '@parlour/game-cribbage';
 import { AnimatePresence, motion } from 'motion/react';
 import { AvatarBadge } from '@/components/AvatarBadge';
 import { getAvatar } from '@/lib/avatars';
@@ -59,7 +59,9 @@ export function CribbageTableScreen(props: CribbageTableScreenProps) {
         runningCount: view?.runningCount ?? null,
         starter: view?.starter ?? null,
         pile: view?.pile ?? [],
-        hand: view ? deal.visibleCards(view.hand, view.localSeat) : [],
+        hand: view
+          ? orderedHand(deal.visibleCards(view.hand, view.localSeat), cribbageCatalog.handOrder)
+          : [],
         legal: deal.dealing ? null : (view?.legal ?? null),
         activeFx: props.fx.map(({ kind, at }) => ({ kind, at: at ?? 0 })),
       });
@@ -298,7 +300,10 @@ function LocalHand(
   const { view } = props;
   const local = view.players.find((player) => player.isLocal);
   const [selected, setSelected] = useState<readonly string[]>([]);
-  const visibleHand = props.deal.visibleCards(view.hand, view.localSeat);
+  const visibleHand = orderedHand(
+    props.deal.visibleCards(view.hand, view.localSeat),
+    cribbageCatalog.handOrder,
+  );
   const selectedVisible = selected.filter((card) => visibleHand.includes(card)).slice(0, 2);
   const discarding = view.legal.discardPairs.length > 0;
   const pair =

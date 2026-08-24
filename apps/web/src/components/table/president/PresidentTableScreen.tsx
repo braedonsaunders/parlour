@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type RefObject } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { type FxEvent } from '@parlour/engine';
+import { orderedHand, type FxEvent } from '@parlour/engine';
+import { presidentCatalog } from '@parlour/game-president';
 import { getAvatar } from '@/lib/avatars';
 import { PRESIDENT_SFX_PACK } from '@/lib/audio/sfx';
 import { useMatchTension } from '@/lib/audio/tension';
@@ -108,7 +109,9 @@ export function PresidentTableScreen(props: PresidentTableScreenProps) {
         decision: view?.decision ?? null,
         standingRank: view?.standing?.rank ?? null,
         pileSize: view ? view.pile.reduce((sum, set) => sum + set.cards.length, 0) : null,
-        hand: view ? deal.visibleCards(view.hand, view.localSeat) : [],
+        hand: view
+          ? orderedHand(deal.visibleCards(view.hand, view.localSeat), presidentCatalog.handOrder)
+          : [],
         scores: view ? Object.fromEntries(view.players.map((p) => [p.seat, p.score])) : {},
       });
     gameWindow.render_game_to_text = renderGameToText;
@@ -428,7 +431,10 @@ function LocalHand({
   onToggle: (card: string) => void;
   deal: DealPresentation;
 }) {
-  const visibleHand = deal.visibleCards(view.hand, view.localSeat);
+  const visibleHand = orderedHand(
+    deal.visibleCards(view.hand, view.localSeat),
+    presidentCatalog.handOrder,
+  );
   const exchanging = view.decision === 'give' || view.decision === 'return';
   const canPick = !busy && (exchanging || view.decision === 'lead-or-follow');
   const showLegality = !busy && view.decision === 'lead-or-follow';

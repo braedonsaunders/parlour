@@ -1,4 +1,4 @@
-import type { CardId } from '@parlour/engine';
+import { stableCardOrder, type CardId, type HandOrder } from '@parlour/engine';
 import { pipValue, rankOf, suitOf } from './cards';
 
 // ---------------------------------------------------------------------------
@@ -169,6 +169,43 @@ function candidateToMeld(candidate: Candidate): GinMeld {
 export function deadwoodOf(hand: readonly CardId[]): number {
   return bestPartition(hand).deadwood;
 }
+
+const GIN_CARD = /^[SHDC]([1-9]|1[0-3])$/;
+const GIN_SUIT_ORDER: Readonly<Record<string, number>> = { C: 0, D: 1, H: 2, S: 3 };
+
+function ginSuitPosition(card: CardId): number {
+  return GIN_SUIT_ORDER[card[0] ?? ''] ?? 99;
+}
+
+function orderGinCards(cards: readonly CardId[], primary: 'rank' | 'suit'): CardId[] {
+  return stableCardOrder(cards, (left, right) => {
+    const rankDiff = rankOf(left) - rankOf(right);
+    const suitDiff = ginSuitPosition(left) - ginSuitPosition(right);
+    return (
+      (primary === 'rank' ? rankDiff || suitDiff : suitDiff || rankDiff) ||
+      left.localeCompare(right)
+    );
+  });
+}
+
+/** Best completed melds first; remaining deadwood is rank-grouped for sets and runs. */
+export const orderGinHand: HandOrder = (cards) => {
+  if (cards.some((card) => !GIN_CARD.test(card))) return [...cards];
+  const partition = bestPartition(cards);
+  const melds = [...partition.melds].sort((left, right) => {
+    const kindDiff = Number(left.kind === 'set') - Number(right.kind === 'set');
+    if (kindDiff !== 0) return kindDiff;
+    const a = left.cards[0]!;
+    const b = right.cards[0]!;
+    return left.kind === 'run'
+      ? ginSuitPosition(a) - ginSuitPosition(b) || rankOf(a) - rankOf(b)
+      : rankOf(a) - rankOf(b);
+  });
+  return [
+    ...melds.flatMap((meld) => orderGinCards(meld.cards, meld.kind === 'run' ? 'suit' : 'rank')),
+    ...orderGinCards(partition.deadwoodCards, 'rank'),
+  ];
+};
 
 // ---------------------------------------------------------------------------
 // Layoffs — defender deadwood added onto the knocker's melds after a knock.

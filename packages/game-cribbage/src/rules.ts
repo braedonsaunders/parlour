@@ -512,7 +512,7 @@ const dealNext: Move<CribbageState> = {
         hands[seat]?.push(card);
         ctx.fx.emit(
           Fx.DealCard,
-          { card, from: 'stock', to: `hand:${seat}`, dur: 180 },
+          { card, from: 'stock', to: `hand:${seat}`, dur: 220 },
           dealIndex * DEAL_STAGGER_MS,
         );
         dealIndex += 1;
@@ -722,7 +722,7 @@ export function createCribbageDef(
           hands[seat]?.push(card);
           fx.emit(
             Fx.DealCard,
-            { card, from: 'stock', to: `hand:${seat}`, dur: 180 },
+            { card, from: 'stock', to: `hand:${seat}`, dur: 220 },
             dealIndex * DEAL_STAGGER_MS,
           );
           dealIndex += 1;

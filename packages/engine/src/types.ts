@@ -13,6 +13,17 @@ import type { CardRecycle, VeilSupport } from './veil';
 export type SeatId = number;
 export type CardId = string;
 
+/** Optional live facts a game pack may use while arranging a player's hand. */
+export type HandOrderContext = Readonly<Record<string, unknown>>;
+
+/**
+ * Pure presentation ordering for a player's hand. It must return every input
+ * card exactly once and must not mutate the authoritative engine zone.
+ */
+export type HandOrder = (cards: readonly CardId[], context: HandOrderContext) => readonly CardId[];
+
+export type CardComparator = (left: CardId, right: CardId) => number;
+
 // ---------------------------------------------------------------------------
 // RNG (seeded, deterministic — the ONLY randomness source)
 // ---------------------------------------------------------------------------
@@ -475,6 +486,8 @@ export interface GameCatalogEntry<C extends RuleValues = RuleValues> {
   seats: readonly number[];
   /** Drives the generated rule-settings panel. */
   configSchema: ConfigSchema<C>;
+  /** Game-owned, presentation-only ordering used by every playable hand rail. */
+  handOrder: HandOrder;
 }
 
 /** The config preset a mode selects, or null to take the schema defaults. */

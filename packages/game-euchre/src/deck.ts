@@ -1,4 +1,12 @@
-import { pairedTeams, stdDeck, type CardFace, type CardId, type DeckDef } from '@parlour/engine';
+import {
+  pairedTeams,
+  stableCardOrder,
+  stdDeck,
+  type CardFace,
+  type CardId,
+  type DeckDef,
+  type HandOrder,
+} from '@parlour/engine';
 
 /** The neutral partnership map for a four-seat euchre table: 0/2 vs 1/3. */
 const TABLE_TEAMS = pairedTeams(4);
@@ -119,5 +127,34 @@ export function trickWinner(
 export function teamOf(seat: number): 0 | 1 {
   return TABLE_TEAMS.teamOf(seat) as 0 | 1;
 }
+
+/**
+ * Keeps suits together while bidding; after trump is named, the left bower
+ * joins the trump block and both bowers sit at its strong end.
+ */
+export const orderEuchreHand: HandOrder = (cards, context) => {
+  const rawTrump = context.trump;
+  const trump = EUCHRE_SUITS.includes(rawTrump as EuchreSuit) ? (rawTrump as EuchreSuit) : null;
+  const suitOrder = trump
+    ? [...EUCHRE_SUITS.filter((suit) => suit !== trump), trump]
+    : [...EUCHRE_SUITS];
+  const suitPosition = new Map(suitOrder.map((suit, index) => [suit, index]));
+
+  return stableCardOrder(cards, (left, right) => {
+    const aRank = rankOf(left);
+    const bRank = rankOf(right);
+    const aSuit = trump ? effectiveSuit(left, trump) : suitLetterOf(left);
+    const bSuit = trump ? effectiveSuit(right, trump) : suitLetterOf(right);
+    if (aRank === null || aSuit === null) return bRank === null || bSuit === null ? 0 : 1;
+    if (bRank === null || bSuit === null) return -1;
+    const suitDiff = (suitPosition.get(aSuit) ?? 99) - (suitPosition.get(bSuit) ?? 99);
+    if (suitDiff !== 0) return suitDiff;
+    const aStrength =
+      trump && aSuit === trump ? trickStrength(left, trump, trump) : ordinaryOrdinal(aRank);
+    const bStrength =
+      trump && bSuit === trump ? trickStrength(right, trump, trump) : ordinaryOrdinal(bRank);
+    return (aStrength ?? -1) - (bStrength ?? -1) || left.localeCompare(right);
+  });
+};
 
 export const GAME_ID = 'euchre';

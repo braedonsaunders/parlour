@@ -71,6 +71,7 @@ describe('game shelf catalog', () => {
       expect(game.seats.length, game.id).toBeGreaterThan(0);
       expect(game.howToPlay.sections.length, game.id).toBeGreaterThan(0);
       expect(game.configSchema.fields, game.id).toBeDefined();
+      expect(game.handOrder, game.id).toBeTypeOf('function');
       expect(game.art.length, game.id).toBeGreaterThan(0);
       expect(game.modes.length, game.id).toBeGreaterThan(0);
 

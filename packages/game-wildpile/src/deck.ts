@@ -1,4 +1,11 @@
-import { isVeilHandle, type CardFace, type CardId, type DeckDef } from '@parlour/engine';
+import {
+  isVeilHandle,
+  stableCardOrder,
+  type CardFace,
+  type CardId,
+  type DeckDef,
+  type HandOrder,
+} from '@parlour/engine';
 
 export const WILDPILE_COLORS = ['red', 'yellow', 'green', 'blue'] as const;
 
@@ -156,3 +163,38 @@ export function sameWildpileFace(left: CardId, right: CardId): boolean {
   if (isVeiledFace(a) || isVeiledFace(b)) return false;
   return a.color === b.color && a.meta.kind === b.meta.kind && a.meta.value === b.meta.value;
 }
+
+const HAND_COLOR_ORDER: Readonly<Record<WildpileColor, number>> = {
+  red: 1,
+  yellow: 2,
+  green: 3,
+  blue: 4,
+};
+
+const HAND_KIND_ORDER: Readonly<Record<WildpileKind, number>> = {
+  number: 0,
+  skip: 10,
+  reverse: 11,
+  'draw-two': 12,
+  wild: 0,
+  'wild-draw-four': 1,
+  'wild-swap': 2,
+  'wild-shuffle': 3,
+  veiled: 99,
+};
+
+/** UNO Mobile order: wilds, then red/yellow/green/blue; numbers before actions. */
+export const orderWildpileHand: HandOrder = (cards) =>
+  stableCardOrder(cards, (left, right) => {
+    const a = faces[left];
+    const b = faces[right];
+    if (!a || a.meta.kind === 'veiled') return b && b.meta.kind !== 'veiled' ? 1 : 0;
+    if (!b || b.meta.kind === 'veiled') return -1;
+    const colorDiff =
+      (a.color ? HAND_COLOR_ORDER[a.color] : 0) - (b.color ? HAND_COLOR_ORDER[b.color] : 0);
+    if (colorDiff !== 0) return colorDiff;
+    const kindDiff = HAND_KIND_ORDER[a.meta.kind] - HAND_KIND_ORDER[b.meta.kind];
+    if (kindDiff !== 0) return kindDiff;
+    const valueDiff = (a.meta.value ?? 0) - (b.meta.value ?? 0);
+    return valueDiff || left.localeCompare(right);
+  });
