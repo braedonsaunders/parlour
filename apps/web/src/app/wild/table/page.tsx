@@ -2,12 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { useRouter } from 'next/navigation';
-import {
-  wildpileDiscardAllCards,
-  type WildpileColor,
-  type WildpileRules,
-  type WildpileState,
-} from '@parlour/game-wildpile';
+import { type WildpileColor, type WildpileRules, type WildpileState } from '@parlour/game-wildpile';
 import { WildTableScreen } from '@/components/table/wild/WildTableScreen';
 import { useSoloTable } from '@/lib/table/useSoloTable';
 import { WildTransport, type WildSnapshot } from '@/lib/solo/WildTransport';
@@ -81,9 +76,9 @@ function ActiveMultiplayerWildTable({ room }: { room: MultiplayerRoomSession }) 
   const localSeat = snapshot.localSeat;
 
   const dispatch = useCallback(
-    (move: string, payload?: unknown, reveals?: readonly string[]) => {
+    (move: string, payload?: unknown) => {
       try {
-        room.send(move, payload, reveals);
+        room.send(move, payload);
         setLocalError(null);
       } catch (error) {
         setLocalError(error instanceof Error ? error.message : 'The move could not be sent.');
@@ -172,10 +167,6 @@ function ActiveMultiplayerWildTable({ room }: { room: MultiplayerRoomSession }) 
     session,
     matchWinner: session.result?.winner ?? null,
   };
-  const playCard = (card: string) => {
-    const cards = session.state.hands[localSeat] ?? [];
-    dispatch('playCard', { card }, wildpileDiscardAllCards(cards, card));
-  };
 
   return (
     <WildTableScreen
@@ -184,7 +175,7 @@ function ActiveMultiplayerWildTable({ room }: { room: MultiplayerRoomSession }) 
       fxKey={snapshot.fxKey}
       busy={!isLocalTurn}
       error={localError ?? snapshot.error}
-      onPlay={playCard}
+      onPlay={(card) => dispatch('playCard', { card })}
       onDraw={() => dispatch('draw')}
       onChooseColor={(color: WildpileColor) => dispatch('chooseColor', { color })}
       onDeclineJump={() => dispatch('declineJump')}
