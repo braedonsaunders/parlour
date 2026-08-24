@@ -458,6 +458,7 @@ export function hintFor(state: KlondikePlayerView): KlondikeHint | null {
 }
 
 export function canAutoFinish(state: KlondikePlayerView): boolean {
+  if (state.stage !== 'playing') return false;
   if (state.stock.length > 0 || state.waste.length > 0) return false;
   if (state.tableau.some((column) => column.down.length > 0)) return false;
   const tableau = cloneTableau(state.tableau);

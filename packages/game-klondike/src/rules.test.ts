@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createSession, sessionApply } from '@parlour/engine';
 import { DECK, SUITS } from './cards';
-import { canAutoFinish, hintFor, klondikeGame, klondikePlayerView } from './game';
+import { canAutoFinish, hintFor, klondikeGame, klondikePlayerView, legalMovesFor } from './game';
 import { applyMove, emptyState, openSession, sessionWithState } from './test-util';
 
 function allStateCards(state: ReturnType<typeof emptyState>): string[] {
@@ -53,6 +53,34 @@ describe('Klondike setup and stock', () => {
     const after = applyMove(before, { id: 'stock.draw' });
     expect(before.state.stock.length - after.state.stock.length).toBe(1);
     expect(after.state.waste).toHaveLength(1);
+  });
+
+  it('turns a final partial Draw Three batch and exposes the next waste card after removal', () => {
+    const state = emptyState({ stock: ['C1', 'D2'], waste: ['S5'] });
+    let session = sessionWithState(state);
+    session = applyMove(session, { id: 'stock.draw' });
+    expect(session.state.stock).toEqual([]);
+    expect(session.state.waste).toEqual(['S5', 'D2', 'C1']);
+    session = applyMove(session, { id: 'waste.toFoundation' });
+    expect(session.state.foundations.clubs).toEqual(['C1']);
+    expect(session.state.waste.at(-1)).toBe('D2');
+  });
+
+  it('preserves stock order over repeated recycles without resurrecting a removed waste card', () => {
+    const state = emptyState({ waste: ['S9', 'H8', 'C7'] });
+    state.tableau[0] = { down: [], up: ['D8'] };
+    let session = sessionWithState(state);
+    session = applyMove(session, { id: 'stock.recycle' });
+    expect(session.state.stock).toEqual(['C7', 'H8', 'S9']);
+    session = applyMove(session, { id: 'stock.draw' });
+    expect(session.state.waste).toEqual(['S9', 'H8', 'C7']);
+    session = applyMove(session, { id: 'waste.toTableau', payload: { to: 0 } });
+    session = applyMove(session, { id: 'stock.recycle' });
+    expect(session.state.stock).toEqual(['H8', 'S9']);
+    expect([...session.state.stock, ...session.state.waste]).not.toContain('C7');
+    session = applyMove(session, { id: 'stock.draw' });
+    expect(session.state.waste).toEqual(['S9', 'H8']);
+    expect(session.state.tableau[0]?.up.at(-1)).toBe('C7');
   });
 });
 
@@ -139,6 +167,10 @@ describe('Klondike moves', () => {
     expect(outcome.session.status).toBe('ended');
     expect(outcome.session.result).toMatchObject({ winner: 0, reason: 'solved in 1 moves' });
     expect(outcome.fx.map((event) => event.kind)).toContain('klondike.win');
+    const won = klondikePlayerView(outcome.session.state);
+    expect(legalMovesFor(outcome.session.state)).toEqual([]);
+    expect(canAutoFinish(won)).toBe(false);
+    expect(hintFor(won)).toBeNull();
   });
 });
 
