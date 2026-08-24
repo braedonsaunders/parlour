@@ -7,6 +7,7 @@ import {
   resolveRoomShareOrigin,
   roomJoinUrl,
   validateRoomCode,
+  validateRoomHostPubkey,
 } from './code';
 
 describe('room codes', () => {
@@ -75,6 +76,16 @@ describe('room codes', () => {
       'https://parlour.app/join/?code=AB2Z',
     );
     expect(() => roomJoinUrl('https://parlour.app/', 'OI10')).toThrow('invalid room code');
+
+    const host = 'ab'.repeat(32);
+    expect(roomJoinUrl('https://parlour.app/', 'AB2Z', host)).toBe(
+      `https://parlour.app/join/?code=AB2Z&host=${host}`,
+    );
+    expect(validateRoomHostPubkey(host.toUpperCase())).toBe(host);
+    expect(validateRoomHostPubkey('not-a-key')).toBeNull();
+    expect(() => roomJoinUrl('https://parlour.app/', 'AB2Z', 'not-a-key')).toThrow(
+      'invalid room host public key',
+    );
   });
 
   it('prefers a configured public share origin for packaged clients', () => {

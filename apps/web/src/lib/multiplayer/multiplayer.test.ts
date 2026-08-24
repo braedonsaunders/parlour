@@ -20,6 +20,7 @@ import {
   validateRoomCode,
   validateEmote,
 } from './index';
+import type { PresenceSnapshot } from './types';
 
 type CounterRules = Record<string, ConfigFieldValue>;
 type CounterState = { count: number };
@@ -147,6 +148,7 @@ describe('resilience state', () => {
     expect(state.expireAndElect(HEARTBEAT_TIMEOUT_MS + 1)).toEqual({
       changed: true,
       hostId: 'peer-b',
+      term: 1,
       resend: [{ id: 'pending-1', seat: 1, move: 'draw' }],
     });
   });
@@ -200,6 +202,7 @@ describe('resilience state', () => {
     expect(state.expireAndElect(HEARTBEAT_TIMEOUT_MS * 2)).toEqual({
       changed: false,
       hostId: 'host',
+      term: 0,
       resend: [],
     });
     expect(state.seats.get(0)?.bot).toBe(false);
@@ -209,6 +212,124 @@ describe('resilience state', () => {
     const state = new MultiplayerState('guest', 'host');
     expect(state.checkHash(4, 'same', 'same')).toBeNull();
     expect(state.checkHash(5, 'local', 'remote')).toEqual({ expectedSeq: 5 });
+  });
+
+  it('orders competing same-term host claims so healed partitions converge', () => {
+    const left = new MultiplayerState('peer-b', 'peer-a');
+    left.seePeer('peer-a', 0);
+    left.seePeer('peer-c', 1_000);
+    const right = new MultiplayerState('peer-c', 'peer-a');
+    right.seePeer('peer-a', 0);
+
+    expect(left.expireAndElect(HEARTBEAT_TIMEOUT_MS + 1)).toMatchObject({
+      hostId: 'peer-b',
+      term: 1,
+    });
+    expect(right.expireAndElect(HEARTBEAT_TIMEOUT_MS + 1)).toMatchObject({
+      hostId: 'peer-c',
+      term: 1,
+    });
+
+    expect(right.considerHostClaim('peer-b', 1)).toBe(true);
+    expect(left.considerHostClaim('peer-c', 1)).toBe(false);
+    expect(left.hostId).toBe('peer-b');
+    expect(right.hostId).toBe('peer-b');
+  });
+
+  it('rejects election-term leaps and claims that are not the deterministic live candidate', () => {
+    const state = new MultiplayerState('peer-c', 'peer-a');
+    state.seePeer('peer-a', 1_000);
+    state.seePeer('peer-b', 1_000);
+
+    expect(state.considerHostClaim('peer-b', 99)).toBe(false);
+    expect(state.considerHostClaim('peer-c', 1)).toBe(false);
+    expect(state.hostId).toBe('peer-a');
+    expect(state.electionTerm).toBe(0);
+  });
+
+  it('lets a winning host term authoritatively replace a conflicting presence snapshot', () => {
+    const state = new MultiplayerState('peer-c', 'peer-a');
+    state.applyPresence(
+      {
+        version: 1,
+        seats: [[0, { peerId: 'peer-a', profileId: 'profile-a', bot: false }]],
+      },
+      4,
+    );
+    const winner: PresenceSnapshot = {
+      version: 1,
+      seats: [[1, { peerId: 'peer-b', profileId: 'profile-b', bot: false }]],
+    };
+
+    expect(() => state.applyPresence(winner, 4)).toThrow('conflicting presence snapshot');
+    expect(state.applyPresence(winner, 4, true)).toBe(true);
+    expect(state.exportPresence()).toEqual(winner);
+  });
+
+  it('adopts a winning recurring host claim and requests its snapshot after a partition heals', async () => {
+    const authority = counterAuthority();
+    const signaling = new NostrSignaling({
+      relays: [],
+      pool: {
+        ensureRelay: vi.fn(),
+        publish: vi.fn(() => []),
+        querySync: vi.fn(async () => []),
+        subscribeMany: vi.fn(() => ({ close() {} })),
+        close: vi.fn(),
+      },
+    });
+    const transport = new P2PTransport({
+      authority,
+      profileId: 'profile-c',
+      signaling,
+      origin: 'https://parlour.test',
+    });
+    const harness = transport as unknown as {
+      resilience: MultiplayerState;
+      pendingResync: boolean;
+      pendingHostMigration: boolean;
+      startRoom(code: string, hostId: string): void;
+      receiveWire(peerId: string, message: unknown): Promise<void>;
+      sendTo: ReturnType<typeof vi.fn>;
+    };
+    harness.sendTo = vi.fn();
+    harness.startRoom('AB2Z', signaling.publicKey);
+    harness.resilience.considerHostClaim(signaling.publicKey, 1, true);
+    harness.resilience.applyPresence(
+      {
+        version: 1,
+        seats: [[0, { peerId: signaling.publicKey, profileId: 'profile-c', bot: false }]],
+      },
+      2,
+    );
+    const winningHost = '0'.repeat(64);
+
+    await harness.receiveWire(winningHost, {
+      type: 'heartbeat',
+      sentAt: 100,
+      hostId: winningHost,
+      term: 1,
+    });
+
+    expect(harness.resilience.hostId).toBe(winningHost);
+    expect(harness.sendTo).toHaveBeenCalledWith(winningHost, {
+      type: 'sync.request',
+      expectedSeq: 0,
+    });
+    await harness.receiveWire(winningHost, {
+      type: 'sync.snapshot',
+      snapshot: {
+        replay: authority.exportSnapshot(),
+        presence: {
+          version: 1,
+          seats: [[0, { peerId: winningHost, profileId: 'profile-b', bot: false }]],
+        },
+      },
+    });
+    expect(harness.resilience.seats.get(0)?.peerId).toBe(winningHost);
+    expect(harness.pendingResync).toBe(false);
+    expect(harness.pendingHostMigration).toBe(false);
+    transport.close();
   });
 });
 

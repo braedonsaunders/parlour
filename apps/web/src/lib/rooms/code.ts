@@ -6,6 +6,8 @@ export const ROOM_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
 export const ROOM_CODE_LENGTH = 4;
 
+export const ROOM_HOST_PUBKEY_LENGTH = 64;
+
 export type NormalizedRoomCode = string;
 
 export function normalizeRoomCode(raw: string): string {
@@ -49,10 +51,20 @@ export function resolveRoomShareOrigin(runtimeOrigin: string, configuredOrigin?:
   return url.origin;
 }
 
-export function roomJoinUrl(origin: string, rawCode: string): string {
+export function validateRoomHostPubkey(raw: string | null | undefined): string | null {
+  const value = raw?.trim().toLowerCase();
+  return value?.length === ROOM_HOST_PUBKEY_LENGTH && /^[0-9a-f]+$/.test(value) ? value : null;
+}
+
+export function roomJoinUrl(origin: string, rawCode: string, hostPubkey?: string): string {
   const verdict = validateRoomCode(rawCode);
   if (!verdict.ok) throw new Error('invalid room code');
   const url = new URL('/join/', origin);
   url.searchParams.set('code', verdict.code);
+  if (hostPubkey !== undefined) {
+    const host = validateRoomHostPubkey(hostPubkey);
+    if (!host) throw new Error('invalid room host public key');
+    url.searchParams.set('host', host);
+  }
   return url.toString();
 }

@@ -241,48 +241,63 @@ export function shareFor(
 }
 
 export type OpenFault =
-  { code: 'missing-shares'; message: string } | { code: 'not-a-card'; message: string };
+  | { code: 'missing-shares'; message: string }
+  | { code: 'invalid-shares'; message: string }
+  | { code: 'not-a-card'; message: string };
 
 /**
  * Finishes an opening once every seat's share has arrived, then reads the card.
  *
- * The shares chain: each is the previous value with one more layer removed, so
- * they must be applied in the order they were produced. A share computed with
- * the wrong exponent produces a value that decodes to no card at all, which is
- * how a dishonest partial decryption is caught immediately rather than at the
- * audit.
+ * The shares chain: each is the previous value with one more layer removed.
+ * Network delivery may reorder the receipts, so the terminal share is the
+ * unique value that decodes through this epoch's codebook. A wrong exponent
+ * leaves no terminal card and is caught before the audit.
  */
 export function finishOpen(
   epoch: VeilEpoch,
   shares: readonly VeilShare[],
   seats: number,
+  requestedPosition = shares[0]?.position,
 ): { card: string } | OpenFault {
   const bySeat = new Map<number, VeilShare>();
+  const expectedSeats =
+    epoch.participants.length > 0 ? epoch.participants : epoch.layers.map((layer) => layer.seat);
   for (const share of shares) {
-    if (share.epoch === epoch.epoch) bySeat.set(share.seat, share);
+    if (
+      share.epoch !== epoch.epoch ||
+      share.position !== requestedPosition ||
+      !expectedSeats.includes(share.seat) ||
+      bySeat.has(share.seat)
+    ) {
+      return {
+        code: 'invalid-shares',
+        message: 'opening shares do not match one distinct peel from every participant',
+      };
+    }
+    bySeat.set(share.seat, share);
   }
-  if (bySeat.size !== seats) {
+  if (expectedSeats.length !== seats || bySeat.size !== seats || shares.length !== seats) {
     return {
       code: 'missing-shares',
       message: `opening needs ${seats} shares, has ${bySeat.size}`,
     };
   }
-  const last = shares[shares.length - 1];
-  if (!last) return { code: 'missing-shares', message: 'no shares supplied' };
-  let opened: bigint;
-  try {
-    opened = elementFromHex(last.value);
-  } catch {
-    return { code: 'not-a-card', message: 'the final share is not a value in the group' };
+  const decoded: string[] = [];
+  for (const share of shares) {
+    try {
+      const card = decodeCard(epoch.codebook, elementFromHex(share.value));
+      if (card) decoded.push(card);
+    } catch {
+      return { code: 'not-a-card', message: 'a share is not a value in the group' };
+    }
   }
-  const card = decodeCard(epoch.codebook, opened);
-  if (!card) {
+  if (decoded.length !== 1) {
     return {
       code: 'not-a-card',
-      message: 'the opened value is not a card in this deck — a share was computed dishonestly',
+      message: 'the peel did not produce one card in this deck — a share was computed dishonestly',
     };
   }
-  return { card };
+  return { card: decoded[0] as string };
 }
 
 /** Deck position -> engine handle, and back. */

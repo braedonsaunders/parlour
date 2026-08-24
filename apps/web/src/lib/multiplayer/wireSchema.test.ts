@@ -62,6 +62,8 @@ const validMessages = [
   },
   { type: 'heartbeat', sentAt: 1 },
   { type: 'host.changed', hostId: 'host', snapshot: migration },
+  { type: 'host.changed', hostId: 'host', term: 2, snapshot: migration },
+  { type: 'heartbeat', sentAt: 100, hostId: 'host', term: 2 },
   { type: 'sync.request', expectedSeq: 2 },
   { type: 'sync.snapshot', snapshot: migration },
   { type: 'emote', emote: 'gg' },
@@ -114,6 +116,11 @@ describe('wire message schema', () => {
     ['negative sequence', { type: 'sync.request', expectedSeq: -1 }],
     ['non-finite timestamp', '{"type":"heartbeat","sentAt":1e400}'],
     ['empty host change identity', { type: 'host.changed', hostId: '', snapshot: migration }],
+    [
+      'invalid host change term',
+      { type: 'host.changed', hostId: 'host', term: -1, snapshot: migration },
+    ],
+    ['partial heartbeat claim', { type: 'heartbeat', sentAt: 100, hostId: 'host' }],
     ['unsupported emote', { type: 'emote', emote: 'raw chat' }],
     [
       'too many peers',

@@ -3,7 +3,12 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
-import { ROOM_CODE_ALPHABET, ROOM_CODE_LENGTH, normalizeRoomCode } from '@/lib/rooms/code';
+import {
+  ROOM_CODE_ALPHABET,
+  ROOM_CODE_LENGTH,
+  normalizeRoomCode,
+  validateRoomHostPubkey,
+} from '@/lib/rooms/code';
 import { useProfileStore } from '@/stores/profile';
 import styles from '@/styles/join.module.css';
 import {
@@ -23,11 +28,16 @@ function readLinkCode(): string {
   return raw ? normalizeRoomCode(raw).slice(0, ROOM_CODE_LENGTH) : '';
 }
 
+function readLinkHost(): string {
+  return validateRoomHostPubkey(new URLSearchParams(window.location.search).get('host')) ?? '';
+}
+
 export default function JoinPage() {
   const router = useRouter();
   const name = useProfileStore((state) => state.name);
   const avatarId = useProfileStore((state) => state.avatarId);
   const linkCode = useSyncExternalStore(subscribeNoop, readLinkCode, () => '');
+  const linkHost = useSyncExternalStore(subscribeNoop, readLinkHost, () => '');
   const [typed, setTyped] = useState<string | null>(null);
   const [roomSession, setRoomSession] = useState<MultiplayerRoomSession | null>(null);
   const [checking, setChecking] = useState(false);
@@ -36,14 +46,14 @@ export default function JoinPage() {
   const code = typed ?? linkCode;
 
   const submit = useCallback(
-    async (code: string) => {
+    async (code: string, expectedHost?: string) => {
       if (checking) return;
       setChecking(true);
       setError(null);
       const next = new MultiplayerRoomSession(multiplayerProfile(name, avatarId));
       setRoomSession(next);
       try {
-        await next.join(code);
+        await next.join(code, expectedHost);
         activateMultiplayerSession(next);
       } catch (caught) {
         setError(
@@ -62,8 +72,8 @@ export default function JoinPage() {
   useEffect(() => {
     if (autoTried.current || !linkCode) return;
     autoTried.current = true;
-    void submit(linkCode);
-  }, [linkCode, submit]);
+    void submit(linkCode, linkHost || undefined);
+  }, [linkCode, linkHost, submit]);
 
   const updateCode = useCallback((raw: string) => {
     setError(null);
@@ -98,7 +108,7 @@ export default function JoinPage() {
         onChange={(event) => updateCode(event.currentTarget.value)}
         onKeyDown={(event) => {
           if (event.key === 'Enter' && code.length === ROOM_CODE_LENGTH && !checking) {
-            void submit(code);
+            void submit(code, typed === null ? linkHost || undefined : undefined);
           }
         }}
         maxLength={ROOM_CODE_LENGTH}
@@ -139,7 +149,7 @@ export default function JoinPage() {
       />
       <button
         type="button"
-        onClick={() => void submit(code)}
+        onClick={() => void submit(code, typed === null ? linkHost || undefined : undefined)}
         disabled={code.length !== ROOM_CODE_LENGTH || checking}
         className="btn-fat w-64 text-lg"
       >

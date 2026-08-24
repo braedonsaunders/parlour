@@ -249,6 +249,24 @@ describe('opening a card over a mesh', () => {
 });
 
 describe('the mesh rejects bad traffic', () => {
+  it('rejects a share from a seat answering outside its peel-chain turn', async () => {
+    const mesh = new Mesh(3);
+    await mesh.openRound();
+    await mesh.runCeremony();
+    const locked = mesh.sessions[0]!.lockedAt(0, 0)!;
+    const outOfTurn = mesh.sessions[2]!.share(0, 0, locked)!;
+    const pending = mesh.rooms[0]!.open(0, 0, 'private');
+
+    await mesh.rooms[0]!.receive('peer:2', {
+      type: 'veil.share',
+      share: outOfTurn,
+      forSeat: 0,
+      sequence: 0,
+    });
+
+    await expect(pending).rejects.toThrow(/outside its peel-chain turn/);
+  });
+
   it('will not adopt a header that describes another room', async () => {
     const mesh = new Mesh(2);
     for (const room of mesh.rooms) await room.announce();

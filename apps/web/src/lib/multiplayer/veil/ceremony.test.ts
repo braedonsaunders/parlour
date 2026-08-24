@@ -134,6 +134,33 @@ describe('private dealing', () => {
     expect((fault as { code: string }).code).toBe('missing-shares');
   });
 
+  it('opens the same card when share receipts arrive out of order', async () => {
+    const { epoch, secrets, seats } = await ceremony();
+    const shares = openPosition(epoch, secrets, 0, 0);
+    const ordered = finishOpen(epoch, shares, seats);
+    const reordered = finishOpen(epoch, [shares[2]!, shares[0]!, shares[1]!], seats);
+    expect(reordered).toEqual(ordered);
+  });
+
+  it('rejects duplicate or cross-position shares instead of letting one shadow another', async () => {
+    const { epoch, secrets, seats } = await ceremony();
+    const shares = openPosition(epoch, secrets, 0, 0);
+    expect(finishOpen(epoch, [shares[0]!, shares[0]!, shares[2]!], seats)).toMatchObject({
+      code: 'invalid-shares',
+    });
+    expect(
+      finishOpen(epoch, [shares[0]!, { ...shares[1]!, position: 1 }, shares[2]!], seats),
+    ).toMatchObject({ code: 'invalid-shares' });
+    expect(
+      finishOpen(
+        epoch,
+        shares.map((share) => ({ ...share, position: 1 })),
+        seats,
+        0,
+      ),
+    ).toMatchObject({ code: 'invalid-shares' });
+  });
+
   it('catches a dishonest share instead of accepting a made-up card', async () => {
     const { epoch, secrets, seats } = await ceremony();
     const liar = { ...(secrets[0] as VeilLayerSecret), key: (secrets[1] as VeilLayerSecret).key };

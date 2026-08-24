@@ -95,6 +95,7 @@ export class P2PTransport implements Transport {
   private heartbeatTimer?: ReturnType<typeof setInterval>;
   private lastEmoteAt = -Infinity;
   private pendingResync = false;
+  private pendingHostMigration = false;
   private closed = false;
   private systemSequence = 0;
 
@@ -139,13 +140,20 @@ export class P2PTransport implements Transport {
     return this.handle(code);
   }
 
-  async join(rawCode: string, resolvedRoom?: RoomAnnouncement): Promise<RoomHandle> {
+  async join(
+    rawCode: string,
+    resolvedRoom?: RoomAnnouncement,
+    expectedHost?: string,
+  ): Promise<RoomHandle> {
     this.assertOpen();
     const verdict = validateRoomCode(rawCode);
     if (!verdict.ok) throw new Error('Room codes use four unambiguous letters or digits');
     const { code } = verdict;
     this.emitPresence({ kind: 'connection', state: 'connecting' });
-    const room = resolvedRoom ?? (await this.signaling.resolve(code));
+    const room = resolvedRoom ?? (await this.signaling.resolve(code, expectedHost));
+    if (expectedHost !== undefined && room.hostPubkey !== expectedHost) {
+      throw new Error('Room announcement does not match the invited host');
+    }
     this.startRoom(code, room.hostPubkey);
     await this.connect(room.hostPubkey, true);
     return this.handle(code);
@@ -283,7 +291,7 @@ export class P2PTransport implements Transport {
       code,
       peerId: this.signaling.publicKey,
       hostId: this.resilience!.hostId,
-      shareUrl: roomJoinUrl(this.origin, code),
+      shareUrl: roomJoinUrl(this.origin, code, this.signaling.publicKey),
       close: () => this.close(),
     };
   }
@@ -370,6 +378,19 @@ export class P2PTransport implements Transport {
     this.resilience?.seePeer(peerId, this.now());
     switch (message.type) {
       case 'heartbeat':
+        if (
+          message.hostId === peerId &&
+          message.term !== undefined &&
+          this.resilience?.considerHostClaim(message.hostId, message.term)
+        ) {
+          this.pendingResync = true;
+          this.pendingHostMigration = true;
+          this.sendTo(message.hostId, {
+            type: 'sync.request',
+            expectedSeq: this.authority.exportSnapshot().log.length,
+          });
+          this.emitPresence({ kind: 'host.changed', hostId: message.hostId });
+        }
         return;
       case 'hello':
         this.profiles.set(peerId, message.profile);
@@ -377,7 +398,7 @@ export class P2PTransport implements Transport {
         return;
       case 'welcome':
         if (peerId !== this.resilience?.hostId || message.hostId !== peerId) return;
-        this.resilience.hostId = message.hostId;
+        this.resilience.considerHostClaim(message.hostId, message.hostTerm ?? 0, true);
         await this.connectMesh(message.peers);
         await this.importMigration(message.snapshot);
         const occupant = this.resilience.seats.get(message.seat);
@@ -428,9 +449,10 @@ export class P2PTransport implements Transport {
         // position — which is only allowed before a single move has landed.
         const opening = !this.pendingResync;
         if (opening && this.authority.exportSnapshot().log.length > 0) return;
-        await this.importMigration(message.snapshot);
+        await this.importMigration(message.snapshot, this.pendingHostMigration);
         const snapshot = this.authority.exportSnapshot();
         this.pendingResync = false;
+        this.pendingHostMigration = false;
         this.emitSnapshot({
           kind: 'snapshot',
           reason: opening ? 'opening' : 'divergence',
@@ -439,9 +461,14 @@ export class P2PTransport implements Transport {
         return;
       }
       case 'host.changed':
-        this.resilience!.expireAndElect(this.now());
-        if (peerId !== message.hostId || message.hostId !== this.resilience!.hostId) return;
-        await this.importMigration(message.snapshot);
+        if (peerId !== message.hostId) return;
+        if (message.term === undefined) {
+          const legacyElection = this.resilience!.expireAndElect(this.now());
+          if (legacyElection.hostId !== message.hostId) return;
+        } else if (!this.resilience!.considerHostClaim(message.hostId, message.term)) return;
+        await this.importMigration(message.snapshot, true);
+        this.pendingResync = false;
+        this.pendingHostMigration = false;
         this.emitPresence({ kind: 'host.changed', hostId: message.hostId });
         return;
       case 'veil':
@@ -478,6 +505,7 @@ export class P2PTransport implements Transport {
     this.sendTo(peerId, {
       type: 'welcome',
       hostId: this.resilience!.hostId,
+      hostTerm: this.resilience!.electionTerm,
       seat,
       peers: this.peerDescriptors(),
       snapshot: this.exportMigration(),
@@ -552,7 +580,13 @@ export class P2PTransport implements Transport {
 
   private heartbeat(): void {
     if (!this.resilience) return;
-    this.broadcast({ type: 'heartbeat', sentAt: this.now() });
+    this.broadcast({
+      type: 'heartbeat',
+      sentAt: this.now(),
+      ...(this.isHost()
+        ? { hostId: this.resilience.hostId, term: this.resilience.electionTerm }
+        : {}),
+    });
     const before = new Map(this.resilience.seats);
     const beforePresence = this.resilience.exportPresence();
     const election = this.resilience.expireAndElect(this.now(), this.heartbeatTimeoutMs);
@@ -566,6 +600,7 @@ export class P2PTransport implements Transport {
       this.broadcast({
         type: 'host.changed',
         hostId: election.hostId,
+        term: election.term,
         snapshot: this.exportMigration(),
       });
       this.emitPresence({ kind: 'host.changed', hostId: election.hostId });
@@ -585,16 +620,23 @@ export class P2PTransport implements Transport {
     };
   }
 
-  private async importMigration(snapshot: MigrationSnapshot): Promise<void> {
+  private async importMigration(
+    snapshot: MigrationSnapshot,
+    authoritativePresence = false,
+  ): Promise<void> {
     validatePresenceSnapshot(snapshot.presence, snapshot.replay.settings.seats);
     await this.authority.importSnapshot(snapshot.replay);
-    this.applyPresence(snapshot.presence, snapshot.replay.settings.seats);
+    this.applyPresence(snapshot.presence, snapshot.replay.settings.seats, authoritativePresence);
   }
 
-  private applyPresence(presence: PresenceSnapshot, maxSeats?: number): void {
+  private applyPresence(
+    presence: PresenceSnapshot,
+    maxSeats?: number,
+    authoritative = false,
+  ): void {
     const before = new Map(this.resilience!.seats);
     const seats = maxSeats ?? this.authority.exportSnapshot().settings.seats;
-    if (!this.resilience!.applyPresence(presence, seats)) return;
+    if (!this.resilience!.applyPresence(presence, seats, authoritative)) return;
     for (const [seat, occupant] of this.resilience!.seats) {
       const previous = before.get(seat);
       if (!previous) {

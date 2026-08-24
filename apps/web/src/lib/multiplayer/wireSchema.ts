@@ -43,6 +43,7 @@ export type WireMessage =
   | {
       type: 'welcome';
       hostId: string;
+      hostTerm?: number;
       seat: SeatId;
       peers: PeerDescriptor[];
       snapshot: MigrationSnapshot;
@@ -51,8 +52,8 @@ export type WireMessage =
   | { type: 'presence.state'; presence: PresenceSnapshot }
   | { type: 'intent'; action: PlayerAction }
   | { type: 'applied'; packet: AppliedPacket }
-  | { type: 'heartbeat'; sentAt: number }
-  | { type: 'host.changed'; hostId: string; snapshot: MigrationSnapshot }
+  | { type: 'heartbeat'; sentAt: number; hostId?: string; term?: number }
+  | { type: 'host.changed'; hostId: string; term?: number; snapshot: MigrationSnapshot }
   | { type: 'sync.request'; expectedSeq: number }
   | { type: 'sync.snapshot'; snapshot: MigrationSnapshot }
   | { type: 'emote'; emote: Emote }
@@ -395,8 +396,9 @@ function isWireMessage(value: unknown): value is WireMessage {
       return hasOnlyKeys(value, ['type', 'profile']) && isPlayerProfile(value.profile);
     case 'welcome': {
       if (
-        !hasOnlyKeys(value, ['type', 'hostId', 'seat', 'peers', 'snapshot']) ||
+        !hasOnlyKeys(value, ['type', 'hostId', 'seat', 'peers', 'snapshot'], ['hostTerm']) ||
         !isBoundedString(value.hostId) ||
+        (value.hostTerm !== undefined && !isBoundedInteger(value.hostTerm, MAX_SEQUENCE)) ||
         !isSeat(value.seat) ||
         !isPeerDescriptors(value.peers) ||
         !isMigrationSnapshot(value.snapshot)
@@ -417,12 +419,16 @@ function isWireMessage(value: unknown): value is WireMessage {
       return hasOnlyKeys(value, ['type', 'packet']) && isAppliedPacket(value.packet);
     case 'heartbeat':
       return (
-        hasOnlyKeys(value, ['type', 'sentAt']) && isBoundedInteger(value.sentAt, MAX_TIMESTAMP)
+        hasOnlyKeys(value, ['type', 'sentAt'], ['hostId', 'term']) &&
+        isBoundedInteger(value.sentAt, MAX_TIMESTAMP) &&
+        ((value.hostId === undefined && value.term === undefined) ||
+          (isBoundedString(value.hostId) && isBoundedInteger(value.term, MAX_SEQUENCE)))
       );
     case 'host.changed':
       return (
-        hasOnlyKeys(value, ['type', 'hostId', 'snapshot']) &&
+        hasOnlyKeys(value, ['type', 'hostId', 'snapshot'], ['term']) &&
         isBoundedString(value.hostId) &&
+        (value.term === undefined || isBoundedInteger(value.term, MAX_SEQUENCE)) &&
         isMigrationSnapshot(value.snapshot)
       );
     case 'sync.request':

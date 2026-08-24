@@ -343,7 +343,7 @@ export class VeilSession {
   ): { card: CardId } | { code: string; message: string } {
     const current = this.epochs.get(epoch);
     if (!current) return { code: 'unknown-epoch', message: 'unknown deck epoch' };
-    const result = finishOpen(current, shares, current.participants.length);
+    const result = finishOpen(current, shares, current.participants.length, position);
     if ('code' in result) return result;
     const handle = handleForPosition(current, position);
     const scope: FaceScope =

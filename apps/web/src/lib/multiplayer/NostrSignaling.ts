@@ -4,6 +4,7 @@ import {
   getPublicKey,
   nip44,
   SimplePool,
+  verifyEvent,
   type Event,
   type Filter,
 } from 'nostr-tools';
@@ -44,6 +45,33 @@ export type RoomAnnouncement = {
   hostPubkey: string;
   settings: RoomSettings;
 };
+
+function parseRoomSettings(content: string): RoomSettings | null {
+  try {
+    const value: unknown = JSON.parse(content);
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+    const candidate = value as Record<string, unknown>;
+    if (
+      typeof candidate.gameId !== 'string' ||
+      candidate.gameId.length === 0 ||
+      candidate.gameId.length > 64 ||
+      !Number.isInteger(candidate.seats) ||
+      (candidate.seats as number) < 2 ||
+      (candidate.seats as number) > 8 ||
+      !candidate.config ||
+      typeof candidate.config !== 'object' ||
+      Array.isArray(candidate.config) ||
+      (candidate.security !== undefined &&
+        candidate.security !== 'open' &&
+        candidate.security !== 'veil')
+    ) {
+      return null;
+    }
+    return candidate as RoomSettings;
+  } catch {
+    return null;
+  }
+}
 
 type SignalingOptions = {
   relays?: readonly string[];
@@ -101,24 +129,39 @@ export class NostrSignaling {
     }
   }
 
-  async resolve(code: string): Promise<RoomAnnouncement> {
+  async resolve(code: string, expectedHost?: string): Promise<RoomAnnouncement> {
+    if (expectedHost !== undefined && !/^[0-9a-f]{64}$/.test(expectedHost)) {
+      throw new Error('Invalid room host public key');
+    }
     const events = await this.pool.querySync(
       this.relays,
-      { kinds: [ROOM_KIND], '#d': [code], limit: 10 },
+      {
+        kinds: [ROOM_KIND],
+        '#d': [code],
+        ...(expectedHost ? { authors: [expectedHost] } : {}),
+        limit: 10,
+      },
       { maxWait: 5_000 },
     );
     const now = Math.floor(this.now() / 1_000);
-    const event = events
-      .filter((candidate) => {
+    const announcement = events
+      .flatMap((candidate) => {
+        if (!verifyEvent(candidate)) return [];
+        if (expectedHost !== undefined && candidate.pubkey !== expectedHost) return [];
         const expiration = candidate.tags.find(([name]) => name === 'expiration')?.[1];
-        return expiration !== undefined && Number(expiration) > now;
+        const settings = parseRoomSettings(candidate.content);
+        return expiration !== undefined && Number(expiration) > now && settings
+          ? [{ event: candidate, settings }]
+          : [];
       })
-      .sort((left, right) => right.created_at - left.created_at)[0];
-    if (!event) throw new Error('Room not found or expired');
-    const settings = JSON.parse(event.content) as RoomSettings;
-    if (!settings.gameId || !Number.isInteger(settings.seats))
-      throw new Error('Invalid room announcement');
-    return { hostPubkey: event.pubkey, settings };
+      .sort((left, right) => right.event.created_at - left.event.created_at)[0];
+    if (
+      !announcement ||
+      (expectedHost !== undefined && announcement.event.pubkey !== expectedHost)
+    ) {
+      throw new Error('Room not found, expired, or hosted by a different peer');
+    }
+    return { hostPubkey: announcement.event.pubkey, settings: announcement.settings };
   }
 
   async send(code: string, targetPubkey: string, payload: SignalPayload): Promise<void> {

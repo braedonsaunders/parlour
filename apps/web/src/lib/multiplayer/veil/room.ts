@@ -465,9 +465,17 @@ export class VeilRoom {
     const key = `${share.epoch}:${share.position}`;
     const waiting = this.pending.get(key);
     if (!waiting) return;
+    const order = this.chain(share.epoch);
+    if (order[sequence] !== share.seat) {
+      this.fail(
+        share.epoch,
+        share.position,
+        `seat ${share.seat} answered outside its peel-chain turn`,
+      );
+      return;
+    }
     if (waiting.shares.some((existing) => existing.seat === share.seat)) return;
     waiting.shares.push(share);
-    const order = this.chain(share.epoch);
     const next = sequence + 1;
     if (next >= order.length) return;
     this.forward(share.epoch, share.position, share.value, next);

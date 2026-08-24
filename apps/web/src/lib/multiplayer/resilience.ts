@@ -68,11 +68,30 @@ export class MultiplayerState {
   private readonly lastSeen = new Map<string, number>();
   private readonly pending = new Map<string, PlayerAction>();
   private presenceVersion = 0;
+  private hostTerm = 0;
 
   constructor(
     readonly localPeerId: string,
     public hostId: string,
   ) {}
+
+  get electionTerm(): number {
+    return this.hostTerm;
+  }
+
+  considerHostClaim(hostId: string, term: number, trustedWelcome = false): boolean {
+    if (!hostId || !Number.isSafeInteger(term) || term < 0) return false;
+    if (!trustedWelcome) {
+      if (term > this.hostTerm + 1) return false;
+      const deterministicCandidate = [this.localPeerId, hostId, ...this.lastSeen.keys()].sort()[0];
+      if (hostId !== deterministicCandidate) return false;
+    }
+    const wins = term > this.hostTerm || (term === this.hostTerm && hostId < this.hostId);
+    if (!wins) return false;
+    this.hostId = hostId;
+    this.hostTerm = term;
+    return true;
+  }
 
   seePeer(peerId: string, now: number): void {
     this.lastSeen.set(peerId, now);
@@ -109,14 +128,19 @@ export class MultiplayerState {
     };
   }
 
-  applyPresence(snapshot: PresenceSnapshot, maxSeats: number): boolean {
+  applyPresence(snapshot: PresenceSnapshot, maxSeats: number, authoritative = false): boolean {
     const validated = validatePresenceSnapshot(snapshot, maxSeats);
-    if (validated.version < this.presenceVersion) return false;
+    if (!authoritative && validated.version < this.presenceVersion) return false;
     if (validated.version === this.presenceVersion) {
-      if (JSON.stringify(validated.seats) !== JSON.stringify(this.exportPresence().seats)) {
+      if (
+        !authoritative &&
+        JSON.stringify(validated.seats) !== JSON.stringify(this.exportPresence().seats)
+      ) {
         throw new Error('conflicting presence snapshot');
       }
-      return false;
+      if (JSON.stringify(validated.seats) === JSON.stringify(this.exportPresence().seats)) {
+        return false;
+      }
     }
     this.seats.clear();
     for (const [seat, occupant] of validated.seats) this.seats.set(seat, occupant);
@@ -139,7 +163,7 @@ export class MultiplayerState {
   expireAndElect(
     now: number,
     timeoutMs = HEARTBEAT_TIMEOUT_MS,
-  ): { changed: boolean; hostId: string; resend: PlayerAction[] } {
+  ): { changed: boolean; hostId: string; term: number; resend: PlayerAction[] } {
     const expired = new Set<string>();
     for (const [peerId, seenAt] of this.lastSeen) {
       if (peerId !== this.localPeerId && now - seenAt > timeoutMs) {
@@ -154,6 +178,7 @@ export class MultiplayerState {
         (peerId) => !expired.has(peerId),
       );
       this.hostId = candidates.sort()[0] ?? this.localPeerId;
+      this.hostTerm++;
     }
 
     let presenceChanged = false;
@@ -171,6 +196,7 @@ export class MultiplayerState {
     return {
       changed: hostExpired,
       hostId: this.hostId,
+      term: this.hostTerm,
       resend: hostExpired ? [...this.pending.values()] : [],
     };
   }
