@@ -5,8 +5,9 @@ export type MusicContext = 'menu' | 'game';
  * Live game surfaces (scene playlists, mood cues); everything else — home,
  * shelves, setup screens, lobbies — plays the pack's menu theme.
  */
-const GAME_ROUTE_PREFIXES = ['/table', '/wild/table', '/match-end'];
-
 export function resolveMusicContext(pathname: string): MusicContext {
-  return GAME_ROUTE_PREFIXES.some((prefix) => pathname.startsWith(prefix)) ? 'game' : 'menu';
+  const route = pathname.split('?')[0] ?? pathname;
+  const isTable = /(^|\/)table(?:\/|$)/.test(route);
+  const isMatchEnd = route === '/match-end' || route.startsWith('/match-end/');
+  return isTable || isMatchEnd ? 'game' : 'menu';
 }
