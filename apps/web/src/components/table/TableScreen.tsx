@@ -179,7 +179,7 @@ function Piles({
   busy: boolean;
   onDraw?: TableScreenProps['onDraw'];
 }) {
-  const visibleDiscard = view.discard.slice(-3);
+  const visibleDiscard = view.discard.slice(0, 3).reverse();
   return (
     <div className={styles.piles}>
       <button

@@ -68,4 +68,19 @@ describe('TableScreen owner hand', () => {
     expect(onDiscard).toHaveBeenCalledOnce();
     expect(onDiscard).toHaveBeenCalledWith('H1');
   });
+
+  it('shows the newest discard on top when the pile contains more than three cards', () => {
+    const view = { ...VIEW, discard: ['C13', 'H12', 'D11', 'S10'] };
+
+    act(() => {
+      root.render(createElement(TableScreen, { view, fx: [], fxKey: 0 }));
+    });
+
+    const discard = container.querySelector('[data-zone="discard"]');
+    const visibleCards = Array.from(discard?.querySelectorAll('[aria-label]') ?? []).map((card) =>
+      card.getAttribute('aria-label'),
+    );
+
+    expect(visibleCards).toEqual(['J of diamonds', 'Q of hearts', 'K of clubs']);
+  });
 });
