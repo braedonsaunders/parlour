@@ -164,15 +164,26 @@ works as it does today. Layer secrets need their own policy:
 
 - Each seat seals its layer secrets under a random recovery key.
 - That key is Shamir-split (GF(256)) among the other active seats.
-- **3–4 seats:** a room-selected threshold recovers a missing layer. The
-  threshold is exactly the number of seats who, colluding, could open a live
-  hand — the room states that number out loud rather than hiding it.
+- **3–4 seats:** a room-selected threshold recovers a missing layer. Each seat
+  hands every other seat exactly one share, addressed — broadcasting the package
+  would give every peer every share and quietly reduce the threshold to one.
+  When a seat drops, the remaining seats collect a quorum, rebuild its layer,
+  and stand in for it on the peel chain so the round continues. The threshold is
+  exactly the number of seats who, colluding, could open a live hand — the room
+  states that number out loud rather than hiding it.
 - **2 seats:** no recovery. Any share that lets your opponent resume also lets
   them read your hand, so the round pauses instead. `recoveryPolicyFor(2)`
   returns `mode: 'none'` and says so.
 
 A bot can continue public turn structure but cannot play a missing human's still
 private hand until the threshold opens that layer.
+
+**Recovery is a privacy loss and is reported as one.** Rebuilding a departed
+seat's layer means whoever holds it can read every card that seat was dealt. The
+room names those seats in the badge for the rest of the round rather than
+letting the loss pass quietly, and a seat is only ever recovered after the room
+agrees it has actually gone. A seat that comes back rotates its material for the
+next round; the current round's layer stays open.
 
 ## Match-end audit
 
@@ -213,5 +224,6 @@ stated in the tier picker before the room is opened.
    public deterministic reducer contract.
 4. ✅ Room security selection, ceremony progress, audit badge and explicit
    two-player disconnect messaging.
-5. ⬜ Threshold recovery wired into live host loss, forced host-loss tests, and
-   independent cryptographic review before calling Veil production-secure.
+5. ✅ Threshold recovery wired into live seat loss (including the host), with
+   forced-disconnect integration tests over the mesh harness.
+6. ⬜ Independent cryptographic review before calling Veil production-secure.

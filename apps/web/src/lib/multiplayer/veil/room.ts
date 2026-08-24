@@ -56,11 +56,24 @@ type Pending = {
 };
 
 const OPEN_TIMEOUT_MS = 20_000;
+const RECOVER_TIMEOUT_MS = 15_000;
+
+type PendingRecovery = {
+  lostSeat: number;
+  epoch: number;
+  offers: Map<number, string>;
+  resolve: (recovered: boolean) => void;
+  timer: ReturnType<typeof setTimeout>;
+};
 
 export class VeilRoom {
   private readonly pending = new Map<string, Pending>();
+  private readonly recovering = new Map<string, PendingRecovery>();
+  private readonly recoveryPromises = new Map<string, Promise<boolean>>();
   private readonly receipts: PeelReceipt[] = [];
   private readonly keys = new Map<number, string>();
+  /** seats the room has been told are gone; their layers may be recovered */
+  private readonly lost = new Set<number>();
 
   constructor(
     private readonly session: VeilSession,
@@ -90,14 +103,92 @@ export class VeilRoom {
     this.link.send({ type: 'veil.header', header }, null);
   }
 
-  /** Lays this seat's layer when it is this seat's turn, and publishes it. */
+  /**
+   * Lays this seat's layer when it is this seat's turn, publishes it, and hands
+   * every other seat one share of the key that would reopen it. The shares go
+   * out one at a time and addressed: broadcasting the whole package would give
+   * every peer every share and quietly reduce the threshold to one.
+   */
   async advanceCeremony(epoch = 0): Promise<boolean> {
     const entry = await this.session.layLayer(epoch);
     if (!entry) return false;
     const transcript = this.session.transcriptRef();
     const signed = transcript?.all().at(-1);
     if (signed) this.link.send({ type: 'veil.entry', entry: signed }, null);
+    await this.distributeRecovery(epoch);
     return true;
+  }
+
+  private async distributeRecovery(epoch: number): Promise<void> {
+    const holders = Array.from({ length: this.seats }, (_, seat) => seat).filter(
+      (seat) => seat !== this.session.seat,
+    );
+    for (const { holder, pack } of await this.session.sealRecovery(epoch, holders)) {
+      const peer = this.link.peerIdForSeat(holder);
+      if (peer) this.link.send({ type: 'veil.recovery', pack }, peer);
+    }
+  }
+
+  /** Marks a seat as gone, so the peel chain stops waiting for it. */
+  markSeatLost(seat: number): void {
+    this.lost.add(seat);
+  }
+
+  markSeatPresent(seat: number): void {
+    this.lost.delete(seat);
+  }
+
+  /** Seats whose layer this client rebuilt — no longer private for the round. */
+  recoveredSeats(): number[] {
+    return this.session.recoveredSeats();
+  }
+
+  /**
+   * Asks the room for enough shares to rebuild a departed seat's layer.
+   *
+   * Resolves false rather than throwing when the room's policy is `none` (two
+   * seats) or when too few holders answer — the caller pauses the round and
+   * says so instead of pretending the cards are gone forever.
+   */
+  recoverSeat(lostSeat: number, epoch = 0): Promise<boolean> {
+    if (this.session.recovery.mode === 'none') return Promise.resolve(false);
+    if (this.session.canCoverSeat(lostSeat, epoch)) return Promise.resolve(true);
+    const key = `${lostSeat}:${epoch}`;
+    // Several openings can stall on the same missing seat at once; they all
+    // wait on one round of collection rather than each starting their own.
+    const inFlight = this.recoveryPromises.get(key);
+    if (inFlight) return inFlight;
+
+    this.lost.add(lostSeat);
+    const pending = new Promise<boolean>((resolve) => {
+      const timer = setTimeout(() => {
+        this.recovering.delete(key);
+        resolve(false);
+      }, RECOVER_TIMEOUT_MS);
+      const offers = new Map<number, string>();
+      // This seat's own share counts toward the quorum.
+      const mine = this.session.shareOfLayer(lostSeat, epoch);
+      if (mine) offers.set(this.session.seat, mine);
+      this.recovering.set(key, { lostSeat, epoch, offers, resolve, timer });
+      this.link.send({ type: 'veil.recover.request', epoch, lostSeat }, null);
+      void this.tryRecover(key);
+    });
+    const tracked = pending.finally(() => this.recoveryPromises.delete(key));
+    this.recoveryPromises.set(key, tracked);
+    return tracked;
+  }
+
+  private async tryRecover(key: string): Promise<void> {
+    const waiting = this.recovering.get(key);
+    if (!waiting) return;
+    if (waiting.offers.size < this.session.recovery.threshold) return;
+    const result = await this.session.recover(waiting.lostSeat, waiting.epoch, [
+      ...waiting.offers.values(),
+    ]);
+    if ('code' in result) return;
+    clearTimeout(waiting.timer);
+    this.recovering.delete(key);
+    waiting.resolve(true);
   }
 
   /**
@@ -137,15 +228,48 @@ export class VeilRoom {
       void this.applyOwnShare(epoch, position, locked, sequence);
       return;
     }
-    const peer = this.link.peerIdForSeat(seat);
+    // A seat that has gone but whose layer the room rebuilt is peeled here
+    // instead of over the wire — that is the whole point of recovery.
+    if (this.session.canCoverSeat(seat, epoch)) {
+      void this.applyRecoveredShare(seat, epoch, position, locked, sequence);
+      return;
+    }
+    const peer = this.lost.has(seat) ? null : this.link.peerIdForSeat(seat);
     if (!peer) {
-      this.fail(epoch, position, `seat ${seat} is not connected, so this card cannot be opened`);
+      this.fail(
+        epoch,
+        position,
+        this.session.recovery.mode === 'none'
+          ? `Seat ${seat} left. With two players there is no way to reopen their cards without ` +
+              `handing over enough key material to read a live hand, so the round pauses here.`
+          : `Seat ${seat} left and their layer has not been recovered yet, so this card cannot ` +
+              `be opened.`,
+      );
       return;
     }
     this.link.send(
       { type: 'veil.peel', epoch, position, forSeat: this.session.seat, locked },
       peer,
     );
+  }
+
+  private async applyRecoveredShare(
+    seat: number,
+    epoch: number,
+    position: number,
+    locked: string,
+    sequence: number,
+  ): Promise<void> {
+    const share = this.session.shareAs(seat, epoch, position, locked);
+    if (!share) {
+      this.fail(epoch, position, `seat ${seat}'s layer is not available`);
+      return;
+    }
+    await this.recordReceipt(epoch, position, seat, sequence, share.value);
+    const waiting = this.pending.get(`${epoch}:${position}`);
+    if (!waiting) return;
+    waiting.shares.push(share);
+    this.forward(epoch, position, share.value, sequence + 1);
   }
 
   private async applyOwnShare(
@@ -256,6 +380,37 @@ export class VeilRoom {
         this.settleRemote(message.share, message.sequence);
         return;
       }
+      case 'veil.recovery':
+        // A sealed layer plus this seat's one share of the key that opens it.
+        this.session.acceptRecovery(message.pack);
+        return;
+      case 'veil.recover.request': {
+        // Only ever answer for a seat this client agrees has gone, and answer
+        // privately: a broadcast share hands the threshold to everyone.
+        if (!this.lost.has(message.lostSeat)) return;
+        if (message.lostSeat === this.session.seat) return;
+        const share = this.session.shareOfLayer(message.lostSeat, message.epoch);
+        if (!share) return;
+        this.link.send(
+          {
+            type: 'veil.recover.offer',
+            epoch: message.epoch,
+            lostSeat: message.lostSeat,
+            holder: this.session.seat,
+            share,
+          },
+          peerId,
+        );
+        return;
+      }
+      case 'veil.recover.offer': {
+        const key = `${message.lostSeat}:${message.epoch}`;
+        const waiting = this.recovering.get(key);
+        if (!waiting) return;
+        waiting.offers.set(message.holder, message.share);
+        await this.tryRecover(key);
+        return;
+      }
       default:
         return;
     }
@@ -290,6 +445,11 @@ export class VeilRoom {
       clearTimeout(waiting.timer);
       this.pending.delete(key);
       waiting.reject(new Error(reason));
+    }
+    for (const [key, waiting] of this.recovering) {
+      clearTimeout(waiting.timer);
+      this.recovering.delete(key);
+      waiting.resolve(false);
     }
   }
 }

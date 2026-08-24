@@ -30,6 +30,10 @@ export type VeilMessage =
   | { type: 'veil.peel'; epoch: number; position: number; forSeat: number; locked: string }
   | { type: 'veil.share'; share: VeilShare; forSeat: number; sequence: number }
   | { type: 'veil.recovery'; pack: RecoveryPackage }
+  /** "seat N is gone — send me your share of its layer" */
+  | { type: 'veil.recover.request'; epoch: number; lostSeat: number }
+  /** one holder's answer, addressed to the requester and never broadcast */
+  | { type: 'veil.recover.offer'; epoch: number; lostSeat: number; holder: number; share: string }
   | { type: 'veil.disclose'; seat: number; secrets: readonly VeilDisclosedSecret[] };
 
 /** A layer secret in transport form — bigints travel as hex, never as numbers. */
@@ -216,6 +220,20 @@ export function isVeilMessage(value: unknown): value is VeilMessage {
       );
     case 'veil.recovery':
       return hasOnlyKeys(value, ['type', 'pack']) && isRecoveryPackage(value.pack);
+    case 'veil.recover.request':
+      return (
+        hasOnlyKeys(value, ['type', 'epoch', 'lostSeat']) &&
+        isIndex(value.epoch, 64) &&
+        isIndex(value.lostSeat, MAX_SEATS - 1)
+      );
+    case 'veil.recover.offer':
+      return (
+        hasOnlyKeys(value, ['type', 'epoch', 'lostSeat', 'holder', 'share']) &&
+        isIndex(value.epoch, 64) &&
+        isIndex(value.lostSeat, MAX_SEATS - 1) &&
+        isIndex(value.holder, MAX_SEATS - 1) &&
+        isHexUpTo(value.share, MAX_SHARE_HEX)
+      );
     case 'veil.disclose':
       return (
         hasOnlyKeys(value, ['type', 'seat', 'secrets']) &&
