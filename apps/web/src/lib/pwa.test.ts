@@ -3,7 +3,12 @@ import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { getInstallPlatform, isStandaloneDisplay, isTauriRuntime, syncAppViewportHeight } from './pwa';
+import {
+  getInstallPlatform,
+  isStandaloneDisplay,
+  isTauriRuntime,
+  syncAppViewportHeight,
+} from './pwa';
 
 describe('installable offline shell', () => {
   it('declares maskable 192px and 512px PNG icons', () => {
