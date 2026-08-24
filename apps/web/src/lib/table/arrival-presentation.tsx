@@ -5,7 +5,6 @@ import {
   useContext,
   useLayoutEffect,
   useMemo,
-  useRef,
   useState,
   type ReactNode,
 } from 'react';
@@ -204,16 +203,27 @@ export function useFanReceiving(): boolean {
   return useContext(ArrivalContext).arriving.size > 0;
 }
 
-/** Drops inbound cards that have not yet been given a gap in the fan. */
+/**
+ * Drops inbound cards that have not yet been given a gap in the fan.
+ *
+ * The last admitted order is real state rather than a ref. A departing card
+ * has already left `cards`, so its old slot can only come from the previous
+ * order — and reading a ref during render can observe a render React threw
+ * away, which would strand a card in the wrong slot mid-flight. Reconciling
+ * during render (React's documented "adjust state when input changes" path)
+ * keeps that read legal without an effect and without a cascading commit:
+ * filtering an already-filtered order is idempotent, so this settles in one
+ * extra pass and lands on exactly the order the ref produced.
+ */
 export function useAdmittedHand(cards: readonly string[]): readonly string[] {
   const { pending, departing } = useContext(ArrivalContext);
-  const previousRef = useRef<readonly string[]>(cards);
+  const [previous, setPrevious] = useState<readonly string[]>(cards);
   const admitted = useMemo(() => {
     const base = pending.size === 0 ? [...cards] : cards.filter((card) => !pending.has(card));
     if (departing.size === 0) return pending.size === 0 ? cards : base;
     const kept: string[] = [];
     const seen = new Set<string>();
-    for (const card of previousRef.current) {
+    for (const card of previous) {
       if (departing.has(card) || base.includes(card)) {
         kept.push(card);
         seen.add(card);
@@ -223,11 +233,13 @@ export function useAdmittedHand(cards: readonly string[]): readonly string[] {
       if (!seen.has(card)) kept.push(card);
     }
     return kept;
-  }, [cards, pending, departing]);
+  }, [cards, pending, departing, previous]);
 
-  useLayoutEffect(() => {
-    previousRef.current = admitted;
-  }, [admitted]);
+  if (previous !== admitted && !sameOrder(previous, admitted)) setPrevious(admitted);
 
   return admitted;
+}
+
+function sameOrder(left: readonly string[], right: readonly string[]): boolean {
+  return left.length === right.length && left.every((card, index) => card === right[index]);
 }

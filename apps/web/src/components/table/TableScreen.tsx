@@ -254,12 +254,16 @@ function Piles({
 
 function LocalHand(props: TableScreenProps & { view: TableView; deal: DealPresentation }) {
   const player = props.view.players.find(({ isLocal }) => isLocal);
-  if (!player) return null;
+  // The hooks below must run on every render, including the one where a
+  // spectator view has no local seat — bailing out first made the hook order
+  // depend on the data and would desync every later hook the moment a seat
+  // appeared or vanished.
   const plannedHand = orderedHand(
-    props.deal.visibleCards(player.hand, player.seat),
+    props.deal.visibleCards(player?.hand ?? [], player?.seat ?? 0),
     blitzCatalog.handOrder,
   );
   const visibleHand = useAdmittedHand(plannedHand);
+  if (!player) return null;
   const canChoose = props.view.legal.discardCards.length > 0 && !props.busy;
   const currentCount = ownerCurrentCount([{ hand: plannedHand, isLocal: true }]);
   return (

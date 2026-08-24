@@ -1,4 +1,4 @@
-import { act, createElement, type ReactNode } from 'react';
+import { act } from 'react';
 import { Fx } from '@parlour/engine';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -15,10 +15,12 @@ import { FX_TIMING } from './fx-motion';
 function Probe({ cardId, hand }: { cardId: string; hand?: readonly string[] }) {
   const arriving = useCardArriving(cardId);
   const admitted = useAdmittedHand(hand ?? [cardId]);
-  return createElement('span', {
-    'data-arriving': arriving ? 'true' : 'false',
-    'data-admitted': admitted.includes(cardId) ? 'true' : 'false',
-  });
+  return (
+    <span
+      data-arriving={arriving ? 'true' : 'false'}
+      data-admitted={admitted.includes(cardId) ? 'true' : 'false'}
+    />
+  );
 }
 
 describe('inboundArrivalCues', () => {
@@ -87,11 +89,12 @@ describe('ArrivalProvider', () => {
     const cue = { startMs: 30, durationMs: FX_TIMING.drawFlightMs };
     act(() => {
       root.render(
-        createElement(ArrivalProvider, {
-          fx: [{ kind: Fx.DrawCard, payload: { card: 'C4', seat: 0, from: 'stock' }, at: 30 }],
-          fxKey: 'draw',
-          children: createElement(Probe, { cardId: 'C4', hand: ['H1', 'C4'] }) as ReactNode,
-        }),
+        <ArrivalProvider
+          fx={[{ kind: Fx.DrawCard, payload: { card: 'C4', seat: 0, from: 'stock' }, at: 30 }]}
+          fxKey={'draw'}
+        >
+          <Probe cardId="C4" hand={['H1', 'C4']} />
+        </ArrivalProvider>,
       );
     });
 
@@ -118,22 +121,21 @@ describe('ArrivalProvider', () => {
     vi.useFakeTimers();
     act(() => {
       root.render(
-        createElement(ArrivalProvider, {
-          fx: [],
-          fxKey: 'idle',
-          children: createElement(Probe, { cardId: 'C4', hand: ['H1', 'C4', 'D3'] }) as ReactNode,
-        }),
+        <ArrivalProvider fx={[]} fxKey={'idle'}>
+          <Probe cardId="C4" hand={['H1', 'C4', 'D3']} />
+        </ArrivalProvider>,
       );
     });
     expect(container.querySelector('span')?.getAttribute('data-admitted')).toBe('true');
 
     act(() => {
       root.render(
-        createElement(ArrivalProvider, {
-          fx: [{ kind: Fx.DiscardCard, payload: { card: 'C4', seat: 0 }, at: 0 }],
-          fxKey: 'discard',
-          children: createElement(Probe, { cardId: 'C4', hand: ['H1', 'D3'] }) as ReactNode,
-        }),
+        <ArrivalProvider
+          fx={[{ kind: Fx.DiscardCard, payload: { card: 'C4', seat: 0 }, at: 0 }]}
+          fxKey={'discard'}
+        >
+          <Probe cardId="C4" hand={['H1', 'D3']} />
+        </ArrivalProvider>,
       );
     });
     expect(container.querySelector('span')?.getAttribute('data-admitted')).toBe('true');
@@ -145,22 +147,20 @@ describe('ArrivalProvider', () => {
   it('does not park another seat’s discard in the local fan', () => {
     act(() => {
       root.render(
-        createElement(ArrivalProvider, {
-          fx: [],
-          fxKey: 'idle',
-          localSeat: 0,
-          children: createElement(Probe, { cardId: 'H4', hand: ['C4', 'D3'] }) as ReactNode,
-        }),
+        <ArrivalProvider fx={[]} fxKey={'idle'} localSeat={0}>
+          <Probe cardId="H4" hand={['C4', 'D3']} />
+        </ArrivalProvider>,
       );
     });
     act(() => {
       root.render(
-        createElement(ArrivalProvider, {
-          fx: [{ kind: Fx.DiscardCard, payload: { card: 'H4', seat: 1 }, at: 0 }],
-          fxKey: 'opp-discard',
-          localSeat: 0,
-          children: createElement(Probe, { cardId: 'H4', hand: ['C4', 'D3'] }) as ReactNode,
-        }),
+        <ArrivalProvider
+          fx={[{ kind: Fx.DiscardCard, payload: { card: 'H4', seat: 1 }, at: 0 }]}
+          fxKey={'opp-discard'}
+          localSeat={0}
+        >
+          <Probe cardId="H4" hand={['C4', 'D3']} />
+        </ArrivalProvider>,
       );
     });
     expect(container.querySelector('span')?.getAttribute('data-admitted')).toBe('false');

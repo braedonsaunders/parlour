@@ -1,4 +1,3 @@
-import { createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { act } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -33,7 +32,11 @@ describe('StockStack', () => {
 
   it('marks the visible top face for flight origins', () => {
     act(() => {
-      root.render(createElement(StockStack, { count: 40 }, createElement('span', null, 'top')));
+      root.render(
+        <StockStack count={40}>
+          <span>top</span>
+        </StockStack>,
+      );
     });
     const stack = container.querySelector('[data-stack-depth]');
     expect(stack?.getAttribute('data-stack-depth')).toBe('5');
@@ -43,7 +46,11 @@ describe('StockStack', () => {
 
   it('keeps an empty well when the stock is gone', () => {
     act(() => {
-      root.render(createElement(StockStack, { count: 0 }, createElement('span', null, 'top')));
+      root.render(
+        <StockStack count={0}>
+          <span>top</span>
+        </StockStack>,
+      );
     });
     expect(container.querySelector('[data-zone-face]')).not.toBeNull();
     expect(container.querySelector('[data-stack-depth]')).toBeNull();

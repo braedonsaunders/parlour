@@ -4,6 +4,7 @@ import {
   replaySession,
   stateHash,
   type ConfigFieldValue,
+  type ConfigSchema,
   type GameDef,
 } from '@parlour/engine';
 import { describe, expect, it } from 'vitest';
@@ -186,5 +187,61 @@ describe('EngineAuthority snapshots', () => {
     ).toThrow('invalid snapshot config');
     expect(guest.getSession()).toBe(adoptedSession);
     expect(guest.exportSnapshot()).toEqual(adoptedSnapshot);
+  });
+
+  /**
+   * A schema may resolve values that are not house-rule *fields* — Blitz's
+   * match-layer `outMask` is the live example. Validating a snapshot against
+   * `fields` alone rejected every such config and took the whole P2P sync path
+   * down with it, so the contract is "whatever `defaults()` declares".
+   */
+  describe('configs carrying non-field schema values', () => {
+    const extraSchema: ConfigSchema<TestConfig> = {
+      fields: configSchema.fields,
+      presets: configSchema.presets,
+      defaults: () => ({ ...configSchema.defaults(), matchFlag: 0 }),
+      resolve: (values) => ({
+        ...configSchema.resolve(values),
+        matchFlag: typeof values.matchFlag === 'number' ? values.matchFlag : 0,
+      }),
+    };
+    const extraGame: GameDef<TestState, TestConfig> = { ...game, configSchema: extraSchema };
+    const extraSettings = (config: TestConfig): RoomSettings => ({
+      gameId: extraGame.id,
+      seats: 2,
+      config,
+    });
+
+    function extraAuthority(config: TestConfig) {
+      return new EngineAuthority({
+        def: extraGame,
+        session: createSession(extraGame, { seed: 5, config, seats: 2 }),
+        settings: extraSettings(config),
+      });
+    }
+
+    it('adopts a snapshot whose config carries a non-field schema value', () => {
+      const config = extraSchema.resolve({ openingScore: 4, matchFlag: 3 });
+      const host = extraAuthority(config);
+      const guest = extraAuthority(extraSchema.resolve({ openingScore: 4, matchFlag: 3 }));
+      expect(() => guest.importSnapshot(host.exportSnapshot())).not.toThrow();
+      expect(guest.exportSnapshot().settings.config).toMatchObject({ matchFlag: 3 });
+    });
+
+    it('still rejects a key the schema never declares', () => {
+      const config = extraSchema.resolve({ openingScore: 4 });
+      const host = extraAuthority(config);
+      const guest = extraAuthority(config);
+      const tampered = host.exportSnapshot();
+      expect(() =>
+        guest.importSnapshot({
+          ...tampered,
+          settings: {
+            ...tampered.settings,
+            config: { ...config, smuggled: 1 } as unknown as TestConfig,
+          },
+        }),
+      ).toThrow('invalid snapshot config');
+    });
   });
 });

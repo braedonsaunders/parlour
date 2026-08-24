@@ -68,9 +68,10 @@ export function useFxAnimation(
               cue.type === 'layoff' ||
               cue.type === 'transfer') &&
             cue.from.startsWith('hand:');
-          const from = leaveFromFan || seatIntoFan
-            ? flightPoint(cue.from, root, bounds, cueCard, element)
-            : zonePoint(cue.from, root, bounds);
+          const from =
+            leaveFromFan || seatIntoFan
+              ? flightPoint(cue.from, root, bounds, cueCard, element)
+              : zonePoint(cue.from, root, bounds);
           const to = seatIntoFan
             ? flightPoint(cue.to, root, bounds, cueCard, element)
             : zonePoint(cue.to, root, bounds);
@@ -282,7 +283,12 @@ export type FlightPoint = {
   handoff?: boolean;
 };
 
-export function zonePoint(zone: Zone, root: HTMLElement, bounds: DOMRect) {
+/**
+ * Annotated as a `FlightPoint` (whose extra fields are all optional) so that
+ * `cond ? flightPoint(...) : zonePoint(...)` collapses to one type instead of
+ * a union that has no `handoff`/`rotate`/`scale` on half its arms.
+ */
+export function zonePoint(zone: Zone, root: HTMLElement, bounds: DOMRect): FlightPoint {
   const anchor =
     root.querySelector<HTMLElement>(`[data-zone="${zone}"]`) ??
     (zone.includes(':')

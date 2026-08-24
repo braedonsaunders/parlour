@@ -208,8 +208,13 @@ export class EngineAuthority<S, C extends RuleValues> implements AuthorityAdapte
 
   private resolveSnapshotConfig(value: unknown): C {
     if (!isRecord(value)) throw new Error('invalid snapshot config');
-    const fieldKeys = new Set(this.def.configSchema.fields.map((field) => field.key));
-    if (Object.keys(value).some((key) => !fieldKeys.has(key))) {
+    // A schema may carry values that are not house-rule *fields* — Blitz's
+    // `outMask` is written by the match layer and deliberately absent from the
+    // picker. Keying this off `fields` alone rejected every Blitz snapshot the
+    // moment that landed, so ask the schema what a complete config looks like.
+    // The round-trip check below still rejects a forged or non-canonical value.
+    const knownKeys = new Set(Object.keys(this.def.configSchema.defaults()));
+    if (Object.keys(value).some((key) => !knownKeys.has(key))) {
       throw new Error('invalid snapshot config');
     }
     const resolved = this.def.configSchema.resolve(value as Partial<C>);
