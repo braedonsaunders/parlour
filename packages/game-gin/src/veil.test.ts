@@ -39,22 +39,38 @@ function toElevenCardAct(session: GameSession<GinState, GinConfig>) {
   let current = sessionApply(def, session, 1, 'option.pass', undefined).session;
   current = sessionApply(def, current, 0, 'option.pass', undefined).session;
   // the settle loop auto-applied seat 1's forced stock draw — throw one back
-  const throwMove = def.flow
-    .legalMovesFor!(current.state, current.phase, 1)
-    .find((move) => move.id === 'discard');
+  const throwMove = def.flow.legalMovesFor!(current.state, current.phase, 1).find(
+    (move) => move.id === 'discard',
+  );
   current = sessionApply(def, current, 1, 'discard', throwMove!.payload).session;
   current = sessionApply(def, current, 0, 'draw.stock', undefined).session;
   return current;
 }
 
 const KNOCK_FACES: readonly CardId[] = [
-  'S5', 'S6', 'S7', 'S8',
-  'H7', 'H8', 'H9',
-  'D5', 'D6', 'D7',
+  'S5',
+  'S6',
+  'S7',
+  'S8',
+  'H7',
+  'H8',
+  'H9',
+  'D5',
+  'D6',
+  'D7',
   'C11',
 ];
 const DEFENDER_FACES: readonly CardId[] = [
-  'C2', 'C3', 'C13', 'D12', 'H2', 'H3', 'S4', 'S9', 'D10', 'C6',
+  'C2',
+  'C3',
+  'C13',
+  'D12',
+  'H2',
+  'H3',
+  'S4',
+  'S9',
+  'D10',
+  'C6',
 ];
 
 describe('gin under Veil', () => {
@@ -78,7 +94,19 @@ describe('gin under Veil', () => {
 
     // opening to a hand above the cap rejects the bluff before the log
     const hand = current.state.hands[0] ?? [];
-    const bluffFaces: CardId[] = ['C2', 'D3', 'H4', 'S6', 'D8', 'C9', 'H10', 'S12', 'D13', 'C7', 'H13'];
+    const bluffFaces: CardId[] = [
+      'C2',
+      'D3',
+      'H4',
+      'S6',
+      'D8',
+      'C9',
+      'H10',
+      'S12',
+      'D13',
+      'C7',
+      'H13',
+    ];
     const bluff = sessionApply(def, current, 0, 'knock', undefined, {
       reveals: hand.map((h, i) => [h, bluffFaces[i]!] as [CardId, CardId]),
     });
@@ -157,9 +185,9 @@ describe('gin under Veil', () => {
     });
     session = sessionApply(matchDef, session, 1, 'option.pass').session;
     session = sessionApply(matchDef, session, 0, 'option.pass').session;
-    const throwMove = matchDef.flow
-      .legalMovesFor!(session.state, session.phase, 1)
-      .find((move) => move.id === 'discard');
+    const throwMove = matchDef.flow.legalMovesFor!(session.state, session.phase, 1).find(
+      (move) => move.id === 'discard',
+    );
     session = sessionApply(matchDef, session, 1, 'discard', throwMove!.payload).session;
     session = sessionApply(matchDef, session, 0, 'draw.stock').session;
 

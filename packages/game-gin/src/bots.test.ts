@@ -2,12 +2,7 @@ import { createSession, sessionApply, makeRng } from '@parlour/engine';
 import { describe, expect, it } from 'vitest';
 import { ginConfigSchema } from './config';
 import { createGinHandDef } from './rules';
-import {
-  GIN_PERSONAS,
-  GIN_TIER_BOTS,
-  ginTierBot,
-  makeGinPersonaBot,
-} from './bots';
+import { GIN_PERSONAS, GIN_TIER_BOTS, ginTierBot, makeGinPersonaBot } from './bots';
 
 const def = createGinHandDef();
 const DEFAULTS = ginConfigSchema.defaults();
@@ -58,9 +53,15 @@ describe('bot legality', () => {
         if (!legal || legal.length === 0) break;
         const rival = seat === 0 ? policy : ginTierBot(3);
         const choice =
-          rival.chooseMove(def.playerView(session.state, seat), seat, legal, makeRng(7).fork(guard), {
-            thinkMs: () => 0,
-          }) ?? legal[0]!;
+          rival.chooseMove(
+            def.playerView(session.state, seat),
+            seat,
+            legal,
+            makeRng(7).fork(guard),
+            {
+              thinkMs: () => 0,
+            },
+          ) ?? legal[0]!;
         session = sessionApply(def, session, seat, choice.id, choice.payload).session;
       }
       expect(session.status).toBe('ended');

@@ -1,0 +1,210 @@
+/* Gin-specific table furniture: deadwood meter, meld glow, hand-end sheet. */
+
+.meldMark {
+  position: absolute;
+  inset: -3px;
+  border-radius: inherit;
+  border: 2px solid rgb(95 174 110 / 0.85);
+  box-shadow:
+    0 0 10px rgb(95 174 110 / 0.35),
+    inset 0 0 6px rgb(95 174 110 / 0.25);
+  pointer-events: none;
+}
+
+.deadwoodMeter {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.3rem 0.75rem;
+  border-radius: 999px;
+  background: rgb(12 14 22 / 0.72);
+  border: 1px solid rgb(255 255 255 / 0.08);
+}
+
+.deadwoodMeter[data-low='true'] {
+  border-color: rgb(95 174 110 / 0.65);
+  box-shadow: 0 0 12px rgb(95 174 110 / 0.28);
+}
+
+.deadwoodMeter span {
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--dusk-200);
+}
+
+.deadwoodMeter strong {
+  font-family: var(--font-display, 'display');
+  font-size: 1rem;
+  font-weight: 900;
+  color: var(--hearth-50);
+}
+
+.optionBanner {
+  position: absolute;
+  left: 50%;
+  top: clamp(9rem, 24%, 13rem);
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.55rem 0.8rem;
+  z-index: 5;
+}
+
+.optionCard {
+  font-family: var(--font-display, 'display');
+  font-weight: 900;
+  font-size: 1.05rem;
+  color: var(--hearth-100);
+}
+
+.handEnd {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  background: rgb(8 10 16 / 0.62);
+  backdrop-filter: blur(4px);
+}
+
+.sheet {
+  width: min(92vw, 34rem);
+  max-height: 86vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  padding: 1.15rem 1.25rem 1.05rem;
+}
+
+.stampRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.stamp {
+  font-family: var(--font-display, 'display');
+  font-size: 1.7rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  color: var(--hearth-50);
+}
+
+.stamp[data-reason='gin'],
+.stamp[data-reason='big-gin'] {
+  color: #7fd694;
+  text-shadow: 0 0 18px rgb(95 174 110 / 0.55);
+}
+
+.stamp[data-reason='undercut'] {
+  color: #e2b049;
+  text-shadow: 0 0 16px rgb(226 176 73 / 0.45);
+}
+
+.points {
+  font-family: var(--font-display, 'display');
+  font-size: 1.25rem;
+  font-weight: 900;
+  color: var(--hearth-100);
+}
+
+.seatRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+
+.seatName {
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: var(--dusk-100);
+  white-space: nowrap;
+}
+
+.meldRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.28rem;
+  align-items: center;
+}
+
+.meldGroup {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 8px;
+  border: 1.5px dashed rgb(95 174 110 / 0.55);
+}
+
+.meldGroup + .meldGroup {
+  margin-left: 0.3rem;
+}
+
+.looseCard {
+  display: inline-flex;
+}
+
+.layoffNote {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--dusk-200);
+}
+
+.scoreLine {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 0.55rem;
+  border-top: 1px solid rgb(255 255 255 / 0.09);
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: var(--hearth-50);
+}
+
+.readyRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.waiting {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--dusk-200);
+}
+
+.ginBurst {
+  pointer-events: none;
+  display: grid;
+  place-items: center;
+  text-align: center;
+}
+
+.ginBurst strong {
+  font-family: var(--font-display, 'display');
+  font-size: clamp(2.4rem, 7vw, 4rem);
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  color: #7fd694;
+  text-shadow:
+    0 0 26px rgb(95 174 110 / 0.65),
+    0 2px 0 rgb(0 0 0 / 0.4);
+}
+
+.ginBurst[data-burst='big-gin'] strong {
+  color: #e2b049;
+  text-shadow:
+    0 0 30px rgb(226 176 73 / 0.7),
+    0 2px 0 rgb(0 0 0 / 0.4);
+}
+
+.ginBurst[data-burst='undercut'] strong {
+  color: #f0876a;
+}

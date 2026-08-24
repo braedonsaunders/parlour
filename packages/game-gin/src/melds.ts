@@ -211,10 +211,7 @@ export function findLayoffs(
   return { melds, layoffs };
 }
 
-function layoffTarget(
-  melds: readonly GinMeld[],
-  card: CardId,
-): { meldIndex: number } | null {
+function layoffTarget(melds: readonly GinMeld[], card: CardId): { meldIndex: number } | null {
   for (let meldIndex = 0; meldIndex < melds.length; meldIndex++) {
     const meld = melds[meldIndex]!;
     if (meld.kind === 'set') {

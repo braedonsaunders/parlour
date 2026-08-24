@@ -1,11 +1,7 @@
 import type { BotPolicy, LegalMove, Rng, SeatId } from '@parlour/engine';
 import { bestPartition } from '../melds';
 import type { GinState } from '../state';
-import {
-  discardMoves,
-  safeDiscard,
-  type GinBotParams,
-} from './shared';
+import { discardMoves, safeDiscard, type GinBotParams } from './shared';
 import { drawOptions } from './view';
 
 /**

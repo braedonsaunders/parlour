@@ -1,12 +1,7 @@
 import type { BotPolicy, LegalMove, Rng, SeatId } from '@parlour/engine';
 import { bestPartition } from '../melds';
 import type { GinState } from '../state';
-import {
-  discardMoves,
-  distanceToGin,
-  safeDiscard,
-  type GinBotParams,
-} from './shared';
+import { discardMoves, distanceToGin, safeDiscard, type GinBotParams } from './shared';
 import { discardDanger, drawOptions, knockSurvival } from './view';
 
 const SURVIVAL_SAMPLES = 40;

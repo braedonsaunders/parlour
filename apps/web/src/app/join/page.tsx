@@ -117,7 +117,11 @@ export default function JoinPage() {
       <JoinStatus
         session={roomSession}
         fallbackError={error}
-        onConnected={(gameId) => router.replace(gameId === 'wildpile' ? '/wild/table' : '/table')}
+        onConnected={(gameId) =>
+          router.replace(
+            gameId === 'wildpile' ? '/wild/table' : gameId === 'gin' ? '/gin/table' : '/table',
+          )
+        }
       />
       <button
         type="button"

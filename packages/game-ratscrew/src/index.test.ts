@@ -11,10 +11,7 @@ import {
 } from '@parlour/engine';
 import { describe, expect, it } from 'vitest';
 import { ratscrewConfigSchema, type RatscrewConfig } from './config';
-import {
-  ratscrewGame,
-  type RatscrewState,
-} from './game';
+import { ratscrewGame, type RatscrewState } from './game';
 import { chancesFor, detectPattern, isFaceCard, rankOf } from './patterns';
 
 function defaults(): RatscrewConfig {
@@ -94,20 +91,12 @@ describe('flip reducer', () => {
   });
 
   it('skips empty seats when advancing the turn', () => {
-    const started = apply(
-      state({ piles: [['S2'], [], ['H9']], seats: 3 }),
-      0,
-      'flip',
-    ).next;
+    const started = apply(state({ piles: [['S2'], [], ['H9']], seats: 3 }), 0, 'flip').next;
     expect(started.turn).toBe(2);
   });
 
   it('opens a slap window on a double and pauses everything', () => {
-    const doubled = apply(
-      state({ center: ['D6'], piles: [['S6', 'S3'], ['H7']] }),
-      0,
-      'flip',
-    );
+    const doubled = apply(state({ center: ['D6'], piles: [['S6', 'S3'], ['H7']] }), 0, 'flip');
     expect(doubled.next.window).toEqual({ pattern: 'double' });
     expect(doubled.next.pendingWin).toBeNull();
     expect(doubled.fx.some((e) => e.kind === 'ratscrew.slap-window')).toBe(true);
@@ -174,7 +163,10 @@ describe('slap reducer', () => {
     const opened = apply(
       state({
         center: ['D6'],
-        piles: [['S6', 'S10'], ['C2', 'H5']],
+        piles: [
+          ['S6', 'S10'],
+          ['C2', 'H5'],
+        ],
         challenge: { challenger: 1, target: 0, chancesLeft: 2 },
         lastFlipper: 1,
       }),
@@ -303,7 +295,8 @@ describe('flow & runtime integration', () => {
 
   it('masks every pile in playerView but keeps counts and the center readable', () => {
     const view = ratscrewGame.playerView(state({ center: ['H5'] }), 1);
-    expect(view.piles[0]).toHaveLength(2);    expect(view.piles[0]?.[0]).toBe('??');
+    expect(view.piles[0]).toHaveLength(2);
+    expect(view.piles[0]?.[0]).toBe('??');
     expect(view.piles[1]?.[0]).toBe('??');
     expect(view.center).toEqual(['H5']);
   });
@@ -331,7 +324,12 @@ describe('config & contract', () => {
   it('resolves presets over defaults', () => {
     expect(applyPreset(ratscrewConfigSchema, 'quick-reflex')).toMatchObject({ slapWindowMs: 700 });
     expect(applyPreset(ratscrewConfigSchema, 'slaphappy')).toMatchObject({ tens: true });
-    expect(defaults()).toMatchObject({ doubles: true, sandwiches: true, tens: false, slapWindowMs: 1200 });
+    expect(defaults()).toMatchObject({
+      doubles: true,
+      sandwiches: true,
+      tens: false,
+      slapWindowMs: 1200,
+    });
   });
 
   it('ships full instructions and a stable id', () => {

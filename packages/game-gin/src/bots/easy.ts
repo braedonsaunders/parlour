@@ -1,11 +1,7 @@
 import type { BotPolicy, LegalMove, Rng, SeatId } from '@parlour/engine';
 import { bestPartition } from '../melds';
 import type { GinState } from '../state';
-import {
-  discardMoves,
-  payloadCard,
-  type GinBotParams,
-} from './shared';
+import { discardMoves, payloadCard, type GinBotParams } from './shared';
 import { drawOptions } from './view';
 
 /**
@@ -66,10 +62,6 @@ function worstThrow(discards: readonly LegalMove[]): LegalMove | null {
     }
   }
   return worst;
-}
-
-function improves(hand: readonly string[], incoming: string): boolean {
-  return hand.some((card) => card.slice(1) === incoming.slice(1));
 }
 
 function cardPoints(card: string): number {

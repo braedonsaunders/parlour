@@ -3,12 +3,7 @@ import type { GinState } from '../state';
 import { makeEasyBot } from './easy';
 import { makeHardBot } from './hard';
 import { makeMediumBot } from './medium';
-import {
-  EASY_PARAMS,
-  HARD_PARAMS,
-  MEDIUM_PARAMS,
-  type GinBotParams,
-} from './params';
+import { EASY_PARAMS, HARD_PARAMS, MEDIUM_PARAMS, type GinBotParams } from './params';
 
 /** The six named characters: tier + parameter skews + emote flavor (spec §9). */
 export interface PersonaDef {

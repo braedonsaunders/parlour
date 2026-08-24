@@ -59,12 +59,10 @@ const events = records.reduce((sum, record) => sum + record.events, 0) / records
 
 console.log('');
 for (const row of aggregateWinRates(records, (_record, seat) => `seat ${seat}`)) {
-  console.log(
-    `  ${row.key.padEnd(8)} ${(row.winRate * 100).toFixed(1)}% over ${row.games} games`,
-  );
+  console.log(`  ${row.key.padEnd(8)} ${(row.winRate * 100).toFixed(1)}% over ${row.games} games`);
 }
 console.log('');
 console.log(
-  `avg ${(events.toFixed(0))} events/game${stalled > 0 ? ` · ${stalled} STALLED` : ''} — done in ${seconds}s`,
+  `avg ${events.toFixed(0)} events/game${stalled > 0 ? ` · ${stalled} STALLED` : ''} — done in ${seconds}s`,
 );
 process.exit(stalled > 0 ? 1 : 0);

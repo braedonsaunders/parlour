@@ -1,10 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  bestPartition,
-  candidateMelds,
-  deadwoodOf,
-  findLayoffs,
-} from './melds';
+import { bestPartition, candidateMelds, deadwoodOf, findLayoffs } from './melds';
 
 const sortCards = (cards: readonly string[]) => [...cards].sort();
 
@@ -19,11 +14,7 @@ describe('candidate melds', () => {
   it('finds runs including every sub-span', () => {
     const melds = candidateMelds(['S3', 'S4', 'S5', 'S6']).filter((m) => m.kind === 'run');
     expect(melds.map((m) => m.cards.join())).toEqual(
-      expect.arrayContaining([
-        'S3,S4,S5',
-        'S4,S5,S6',
-        'S3,S4,S5,S6',
-      ]),
+      expect.arrayContaining(['S3,S4,S5', 'S4,S5,S6', 'S3,S4,S5,S6']),
     );
   });
 
@@ -34,7 +25,7 @@ describe('candidate melds', () => {
 
   it('accepts A-2-3 as a run', () => {
     const melds = candidateMelds(['H1', 'H2', 'H3']).filter((m) => m.kind === 'run');
-    expect(melds.map((m) => m.cards.join())) .toContain('H1,H2,H3');
+    expect(melds.map((m) => m.cards.join())).toContain('H1,H2,H3');
   });
 
   it('does not wrap runs across suits or mix ranks', () => {
@@ -69,11 +60,7 @@ describe('best partition', () => {
   });
 
   it('handles eleven-card big gin hands', () => {
-    const hand = [
-      'S2', 'S3', 'S4', 'S5', 'S6',
-      'H7', 'H8', 'H9',
-      'D3', 'D4', 'D5',
-    ];
+    const hand = ['S2', 'S3', 'S4', 'S5', 'S6', 'H7', 'H8', 'H9', 'D3', 'D4', 'D5'];
     expect(bestPartition(hand)).toMatchObject({ deadwood: 0 });
     expect(bestPartition(hand).melds).toHaveLength(3);
   });

@@ -436,9 +436,7 @@ const flow: HandFlow = {
       if (!state.forceStockDraw) return { phase: phaseFor(state) };
       return {
         phase: phaseFor(state),
-        autoMoves: [
-          { seat: nonDealer(state), move: 'draw.stock', reason: 'both seats passed' },
-        ],
+        autoMoves: [{ seat: nonDealer(state), move: 'draw.stock', reason: 'both seats passed' }],
       };
     }
 
@@ -538,8 +536,8 @@ export function createGinHandDef(options: GinDefOptions = {}): GameDef<GinState,
     playerView(state, seat) {
       return {
         ...state,
-        hands: state.hands.map((hand, at) =>
-          at === seat ? hand : hand.map(() => '?'), // placeholder keeps counts, hides faces
+        hands: state.hands.map(
+          (hand, at) => (at === seat ? hand : hand.map(() => '?')), // placeholder keeps counts, hides faces
         ),
         stock: state.stock.map(() => '?'),
       };

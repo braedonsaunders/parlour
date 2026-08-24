@@ -98,7 +98,9 @@ describe('deal & setup', () => {
     const setup = session.setupFx ?? [];
     expect(setup.filter((event) => event.kind === Fx.DealCard)).toHaveLength(20);
     expect(setup.filter((event) => event.kind === Fx.FlipCard)).toHaveLength(1);
-    expect(setup.map((event) => event.at ?? 0)).toEqual([...setup.map((e) => e.at ?? 0)].sort((a, b) => a - b));
+    expect(setup.map((event) => event.at ?? 0)).toEqual(
+      [...setup.map((e) => e.at ?? 0)].sort((a, b) => a - b),
+    );
   });
 });
 
@@ -153,13 +155,13 @@ describe('draw / discard loop', () => {
 
   it('advances the turn and clears draw markers on discard', () => {
     let state = freshState({ turn: 1 });
-    let fx;
     ({ state } = applyMove(state, 1, 'draw.stock'));
     const hand = [...state.hands[1]!];
     const thrown = hand.find((card) => card !== state.drawnFromStock)!;
     const stockBefore = state.stock.length;
-    ({ state, fx } = applyMove(state, 1, 'discard', { card: thrown }));
-    expect(fx.some((event) => event.kind === Fx.DiscardCard)).toBe(true);
+    const discarded = applyMove(state, 1, 'discard', { card: thrown });
+    state = discarded.state;
+    expect(discarded.fx.some((event) => event.kind === Fx.DiscardCard)).toBe(true);
     expect(state.turn).toBe(0);
     expect(state.discard[0]).toBe(thrown);
     expect(state.stock.length).toBe(stockBefore);
@@ -178,7 +180,10 @@ describe('draw / discard loop', () => {
 describe('knock validation', () => {
   it('accepts deadwood at or below the cap', () => {
     const state = freshState({
-      hands: [['S3', 'S4', 'S5', 'H7', 'H8', 'H9', 'D2', 'D3', 'D4', 'D6'], ['C7', 'C8', 'C9']],
+      hands: [
+        ['S3', 'S4', 'S5', 'H7', 'H8', 'H9', 'D2', 'D3', 'D4', 'D6'],
+        ['C7', 'C8', 'C9'],
+      ],
     });
     expect(def.moves.knock!.validate(state, 0, undefined)).toBe(true); // D6 deadwood = 6
   });
@@ -244,18 +249,11 @@ describe('showdown scoring paths', () => {
   });
 
   it('big gin needs eleven melded cards and pays its own bonus', () => {
-    const eleven = [
-      'S2', 'S3', 'S4', 'S5', 'S6',
-      'H7', 'H8', 'H9',
-      'D3', 'D4', 'D5',
-    ];
+    const eleven = ['S2', 'S3', 'S4', 'S5', 'S6', 'H7', 'H8', 'H9', 'D3', 'D4', 'D5'];
     const scored = scoreHand(
       freshState({
         knocker: 1,
-        hands: [
-          ['C10', 'C12', 'C13'],
-          eleven,
-        ],
+        hands: [['C10', 'C12', 'C13'], eleven],
       }),
     );
     expect(scored.reason).toBe('big-gin');
@@ -268,7 +266,10 @@ describe('showdown scoring paths', () => {
       freshState({
         rules,
         knocker: 1,
-        hands: [['C10', 'C12', 'C13'], ['S2', 'S3', 'S4', 'S5', 'S6', 'H7', 'H8', 'H9', 'D3', 'D4', 'D5']],
+        hands: [
+          ['C10', 'C12', 'C13'],
+          ['S2', 'S3', 'S4', 'S5', 'S6', 'H7', 'H8', 'H9', 'D3', 'D4', 'D5'],
+        ],
       }),
     );
     expect(scored.reason).toBe('gin');
@@ -313,7 +314,7 @@ describe('dead hand', () => {
   it('gives the drawing seat one final act before the hand dies', () => {
     // stock of exactly two after the draw: the act phase is still offered
     const state = freshState({ stock: ['C5', 'D5'] });
-    let next = applyMove(state, 0, 'draw.stock').state;
+    const next = applyMove(state, 0, 'draw.stock').state;
     expect(next.stock).toHaveLength(1);
     expect(next.outcome).toBeNull();
   });

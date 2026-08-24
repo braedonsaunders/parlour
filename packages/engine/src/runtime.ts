@@ -362,7 +362,15 @@ export function sessionApply<S, C extends RuleValues>(
     def,
     session.seed,
     cursor,
-    { seat, moveId, payload: effectivePayload, automatic: false, atMs: meta.atMs, reveals, conceals },
+    {
+      seat,
+      moveId,
+      payload: effectivePayload,
+      automatic: false,
+      atMs: meta.atMs,
+      reveals,
+      conceals,
+    },
     fx,
   );
   settle(def, session.seed, session.seats, cursor, event, fx);

@@ -133,7 +133,6 @@ function averageProjection(hand: readonly CardId[], pool: readonly CardId[]): nu
  * Samples lean on inference so an appetite-heavy opponent reads as stronger.
  */
 export function knockSurvival(ctx: BrainContext, myDeadwood: number, samples: number): number {
-  const opp = opponentSeat(ctx);
   const pool = unseenPool(ctx.view, ctx.seat);
   if (pool.length < HAND_SIZE) return 1;
 
@@ -145,8 +144,7 @@ export function knockSurvival(ctx: BrainContext, myDeadwood: number, samples: nu
     const sample = drawSample(ctx.rng, pool, HAND_SIZE, appetite);
     const partition = bestPartition(sample);
     const laidOff = estimateLayoffs(partition.deadwoodCards, knockerMelds);
-    const final =
-      Math.max(0, partition.deadwood - laidOff) + ctx.params.opponentUplift;
+    const final = Math.max(0, partition.deadwood - laidOff) + ctx.params.opponentUplift;
     if (final <= myDeadwood) escapes += 1;
   }
   return escapes / tries;

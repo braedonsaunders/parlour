@@ -19,7 +19,10 @@ export const ginHowToPlay: HowToPlayDoc = {
       body: ['Two steps, every turn:'],
       bullets: [
         { label: 'Draw', text: 'take the top of the stock, or swipe the top of the discard pile' },
-        { label: 'Discard', text: 'slide one card face-up onto the pile — never a card you drew this turn, from either pile' },
+        {
+          label: 'Discard',
+          text: 'slide one card face-up onto the pile — never a card you drew this turn, from either pile',
+        },
       ],
     },
     {
@@ -59,7 +62,10 @@ export const ginHowToPlay: HowToPlayDoc = {
       heading: 'House rules',
       body: ['Every table can be tuned in room settings:'],
       bullets: [
-        { label: 'Knock cap', text: 'how low you must be to knock — tighter caps mean later hands' },
+        {
+          label: 'Knock cap',
+          text: 'how low you must be to knock — tighter caps mean later hands',
+        },
         { label: 'Match target', text: '50 for a quick game, 100 classic, more for grinders' },
         { label: 'Big gin / bonuses / box bonus', text: 'the payout dials' },
       ],

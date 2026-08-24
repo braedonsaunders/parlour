@@ -63,8 +63,7 @@ export function scoreHand(state: GinState): HandOutcome {
   const finalDeadwood = [knockerPartition.deadwood, defenderDeadwood];
 
   if (defenderDeadwood <= knockerPartition.deadwood) {
-    const points =
-      knockerPartition.deadwood - defenderDeadwood + UNDERCUT_BONUS_POINTS;
+    const points = knockerPartition.deadwood - defenderDeadwood + UNDERCUT_BONUS_POINTS;
     return {
       reason: 'undercut',
       knocker: knockerSeat,

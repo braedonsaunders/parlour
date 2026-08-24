@@ -66,7 +66,9 @@ for (const row of report.personas.rows) {
     row.winRate < report.thresholds.personaBandMin || row.winRate > report.thresholds.personaBandMax
       ? ' ✗'
       : '';
-  console.log(`  ${row.key.padEnd(14)} ${(row.winRate * 100).toFixed(1)}% (${row.games} games)${flagged}`);
+  console.log(
+    `  ${row.key.padEnd(14)} ${(row.winRate * 100).toFixed(1)}% (${row.games} games)${flagged}`,
+  );
 }
 console.log(`  — ${report.personas.passes ? 'PASS' : 'FAIL'}`);
 if (report.stalls > 0) console.log(`  (${report.stalls} abandoned hands)`);

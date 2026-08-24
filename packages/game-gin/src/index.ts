@@ -34,4 +34,5 @@ export type {
   Pickup,
 } from './state';
 export { ginHowToPlay } from './howto';
+export { ginCatalog } from './catalog';
 export * from './bots';

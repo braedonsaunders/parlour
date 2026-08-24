@@ -185,10 +185,7 @@ export function createGinMatchDef(
 // flow delegation
 // ---------------------------------------------------------------------------
 
-function matchFlow(hand: GameDef<GinState, GinConfig>): GameDef<
-  GinMatchState,
-  GinConfig
->['flow'] {
+function matchFlow(hand: GameDef<GinState, GinConfig>): GameDef<GinMatchState, GinConfig>['flow'] {
   const inner = hand.flow;
 
   /** The hand def derives its present phase purely from state. */

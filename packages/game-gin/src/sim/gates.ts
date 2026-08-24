@@ -112,9 +112,7 @@ export function runBalanceGates(opts: {
   const headToHeadPasses = hardWinRate >= thresholds.headToHeadMin;
   const personasPass = failures.length === 0 && personaRows.length === GIN_PERSONAS.length;
   const passed =
-    headToHeadPasses &&
-    personasPass &&
-    stalls / Math.max(1, 2 * games) <= thresholds.maxStallRate;
+    headToHeadPasses && personasPass && stalls / Math.max(1, 2 * games) <= thresholds.maxStallRate;
 
   return {
     gamesPerPhase: games,

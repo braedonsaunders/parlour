@@ -1,9 +1,14 @@
 import { applyPreset, stateHash } from '@parlour/engine';
+import { ginConfigSchema } from '@parlour/game-gin';
 import { wildpileConfig } from '@parlour/game-wildpile';
 import { afterEach, describe, expect, it } from 'vitest';
 import { NostrSignaling, type SignalPayload } from '@/lib/multiplayer/NostrSignaling';
 import type { RoomSettings } from '@/lib/multiplayer/types';
-import { MultiplayerRoomSession, wildMultiplayerSession } from './roomSession';
+import {
+  ginMultiplayerSession,
+  MultiplayerRoomSession,
+  wildMultiplayerSession,
+} from './roomSession';
 
 type SignalHandler = (sender: string, signal: SignalPayload) => void;
 
@@ -210,7 +215,11 @@ describe('multiplayer route composition', () => {
 
     expect(host.getSnapshot()).toMatchObject({ gameId: 'wildpile' });
     expect(guest.getSnapshot()).toMatchObject({ gameId: 'wildpile' });
-    expect(guest.getSnapshot().settings?.config).toMatchObject({ stackDrawTwo: true, stackDrawFour: true, jumpIn: true });
+    expect(guest.getSnapshot().settings?.config).toMatchObject({
+      stackDrawTwo: true,
+      stackDrawFour: true,
+      jumpIn: true,
+    });
 
     const hostSession = wildMultiplayerSession(host.getSnapshot());
     expect(hostSession).not.toBeNull();
@@ -224,6 +233,84 @@ describe('multiplayer route composition', () => {
     });
     expect(stateHash(wildMultiplayerSession(guest.getSnapshot())?.state)).toBe(
       stateHash(wildMultiplayerSession(host.getSnapshot())?.state),
+    );
+  });
+
+  it('discovers a Gin room and keeps replay logs and state hashes identical after moves', async () => {
+    const broker = new MockSignalingBroker();
+    const rtc = new MockRtcNetwork();
+    const host = new MultiplayerRoomSession(
+      { name: 'Host', avatarId: 'ember', profileId: 'gin-host' },
+      {
+        signaling: broker.signaling('gin-host-peer'),
+        peerConnection: rtc.factory('host'),
+        seed: 4242,
+      },
+    );
+    const guest = new MultiplayerRoomSession(
+      { name: 'Guest', avatarId: 'mint', profileId: 'gin-guest' },
+      {
+        signaling: broker.signaling('gin-guest-peer'),
+        peerConnection: rtc.factory('guest'),
+        seed: 7,
+      },
+    );
+    sessions.push(host, guest);
+
+    const room = await host.create({
+      gameId: 'gin',
+      seats: 2,
+      config: ginConfigSchema.resolve({}),
+    });
+    await guest.join(room.code);
+    await eventually(() => expect(guest.getSnapshot().localSeat).toBe(1));
+
+    expect(host.getSnapshot()).toMatchObject({ gameId: 'gin' });
+    expect(guest.getSnapshot()).toMatchObject({ gameId: 'gin' });
+    expect(ginMultiplayerSession(guest.getSnapshot())?.state.scores).toEqual([0, 0]);
+
+    // drive real decisions: the non-dealer (guest) declines first, the host
+    // follows; the forced stock draw for the leader lands automatically in
+    // the settle loop
+    guest.send('option.pass');
+    await eventually(() => {
+      expect(ginMultiplayerSession(guest.getSnapshot())?.log.length).toBeGreaterThan(0);
+    });
+    host.send('option.pass');
+    await eventually(() => {
+      expect(ginMultiplayerSession(guest.getSnapshot())?.log.length).toBeGreaterThanOrEqual(3);
+      expect(ginMultiplayerSession(host.getSnapshot())?.log.length).toBe(
+        ginMultiplayerSession(guest.getSnapshot())?.log.length,
+      );
+    });
+
+    // the leader (seat 1) throws one back, then the host draws from stock
+    const leaderSession = ginMultiplayerSession(host.getSnapshot())!;
+    const throwMove = leaderSession.def.flow.legalMovesFor!(
+      leaderSession.state,
+      leaderSession.phase,
+      1,
+    ).find((move) => move.id === 'discard');
+    expect(throwMove).toBeDefined();
+    guest.send(throwMove!.id, throwMove!.payload);
+    await eventually(() => {
+      expect(ginMultiplayerSession(guest.getSnapshot())?.phase.phase).toBe('turn');
+    });
+
+    const afterThrow = ginMultiplayerSession(host.getSnapshot())!;
+    const draw = afterThrow.def.flow.legalMovesFor!(afterThrow.state, afterThrow.phase, 0).find(
+      (move) => move.id === 'draw.stock',
+    );
+    host.send(draw!.id);
+
+    await eventually(() => {
+      expect(ginMultiplayerSession(host.getSnapshot())?.phase.phase).toBe('act');
+    });
+    expect(stateHash(ginMultiplayerSession(guest.getSnapshot())?.state)).toBe(
+      stateHash(ginMultiplayerSession(host.getSnapshot())?.state),
+    );
+    expect(ginMultiplayerSession(guest.getSnapshot())?.lastAppliedHash).toBe(
+      ginMultiplayerSession(host.getSnapshot())?.lastAppliedHash,
     );
   });
 });

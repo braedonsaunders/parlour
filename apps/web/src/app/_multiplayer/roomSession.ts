@@ -14,6 +14,12 @@ import {
   type WildpileState,
 } from '@parlour/game-wildpile';
 import {
+  createGinMatchDef,
+  ginConfigSchema,
+  type GinConfig,
+  type GinMatchState,
+} from '@parlour/game-gin';
+import {
   EngineAuthority,
   P2PTransport,
   type AppliedPacket,
@@ -35,7 +41,7 @@ import {
 import { NostrSignaling, type RoomAnnouncement } from '@/lib/multiplayer/NostrSignaling';
 import { validateRoomCode } from '@/lib/rooms/code';
 
-export type MultiplayerGameId = 'blitz' | 'wildpile';
+export type MultiplayerGameId = 'blitz' | 'wildpile' | 'gin';
 
 /** What the room badge shows about privacy — see lib/multiplayer/veil. */
 export type MultiplayerSecurity = {
@@ -56,7 +62,9 @@ export type MultiplayerSecurity = {
   paused: string | null;
 };
 export type MultiplayerGameSession =
-  GameSession<BlitzState, BlitzConfig> | GameSession<WildpileState, WildpileRules>;
+  | GameSession<BlitzState, BlitzConfig>
+  | GameSession<WildpileState, WildpileRules>
+  | GameSession<GinMatchState, GinConfig>;
 
 export type MultiplayerProfile = {
   name: string;
@@ -644,6 +652,14 @@ export function blitzMultiplayerSession(
     : null;
 }
 
+export function ginMultiplayerSession(
+  snapshot: MultiplayerRoomSnapshot,
+): GameSession<GinMatchState, GinConfig> | null {
+  return snapshot.gameId === 'gin'
+    ? (snapshot.session as GameSession<GinMatchState, GinConfig> | null)
+    : null;
+}
+
 export function wildMultiplayerSession(
   snapshot: MultiplayerRoomSnapshot,
 ): GameSession<WildpileState, WildpileRules> | null {
@@ -658,6 +674,7 @@ function stateHolds(state: unknown, handle: string): boolean {
 
 /** The game pack a room's settings name. */
 function gameDefFor(settings: RoomSettings) {
+  if (settings.gameId === 'gin') return createGinMatchDef();
   return settings.gameId === 'wildpile' ? wildpileGame : createBlitzDef();
 }
 
@@ -699,6 +716,14 @@ function resolveRoomSettings(settings: RoomSettings): RoomSettings {
       security,
     };
   }
+  if (settings.gameId === 'gin') {
+    return {
+      gameId: 'gin',
+      seats: settings.seats,
+      config: ginConfigSchema.resolve(settings.config as Partial<GinConfig>),
+      security,
+    };
+  }
   throw new Error(`unsupported room game: ${settings.gameId}`);
 }
 
@@ -715,6 +740,18 @@ function createRoomRuntime(
   const veiled = settings.security === 'veil' && deckOrder !== undefined;
   const veil = veiled ? { veiled: true, deckOrder } : {};
   const runtimeSettings: RoomSettings = veiled ? settings : { ...settings, security: 'open' };
+  if (settings.gameId === 'gin') {
+    const def = createGinMatchDef();
+    const config = settings.config as GinConfig;
+    const session = createSession(def, { seed, config, seats: settings.seats, ...veil });
+    const authority = new EngineAuthority({
+      def,
+      session,
+      settings: runtimeSettings,
+      onSeatBot,
+    });
+    return { session, authority };
+  }
   if (settings.gameId === 'wildpile') {
     const config = settings.config as WildpileRules;
     const session = createSession(wildpileGame, { seed, config, seats: settings.seats, ...veil });
