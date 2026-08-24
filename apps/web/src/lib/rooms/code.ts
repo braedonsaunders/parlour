@@ -1,5 +1,3 @@
-import type { Rng } from '@parlour/engine';
-
 /**
  * 4-char room codes over an unambiguous alphabet (spec §4.2):
  * no 0/O/1/I — everything a human reads or types stays decidable.
@@ -32,9 +30,17 @@ export function validateRoomCode(
   return { ok: true, code };
 }
 
-/** Deterministic code generation from the engine's seeded Rng (host-side). */
-export function makeRoomCode(rng: Rng): NormalizedRoomCode {
-  let out = '';
-  for (let i = 0; i < ROOM_CODE_LENGTH; i += 1) out += rng.pick(ROOM_CODE_ALPHABET.split(''));
-  return out;
+export function createRoomCode(randomBytes: (length: number) => Uint8Array): NormalizedRoomCode {
+  const bytes = randomBytes(ROOM_CODE_LENGTH);
+  if (bytes.length < ROOM_CODE_LENGTH) throw new Error('room code source returned too few bytes');
+  return [...bytes]
+    .slice(0, ROOM_CODE_LENGTH)
+    .map((value) => ROOM_CODE_ALPHABET[value % ROOM_CODE_ALPHABET.length])
+    .join('');
+}
+
+export function roomJoinUrl(origin: string, rawCode: string): string {
+  const verdict = validateRoomCode(rawCode);
+  if (!verdict.ok) throw new Error('invalid room code');
+  return new URL(`/join/${verdict.code}`, origin).toString();
 }

@@ -6,14 +6,16 @@ import {
   MultiplayerState,
   normalizeRoomCode,
   roomJoinUrl,
+  validateRoomCode,
   validateEmote,
 } from './index';
 
 describe('room identity', () => {
-  it('normalizes an unambiguous four-character code and rejects unsafe input', () => {
+  it('normalizes input separately from validating an unambiguous four-character code', () => {
     expect(normalizeRoomCode(' ab2z ')).toBe('AB2Z');
-    expect(normalizeRoomCode('OI10')).toBeNull();
-    expect(normalizeRoomCode('ABC')).toBeNull();
+    expect(normalizeRoomCode('OI10')).toBe('OI10');
+    expect(validateRoomCode('OI10').ok).toBe(false);
+    expect(validateRoomCode('ABC').ok).toBe(false);
     expect(roomJoinUrl('https://parlour.app/', 'ab2z')).toBe('https://parlour.app/join/AB2Z');
   });
 });

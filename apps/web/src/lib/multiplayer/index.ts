@@ -1,5 +1,5 @@
 export * from './types';
-export * from './roomCode';
+export * from '../rooms/code';
 export * from './resilience';
 export * from './emotes';
 export * from './NostrSignaling';

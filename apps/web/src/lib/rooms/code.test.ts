@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { makeRng } from '@parlour/engine';
-import { ROOM_CODE_ALPHABET, makeRoomCode, normalizeRoomCode, validateRoomCode } from './code';
+import {
+  createRoomCode,
+  ROOM_CODE_ALPHABET,
+  ROOM_CODE_LENGTH,
+  normalizeRoomCode,
+  roomJoinUrl,
+  validateRoomCode,
+} from './code';
 
 describe('room codes', () => {
   it('alphabet excludes ambiguous glyphs 0 O 1 I', () => {
@@ -45,10 +51,26 @@ describe('room codes', () => {
     expect(validateRoomCode('0000')).toMatchObject({ ok: false, issue: { reason: 'charset' } });
   });
 
-  it('makeRoomCode is deterministic under a seeded rng and always valid', () => {
-    const rng = makeRng(1234);
-    const code = makeRoomCode(rng);
-    expect(code).toBe(makeRoomCode(makeRng(1234)));
+  it('creates a valid code from an injected byte source', () => {
+    const requestedLengths: number[] = [];
+    const code = createRoomCode((length) => {
+      requestedLengths.push(length);
+      return Uint8Array.from([0, 1, 31, 32]);
+    });
+
+    expect(requestedLengths).toEqual([ROOM_CODE_LENGTH]);
+    expect(code).toBe('AB9A');
     expect(validateRoomCode(code)).toEqual({ ok: true, code });
+  });
+
+  it('rejects a byte source that cannot fill a room code', () => {
+    expect(() => createRoomCode(() => Uint8Array.from([1, 2, 3]))).toThrow(
+      'room code source returned too few bytes',
+    );
+  });
+
+  it('builds join URLs only for validated room codes', () => {
+    expect(roomJoinUrl('https://parlour.app/', ' ab-2z ')).toBe('https://parlour.app/join/AB2Z');
+    expect(() => roomJoinUrl('https://parlour.app/', 'OI10')).toThrow('invalid room code');
   });
 });
