@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { wildpileConfig, wildpileHowToPlay } from '@parlour/game-wildpile';
+import { GameArt } from '@/components/GameArt';
+import { getGame } from '@/lib/games';
 import { HowToPlayButton } from '@/components/HowToPlay';
 import { RuleSettings } from '@/components/settings/RuleSettings';
 import { useCenteredCarousel } from '@/hooks/useCenteredCarousel';
@@ -12,14 +14,7 @@ import { useWildSetupStore, wildRulesFor } from '@/stores/wildSetup';
 import styles from '@/styles/modes.module.css';
 import gameStyles from '@/styles/games.module.css';
 
-const SEAT_OPTIONS = [2, 3, 4] as const;
-
-/** Two cards that read as the mode at a glance, behind the shared 7. */
-const PREVIEW_CARDS: Record<string, readonly [string, string]> = {
-  classic: ['↻', '⊘'],
-  party: ['+4', '⚡'],
-  houseRules: ['⇄', '0'],
-};
+const SEAT_OPTIONS = getGame('wild').seats;
 
 export default function WildSetupPage() {
   const router = useRouter();
@@ -172,14 +167,7 @@ function ModeTile({
         }}
       >
         <span className={styles.tileGlow} />
-        <span className={styles.preview}>
-          <span className={gameStyles.wildCard}>7</span>
-          {(PREVIEW_CARDS[def.id] ?? PREVIEW_CARDS.classic ?? []).map((pip, index) => (
-            <span key={index} className={gameStyles.wildCard}>
-              {pip}
-            </span>
-          ))}
-        </span>
+        <GameArt cards={def.art} motif={def.motif} />
         <span className={styles.tagline}>{def.tagline}</span>
         <h2 className={styles.modeName}>{def.name}</h2>
         <span className={styles.facts}>

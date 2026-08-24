@@ -14,7 +14,7 @@ describe('mode catalog', () => {
       expect(mode.facts.length).toBeGreaterThan(0);
       expect(mode.accent).toMatch(/^#[0-9a-f]{6}$/);
       expect(mode.shade).toMatch(/^#[0-9a-f]{6}$/);
-      expect(['lives', 'snap', 'clock']).toContain(mode.preview);
+      expect(['lives', 'snap', 'clock']).toContain(mode.motif);
     }
   });
 

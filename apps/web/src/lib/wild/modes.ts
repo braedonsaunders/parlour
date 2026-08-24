@@ -1,54 +1,17 @@
+import type { GameMode } from '@parlour/engine';
 import type { WildpileRules } from '@parlour/game-wildpile';
+import { gameModes, isGameModeId } from '@/lib/games';
 
 export type WildModeId = 'classic' | 'party' | 'houseRules';
 
-export interface WildModeDef {
-  id: WildModeId;
-  name: string;
-  tagline: string;
-  description: string;
-  facts: readonly string[];
-  accent: string;
-  shade: string;
-}
+export type WildModeDef = GameMode;
 
 /**
- * Wild's two table settings — presentation for @parlour/game-wildpile's config
- * presets (`classic` / `party`). Rule values live in the package's schema; this
- * catalog is presentation only, mirroring lib/modes.ts for Blitz.
+ * Wild's table settings, straight from the pack's shelf entry. Rule values live
+ * in @parlour/game-wildpile's config schema and the presentation lives beside
+ * them in its catalog; this module is only the app-side name for that list.
  */
-export const WILD_MODES: readonly WildModeDef[] = [
-  {
-    id: 'classic',
-    name: 'Classic',
-    tagline: 'By the book',
-    description:
-      'Match the color or the number, shed every card. No stacking, no jump-ins — a polite riot.',
-    facts: ['one deal', 'no stacking', '~5 min'],
-    accent: '#4ba1ba',
-    shade: '#25586e',
-  },
-  {
-    id: 'party',
-    name: 'Party',
-    tagline: 'Stack and slam',
-    description:
-      'Draw-twos and draw-fours pile up, and an exact match lets anyone jump in out of turn. Chaos, warmly lit.',
-    facts: ['stacking on', 'jump-ins on', '~5 min'],
-    accent: '#c8566b',
-    shade: '#7c2c3e',
-  },
-  {
-    id: 'houseRules',
-    name: 'House Rules',
-    tagline: 'Everything on',
-    description:
-      'Sevens trade hands, zeroes pass them along, swap-hand wilds join the deck, and a card you drew has to be played.',
-    facts: ['7-0 swaps', 'swap wilds', 'force play'],
-    accent: '#7f6bd0',
-    shade: '#402f7a',
-  },
-];
+export const WILD_MODES: readonly WildModeDef[] = gameModes('wild');
 
 /**
  * Wild deals once and runs about five minutes. There is no match clock, so this
@@ -65,7 +28,7 @@ export function getWildMode(id: WildModeId): WildModeDef {
 }
 
 export function isWildModeId(value: unknown): value is WildModeId {
-  return typeof value === 'string' && BY_ID.has(value as WildModeId);
+  return isGameModeId('wild', value);
 }
 
 /**
