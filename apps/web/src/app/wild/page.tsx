@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useWipeRouter } from '@/hooks/useWipeRouter';
 import { useState } from 'react';
 import { wildpileConfig, wildpileHowToPlay } from '@parlour/game-wildpile';
 import { GameArt } from '@/components/GameArt';
@@ -18,7 +18,7 @@ import gameStyles from '@/styles/games.module.css';
 const SEAT_OPTIONS = getGame('wild').seats;
 
 export default function WildSetupPage() {
-  const router = useRouter();
+  const router = useWipeRouter();
   const mode = useWildSetupStore((s) => s.mode);
   const seats = useWildSetupStore((s) => s.seats);
   const botTier = useWildSetupStore((s) => s.botTier);

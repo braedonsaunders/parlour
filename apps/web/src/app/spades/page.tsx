@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useWipeRouter } from '@/hooks/useWipeRouter';
 import { useState } from 'react';
 import { GameArt } from '@/components/GameArt';
 import { BotDifficultyPicker } from '@/components/setup/BotDifficultyPicker';
@@ -12,7 +12,7 @@ import { useSpadesSetupStore } from '@/stores/spadesSetup';
 import styles from '@/styles/modes.module.css';
 
 export default function SpadesSetupPage() {
-  const router = useRouter();
+  const router = useWipeRouter();
   const mode = useSpadesSetupStore((s) => s.mode);
   const botTier = useSpadesSetupStore((s) => s.botTier);
   const setMode = useSpadesSetupStore((s) => s.setMode);

@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useWipeRouter } from '@/hooks/useWipeRouter';
 import { useState } from 'react';
 import { GameArt } from '@/components/GameArt';
 import { getGameMode } from '@/lib/games';
@@ -16,7 +16,7 @@ import { useKlondikeSetupStore } from '@/stores/klondikeSetup';
 import modeStyles from '@/styles/modes.module.css';
 
 export default function KlondikeSetupPage() {
-  const router = useRouter();
+  const router = useWipeRouter();
   const storedMode = useKlondikeSetupStore((state) => state.mode);
   const startRun = useKlondikeSetupStore((state) => state.start);
   const [mode, setMode] = useState<KlondikeModeId>(storedMode);

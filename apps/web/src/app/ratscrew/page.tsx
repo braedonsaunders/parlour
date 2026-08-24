@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useWipeRouter } from '@/hooks/useWipeRouter';
 import { useState } from 'react';
 import { ratscrewConfigSchema, ratscrewHowToPlay } from '@parlour/game-ratscrew';
 import { GameArt } from '@/components/GameArt';
@@ -18,7 +18,7 @@ import gameStyles from '@/styles/games.module.css';
 const SEAT_OPTIONS = getGame('ratscrew').seats;
 
 export default function RatscrewSetupPage() {
-  const router = useRouter();
+  const router = useWipeRouter();
   const mode = useRatscrewSetupStore((s) => s.mode);
   const seats = useRatscrewSetupStore((s) => s.seats);
   const botTier = useRatscrewSetupStore((s) => s.botTier);

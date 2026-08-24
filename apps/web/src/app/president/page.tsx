@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useWipeRouter } from '@/hooks/useWipeRouter';
 import { useState } from 'react';
 import { presidentConfig, presidentHowToPlay } from '@parlour/game-president';
 import { GameArt } from '@/components/GameArt';
@@ -18,7 +18,7 @@ import gameStyles from '@/styles/games.module.css';
 const SEAT_OPTIONS = getGame('president').seats;
 
 export default function PresidentSetupPage() {
-  const router = useRouter();
+  const router = useWipeRouter();
   const mode = usePresidentSetupStore((s) => s.mode);
   const seats = usePresidentSetupStore((s) => s.seats);
   const botTier = usePresidentSetupStore((s) => s.botTier);

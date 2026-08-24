@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useWipeRouter } from '@/hooks/useWipeRouter';
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { RoomLobby } from '@/components/multiplayer/RoomLobby';
 import { SecurityBadge } from '@/components/multiplayer/TableSecurity';
@@ -15,7 +15,7 @@ import {
 } from '../../_multiplayer/roomSession';
 
 export default function CreateWildRoomPage() {
-  const router = useRouter();
+  const router = useWipeRouter();
   const name = useProfileStore((state) => state.name);
   const avatarId = useProfileStore((state) => state.avatarId);
   const mode = useWildSetupStore((state) => state.mode);

@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
-import { useRouter } from 'next/navigation';
+import { useWipeRouter } from '@/hooks/useWipeRouter';
 import {
   wildpileDiscardAllCards,
   type WildpileColor,
@@ -72,7 +72,7 @@ function SoloWildTablePage() {
 }
 
 function ActiveMultiplayerWildTable({ room }: { room: MultiplayerRoomSession }) {
-  const router = useRouter();
+  const router = useWipeRouter();
   const setLastMatch = useMatchFlowStore((state) => state.setLastMatch);
   const registerPlayAgain = useMatchFlowStore((state) => state.registerPlayAgain);
   const recordResult = useProfileStore((state) => state.recordResult);
@@ -245,7 +245,7 @@ function ActiveMultiplayerWildTable({ room }: { room: MultiplayerRoomSession }) 
 }
 
 function ActiveWildTable({ transport }: { transport: WildTransport }) {
-  const router = useRouter();
+  const router = useWipeRouter();
   const setLastMatch = useMatchFlowStore((state) => state.setLastMatch);
   const registerPlayAgain = useMatchFlowStore((state) => state.registerPlayAgain);
   const recordResult = useProfileStore((state) => state.recordResult);

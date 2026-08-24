@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
-import { useRouter } from 'next/navigation';
+import { useWipeRouter } from '@/hooks/useWipeRouter';
 import { Fx, isActingSeat, type FxEvent, type MatchResult } from '@parlour/engine';
 import { RoundEndOverlay } from '@/components/celebration/RoundEndOverlay';
 import { TableScreen, type TableView } from '@/components/table/TableScreen';
@@ -61,7 +61,7 @@ function SoloTablePage() {
 }
 
 function ActiveMultiplayerTable({ room }: { room: MultiplayerRoomSession }) {
-  const router = useRouter();
+  const router = useWipeRouter();
   const snapshot = useSyncExternalStore(room.subscribe, room.getSnapshot, room.getSnapshot);
   const [localError, setLocalError] = useState<string | null>(null);
   const setLastMatch = useMatchFlowStore((state) => state.setLastMatch);
@@ -204,7 +204,7 @@ function numericDetail(value: number | string | boolean | undefined): number {
 }
 
 function ActiveSoloTable({ transport }: { transport: LocalTransport }) {
-  const router = useRouter();
+  const router = useWipeRouter();
   const setLastMatch = useMatchFlowStore((state) => state.setLastMatch);
   const registerPlayAgain = useMatchFlowStore((state) => state.registerPlayAgain);
   const recordResult = useProfileStore((state) => state.recordResult);

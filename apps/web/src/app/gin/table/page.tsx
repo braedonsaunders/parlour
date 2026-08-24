@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
-import { useRouter } from 'next/navigation';
+import { useWipeRouter } from '@/hooks/useWipeRouter';
 import type { GinModeId } from '@/lib/gin/modes';
 import { usePodiumHandoff } from '@/lib/table/usePodiumHandoff';
 import { GinTableScreen } from '@/components/table/gin/GinTableScreen';
@@ -59,7 +59,7 @@ function SoloGinTablePage() {
 }
 
 function SoloGinTable({ transport }: { transport: GinTransport }) {
-  const router = useRouter();
+  const router = useWipeRouter();
   const setLastMatch = useMatchFlowStore((state) => state.setLastMatch);
   const registerPlayAgain = useMatchFlowStore((state) => state.registerPlayAgain);
   const handOffToPodium = usePodiumHandoff();
@@ -132,7 +132,7 @@ function SoloGinTable({ transport }: { transport: GinTransport }) {
 }
 
 function ActiveMultiplayerGinTable({ room }: { room: MultiplayerRoomSession }) {
-  const router = useRouter();
+  const router = useWipeRouter();
   const setLastMatch = useMatchFlowStore((state) => state.setLastMatch);
   const registerPlayAgain = useMatchFlowStore((state) => state.registerPlayAgain);
   const handOffToPodium = usePodiumHandoff();

@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
-import { useRouter } from 'next/navigation';
+import { useWipeRouter } from '@/hooks/useWipeRouter';
 import type { FxEvent } from '@parlour/engine';
 import { RatscrewTableScreen } from '@/components/table/ratscrew/RatscrewTableScreen';
 import { RatscrewTransport, type RatscrewSnapshot } from '@/lib/solo/RatscrewTransport';
@@ -71,7 +71,7 @@ function SoloRatscrewTablePage() {
 
 /** Drives the UI off the transport's real-time notifications. */
 function LiveRatscrewTable({ transport }: { transport: RatscrewTransport }) {
-  const router = useRouter();
+  const router = useWipeRouter();
   const setLastMatch = useMatchFlowStore((state) => state.setLastMatch);
   const registerPlayAgain = useMatchFlowStore((state) => state.registerPlayAgain);
   const handOffToPodium = usePodiumHandoff();
@@ -162,7 +162,7 @@ function LiveRatscrewTable({ transport }: { transport: RatscrewTransport }) {
  * dead race always resumes play (mirroring solo behavior bit-for-bit).
  */
 function ActiveMultiplayerRatscrewTable({ room }: { room: MultiplayerRoomSession }) {
-  const router = useRouter();
+  const router = useWipeRouter();
   const setLastMatch = useMatchFlowStore((state) => state.setLastMatch);
   const registerPlayAgain = useMatchFlowStore((state) => state.registerPlayAgain);
   const handOffToPodium = usePodiumHandoff();

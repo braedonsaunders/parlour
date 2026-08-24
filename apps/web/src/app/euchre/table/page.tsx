@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
-import { useRouter } from 'next/navigation';
+import { useWipeRouter } from '@/hooks/useWipeRouter';
 import { type LegalMove } from '@parlour/engine';
 import type { EuchreSuit } from '@parlour/game-euchre';
 import { EuchreTableScreen } from '@/components/table/euchre/EuchreTableScreen';
@@ -65,7 +65,7 @@ function SoloEuchreTablePage() {
 }
 
 function ActiveSoloEuchreTable({ transport }: { transport: EuchreTransport }) {
-  const router = useRouter();
+  const router = useWipeRouter();
   const setLastMatch = useMatchFlowStore((state) => state.setLastMatch);
   const registerPlayAgain = useMatchFlowStore((state) => state.registerPlayAgain);
   const handOffToPodium = usePodiumHandoff();
@@ -150,7 +150,7 @@ function localWon(snapshot: EuchreSnapshot): boolean {
 // ---------------------------------------------------------------------------
 
 function ActiveMultiplayerEuchreTable({ room }: { room: MultiplayerRoomSession }) {
-  const router = useRouter();
+  const router = useWipeRouter();
   const setLastMatch = useMatchFlowStore((state) => state.setLastMatch);
   const registerPlayAgain = useMatchFlowStore((state) => state.registerPlayAgain);
   const handOffToPodium = usePodiumHandoff();

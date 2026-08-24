@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useWipeRouter } from '@/hooks/useWipeRouter';
 import { useState } from 'react';
 import { blitzHowToPlay } from '@parlour/game-blitz';
 import { HowToPlayButton } from '@/components/HowToPlay';
@@ -16,7 +16,7 @@ import gameStyles from '@/styles/games.module.css';
 
 const SEAT_OPTIONS = getGame('blitz').seats;
 export default function ModeSelectPage() {
-  const router = useRouter();
+  const router = useWipeRouter();
   const mode = useSetupStore((s) => s.mode);
   const seats = useSetupStore((s) => s.seats);
   const botTier = useSetupStore((s) => s.botTier);

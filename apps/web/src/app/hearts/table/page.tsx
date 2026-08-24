@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
-import { useRouter } from 'next/navigation';
+import { useWipeRouter } from '@/hooks/useWipeRouter';
 import { isActingSeat } from '@parlour/engine';
 import type { HeartsModeId } from '@/lib/hearts/modes';
 import { usePodiumHandoff } from '@/lib/table/usePodiumHandoff';
@@ -68,7 +68,7 @@ function SoloHeartsTablePage() {
 const BOT_THINK_MS = 520;
 
 function ActiveSoloHeartsTable({ transport }: { transport: HeartsTransport }) {
-  const router = useRouter();
+  const router = useWipeRouter();
   const setLastMatch = useMatchFlowStore((state) => state.setLastMatch);
   const registerPlayAgain = useMatchFlowStore((state) => state.registerPlayAgain);
   const handOffToPodium = usePodiumHandoff();
@@ -164,7 +164,7 @@ function matchResultFrom(snapshot: HeartsSnapshot) {
 }
 
 function ActiveMultiplayerHeartsTable({ room }: { room: MultiplayerRoomSession }) {
-  const router = useRouter();
+  const router = useWipeRouter();
   const setLastMatch = useMatchFlowStore((state) => state.setLastMatch);
   const registerPlayAgain = useMatchFlowStore((state) => state.registerPlayAgain);
   const handOffToPodium = usePodiumHandoff();

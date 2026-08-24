@@ -6,7 +6,14 @@ import { useKlondikeStatsStore } from '@/stores/klondikeStats';
 import KlondikeSetupPage from './page';
 
 const router = vi.hoisted(() => ({ push: vi.fn() }));
-vi.mock('next/navigation', () => ({ useRouter: () => router }));
+vi.mock('next/navigation', () => ({ useRouter: () => router, usePathname: () => '/klondike' }));
+
+// The table wipe is presentational and holds the navigation for its own beat;
+// this test is about where the button goes. `runTableWipe.test.ts` owns the
+// timing.
+vi.mock('@/lib/transitions/runTableWipe', () => ({
+  runTableWipe: (nav: () => void) => nav(),
+}));
 
 let container: HTMLDivElement;
 let root: Root;

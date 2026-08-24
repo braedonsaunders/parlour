@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useWipeRouter } from '@/hooks/useWipeRouter';
 import { useState } from 'react';
 import { cribbageConfigSchema, cribbageHowToPlay } from '@parlour/game-cribbage';
 import { GameArt } from '@/components/GameArt';
@@ -15,7 +15,7 @@ import modeStyles from '@/styles/modes.module.css';
 import gameStyles from '@/styles/games.module.css';
 
 export default function CribbageSetupPage() {
-  const router = useRouter();
+  const router = useWipeRouter();
   const mode = useCribbageSetupStore((state) => state.mode);
   const botTier = useCribbageSetupStore((state) => state.botTier);
   const overrides = useCribbageSetupStore((state) => state.overrides);

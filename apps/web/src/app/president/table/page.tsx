@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
-import { useRouter } from 'next/navigation';
+import { useWipeRouter } from '@/hooks/useWipeRouter';
 import type { GameSession } from '@parlour/engine';
 import { PresidentTableScreen } from '@/components/table/president/PresidentTableScreen';
 import { PresidentTransport, type PresidentSnapshot } from '@/lib/solo/PresidentTransport';
@@ -64,7 +64,7 @@ function SoloPresidentTablePage() {
 }
 
 function ActiveMultiplayerPresidentTable({ room }: { room: MultiplayerRoomSession }) {
-  const router = useRouter();
+  const router = useWipeRouter();
   const setLastMatch = useMatchFlowStore((state) => state.setLastMatch);
   const registerPlayAgain = useMatchFlowStore((state) => state.registerPlayAgain);
   const handOffToPodium = usePodiumHandoff();
@@ -207,7 +207,7 @@ function pickExchangeMove(
 }
 
 function ActivePresidentTable({ transport }: { transport: PresidentTransport }) {
-  const router = useRouter();
+  const router = useWipeRouter();
   const setLastMatch = useMatchFlowStore((state) => state.setLastMatch);
   const registerPlayAgain = useMatchFlowStore((state) => state.registerPlayAgain);
   const handOffToPodium = usePodiumHandoff();

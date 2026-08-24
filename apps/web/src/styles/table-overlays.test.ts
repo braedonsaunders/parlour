@@ -11,6 +11,8 @@ const gin = readStyles('gin');
 const hearts = readStyles('hearts');
 const president = readStyles('president');
 const wild = readStyles('wild');
+const wipe = readStyles('wipe');
+const splash = readStyles('splash');
 
 function declarationsFor(source: string, selector: string): string {
   const escapedSelector = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -82,5 +84,28 @@ describe('table overlay stacking', () => {
     expect(declarationsFor(euchre, '.trumpBadge')).toMatch(
       /top:\s*clamp\(6\.4rem,\s*17vh,\s*7\.8rem\);/,
     );
+  });
+
+  it('keeps the table wipe over the only other layer it shares the body with', () => {
+    // Everything a page draws — including its own fixed sheets — is boxed
+    // inside the `z-10` app shell, so the wipe only has to clear the splash.
+    // If it did not, the logo would sit on top of the panels on a cold start.
+    expect(zIndexFor(wipe, '.overlay')).toBeGreaterThan(zIndexFor(splash, '.overlay'));
+  });
+
+  it('rests the wipe emblem in its settled pose so it can be swept back out', () => {
+    // Each part animates in on `covered` and is carried out by `emblemOut` on
+    // `reveal`. If a part were parked at `opacity: 0`, the entrance rule would
+    // stop applying the instant the status changed and it would vanish before
+    // the exit had a frame to play.
+    for (const part of ['.kicker', '.title', '.rule', '.sub', '.fanCard']) {
+      expect(declarationsFor(wipe, part), `${part} rests visible`).not.toMatch(/opacity:\s*0\s*;/);
+    }
+  });
+
+  it('covers the window rather than the viewport the browser admits to', () => {
+    // `100dvh` stops short of the iOS home indicator in a standalone PWA, which
+    // would leave a strip of the outgoing table showing under the panels.
+    expect(declarationsFor(wipe, '.overlay')).toMatch(/height:\s*var\(--app-height\);/);
   });
 });

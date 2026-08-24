@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
-import { useRouter } from 'next/navigation';
+import { useWipeRouter } from '@/hooks/useWipeRouter';
 import { type LegalMove } from '@parlour/engine';
 import { SpadesTableScreen } from '@/components/table/spades/SpadesTableScreen';
 import { SpadesTransport, type SpadesSnapshot } from '@/lib/solo/SpadesTransport';
@@ -64,7 +64,7 @@ function SoloSpadesTablePage() {
 }
 
 function ActiveSoloSpadesTable({ transport }: { transport: SpadesTransport }) {
-  const router = useRouter();
+  const router = useWipeRouter();
   const setLastMatch = useMatchFlowStore((state) => state.setLastMatch);
   const registerPlayAgain = useMatchFlowStore((state) => state.registerPlayAgain);
   const handOffToPodium = usePodiumHandoff();
@@ -141,7 +141,7 @@ function ActiveSoloSpadesTable({ transport }: { transport: SpadesTransport }) {
 // ---------------------------------------------------------------------------
 
 function ActiveMultiplayerSpadesTable({ room }: { room: MultiplayerRoomSession }) {
-  const router = useRouter();
+  const router = useWipeRouter();
   const setLastMatch = useMatchFlowStore((state) => state.setLastMatch);
   const registerPlayAgain = useMatchFlowStore((state) => state.registerPlayAgain);
   const handOffToPodium = usePodiumHandoff();
