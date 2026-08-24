@@ -12,7 +12,7 @@ import {
   type RuleError,
   type SeatId,
 } from '@parlour/engine';
-import { ACE, QUEEN, dealtDeck, isWildCard, spiteFace } from './cards';
+import { FIRST_RANK, LAST_RANK, dealtDeck, isWildCard, spiteFace } from './cards';
 import { spiteConfig, type SpiteRules } from './config';
 import { SPITE_BOTS } from './bots';
 import { spiteHowToPlay } from './howto';
@@ -124,8 +124,8 @@ const build: Move<SpiteState> = {
       return error('bad-pile', `centre pile ${pile} does not exist`);
     }
     const target = state.centre[pile] as CentrePile;
-    if (rank < ACE || rank > QUEEN) {
-      return error('bad-rank', `a wild must stand for Ace through Queen (${ACE}–${QUEEN})`);
+    if (rank < FIRST_RANK || rank > LAST_RANK) {
+      return error('bad-rank', `a wild must stand for ${FIRST_RANK} through ${LAST_RANK}`);
     }
     if (target.nextRank !== rank) {
       return error('wrong-rank', `that pile wants rank ${target.nextRank}, not ${rank}`);
@@ -190,7 +190,7 @@ const build: Move<SpiteState> = {
 
     let stock = state.stock;
     let settledWildRanks = wildRanks;
-    if (rank >= QUEEN) {
+    if (rank >= LAST_RANK) {
       // Queen lands: the whole pile retires to the stock. This is the moment
       // the game is played for, so every card flies home individually.
       const completed = (centre[pile] as CentrePile).cards;
@@ -497,7 +497,7 @@ export const spiteGame: GameDef<SpiteState, SpiteRules> = {
     if (!Number.isInteger(seats) || seats < 2 || seats > 4) {
       throw new Error('spite requires 2–4 seats');
     }
-    const deck = dealtDeck(seats, config.kingsWild, config.jokersWild);
+    const deck = dealtDeck(config.wilds);
     const ids = dealOrder(ctx, deck);
     const minimum = seats * (config.payoffSize + config.handSize);
     if (ids.length < minimum) {

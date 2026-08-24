@@ -30,9 +30,8 @@ export type SpiteTarget = { kind: 'centre'; pile: number } | { kind: 'discard'; 
 
 export interface SpiteCardView {
   card: string;
+  /** The numeral the card shows: its own rank, or the one a played wild took. */
   label: string;
-  /** Colour band for the face; wilds render as their own thing. */
-  color: string | null;
   wild: boolean;
   /** For a played wild, the rank it was declared as. */
   standsFor: number | null;
@@ -84,12 +83,14 @@ function cardView(card: string | undefined, state: SpiteState): SpiteCardView | 
   const face = spiteFace(card);
   const wild = isWildCard(card);
   const declared = state.wildRanks[card];
+  const standsFor = wild && typeof declared === 'number' ? declared : null;
   return {
     card,
-    label: face.short || face.label,
-    color: face.color ?? null,
+    // A wild that has been played reads as the rank it took, because that is
+    // what the pile now demands off it; one still in hand has no number at all.
+    label: wild ? (standsFor === null ? '' : String(standsFor)) : face.short || face.label,
     wild,
-    standsFor: wild && typeof declared === 'number' ? declared : null,
+    standsFor,
   };
 }
 

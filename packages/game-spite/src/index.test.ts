@@ -8,23 +8,30 @@ import { GAME_ID, PERSONAS, makePersonaBot, SPITE_BOTS, spiteCatalog, spiteTierB
 describe('spite deck and setup', () => {
   it('catalogues three decks of faces: 156 cards plus nine jokers', () => {
     expect(GAME_ID).toBe('spite');
-    expect(spiteDeck.cardIds).toHaveLength(3 * (4 * 13 + 3));
+    // The boxed deck, card for card: twelve of each 1-12, and eighteen wilds.
+    expect(spiteDeck.cardIds).toHaveLength(162);
     expect(new Set(spiteDeck.cardIds).size).toBe(spiteDeck.cardIds.length);
-    expect(Object.values(spiteDeck.faces).filter((f) => f.meta?.kind === 'wild')).toHaveLength(12);
-    expect(Object.values(spiteDeck.faces).filter((f) => f.meta?.kind === 'joker')).toHaveLength(9);
+    expect(Object.values(spiteDeck.faces).filter((f) => f.meta?.kind === 'wild')).toHaveLength(18);
+    for (let rank = 1; rank <= 12; rank++) {
+      expect(
+        Object.values(spiteDeck.faces).filter((f) => f.meta?.kind === 'number' && f.rank === rank),
+        `rank ${rank}`,
+      ).toHaveLength(12);
+    }
+    // Nothing carries a suit or a colour, because no rule ever read one.
+    expect(Object.values(spiteDeck.faces).every((f) => !('color' in f))).toBe(true);
   });
 
-  it('deals two decks for small tables and three for four seats', () => {
-    expect(dealtDeck(2, true, true).cardIds).toHaveLength(110);
-    expect(dealtDeck(3, true, true).cardIds).toHaveLength(110);
-    expect(dealtDeck(4, true, true).cardIds).toHaveLength(165);
-    // Switching a wild family off leaves those cards out of the shuffle.
-    expect(dealtDeck(2, false, true).cardIds).toHaveLength(102);
-    expect(dealtDeck(2, true, false).cardIds).toHaveLength(104);
-    expect(dealtDeck(2, false, false).cardIds).toHaveLength(96);
-    for (const id of dealtDeck(2, false, true).cardIds) {
-      expect(id.endsWith('K-0') || id.endsWith('K-1')).toBe(false);
-    }
+  it('deals one deck at every seat count, and thins only the wilds', () => {
+    // The boxed game does not scale by players either: completed build piles
+    // shuffle back into the stock and keep one deck circulating all match.
+    expect(dealtDeck(18).cardIds).toHaveLength(162);
+    expect(dealtDeck(6).cardIds).toHaveLength(150);
+    expect(dealtDeck(0).cardIds).toHaveLength(144);
+    expect(dealtDeck(0).cardIds.some((id) => id.startsWith('wild-'))).toBe(false);
+    // Out-of-range asks are clamped rather than dealing a deck that cannot exist.
+    expect(dealtDeck(99).cardIds).toHaveLength(162);
+    expect(dealtDeck(-4).cardIds).toHaveLength(144);
   });
 
   it.each([2, 3, 4])('deals a legal %i-seat match: full zones, flipped tops, deal fx', (seats) => {
@@ -41,7 +48,7 @@ describe('spite deck and setup', () => {
     );
     expect(
       state.hands.flat().length + state.payoffs.flat().length + state.stock.length,
-    ).toBeLessThanOrEqual(dealtDeck(seats, config.kingsWild, config.jokersWild).cardIds.length);
+    ).toBeLessThanOrEqual(dealtDeck(config.wilds).cardIds.length);
     for (const pile of state.payoffs) {
       expect(spiteDeck.faces[pile[0] as string]).toBeDefined();
     }
@@ -63,13 +70,14 @@ describe('spite deck and setup', () => {
   it('resolves configs idempotently and keeps the named presets distinct', () => {
     const once = spiteConfig.resolve({ payoffSize: 13 });
     expect(spiteConfig.resolve(once)).toEqual(once);
-    expect(applyPreset(spiteConfig, 'classic').payoffSize).toBe(20);
+    // Classic is the boxed stock pile: thirty cards.
+    expect(applyPreset(spiteConfig, 'classic').payoffSize).toBe(30);
     expect(applyPreset(spiteConfig, 'quick')).toMatchObject({
-      payoffSize: 10,
+      payoffSize: 12,
       refillMidTurn: true,
     });
     expect(applyPreset(spiteConfig, 'cutthroat')).toMatchObject({
-      payoffSize: 13,
+      payoffSize: 20,
       refillMidTurn: false,
     });
     expect(spiteCatalog.modes.map((mode) => mode.preset)).toEqual([
@@ -104,12 +112,13 @@ describe('spite deck and setup', () => {
   });
 
   it('orders the hand low-to-high with wilds last, losing no card', () => {
-    const hand = ['red-K-0', 'yellow-A-0', 'joker-0', 'blue-Q-0', 'red-A-0'];
+    const hand = ['wild-0', '1-3', '12-1', '1-0', '7-2'];
     const ordered = orderSpiteHand(hand, {});
     expect([...ordered].sort()).toEqual([...hand].sort());
-    expect(ordered.indexOf('red-A-0')).toBeLessThan(ordered.indexOf('yellow-A-0'));
-    expect(ordered.indexOf('yellow-A-0')).toBeLessThan(ordered.indexOf('red-K-0'));
-    expect(orderSpiteHand(['v#0', 'red-2-0'], {})).toEqual(['red-2-0', 'v#0']);
+    expect(ordered.indexOf('1-0')).toBeLessThan(ordered.indexOf('1-3'));
+    expect(ordered.indexOf('1-3')).toBeLessThan(ordered.indexOf('7-2'));
+    expect(ordered.indexOf('12-1')).toBeLessThan(ordered.indexOf('wild-0'));
+    expect(orderSpiteHand(['v#0', '2-0'], {})).toEqual(['2-0', 'v#0']);
   });
 
   it('hashes identical setups identically', () => {

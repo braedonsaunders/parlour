@@ -7,7 +7,7 @@ import type { RuleValues } from '@parlour/engine';
  * added without a rule that reads it.
  */
 export interface SpiteRules extends RuleValues {
-  /** Cards buried face-down in each seat's payoff pile (classic 20). */
+  /** Cards buried face-down in each seat's payoff pile (the boxed game: 30). */
   payoffSize: number;
   /** Cards dealt to each seat, refilled to at the start of every turn. */
   handSize: number;
@@ -15,10 +15,8 @@ export interface SpiteRules extends RuleValues {
   discardPiles: number;
   /** Shared centre build piles. */
   buildPiles: number;
-  /** Deal the Kings; they are wild. Off leaves them out of the shuffle. */
-  kingsWild: boolean;
-  /** Deal the Jokers; they are wild too. Off leaves them out of the shuffle. */
-  jokersWild: boolean;
+  /** Wilds in the shuffle, out of the eighteen the deck holds. */
+  wilds: number;
   /**
    * Empty your hand mid-turn and it refills to full immediately. Off makes the
    * game much harsher: an emptied hand plays on from payoff and discard tops
@@ -34,8 +32,8 @@ export const spiteConfig = defineConfig<SpiteRules>(
       kind: 'int',
       label: 'Payoff pile',
       min: 5,
-      max: 25,
-      default: 20,
+      max: 30,
+      default: 30,
       group: 'The deal',
       help: 'Cards buried in each payoff pile. Clear yours to win — smaller numbers make shorter games.',
     },
@@ -60,20 +58,14 @@ export const spiteConfig = defineConfig<SpiteRules>(
       help: 'Piles in front of each player. Ending a turn means discarding onto one.',
     },
     {
-      key: 'kingsWild',
-      kind: 'toggle',
-      label: 'Kings are wild',
-      default: true,
+      key: 'wilds',
+      kind: 'int',
+      label: 'Wilds in the deck',
+      min: 0,
+      max: 18,
+      default: 18,
       group: 'Wilds',
-      help: 'A King stands for any rank you name. Off deals no Kings at all.',
-    },
-    {
-      key: 'jokersWild',
-      kind: 'toggle',
-      label: 'Jokers are wild',
-      default: true,
-      group: 'Wilds',
-      help: 'Jokers play exactly like Kings. Off deals none.',
+      help: 'A wild stands for any rank you name. Eighteen is the boxed deck; fewer makes every one of them precious.',
     },
     {
       key: 'buildPiles',
@@ -105,12 +97,12 @@ export const spiteConfig = defineConfig<SpiteRules>(
     {
       id: 'quick',
       label: 'Quick',
-      values: { payoffSize: 10 },
+      values: { payoffSize: 12 },
     },
     {
       id: 'cutthroat',
       label: 'Cutthroat',
-      values: { payoffSize: 13, refillMidTurn: false },
+      values: { payoffSize: 20, refillMidTurn: false },
     },
   ],
 );

@@ -15,7 +15,7 @@ export const spiteCatalog: GameCatalogEntry<SpiteRules> = {
   subtitle: 'the payoff pile race',
   tagline: 'Pay them back in spades',
   description:
-    'Build the centre piles Ace to Queen, dump your payoff stack, and ruin everyone else’s plans with well-timed wilds. The name is the rules.',
+    'Build the centre piles 1 to 12, dump your payoff stack, and ruin everyone else’s plans with well-timed wilds. The name is the rules.',
   facts: ['2–4 players', 'classic · quick · cutthroat', 'solo or friends'],
   accent: '#7f6bd0',
   shade: '#402f7a',
@@ -37,8 +37,8 @@ export const spiteCatalog: GameCatalogEntry<SpiteRules> = {
       name: 'Classic',
       tagline: 'The full race',
       description:
-        'Twenty cards buried in every payoff pile and all the wilds in the deck. The game as it was meant to be nursed along.',
-      facts: ['20-card payoff', 'kings & jokers wild', '~15 min'],
+        'Thirty cards buried in every payoff pile and all eighteen wilds in the deck. The full boxed game, nursed along.',
+      facts: ['30-card payoff', 'all 18 wilds', '~20 min'],
       accent: '#7f6bd0',
       shade: '#402f7a',
       art: [
@@ -53,8 +53,8 @@ export const spiteCatalog: GameCatalogEntry<SpiteRules> = {
       name: 'Quick',
       tagline: 'Shorter grudge',
       description:
-        'Ten-card payoff piles keep everything else intact — same wilds, same malice, half the wait for your revenge.',
-      facts: ['10-card payoff', 'all wilds', '~5–8 min'],
+        'Twelve-card payoff piles keep everything else intact — same wilds, same malice, a third of the wait for your revenge.',
+      facts: ['12-card payoff', 'all wilds', '~6–9 min'],
       accent: '#4ba1ba',
       shade: '#25586e',
       art: [
@@ -68,8 +68,8 @@ export const spiteCatalog: GameCatalogEntry<SpiteRules> = {
       name: 'Cutthroat',
       tagline: 'No mercy, no refills',
       description:
-        'Thirteen cards deep and no mid-turn refill: empty your hand at the wrong moment and you play short-handed while someone else wins.',
-      facts: ['13-card payoff', 'no mid-turn refill', 'harsh'],
+        'Twenty cards deep and no mid-turn refill: empty your hand at the wrong moment and you play short-handed while someone else wins.',
+      facts: ['20-card payoff', 'no mid-turn refill', 'harsh'],
       accent: '#c8566b',
       shade: '#7c2c3e',
       art: [

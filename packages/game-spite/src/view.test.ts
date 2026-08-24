@@ -1,26 +1,26 @@
 import { describe, expect, it } from 'vitest';
 import { spiteGame } from './game';
-import { card, fixture, joker, king } from './test-util';
+import { card, fixture, wild } from './test-util';
 
 describe('playerView masking', () => {
   it('masks other hands, buried payoff cards and the stock — nothing else', () => {
     const session = fixture({
       seats: 3,
-      hands: [[card(2), card(3)], [card(4, 'blue'), king(1)], [joker(0)]],
+      hands: [[card(2), card(3)], [card(4, 1), wild(1)], [wild(0)]],
       payoffs: [[card(9), card(10), card(11)], [card(12), card(5)], []],
       discards: [
         [[card(6), card(7)], [], [], []],
-        [[card(8, 'green')], [card(9, 'yellow')], [], []],
+        [[card(8, 2)], [card(9, 3)], [], []],
         [[], [], [], []],
       ],
       centre: [
-        { cards: [card(1), card(2, 'blue')], nextRank: 3 },
+        { cards: [card(1), card(2, 1)], nextRank: 3 },
         { cards: [], nextRank: 1 },
         { cards: [], nextRank: 1 },
         { cards: [], nextRank: 1 },
       ],
-      wildRanks: { [card(2, 'blue')]: 2 },
-      stock: [card(13, 'green'), card(1, 'yellow')],
+      wildRanks: { [card(2, 1)]: 2 },
+      stock: [card(13, 2), card(1, 3)],
       started: true,
     });
 
@@ -42,7 +42,7 @@ describe('playerView masking', () => {
     // Discards and the centre are fully public.
     expect(view.discards).toEqual(session.state.discards);
     expect(view.centre).toEqual(session.state.centre);
-    expect(view.wildRanks).toEqual({ [card(2, 'blue')]: 2 });
+    expect(view.wildRanks).toEqual({ [card(2, 1)]: 2 });
   });
 
   it('keeps zone lengths stable so counts stay visible', () => {
@@ -59,9 +59,9 @@ describe('playerView masking', () => {
   it('never leaks a hidden card through legal-move enumeration', () => {
     // Seat 1's view must not offer plays with seat 0's hidden cards in them.
     const session = fixture({
-      hands: [[card(2)], [card(3, 'blue')]],
+      hands: [[card(2)], [card(3, 1)]],
       payoffs: [[], [card(1)]],
-      stock: [king(), joker(1)],
+      stock: [wild(), wild(1)],
       turn: 1,
       started: true,
     });

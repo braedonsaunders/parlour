@@ -23,6 +23,10 @@ function table(seats = 2) {
   });
 }
 
+function viewOf(transport: SpiteTransport) {
+  return spiteTableView(transport.getSnapshot(), transport.legalMoves(0));
+}
+
 function render(transport: SpiteTransport, props: Record<string, unknown> = {}) {
   const legal = transport.legalMoves(0);
   act(() =>
@@ -150,5 +154,41 @@ describe('SpiteTableScreen', () => {
     expect(SPITE_STYLES).toContain('.board[data-holding]');
     expect(SPITE_STYLES).toContain('var(--unplayable-filter)');
     expect(SPITE_STYLES).toContain('var(--unplayable-opacity)');
+  });
+
+  it('draws every card as a plain number, with no colour or suit anywhere', () => {
+    const transport = table();
+    render(transport);
+    for (const face of container.querySelectorAll('[data-hand-card] span')) {
+      expect(face.getAttribute('data-color')).toBeNull();
+    }
+    // Numbers only: a hand card reads as 1-12, or it is a wild.
+    for (const entry of viewOf(transport).hand) {
+      expect(entry.wild || /^(?:[1-9]|1[0-2])$/.test(entry.label), entry.card).toBe(true);
+    }
+  });
+
+  it('moves the rank into the visible band of a fanned card', () => {
+    // The shared rail overlaps cards by up to 48% of their width, so a rank
+    // centred on the face lands on the slice edge and half of "12" reads as
+    // "1". The fix is structural, and silent if it regresses.
+    const handFace = /\.handCard \.face \{([^}]*)\}/.exec(SPITE_STYLES)?.[1] ?? '';
+    expect(handFace).toContain('justify-items: start');
+    expect(SPITE_STYLES).toContain('.handCard .corner');
+  });
+
+  it('gives a wild its own plate, and shows the rank once it has taken one', () => {
+    const transport = table();
+    const view = viewOf(transport);
+    render(transport);
+    // An unplayed wild carries no number at all — it has not chosen one yet.
+    for (const entry of view.hand.filter((card) => card.wild && card.standsFor === null)) {
+      expect(entry.label).toBe('');
+    }
+    expect(SPITE_STYLES).toContain('.face[data-wild]');
+    // The burst is sized in `em` off the mark so it shrinks with a compact pile
+    // instead of overflowing a discard the size of a thumbnail.
+    const burst = /\.wildBurst \{([^}]*)\}/.exec(SPITE_STYLES)?.[1] ?? '';
+    expect(burst).toMatch(/width: [\d.]+em/);
   });
 });

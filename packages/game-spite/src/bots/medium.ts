@@ -1,5 +1,5 @@
 import type { BotPolicy, LegalMove, Rng } from '@parlour/engine';
-import { isWildCard, QUEEN, spiteFace } from '../cards';
+import { isWildCard, LAST_RANK, spiteFace } from '../cards';
 import type { SpiteState } from '../state';
 import {
   buildOptions,
@@ -37,7 +37,7 @@ export function scoreBuild(
     else score -= 5;
   }
 
-  if (option.rank >= QUEEN) score += 30;
+  if (option.rank >= LAST_RANK) score += 30;
 
   if (option.wild && option.source.kind === 'hand') score -= params.wildHold;
   return score + rng.float() * params.noise;

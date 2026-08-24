@@ -1,5 +1,5 @@
 import type { BotPolicy } from '@parlour/engine';
-import { isWildCard, QUEEN, spiteFace } from '../cards';
+import { isWildCard, LAST_RANK, spiteFace } from '../cards';
 import type { SpiteState } from '../state';
 import { buildOptions } from './evaluate';
 import { chooseDiscard, scoreBuild } from './medium';
@@ -54,7 +54,7 @@ export function makeHardBot(
           // exactly what a rival has showing — or they hold a wild on top,
           // which fits anything — the play feeds them.
           const demandAfter = option.rank + 1;
-          if (demandAfter <= QUEEN) {
+          if (demandAfter <= LAST_RANK) {
             for (const top of rivalTops) {
               if (isWildCard(top) || spiteFace(top).meta.value === demandAfter) {
                 score -= params.blockAwareness;

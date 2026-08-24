@@ -252,10 +252,10 @@ export function SpiteTableScreen({
               justDrawn={selected === card.card}
             >
               {/*
-                Spite's deck is four colours of numbers plus wilds, not suits, so
-                the shared PlayingCard has nothing to parse — handed one of these
-                ids it renders the id. The face is drawn here instead, in a real
-                button so the card keeps its tap target and its keyboard path.
+                This deck is numbers and wilds, not suits, so the shared
+                PlayingCard has nothing to parse — handed one of these ids it
+                renders the id. The face is drawn here instead, in a real button
+                so the card keeps its tap target and its keyboard path.
               */}
               <button
                 type="button"
@@ -290,7 +290,15 @@ export function SpiteTableScreen({
   );
 }
 
-/** A card face, or the empty slot it would sit in. */
+/**
+ * A card face, or the empty slot it would sit in.
+ *
+ * Drawn here rather than as a `PlayingCard`: this deck is a hundred and forty
+ * four numbers and eighteen wilds, so the shared chassis — which is built out
+ * of a rank and a suit glyph — has nothing to say about it. The layout is the
+ * standard one anyway: an index in opposite corners so the card reads from
+ * either end of a fan, and the rank large in the middle.
+ */
 function SpiteCard({ card, placeholder }: { card: SpiteCardView | null; placeholder: string }) {
   if (!card) {
     return (
@@ -299,14 +307,36 @@ function SpiteCard({ card, placeholder }: { card: SpiteCardView | null; placehol
       </span>
     );
   }
+
+  if (card.wild) {
+    return (
+      <span className={styles.face} data-wild="">
+        {/* The burst sits inside the mark so it follows it into the fan band
+            rather than staying centred while the wordmark shifts off it. */}
+        <span className={styles.wildMark}>
+          <span className={styles.wildBurst} aria-hidden="true" />
+          {card.standsFor === null ? (
+            <b className={styles.wildWord}>WILD</b>
+          ) : (
+            <>
+              <b className={styles.centreRank}>{card.standsFor}</b>
+              <small className={styles.wildTag}>wild</small>
+            </>
+          )}
+        </span>
+      </span>
+    );
+  }
+
   return (
-    <span
-      className={styles.face}
-      data-color={card.color ?? undefined}
-      data-wild={card.wild || undefined}
-    >
-      <b>{card.wild && card.standsFor !== null ? card.standsFor : card.label}</b>
-      {card.wild ? <small>wild</small> : null}
+    <span className={styles.face}>
+      <i className={styles.corner} data-corner="tl" aria-hidden="true">
+        {card.label}
+      </i>
+      <b className={styles.centreRank}>{card.label}</b>
+      <i className={styles.corner} data-corner="br" aria-hidden="true">
+        {card.label}
+      </i>
     </span>
   );
 }
