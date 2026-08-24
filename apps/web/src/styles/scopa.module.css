@@ -1,0 +1,291 @@
+.screen {
+  --sc-accent: #8a4b3c;
+  --sc-shade: #48211a;
+  --sc-held: #66ffe1;
+  --sc-card: clamp(2.6rem, 4.6vw, 3.8rem);
+}
+
+.playfield {
+  background:
+    radial-gradient(ellipse at 50% 46%, rgba(180, 110, 70, 0.16), transparent 58%),
+    linear-gradient(180deg, rgba(34, 16, 10, 0.1), rgba(22, 10, 8, 0.22));
+}
+
+/*
+ * Rows, not percentages: opponents / felt / chooser / your plate.
+ *
+ * The playfield is the only positioned box on a table and `.screen` is not a
+ * flow container, so a region rendered as its sibling stacks at the top of the
+ * screen instead of below the felt.
+ */
+.board {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-rows: auto 1fr auto auto;
+  align-items: center;
+  padding: clamp(5.4rem, 11vh, 7rem) 0 12.8rem;
+}
+
+.seats {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: center;
+  gap: clamp(0.4rem, 1.8vw, 1.4rem);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* `position: relative` and the seat tokens are load-bearing: the shared
+   nameplate paints its pill from them. */
+.seat {
+  --seat-accent: var(--sc-accent);
+  --seat-shade: var(--sc-shade);
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 0.12rem;
+  width: clamp(4.8rem, 10vw, 7rem);
+  padding: 0.28rem 0.24rem;
+  border-radius: var(--radius-chunky);
+  transition: background var(--dur-feedback) var(--ease-settle);
+}
+
+.seat[data-turn] {
+  background: rgba(255, 224, 173, 0.14);
+  box-shadow: inset 0 0 0 1px rgba(255, 224, 173, 0.4);
+}
+
+.pips {
+  display: flex;
+  gap: 0.18rem;
+  margin: 0;
+  width: 100%;
+  font-variant-numeric: tabular-nums;
+}
+
+.pips span {
+  display: grid;
+  flex: 1 1 0;
+  justify-items: center;
+  min-width: 0;
+  padding: 0.1rem 0.14rem;
+  border-radius: 0.4rem;
+  background: rgba(8, 20, 26, 0.42);
+  font-size: clamp(0.7rem, 1.4vw, 0.88rem);
+  font-weight: 700;
+  line-height: 1.05;
+}
+
+.pips small {
+  color: var(--ink-dim);
+  font-size: clamp(0.44rem, 0.9vw, 0.56rem);
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+/* ---------------------------------------------------------------------------
+   The felt
+   --------------------------------------------------------------------------- */
+
+.table {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(0.3rem, 1.4vw, 0.8rem);
+  margin: 0;
+  padding: 0 1rem;
+  list-style: none;
+}
+
+.tableEmpty {
+  color: var(--ink-dim);
+  font-size: 0.82rem;
+  font-style: italic;
+}
+
+/* The 40-card Italian deck is four suits of pip values; the shared card
+   chassis parses `S12`-style ids and has nothing to say about `denari-7`. */
+.face {
+  display: grid;
+  place-items: center;
+  width: var(--sc-card);
+  aspect-ratio: 5 / 7;
+  border-radius: 0.42rem;
+  background: linear-gradient(180deg, #fdf6ec, #e6d8c2);
+  color: #2b1b12;
+  line-height: 1;
+  transition:
+    filter var(--dur-feedback) var(--ease-settle),
+    opacity var(--dur-feedback) var(--ease-settle);
+}
+
+.face b {
+  font-size: clamp(0.9rem, 2vw, 1.3rem);
+  font-weight: 900;
+}
+
+.face small {
+  font-size: 0.72rem;
+  opacity: 0.7;
+}
+
+.face[data-suit='denari'] {
+  background: linear-gradient(180deg, #ffe6a1, #d9a63a);
+}
+.face[data-suit='coppe'] {
+  background: linear-gradient(180deg, #ffc9c0, #cf6a5c);
+}
+.face[data-suit='spade'] {
+  background: linear-gradient(180deg, #cfe0ee, #6f8fa8);
+}
+.face[data-suit='bastoni'] {
+  background: linear-gradient(180deg, #cfe6c6, #6f9c62);
+}
+
+/* The seven of coins is a point of its own; it should never be hard to find. */
+.face[data-settebello] {
+  box-shadow:
+    0 0 0 2px #ffd166,
+    0 0 14px rgba(255, 209, 102, 0.7);
+}
+
+.face[data-dim] {
+  filter: var(--unplayable-filter);
+  opacity: var(--unplayable-opacity);
+}
+
+/* ---------------------------------------------------------------------------
+   Choosing what to take
+   --------------------------------------------------------------------------- */
+
+.chooser {
+  display: grid;
+  justify-items: center;
+  gap: 0.35rem;
+  justify-self: center;
+  max-width: min(94vw, 42rem);
+  margin-bottom: 0.3rem;
+  padding: 0.5rem 0.8rem;
+  border-radius: var(--radius-chunky);
+  background: rgba(12, 26, 32, 0.92);
+  box-shadow: var(--shadow-ambient);
+}
+
+.chooserPrompt {
+  margin: 0;
+  color: var(--ink-dim);
+  font-size: 0.82rem;
+}
+
+.chooserButtons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.3rem;
+}
+
+.takeButton {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  min-height: 2.75rem;
+  padding: 0.3rem 0.7rem;
+  border: 0;
+  border-radius: 0.6rem;
+  background: linear-gradient(180deg, var(--sc-accent), var(--sc-shade));
+  color: var(--ink);
+  font-size: 0.86rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.takeButton[data-pose] {
+  background: rgba(8, 20, 26, 0.6);
+  font-weight: 700;
+}
+
+.takeButton[data-scopa] {
+  box-shadow:
+    0 0 0 2px #ffd166,
+    0 0 16px rgba(255, 209, 102, 0.6);
+}
+
+.takeButton em {
+  color: #ffd166;
+  font-style: normal;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+}
+
+.takeButton:disabled {
+  filter: var(--unplayable-filter);
+  opacity: var(--unplayable-opacity);
+  cursor: default;
+}
+
+.localRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  justify-self: center;
+  padding: 0.2rem 0.6rem;
+  border-radius: var(--radius-pill);
+  background: rgba(8, 20, 26, 0.42);
+}
+
+.localRow .pips {
+  width: auto;
+}
+
+.localRow .pips span {
+  min-width: 2.4rem;
+}
+
+/*
+ * `pointer-events: auto` is required, not decorative: the shared hand rail
+ * turns pointer events OFF for itself and back on only for `.card`, a hashed
+ * CSS-module class this game's face is not.
+ */
+.handCard {
+  pointer-events: auto;
+  display: block;
+  width: var(--hand-card-width, 5.6rem);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.handCard:disabled {
+  cursor: default;
+}
+
+.handCard .face {
+  width: 100%;
+  box-shadow:
+    0 8px 18px -6px rgba(3, 11, 15, 0.7),
+    inset 0 0 0 1px rgba(92, 48, 25, 0.16);
+}
+
+/* Scoped to `.board`/`.handCard`: a CSS module rejects a selector with no
+   local class. */
+.handCard[data-held] .face {
+  outline: 3px solid var(--sc-held);
+  outline-offset: 2px;
+}
+
+.stock {
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .seat,
+  .face {
+    transition: none;
+  }
+}

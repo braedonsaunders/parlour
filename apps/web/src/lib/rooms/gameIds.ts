@@ -21,6 +21,7 @@ export type MultiplayerGameId =
   | 'gin'
   | 'president'
   | 'spades'
+  | 'ohhell'
   | 'ohhell';
 
 export const MULTIPLAYER_GAME_IDS = [

@@ -25,12 +25,7 @@ export const spiteCatalog: GameCatalogEntry<SpiteRules> = {
     { label: 'Q', tint: ['#c8566b', '#7c2c3e'] },
     { label: '★', tint: ['#e29349', '#96471c'] },
   ],
-  // No table yet: the pack is complete and tested, but the board — two decks,
-  // four shared centre piles and four discard piles per seat — is a bigger
-  // surface than anything else on the shelf. `null` is the catalog's own
-  // "coming soon" state, which the shelf renders as a disabled tile with a
-  // ribbon rather than a link into a 404.
-  href: null,
+  href: '/spite',
   howToPlay: spiteHowToPlay,
   seats: [2, 3, 4],
   configSchema: spiteConfig,

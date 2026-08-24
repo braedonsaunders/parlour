@@ -70,6 +70,18 @@ const REQUIRED_SOUNDS = [
   'ohhell.trick-collect',
   'ohhell.score',
   'ohhell.match-score',
+  // Spite reuses the shared card samples; the ids are still declared so each
+  // is checked to point at a real, non-empty MP3.
+  'spite.wild',
+  'spite.complete',
+  'spite.win',
+  'spite.discard',
+  'spite.draw',
+  'scopa.capture',
+  'scopa.pose',
+  'scopa.scopa',
+  'scopa.sweep',
+  'scopa.score',
   'klondike.draw',
   'klondike.recycle',
   'klondike.move',

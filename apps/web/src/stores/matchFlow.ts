@@ -12,6 +12,8 @@ import type { RatscrewModeId } from '@/lib/ratscrew/modes';
 import type { PresidentModeId } from '@/lib/president/modes';
 import type { OhHellModeId } from '@/lib/ohhell/modes';
 import type { SpadesModeId } from '@/lib/spades/modes';
+import type { ScopaModeId } from '@/lib/scopa/modes';
+import type { SpiteModeId } from '@/lib/spite/modes';
 import type { RecordedSeat } from '@/stores/history';
 
 /** Everything the podium needs about the finished match. */
@@ -39,7 +41,9 @@ export interface MatchSnapshot {
     | GinModeId
     | PresidentModeId
     | SpadesModeId
-    | OhHellModeId;
+    | OhHellModeId
+    | SpiteModeId
+    | ScopaModeId;
   /** The human's seat, for jingle-vs-sting and the "you" framing; null when absent. */
   localSeat: number | null;
 }

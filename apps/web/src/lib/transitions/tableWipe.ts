@@ -17,6 +17,8 @@ export const TABLE_WIPE_ROUTES: readonly (readonly [route: string, gameId: strin
   ['/president/table', 'president'],
   ['/spades/table', 'spades'],
   ['/ohhell/table', 'ohhell'],
+  ['/spite/table', 'spite'],
+  ['/scopa/table', 'scopa'],
 ];
 
 const ROUTE_GAME = new Map(TABLE_WIPE_ROUTES);

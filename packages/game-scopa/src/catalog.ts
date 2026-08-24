@@ -24,10 +24,7 @@ export const scopaCatalog: GameCatalogEntry<ScopaRules> = {
     { label: 'SCO!' },
     { label: 'K♣', tint: ['#4a4a55', '#1d1d26'] },
   ],
-  // No table yet: the pack is complete and tested, but sum-captures need a
-  // selection UI no other game on the shelf has (pick which combination of
-  // table cards your card takes). `null` is the catalog's coming-soon state.
-  href: null,
+  href: '/scopa',
   howToPlay: scopaHowToPlay,
   seats: [2, 3, 4, 6],
   configSchema: scopaConfig,

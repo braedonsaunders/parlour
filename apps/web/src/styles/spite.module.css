@@ -1,0 +1,340 @@
+.screen {
+  --sp-accent: #3f6f5c;
+  --sp-shade: #1d3a30;
+  --sp-open: #ffe0a1;
+  --sp-held: #66ffe1;
+  --sp-card: clamp(2.9rem, 5vw, 4.1rem);
+}
+
+.playfield {
+  background:
+    radial-gradient(ellipse at 50% 44%, rgba(77, 150, 109, 0.18), transparent 58%),
+    linear-gradient(180deg, rgba(8, 31, 28, 0.08), rgba(5, 22, 22, 0.22));
+}
+
+/*
+ * Rows, not percentages: opponents / centre builds / your own piles.
+ *
+ * The playfield is the only positioned box on a table, and `.screen` is not a
+ * flow container — a region rendered as its sibling stacks at the top of the
+ * screen. Everything here is a grid row, so a wide table (four seats, four
+ * builds, four discards each) cannot fold onto itself.
+ */
+.board {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  align-items: center;
+  /* Top clears the HUD pill; bottom clears the shared 13rem hand rail. */
+  padding: clamp(5.4rem, 11vh, 7rem) 0 12.8rem;
+}
+
+.opponents {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: center;
+  gap: clamp(0.5rem, 2vw, 1.6rem);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/*
+ * `position: relative` and the seat tokens are both load-bearing: the shared
+ * nameplate paints its pill from `--seat-accent`, and anything absolutely
+ * placed inside a seat needs the seat to be the containing block.
+ */
+.seat {
+  --seat-accent: var(--sp-accent);
+  --seat-shade: var(--sp-shade);
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 0.2rem;
+  padding: 0.3rem 0.4rem;
+  border-radius: var(--radius-chunky);
+  transition: background var(--dur-feedback) var(--ease-settle);
+}
+
+.seat[data-turn] {
+  background: rgba(255, 224, 173, 0.14);
+  box-shadow: inset 0 0 0 1px rgba(255, 224, 173, 0.4);
+}
+
+.seatHead {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.seatPiles {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+}
+
+.handCount {
+  padding-left: 0.15rem;
+  color: var(--ink-dim);
+  font-size: 0.7rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* ---------------------------------------------------------------------------
+   Piles
+   --------------------------------------------------------------------------- */
+
+.pile,
+.centrePile,
+.discardPile {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: var(--sp-card);
+  aspect-ratio: 5 / 7;
+  padding: 0;
+  border: 2px dashed rgba(253, 246, 236, 0.24);
+  border-radius: 0.5rem;
+  background: rgba(6, 18, 22, 0.34);
+  color: var(--ink);
+  cursor: default;
+}
+
+.pile[data-compact] {
+  width: calc(var(--sp-card) * 0.74);
+}
+
+.pile[data-tone='payoff'] {
+  border-style: solid;
+  border-color: color-mix(in srgb, var(--sp-accent) 70%, transparent);
+}
+
+button.pile:not(:disabled),
+.discardPile:not(:disabled),
+.centrePile:not(:disabled) {
+  cursor: pointer;
+}
+
+.pileCount {
+  position: absolute;
+  right: -0.3rem;
+  bottom: -0.35rem;
+  min-width: 1.1rem;
+  padding: 0.02rem 0.24rem;
+  border-radius: 999px;
+  background: rgba(6, 18, 22, 0.92);
+  font-size: 0.6rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.emptySlot {
+  color: rgba(253, 246, 236, 0.4);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+/* A face, drawn here rather than as a PlayingCard: Spite's deck is four
+   colours of numbers, not suits, so the standard chassis has nothing to say. */
+.face {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  border-radius: 0.4rem;
+  background: linear-gradient(180deg, #fdf6ec, #e3d6c4);
+  color: #23303a;
+  line-height: 1;
+}
+
+.face b {
+  font-size: clamp(0.95rem, 2.2vw, 1.4rem);
+  font-weight: 900;
+}
+
+.face small {
+  font-size: 0.48rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  opacity: 0.66;
+}
+
+.face[data-color='red'] {
+  background: linear-gradient(180deg, #ffb4a6, #d9584a);
+  color: #2b0f0c;
+}
+.face[data-color='yellow'] {
+  background: linear-gradient(180deg, #ffe6a1, #dfa93a);
+  color: #33260a;
+}
+.face[data-color='green'] {
+  background: linear-gradient(180deg, #b6e7c1, #4f9d64);
+  color: #0d2a17;
+}
+.face[data-color='blue'] {
+  background: linear-gradient(180deg, #aad6f0, #3f86b8);
+  color: #0b2432;
+}
+
+.face[data-wild] {
+  background: linear-gradient(180deg, #e6d2ff, #8a5fd6);
+  color: #1e0f33;
+}
+
+/* ---------------------------------------------------------------------------
+   Centre builds and your own piles
+   --------------------------------------------------------------------------- */
+
+.centre {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(0.4rem, 2vw, 1.2rem);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.centrePile {
+  width: calc(var(--sp-card) * 1.25);
+}
+
+.needs {
+  position: absolute;
+  bottom: -1.1rem;
+  color: var(--ink-dim);
+  font-size: 0.6rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.localArea {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(0.8rem, 3vw, 2rem);
+}
+
+.myDiscards {
+  display: flex;
+  align-items: center;
+  gap: clamp(0.3rem, 1.4vw, 0.8rem);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.discardPile {
+  width: calc(var(--sp-card) * 1.05);
+}
+
+/* ---------------------------------------------------------------------------
+   Holding a card
+   --------------------------------------------------------------------------- */
+
+/*
+ * The same language every other table uses: what you are holding lifts and
+ * lights, what it can reach is ringed, and everything else falls back. The
+ * filter tokens are the shared ones, so Spite and the hand rail read alike.
+ */
+/* Scoped to `.board`: a CSS module rejects a selector with no local class, and
+   these are this table's idea of held/open, not a global one. */
+.board [data-held] {
+  outline: 3px solid var(--sp-held);
+  outline-offset: 2px;
+  translate: 0 -0.3rem;
+}
+
+.board [data-legal-target] {
+  border-style: solid;
+  border-color: var(--sp-open);
+  box-shadow:
+    0 0 0 2px var(--sp-open),
+    0 0 18px rgba(255, 195, 96, 0.6);
+}
+
+.board[data-holding] .centrePile:not([data-legal-target]),
+.board[data-holding] .discardPile:not([data-legal-target]):not([data-held]),
+.board[data-holding] .opponents {
+  filter: var(--unplayable-filter);
+  opacity: var(--unplayable-opacity);
+}
+
+.centrePile,
+.discardPile,
+.pile,
+.opponents {
+  transition:
+    filter var(--dur-feedback) var(--ease-settle),
+    opacity var(--dur-feedback) var(--ease-settle);
+}
+
+/*
+ * The hand card chassis.
+ *
+ * Sized from the shared rail's own `--hand-card-width` so a Spite hand fans
+ * exactly like every other hand on the shelf.
+ *
+ * `pointer-events: auto` is required, not decorative: the shared rail turns
+ * pointer events OFF for itself and back on only for `.card`, which is a hashed
+ * CSS-module class this game's face is not. Without this the whole hand is
+ * unclickable and the board underneath swallows every tap.
+ */
+.handCard {
+  pointer-events: auto;
+  display: block;
+  width: var(--hand-card-width, 5.6rem);
+  aspect-ratio: 5 / 7;
+  padding: 0;
+  border: 0;
+  border-radius: 0.5rem;
+  background: transparent;
+  cursor: pointer;
+}
+
+.handCard:disabled {
+  cursor: default;
+}
+
+.handCard .face {
+  box-shadow:
+    0 8px 18px -6px rgba(3, 11, 15, 0.7),
+    inset 0 0 0 1px rgba(92, 48, 25, 0.16);
+}
+
+.stock {
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.result {
+  position: absolute;
+  z-index: 45;
+  left: 50%;
+  top: 44%;
+  translate: -50% -50%;
+  padding: 1rem 1.4rem;
+  border-radius: var(--radius-chunky);
+  background: rgba(12, 26, 32, 0.94);
+  box-shadow: var(--shadow-lift);
+  text-align: center;
+}
+
+.result h2 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .centrePile,
+  .discardPile,
+  .pile,
+  .opponents {
+    transition: none;
+  }
+}

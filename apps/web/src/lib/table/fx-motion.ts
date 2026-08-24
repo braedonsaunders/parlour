@@ -14,7 +14,23 @@ export const FX_TIMING = {
   maxBurstMs: 1200,
 } as const;
 
-export type Zone = 'stock' | 'discard' | 'peg' | `hand:${number}` | `seat:${number}`;
+/**
+ * A named table zone, optionally scoped by seat and then by pile.
+ *
+ * `stock`, `hand:2`, `payoff:1`, `discard:0:3`. It was a closed list of five
+ * names, which meant a game with per-seat piles could not name them: Spite
+ * emits `discard:<seat>:<pile>` and `centre:<pile>`, and the list rejected
+ * both — throwing out of `delayUntilFxSettles`, which every solo table calls to
+ * pace its bots, and taking the whole screen down with it.
+ *
+ * Widening this loses nothing real. Zone strings only ever become a
+ * `[data-zone="..."]` lookup, and `zonePoint` already falls back to the table
+ * centre when it finds no element, so an unknown zone degrades to a flight
+ * that starts from the middle rather than a crash. The shape check below still
+ * catches a malformed zone, which is what the list was actually buying.
+ */
+export type Zone =
+  'stock' | 'discard' | 'peg' | 'centre' | `${string}:${number}` | `${string}:${number}:${number}`;
 
 type BaseCue = {
   id: string;
@@ -90,17 +106,12 @@ function durationField(event: FxEvent, fallback: number): number {
   return Math.min(value, FX_TIMING.maxBurstMs);
 }
 
+/** Lower-case name, then any number of numeric scopes: `discard:0:3`. */
+const ZONE_SHAPE = /^[a-z][a-z-]*(?::\d+)*$/;
+
 function zoneField(event: FxEvent, field: string): Zone {
   const value = stringField(event, field);
-  if (
-    value === 'stock' ||
-    value === 'discard' ||
-    value === 'peg' ||
-    /^hand:\d+$/.test(value) ||
-    /^seat:\d+$/.test(value)
-  ) {
-    return value as Zone;
-  }
+  if (ZONE_SHAPE.test(value)) return value as Zone;
   throw new Error(`${event.kind} fx has an invalid ${field} zone: ${value}`);
 }
 
