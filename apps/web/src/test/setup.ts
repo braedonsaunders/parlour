@@ -16,5 +16,14 @@ Object.defineProperty(globalThis, 'localStorage', {
   value: memoryStorage,
 });
 
+// jsdom implements no scrolling at all, and every setup screen centres its mode
+// carousel on mount. Without this each of those tests would have to stub the
+// same gap before it could render a page.
+Object.defineProperty(HTMLElement.prototype, 'scrollTo', {
+  configurable: true,
+  writable: true,
+  value: () => {},
+});
+
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT =
   true;

@@ -43,18 +43,37 @@ describe('mode picker screen fit', () => {
   it('hands the leftover height to the carousel and shrinks only the artwork', () => {
     const carousel = declarationsFor('.fitCarousel');
 
-    expect(carousel).toMatch(/flex:\s*1 1 auto;/);
+    // Basis zero, not auto: the carousel takes what the header and footer leave
+    // rather than competing with the controls for it.
+    expect(carousel).toMatch(/flex:\s*1 1 0;/);
     expect(carousel).toMatch(/min-height:\s*0;/);
     expect(declarationsFor('.fitCarousel .tile')).toMatch(/max-height:\s*100%;/);
     expect(declarationsFor('.fitCarousel .preview')).toMatch(/flex:\s*0 1 7\.5rem;/);
     expect(declarationsFor('.fitCarousel .description')).toMatch(/-webkit-line-clamp:\s*3;/);
   });
 
-  it('keeps the header and footer out of the flexible middle', () => {
+  it('keeps the header out of the flexible middle', () => {
     expect(declarationsFor('.fitHeader')).toMatch(/flex:\s*none;/);
-    expect(declarationsFor('.fitFooter')).toMatch(/flex:\s*none;/);
-    expect(declarationsFor('.fitFooter')).toMatch(
-      /padding-bottom:\s*max\(0\.75rem, env\(safe-area-inset-bottom\)\);/,
-    );
+  });
+
+  it('clears the phone chrome the header would otherwise hide under', () => {
+    const header = declarationsFor('.fitHeader');
+
+    // The bug this guards: a standalone iOS window puts the status bar over the
+    // top of the page, so a header padded by a fixed amount hands the player a
+    // back link they cannot tap.
+    expect(header).toMatch(/padding-top:\s*max\(1\.25rem, env\(safe-area-inset-top\)\);/);
+    expect(header).toMatch(/padding-right:\s*max\(1\.5rem, env\(safe-area-inset-right\)\);/);
+    expect(header).toMatch(/padding-left:\s*max\(1\.5rem, env\(safe-area-inset-left\)\);/);
+  });
+
+  it('lets a tall footer scroll inside itself rather than clip or take the screen', () => {
+    const footer = declarationsFor('.fitFooter');
+
+    expect(footer).toMatch(/flex:\s*none;/);
+    expect(footer).toMatch(/max-height:\s*62%;/);
+    expect(footer).toMatch(/overflow-y:\s*auto;/);
+    expect(footer).toMatch(/min-height:\s*0;/);
+    expect(footer).toMatch(/padding-bottom:\s*max\(0\.75rem, env\(safe-area-inset-bottom\)\);/);
   });
 });
