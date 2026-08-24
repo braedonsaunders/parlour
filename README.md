@@ -71,22 +71,23 @@ Write a rules module, add one registry entry and one table pack, and you inherit
 
 <img src="docs/shots/shelf-fable.png" alt="The parlour game shelf" width="100%" />
 
-| Game                         | What it is                                                                                     | Status       |
-| ---------------------------- | ---------------------------------------------------------------------------------------------- | ------------ |
-| **Blitz** · the 31 game      | Draw, swap, and knock your way to 31 in one suit. Classic, Fast, and Timed formats.            | **Playable** |
-| **Wild** · the shedding game | 112 cards of skips, draw-fours, color dumps, and jump-ins. Classic or Party house rules.       | **Playable** |
-| **Egyptian Ratscrew**        | Flip, challenge on face cards, and slap doubles and sandwiches inside a real-time slap window. | **Playable** |
-| **Gin Rummy**                | Meld, knock, go gin — and undercut the player who knocked too soon.                            | **Playable** |
-| **Hearts**                   | Pass three, dodge the Queen, break hearts, or shoot the moon.                                  | **Playable** |
-| **Euchre**                   | Order it up, name trump, go alone, and march the hand.                                         | **Playable** |
-| **Cribbage**                 | Peg the board, count the show, and try not to get skunked.                                     | **Playable** |
-| **President**                | Slam sets, clear the pile, and trade cards between President and Scum.                         | **Playable** |
-| **Poker** · no-limit hold'em | Two cards down, five in the middle, blinds that climb until one stack has the lot. Chips only. | **Playable** |
-| **Oh Hell**                  | Bid exactly the tricks you will take. The hand grows a card a round, then shrinks back down.   | **Playable** |
-| **Scopa**                    | Fish cards off the table by matching one, or the sum of several. Clear it for a scopa.         | **Playable** |
-| **Spite & Malice**           | Race to empty your payoff pile onto four shared builds, and bury what your neighbour needs.    | **Playable** |
-| **Spades**                   | Bid your books with a partner, break spades, and mind the bags.                                | **Playable** |
-| **Klondike**                 | The solitaire everyone already knows, dealt from a seed you can share.                         | **Playable** |
+| Game                                     | What it is                                                                                                                      | Status       |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ------------ |
+| **Blitz** · the 31 game                  | Draw, swap, and knock your way to 31 in one suit. Classic, Fast, and Timed formats.                                             | **Playable** |
+| **Wild** · the shedding game             | 112 cards of skips, draw-fours, color dumps, and jump-ins. Classic or Party house rules.                                        | **Playable** |
+| **Crazy Eights** · the wild-card shedder | One ordinary pack. Match the suit or the rank, drop an eight to call a suit, and charge the table for what it is still holding. | **Playable** |
+| **Egyptian Ratscrew**                    | Flip, challenge on face cards, and slap doubles and sandwiches inside a real-time slap window.                                  | **Playable** |
+| **Gin Rummy**                            | Meld, knock, go gin — and undercut the player who knocked too soon.                                                             | **Playable** |
+| **Hearts**                               | Pass three, dodge the Queen, break hearts, or shoot the moon.                                                                   | **Playable** |
+| **Euchre**                               | Order it up, name trump, go alone, and march the hand.                                                                          | **Playable** |
+| **Cribbage**                             | Peg the board, count the show, and try not to get skunked.                                                                      | **Playable** |
+| **President**                            | Slam sets, clear the pile, and trade cards between President and Scum.                                                          | **Playable** |
+| **Poker** · no-limit hold'em             | Two cards down, five in the middle, blinds that climb until one stack has the lot. Chips only.                                  | **Playable** |
+| **Oh Hell**                              | Bid exactly the tricks you will take. The hand grows a card a round, then shrinks back down.                                    | **Playable** |
+| **Scopa**                                | Fish cards off the table by matching one, or the sum of several. Clear it for a scopa.                                          | **Playable** |
+| **Spite & Malice**                       | Race to empty your payoff pile onto four shared builds, and bury what your neighbour needs.                                     | **Playable** |
+| **Spades**                               | Bid your books with a partner, break spades, and mind the bags.                                                                 | **Playable** |
+| **Klondike**                             | The solitaire everyone already knows, dealt from a seed you can share.                                                          | **Playable** |
 
 ### Blitz · the 31 game
 
