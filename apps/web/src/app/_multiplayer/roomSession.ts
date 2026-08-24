@@ -53,6 +53,12 @@ import {
   type HeartsState,
 } from '@parlour/game-hearts';
 import {
+  createSpadesDef,
+  spadesConfig,
+  type SpadesRules,
+  type SpadesState,
+} from '@parlour/game-spades';
+import {
   createGinMatchDef,
   ginConfigSchema,
   type GinConfig,
@@ -83,7 +89,15 @@ import { validateRoomCode } from '@/lib/rooms/code';
 import { hasValidSeatCount, seatRangeFor } from '@/lib/rooms/seatRange';
 
 export type MultiplayerGameId =
-  'blitz' | 'cribbage' | 'wildpile' | 'ratscrew' | 'euchre' | 'hearts' | 'gin' | 'president';
+  | 'blitz'
+  | 'cribbage'
+  | 'wildpile'
+  | 'ratscrew'
+  | 'euchre'
+  | 'hearts'
+  | 'gin'
+  | 'president'
+  | 'spades';
 
 /** What the room badge shows about privacy — see lib/multiplayer/veil. */
 export type MultiplayerSecurity = {
@@ -111,7 +125,8 @@ export type MultiplayerGameSession =
   | GameSession<EuchreState, EuchreRules>
   | GameSession<HeartsState, HeartsRules>
   | GameSession<GinMatchState, GinConfig>
-  | GameSession<PresidentState, PresidentRules>;
+  | GameSession<PresidentState, PresidentRules>
+  | GameSession<SpadesState, SpadesRules>;
 
 export type MultiplayerProfile = {
   name: string;
@@ -983,6 +998,7 @@ function gameDefFor(settings: RoomSettings) {
   if (settings.gameId === 'wildpile') return wildpileGame;
   if (settings.gameId === 'cribbage') return createCribbageDef();
   if (settings.gameId === 'president') return presidentGame;
+  if (settings.gameId === 'spades') return createSpadesDef();
   return createBlitzDef();
 }
 
@@ -1091,6 +1107,21 @@ function resolveRoomSettings(settings: RoomSettings): RoomSettings {
       security,
     };
   }
+  if (settings.gameId === 'spades') {
+    if (settings.seats !== 4) throw new Error('Spades rooms require exactly four seats');
+    if (security === 'veil') {
+      // Say so out loud rather than quietly downgrading. Advertising a
+      // cryptographic tier the engine no longer backs would be a lie told to
+      // the one person relying on it.
+      throw new Error('Spades friend rooms use open replay — veiled Spades is not available');
+    }
+    return {
+      gameId: 'spades',
+      seats: 4,
+      config: spadesConfig.resolve(settings.config as Partial<SpadesRules>),
+      security: 'open',
+    };
+  }
   throw new Error(`unsupported room game: ${settings.gameId}`);
 }
 
@@ -1147,6 +1178,15 @@ function createRoomRuntime(
     const config = settings.config as PresidentRules;
     const session = createSession(presidentGame, { seed, config, seats: settings.seats, ...veil });
     const authority = new EngineAuthority({ def: presidentGame, session, ...common });
+    return { session, authority };
+  }
+
+  if (settings.gameId === 'spades') {
+    const def = createSpadesDef();
+    const config = settings.config as SpadesRules;
+    // Spades rooms always resolve to `open`, so the veil spread stays out.
+    const session = createSession(def, { seed, config, seats: 4 });
+    const authority = new EngineAuthority({ def, session, ...common });
     return { session, authority };
   }
 

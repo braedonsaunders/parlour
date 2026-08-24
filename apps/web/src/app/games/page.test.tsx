@@ -45,8 +45,8 @@ describe('game library', () => {
 
     expect(input?.type).toBe('search');
     expect(container.querySelector('label[for="game-search"]')?.textContent).toBe('Search games');
-    expect(gameTiles()).toHaveLength(8);
-    expect(container.textContent).toContain('8 games ready to play');
+    expect(gameTiles()).toHaveLength(9);
+    expect(container.textContent).toContain('9 games ready to play');
   });
 
   it('filters instantly across catalog metadata and keeps selection working', () => {
@@ -66,8 +66,8 @@ describe('game library', () => {
     const clear = container.querySelector<HTMLButtonElement>('[aria-label="Clear game search"]');
     act(() => clear?.click());
 
-    expect(gameTiles()).toHaveLength(8);
-    expect(container.textContent).toContain('8 games ready to play');
+    expect(gameTiles()).toHaveLength(9);
+    expect(container.textContent).toContain('9 games ready to play');
   });
 
   it('offers a friendly recovery when no game matches', () => {

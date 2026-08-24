@@ -24,6 +24,7 @@
     "@parlour/game-hearts": "workspace:*",
     "@parlour/game-president": "workspace:*",
     "@parlour/game-ratscrew": "workspace:*",
+    "@parlour/game-spades": "workspace:*",
     "@parlour/game-wildpile": "workspace:*",
     "gsap": "^3.13.0",
     "howler": "^2.2.4",

@@ -9,6 +9,7 @@ import type { GinModeId } from '@/lib/gin/modes';
 import type { WildModeId } from '@/lib/wild/modes';
 import type { RatscrewModeId } from '@/lib/ratscrew/modes';
 import type { PresidentModeId } from '@/lib/president/modes';
+import type { SpadesModeId } from '@/lib/spades/modes';
 import type { RecordedSeat } from '@/stores/history';
 
 /** Everything the podium needs about the finished match. */
@@ -34,7 +35,8 @@ export interface MatchSnapshot {
     | EuchreModeId
     | HeartsModeId
     | GinModeId
-    | PresidentModeId;
+    | PresidentModeId
+    | SpadesModeId;
   /** The human's seat, for jingle-vs-sting and the "you" framing; null when absent. */
   localSeat: number | null;
 }

@@ -26,6 +26,12 @@ import {
   type RatscrewConfig,
   type RatscrewState,
 } from '@parlour/game-ratscrew';
+import {
+  createSpadesDef,
+  spadesConfig,
+  type SpadesRules,
+  type SpadesState,
+} from '@parlour/game-spades';
 import { wildpileConfig, type WildpileRules, type WildpileState } from '@parlour/game-wildpile';
 import { afterEach, describe, expect, it } from 'vitest';
 import { EngineAuthority } from '@/lib/multiplayer';
@@ -1048,5 +1054,148 @@ describe('president rooms on the shared stack', () => {
     await expect(host.create({ gameId: 'president', seats: 9 })).rejects.toThrow(/4–8 seats/);
     // blitz keeps its own 2–4 ring
     await expect(host.create({ gameId: 'blitz', seats: 6 })).rejects.toThrow(/2–4 seats/);
+  });
+});
+
+describe('spades rooms on the shared stack', () => {
+  const sessions: MultiplayerRoomSession[] = [];
+
+  afterEach(() => sessions.splice(0).forEach((session) => session.close()));
+
+  it('discovers a Spades room and keeps partnership state synchronized across peers', async () => {
+    const broker = new MockSignalingBroker();
+    const rtc = new MockRtcNetwork();
+    const host = new MultiplayerRoomSession(
+      { name: 'Host', avatarId: 'ember', profileId: 'spades-host' },
+      {
+        signaling: broker.signaling('spades-host-peer'),
+        peerConnection: rtc.factory('host'),
+        seed: 5150,
+      },
+    );
+    const guest = new MultiplayerRoomSession(
+      { name: 'Guest', avatarId: 'cobalt', profileId: 'spades-guest' },
+      {
+        signaling: broker.signaling('spades-guest-peer'),
+        peerConnection: rtc.factory('guest'),
+        seed: 8,
+      },
+    );
+    sessions.push(host, guest);
+
+    const created = await host.create({
+      gameId: 'spades',
+      seats: 4,
+      config: applyPreset(spadesConfig, 'quick'),
+    });
+    await guest.join(created.code);
+    await eventually(() => expect(guest.getSnapshot().localSeat).toBe(1));
+
+    expect(host.getSnapshot()).toMatchObject({ gameId: 'spades' });
+    expect(guest.getSnapshot()).toMatchObject({ gameId: 'spades' });
+    expect(guest.getSnapshot().settings?.config).toMatchObject({
+      targetScore: 250,
+      nil: true,
+      bags: true,
+    });
+
+    const def = createSpadesDef();
+    const before = multiplayerSession<SpadesState, SpadesRules>(host.getSnapshot(), 'spades')!;
+    expect(before.state.stage).toBe('bidding');
+    const actor = before.phase.actor!;
+    const legal = def.flow.legalMoves(before.state, before.phase);
+    expect(legal.length).toBeGreaterThan(0);
+    const speaker = actor === 0 ? host : actor === 1 ? guest : null;
+    if (speaker) {
+      speaker.send(legal[0]!.id, legal[0]!.payload);
+      await eventually(() => {
+        const hostSession = multiplayerSession<SpadesState, SpadesRules>(
+          host.getSnapshot(),
+          'spades',
+        );
+        const guestSession = multiplayerSession<SpadesState, SpadesRules>(
+          guest.getSnapshot(),
+          'spades',
+        );
+        expect(guestSession?.log.length).toBe(hostSession?.log.length);
+        expect(guestSession!.log.length).toBeGreaterThan(0);
+        expect(stateHash(guestSession?.state)).toBe(stateHash(hostSession?.state));
+      });
+    }
+  });
+
+  it('narrows multiplayerSession to spades and refuses another game id', async () => {
+    const host = new MultiplayerRoomSession(
+      { name: 'Host', avatarId: 'ember', profileId: 'spades-narrow' },
+      {
+        signaling: new MockSignalingBroker().signaling('spades-narrow-peer'),
+        peerConnection: new MockRtcNetwork().factory('host'),
+        seed: 61,
+      },
+    );
+    sessions.push(host);
+    await host.create({ gameId: 'spades', seats: 4 });
+
+    const snapshot = host.getSnapshot();
+    expect(multiplayerSession<SpadesState, SpadesRules>(snapshot, 'spades')).not.toBeNull();
+    // A euchre table must never read a spades snapshot as its own.
+    expect(multiplayerSession<SpadesState, SpadesRules>(snapshot, 'euchre')).toBeNull();
+  });
+
+  it('deals thirteen cards to each of exactly four seats', async () => {
+    const host = new MultiplayerRoomSession(
+      { name: 'Host', avatarId: 'ember', profileId: 'spades-deal' },
+      {
+        signaling: new MockSignalingBroker().signaling('spades-deal-peer'),
+        peerConnection: new MockRtcNetwork().factory('host'),
+        seed: 99,
+      },
+    );
+    sessions.push(host);
+    await host.create({ gameId: 'spades', seats: 4 });
+    const session = multiplayerSession<SpadesState, SpadesRules>(host.getSnapshot(), 'spades')!;
+    expect(session.state.hands).toHaveLength(4);
+    expect(session.state.hands.map((hand) => hand.length)).toEqual([13, 13, 13, 13]);
+  });
+
+  it('rejects any seat count other than four before a transport exists', async () => {
+    const host = new MultiplayerRoomSession(
+      { name: 'Host', avatarId: 'ember', profileId: 'spades-cap' },
+      { seed: 2 },
+    );
+    sessions.push(host);
+    await expect(host.create({ gameId: 'spades', seats: 3 })).rejects.toThrow(/4–4 seats/);
+    await expect(host.create({ gameId: 'spades', seats: 5 })).rejects.toThrow(/4–4 seats/);
+    await expect(host.create({ gameId: 'spades', seats: 2 })).rejects.toThrow(/4–4 seats/);
+  });
+
+  // Engine v1 Veil is gone. Saying so out loud beats quietly downgrading a
+  // player who explicitly asked for cryptographic play.
+  it('refuses a veiled spades room in plain words instead of silently opening it', async () => {
+    const host = new MultiplayerRoomSession(
+      { name: 'Host', avatarId: 'ember', profileId: 'spades-veil' },
+      { seed: 3 },
+    );
+    sessions.push(host);
+    await expect(host.create({ gameId: 'spades', seats: 4, security: 'veil' })).rejects.toThrow(
+      /veiled Spades is not available/,
+    );
+  });
+
+  it('resolves an open spades room as open, with the pack defaults filled in', async () => {
+    const host = new MultiplayerRoomSession(
+      { name: 'Host', avatarId: 'ember', profileId: 'spades-open' },
+      {
+        signaling: new MockSignalingBroker().signaling('spades-open-peer'),
+        peerConnection: new MockRtcNetwork().factory('host'),
+        seed: 4,
+      },
+    );
+    sessions.push(host);
+    await host.create({ gameId: 'spades', seats: 4 });
+    const settings = host.getSnapshot().settings!;
+    expect(settings.security).toBe('open');
+    expect(settings.seats).toBe(4);
+    expect(settings.config).toMatchObject({ targetScore: 500, nil: true, bags: true });
   });
 });

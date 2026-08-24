@@ -7,6 +7,7 @@ import { heartsCatalog } from '@parlour/game-hearts';
 import { presidentCatalog } from '@parlour/game-president';
 import { wildpileCatalog } from '@parlour/game-wildpile';
 import { ratscrewCatalog } from '@parlour/game-ratscrew';
+import { spadesCatalog } from '@parlour/game-spades';
 
 /**
  * Pack catalogs are generic over their rule config. `ConfigSchema<C>` is
@@ -37,7 +38,7 @@ function shelfEntry<C extends RuleValues>(entry: GameCatalogEntry<C>): GameCatal
  * silently orphan someone's results rather than fail the build.
  */
 export type GameId =
-  'blitz' | 'cribbage' | 'wild' | 'ratscrew' | 'euchre' | 'hearts' | 'gin' | 'president';
+  'blitz' | 'cribbage' | 'wild' | 'ratscrew' | 'euchre' | 'hearts' | 'gin' | 'president' | 'spades';
 
 const SHELF: readonly GameCatalogEntry[] = [
   shelfEntry(blitzCatalog),
@@ -45,6 +46,7 @@ const SHELF: readonly GameCatalogEntry[] = [
   shelfEntry(wildpileCatalog),
   shelfEntry(ratscrewCatalog),
   shelfEntry(euchreCatalog),
+  shelfEntry(spadesCatalog),
   shelfEntry(heartsCatalog),
   shelfEntry(ginCatalog),
   shelfEntry(presidentCatalog),

@@ -68,6 +68,9 @@ importers:
       '@parlour/game-ratscrew':
         specifier: workspace:*
         version: link:../../packages/game-ratscrew
+      '@parlour/game-spades':
+        specifier: workspace:*
+        version: link:../../packages/game-spades
       '@parlour/game-wildpile':
         specifier: workspace:*
         version: link:../../packages/game-wildpile

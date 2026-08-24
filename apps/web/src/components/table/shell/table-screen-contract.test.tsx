@@ -8,6 +8,7 @@ import type { GinTableView } from '@/lib/gin/view';
 import type { HeartsTableView } from '@/lib/hearts/view';
 import type { PresidentTableView } from '@/lib/president/view';
 import type { RatscrewTableView } from '@/lib/ratscrew/view';
+import type { SpadesTableView } from '@/lib/spades/view';
 import type { WildTableView } from '@/lib/wild/view';
 import tableStyles from '@/styles/table.module.css';
 import { TableScreen, type TableView } from '../TableScreen';
@@ -17,6 +18,7 @@ import { GinTableScreen } from '../gin/GinTableScreen';
 import { HeartsTableScreen } from '../hearts/HeartsTableScreen';
 import { PresidentTableScreen } from '../president/PresidentTableScreen';
 import { RatscrewTableScreen } from '../ratscrew/RatscrewTableScreen';
+import { SpadesTableScreen } from '../spades/SpadesTableScreen';
 import { WildTableScreen } from '../wild/WildTableScreen';
 
 /**
@@ -225,6 +227,51 @@ const EUCHRE_VIEW: EuchreTableView = {
   rules: { targetScore: 10, stickDealer: true, goingAlone: true },
 };
 
+const SPADES_VIEW: SpadesTableView = {
+  players: [0, 1, 2, 3].map((seat) => ({
+    seat,
+    name: seat === 0 ? 'You' : `Seat ${seat}`,
+    avatarId: seat === 0 ? 'ember' : 'slate',
+    isLocal: seat === 0,
+    isBot: seat !== 0,
+    team: (seat % 2) as 0 | 1,
+    handCount: 13,
+    isDealer: seat === 3,
+    bid: { seat, tricks: 3, nil: false },
+    tricksWon: 0,
+  })),
+  localSeat: 0,
+  activeSeat: 0,
+  stageLabel: 'classic · trick 1 of 13',
+  stage: 'playing',
+  scores: [0, 0],
+  bags: [0, 0],
+  targetScore: 500,
+  teams: [
+    { team: 0, score: 0, bags: 0, contract: 6, tricks: 0, nilSeats: [], label: 'You & partner' },
+    { team: 1, score: 0, bags: 0, contract: 6, tricks: 0, nilSeats: [], label: 'Openers' },
+  ],
+  handNo: 1,
+  dealer: 3,
+  turn: 0,
+  trick: [],
+  leader: null,
+  ledSuit: null,
+  spadesBroken: false,
+  overtime: false,
+  tricksPlayed: 0,
+  lastTrickWinner: null,
+  hand: ['C2', 'C7', 'D3', 'H4', 'S1'],
+  legalCards: ['C2'],
+  bidOptions: [],
+  canBidNil: false,
+  decision: 'play',
+  lastHand: null,
+  matchOver: false,
+  mode: 'classic',
+  rules: { targetScore: 500, nil: true, bags: true },
+};
+
 const PRESIDENT_VIEW: PresidentTableView = {
   players: [0, 1, 2, 3].map((seat) => ({
     seat,
@@ -357,6 +404,18 @@ const SCREENS: readonly ScreenCase[] = [
     loadingCopy: 'Dealing the first hand…',
     dealState: true,
     gameText: 'euchre',
+  },
+  {
+    name: 'spades',
+    Screen: SpadesTableScreen as ComponentType<never>,
+    view: SPADES_VIEW,
+    eyebrow: 'Spades',
+    playfield: 'Spades table',
+    feltMark: '♠',
+    errorHeadline: 'The table lost the thread.',
+    loadingCopy: 'Cutting for the first deal…',
+    dealState: true,
+    gameText: 'spades',
   },
   {
     name: 'gin',

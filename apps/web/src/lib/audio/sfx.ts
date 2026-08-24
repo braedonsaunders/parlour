@@ -8,6 +8,7 @@ import {
   heartsCuesForFx,
   presidentCuesForFx,
   ratscrewCuesForFx,
+  spadesCuesForFx,
 } from './game-cues';
 
 export type SfxPack = {
@@ -78,6 +79,26 @@ export const EUCHRE_SFX = {
   euchreSting: 'euchre.euchre-sting',
   marchFanfare: 'euchre.march-fanfare',
   scoreChime: 'euchre.score-chime',
+} as const;
+
+/**
+ * Spades ships no new audio. Every id below points at an existing parlour
+ * asset chosen for its gesture, not its former game: `validatePack` requires
+ * the `spades.` namespace, and `uniqueSounds` only objects when one id claims
+ * two different files, so sharing a file across packs is deliberate and safe.
+ */
+export const SPADES_SFX = {
+  bid: 'spades.bid',
+  bidNil: 'spades.bid-nil',
+  bidsComplete: 'spades.bids-complete',
+  trickCollect: 'spades.trick-collect',
+  spadesBroken: 'spades.spades-broken',
+  nilMade: 'spades.nil-made',
+  nilFailed: 'spades.nil-failed',
+  set: 'spades.set',
+  contractMade: 'spades.contract-made',
+  bagPenalty: 'spades.bag-penalty',
+  scoreChime: 'spades.score-chime',
 } as const;
 
 export const GIN_SFX = {
@@ -206,6 +227,25 @@ export const EUCHRE_SFX_PACK: SfxPack = {
   cuesForFx: euchreCuesForFx,
 };
 
+export const SPADES_SFX_PACK: SfxPack = {
+  id: 'spades',
+  label: 'Spades',
+  sounds: [
+    sound(SPADES_SFX.bid, '/audio/sfx/euchre-order-up.mp3', 0.7, 4, 60),
+    sound(SPADES_SFX.bidNil, '/audio/sfx/gin-knock-rap.mp3', 0.86, 1, 250),
+    sound(SPADES_SFX.bidsComplete, '/audio/sfx/euchre-trump-called.mp3', 0.74, 1, 250),
+    sound(SPADES_SFX.trickCollect, '/audio/sfx/euchre-trick-collect.mp3', 0.76, 2, 100),
+    sound(SPADES_SFX.spadesBroken, '/audio/sfx/hearts-hearts-broken.mp3', 0.8, 1, 250),
+    sound(SPADES_SFX.nilMade, '/audio/sfx/president-crown.mp3', 0.85, 1, 500),
+    sound(SPADES_SFX.nilFailed, '/audio/sfx/euchre-euchre-sting.mp3', 0.86, 1, 500),
+    sound(SPADES_SFX.set, '/audio/sfx/euchre-euchre-sting.mp3', 0.86, 1, 500),
+    sound(SPADES_SFX.contractMade, '/audio/sfx/euchre-march-fanfare.mp3', 0.88, 1, 500),
+    sound(SPADES_SFX.bagPenalty, '/audio/sfx/life-chip-loss.mp3', 0.82, 2, 150),
+    sound(SPADES_SFX.scoreChime, '/audio/sfx/euchre-score-chime.mp3', 0.68, 6, 50),
+  ],
+  cuesForFx: spadesCuesForFx,
+};
+
 export const GIN_SFX_PACK: SfxPack = {
   id: 'gin',
   label: 'Gin Rummy',
@@ -273,6 +313,7 @@ for (const pack of [
   WILDPILE_SFX_PACK,
   HEARTS_SFX_PACK,
   EUCHRE_SFX_PACK,
+  SPADES_SFX_PACK,
   GIN_SFX_PACK,
   CRIBBAGE_SFX_PACK,
   RATSCREW_SFX_PACK,

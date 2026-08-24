@@ -10,6 +10,14 @@ describe('seatRange', () => {
     expect(hasValidSeatCount('blitz', 5)).toBe(false);
   });
 
+  it('pins spades to exactly four seats — partnerships have no other shape', () => {
+    expect(seatRangeFor('spades')).toEqual({ min: 4, max: 4 });
+    expect(hasValidSeatCount('spades', 4)).toBe(true);
+    expect(hasValidSeatCount('spades', 3)).toBe(false);
+    expect(hasValidSeatCount('spades', 5)).toBe(false);
+    expect(hasValidSeatCount('spades', 2)).toBe(false);
+  });
+
   it('opens the president ring to 4–8 without touching other games', () => {
     expect(seatRangeFor('president')).toEqual({ min: 4, max: 8 });
     expect(hasValidSeatCount('president', 3)).toBe(false);

@@ -61,6 +61,41 @@ export function euchreCuesForFx(fx: readonly FxEvent[]): SoundCue[] {
   });
 }
 
+export function spadesCuesForFx(fx: readonly FxEvent[]): SoundCue[] {
+  return fx.flatMap((event) => {
+    const atMs = Math.max(0, event.at ?? 0);
+    switch (event.kind) {
+      case 'spades.bid':
+        return [{ id: payloadBoolean(event, 'nil') ? 'spades.bid-nil' : 'spades.bid', atMs }];
+      case 'spades.bids-complete':
+        return [{ id: 'spades.bids-complete', atMs }];
+      case 'spades.spades-broken':
+        return [{ id: 'spades.spades-broken', atMs }];
+      case 'spades.trick-collect':
+        return [{ id: 'spades.trick-collect', atMs: atMs + 120 }];
+      case 'spades.nil-made':
+        return [{ id: 'spades.nil-made', atMs }];
+      case 'spades.nil-failed':
+        return [{ id: 'spades.nil-failed', atMs }];
+      case 'spades.hand-score': {
+        // One event carries both partnerships; a set anywhere stings, and an
+        // unblemished made contract gets the fanfare.
+        const teams = payloadRecord(event)?.teams;
+        if (!Array.isArray(teams)) return [];
+        const made = teams.filter((team) => (team as { made?: unknown }).made === true);
+        if (made.length < teams.length) return [{ id: 'spades.set', atMs }];
+        return made.length > 0 ? [{ id: 'spades.contract-made', atMs }] : [];
+      }
+      case 'spades.bag-penalty':
+        return [{ id: 'spades.bag-penalty', atMs }];
+      case 'spades.score-chip':
+        return [{ id: 'spades.score-chime', atMs }];
+      default:
+        return [];
+    }
+  });
+}
+
 export function ginCuesForFx(fx: readonly FxEvent[]): SoundCue[] {
   return fx.flatMap((event) => {
     const atMs = Math.max(0, event.at ?? 0);
