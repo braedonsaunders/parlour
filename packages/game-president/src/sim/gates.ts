@@ -18,7 +18,7 @@ export interface GateThresholds {
   ladderMin: number;
   socialBandMin: number;
   socialBandMax: number;
-    sharpWinMax: number;
+  sharpWinMax: number;
   maxAverageDeals: number;
 }
 
