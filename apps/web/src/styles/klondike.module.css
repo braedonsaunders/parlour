@@ -1,4 +1,10 @@
 .screen {
+  /* Teal says "you are holding this" — see the selection rule below, which
+     shipped separately. Amber therefore says "this just arrived". Keeping the
+     two different is what stops a freshly turned waste card reading as a card
+     you already picked up. */
+  --kl-select: #ffe0a1;
+  --kl-fresh: #ffc46a;
   --kl-card: clamp(4.7rem, 7.2vw, 6.6rem);
   --kl-down-step: clamp(0.82rem, 1.6vh, 1.05rem);
   --kl-up-step: clamp(1.65rem, 3.8vh, 2.35rem);
@@ -117,8 +123,8 @@ button.pileButton {
   height: 100%;
 }
 
-.pileButton :global(.card),
-.tableauCard :global(.card) {
+.pileButton [data-card-chassis],
+.tableauCard [data-card-chassis] {
   width: 100%;
 }
 
@@ -126,7 +132,7 @@ button.pileButton {
 .tableauColumn[data-legal-target] .columnTarget {
   border-radius: 0.85rem;
   box-shadow:
-    0 0 0 3px #ffe0a1,
+    0 0 0 3px var(--kl-select),
     0 0 24px rgba(255, 195, 96, 0.74);
 }
 
@@ -152,6 +158,53 @@ button.pileButton {
     0 0 30px 10px rgba(65, 255, 219, 0.72),
     0 16px 30px rgba(3, 13, 15, 0.72);
   filter: saturate(1.08) brightness(1.04);
+}
+
+/*
+ * The card the stock just turned up.
+ *
+ * Same idea as the hand rail's just-drawn lift: the one card that changed
+ * should be findable without hunting for it. Teal rather than the amber
+ * selection ring, so "this is new" and "this is chosen" never read as the same
+ * state.
+ */
+.board [data-just-drawn]:not([data-selected='true']) > [data-card-chassis] {
+  box-shadow:
+    0 0 0 3px var(--kl-fresh),
+    0 0 22px rgba(255, 196, 106, 0.5);
+}
+
+/*
+ * While a card is held, everything it cannot reach falls back.
+ *
+ * The additive gold ring on legal targets was doing this job alone, which asks
+ * the player to scan for what is lit. Dimming the rest states the same fact the
+ * other way round and matches what every other table already does with an
+ * unplayable card — same tokens, deliberately.
+ */
+.board[data-holding]
+  .pileButton:not([data-legal-target]):not([data-holds-selection])
+  [data-card-chassis],
+.board[data-holding]
+  .tableauColumn:not([data-legal-target])
+  .tableauCard:not([data-selected]):not([data-in-selected-run])
+  [data-card-chassis] {
+  filter: var(--unplayable-filter);
+  opacity: var(--unplayable-opacity);
+}
+
+.board[data-holding] .pileButton:not([data-legal-target]) .emptyPile,
+.board[data-holding] .pileButton:not([data-legal-target]) .emptyFoundation,
+.board[data-holding] .tableauColumn:not([data-legal-target]) .emptyColumn {
+  opacity: calc(var(--unplayable-opacity) * 0.6);
+}
+
+/* Dimming is a state change, not a motion; calm motion keeps it. */
+.pileButton [data-card-chassis],
+.tableauCard [data-card-chassis] {
+  transition:
+    filter var(--dur-feedback) var(--ease-settle),
+    opacity var(--dur-feedback) var(--ease-settle);
 }
 
 .emptyPile,
@@ -241,7 +294,12 @@ button.pileButton {
   translate: -50% 0;
 }
 
-.tableauCard > :global(.card) {
+/*
+ * Minimum tap target for a tableau card. This was the third rule reaching the
+ * chassis through a hashed class name, so it had never applied — tableau cards
+ * could render below the 2.75rem touch minimum on a narrow phone.
+ */
+.tableauCard > [data-card-chassis] {
   min-width: 2.75rem;
   min-height: 3.85rem;
 }

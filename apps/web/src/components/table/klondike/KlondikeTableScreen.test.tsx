@@ -9,6 +9,7 @@ import { rulesForKlondikeMode } from '@/lib/klondike/modes';
 import {
   cardOfMove,
   klondikeTableView,
+  selectionForCard,
   sourceOfMove,
   targetOfMove,
   type KlondikeTableView,
@@ -290,6 +291,112 @@ describe('KlondikeTableScreen', () => {
     );
     expect(container.textContent).toContain('01:32');
     expect(textSurface()).toMatchObject({ status: 'won', won: true });
+  });
+
+  describe('showing where a held card can go', () => {
+    it('marks the board as holding only while a card is selected', () => {
+      const { view } = table();
+      render(view);
+      const board = () => container.querySelector('[data-testid="klondike-board"]')!;
+      expect(board().hasAttribute('data-holding')).toBe(false);
+
+      const run = container.querySelector<HTMLElement>('[data-testid="klondike-run-head"]');
+      act(() => run!.click());
+      expect(board().hasAttribute('data-holding')).toBe(true);
+
+      act(() => {
+        window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+      });
+      expect(board().hasAttribute('data-holding')).toBe(false);
+    });
+
+    it('dims every card that is not a legal destination while holding', () => {
+      // The rule keys off `[data-holding]` on the board and `[data-legal-target]`
+      // on each pile, so a stylesheet regression that drops either one is a
+      // silent loss of the whole affordance.
+      expect(KLONDIKE_STYLES).toContain('.board[data-holding]');
+      expect(KLONDIKE_STYLES).toContain('var(--unplayable-filter)');
+      expect(KLONDIKE_STYLES).toContain('var(--unplayable-opacity)');
+      expect(KLONDIKE_STYLES).toContain(':not([data-legal-target])');
+      // The card being held and the run under it must be exempt, or the player
+      // dims the very thing they picked up.
+      expect(KLONDIKE_STYLES).toContain(':not([data-holds-selection])');
+      expect(KLONDIKE_STYLES).toContain(':not([data-in-selected-run])');
+    });
+
+    it('reaches the card chassis by a hook that survives CSS module hashing', () => {
+      // `:global(.card)` matched nothing: PlayingCard's class is a CSS module
+      // class and is hashed at build time. Three rules were dead because of it,
+      // including the selection ring on a card taken from the waste.
+      expect(KLONDIKE_STYLES).not.toContain(':global(.card)');
+      expect(KLONDIKE_STYLES).toContain('[data-card-chassis]');
+      const { view } = table();
+      render(view);
+      expect(container.querySelector('[data-card-chassis]')).not.toBeNull();
+    });
+
+    it('highlights a card selected from the waste, not just tableau runs', () => {
+      // Draw from the real stock until the waste top is a card the rules will
+      // actually let us pick up; a synthetic waste would not be selectable and
+      // would prove nothing about the highlight.
+      const { transport } = table();
+      let view = klondikeTableView(transport.getSnapshot(), transport.legalMoves());
+      for (let draw = 0; draw < 24; draw += 1) {
+        const top = view.waste.at(-1);
+        if (top && selectionForCard(view, 'waste', top)) break;
+        const stock = view.legal.find((move) => move.id === 'stock.draw');
+        if (!stock) break;
+        transport.dispatch(stock.id, stock.payload);
+        view = klondikeTableView(transport.getSnapshot(), transport.legalMoves());
+      }
+      const top = view.waste.at(-1)!;
+      expect(selectionForCard(view, 'waste', top)).not.toBeNull();
+
+      render(view);
+      const wasteZone = () => container.querySelector<HTMLElement>('[data-zone="waste"]')!;
+      expect(wasteZone().querySelector(`[data-card="${top}"]`)!.hasAttribute('data-selected')).toBe(
+        false,
+      );
+
+      act(() =>
+        wasteZone().querySelector<HTMLElement>(`[data-card="${top}"] [data-card-chassis]`)!.click(),
+      );
+      expect(wasteZone().querySelector(`[data-card="${top}"]`)!.hasAttribute('data-selected')).toBe(
+        true,
+      );
+      expect(wasteZone().hasAttribute('data-holds-selection')).toBe(true);
+      expect(
+        container.querySelector('[data-testid="klondike-board"]')!.hasAttribute('data-holding'),
+      ).toBe(true);
+    });
+
+    it('calls out the card the stock just turned up, and clears it on the next move', () => {
+      const { view } = table();
+      render({ ...view, waste: [], moves: 4 });
+      const wasteCard = () =>
+        container.querySelector<HTMLElement>('[data-zone="waste"] [data-card]');
+      expect(wasteCard()).toBeNull();
+
+      render({ ...view, waste: ['H7'], moves: 5 });
+      expect(wasteCard()!.hasAttribute('data-just-drawn')).toBe(true);
+
+      // Any later move retires the call-out: "fresh" lasts exactly one move.
+      render({ ...view, waste: ['H7'], moves: 6 });
+      expect(wasteCard()!.hasAttribute('data-just-drawn')).toBe(false);
+    });
+
+    it('keeps the fresh-draw ring a different colour from the selection ring', () => {
+      // If these ever collapse to one colour, "this just arrived" and "you are
+      // holding this" become the same signal.
+      expect(KLONDIKE_STYLES).toContain('--kl-select:');
+      expect(KLONDIKE_STYLES).toContain('--kl-fresh:');
+      expect(KLONDIKE_STYLES).toContain('[data-just-drawn] > [data-card-chassis]');
+      const select = /--kl-select:\s*([^;]+);/.exec(KLONDIKE_STYLES)?.[1]?.trim();
+      const fresh = /--kl-fresh:\s*([^;]+);/.exec(KLONDIKE_STYLES)?.[1]?.trim();
+      expect(select).toBeTruthy();
+      expect(fresh).toBeTruthy();
+      expect(select).not.toBe(fresh);
+    });
   });
 });
 
