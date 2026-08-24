@@ -42,10 +42,8 @@ export type TableScreenProps = {
   view: TableView | null;
   fx: readonly FxEvent[];
   fxKey: string | number;
-  selectedCard?: string | null;
   busy?: boolean;
   error?: string | null;
-  onSelectCard?: (card: string) => void;
   onDraw?: (source: 'stock' | 'discard') => void;
   onDiscard?: (card: string) => void;
   onKnock?: () => void;
@@ -116,18 +114,6 @@ export function TableScreen(props: TableScreenProps) {
           onClick={props.onKnock}
         >
           Knock
-        </button>
-        <button
-          type="button"
-          className="btn-fat btn-fat--teal"
-          disabled={
-            !props.selectedCard ||
-            !view.legal.discardCards.includes(props.selectedCard) ||
-            props.busy
-          }
-          onClick={() => props.selectedCard && props.onDiscard?.(props.selectedCard)}
-        >
-          Discard
         </button>
       </div>
     </main>
@@ -248,9 +234,8 @@ function LocalHand(props: TableScreenProps & { view: TableView }) {
             <div className={styles.handFan}>
               <PlayingCard
                 card={card}
-                selected={props.selectedCard === card}
                 disabled={!canChoose || !props.view.legal.discardCards.includes(card)}
-                onClick={() => props.onSelectCard?.(card)}
+                onClick={() => props.onDiscard?.(card)}
               />
             </div>
           </motion.div>

@@ -286,12 +286,6 @@ button.card:not(:disabled):hover {
   background: linear-gradient(145deg, #fffdf8, #eee6d8);
   color: #18252c;
 }
-.cardSelected {
-  transform: translateY(-17px) rotate(var(--card-rotation)) scale(1.06);
-  box-shadow:
-    0 0 0 3px var(--hearth-core),
-    0 18px 28px -8px rgba(3, 11, 15, 0.8);
-}
 .cardDisabled {
   filter: saturate(0.68) brightness(0.8);
 }

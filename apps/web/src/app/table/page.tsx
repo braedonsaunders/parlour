@@ -49,7 +49,6 @@ function ActiveSoloTable({ transport }: { transport: LocalTransport }) {
   const [fx, setFx] = useState<readonly FxEvent[]>(() => snapshot.session.setupFx ?? []);
   const [roundFx, setRoundFx] = useState<readonly FxEvent[]>(() => snapshot.session.setupFx ?? []);
   const [fxKey, setFxKey] = useState(0);
-  const [selectedCard, setSelectedCard] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const accept = useCallback((outcome: LocalDispatch) => {
@@ -58,7 +57,6 @@ function ActiveSoloTable({ transport }: { transport: LocalTransport }) {
       return;
     }
     setError(null);
-    setSelectedCard(null);
     setSnapshot(outcome.snapshot);
     setFx(outcome.fx);
     setRoundFx((current) =>
@@ -153,10 +151,8 @@ function ActiveSoloTable({ transport }: { transport: LocalTransport }) {
         view={view}
         fx={fx}
         fxKey={fxKey}
-        selectedCard={selectedCard}
         busy={snapshot.session.phase.actor !== 0 || snapshot.session.status !== 'playing'}
         error={error}
-        onSelectCard={setSelectedCard}
         onDraw={(source) => dispatch(`draw.${source}`)}
         onDiscard={(card) => dispatch('discard', { card })}
         onKnock={() => dispatch('knock')}
