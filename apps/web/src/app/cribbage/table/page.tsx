@@ -67,7 +67,10 @@ function ActiveSoloTable({ transport }: { transport: CribbageTransport }) {
   const recordResult = useProfileStore((state) => state.recordResult);
   const recordMatch = useHistoryStore((state) => state.recordMatch);
   const reported = useRef(false);
-  const botPaceMs = useCallback((_current: ReturnType<CribbageTransport['getSnapshot']>) => 420, []);
+  const botPaceMs = useCallback(
+    (_current: ReturnType<CribbageTransport['getSnapshot']>) => 420,
+    [],
+  );
   const { snapshot, fx, fxKey, error, dispatch } = useSoloTable(transport, {
     round: (current) => current.match.round,
     botPaceMs,

@@ -112,7 +112,10 @@ const eslintConfig = [
           paths: [
             { name: 'react', message: 'Engine and game packages are React-free (spec §4).' },
             { name: 'react-dom', message: 'Engine and game packages are React-free (spec §4).' },
-            { name: 'zustand', message: 'Engine state lives in the engine, not a store (spec §4).' },
+            {
+              name: 'zustand',
+              message: 'Engine state lives in the engine, not a store (spec §4).',
+            },
           ],
           patterns: [
             {

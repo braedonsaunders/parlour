@@ -568,12 +568,36 @@ describe('trick resolution via @parlour/tricks (D7)', () => {
 
   it('still lets the right bower beat the left bower', () => {
     // J♥ (right) vs J♦ (left) with hearts trump — the left must not win.
-    expect(trickWinner([{ seat: 0, card: 'D11' }, { seat: 1, card: 'H11' }], 'H')).toBe(1);
-    expect(trickWinner([{ seat: 0, card: 'H11' }, { seat: 1, card: 'D11' }], 'H')).toBe(0);
+    expect(
+      trickWinner(
+        [
+          { seat: 0, card: 'D11' },
+          { seat: 1, card: 'H11' },
+        ],
+        'H',
+      ),
+    ).toBe(1);
+    expect(
+      trickWinner(
+        [
+          { seat: 0, card: 'H11' },
+          { seat: 1, card: 'D11' },
+        ],
+        'H',
+      ),
+    ).toBe(0);
   });
 
   it('lets the left bower beat the trump ace', () => {
-    expect(trickWinner([{ seat: 0, card: 'H1' }, { seat: 1, card: 'D11' }], 'H')).toBe(1);
+    expect(
+      trickWinner(
+        [
+          { seat: 0, card: 'H1' },
+          { seat: 1, card: 'D11' },
+        ],
+        'H',
+      ),
+    ).toBe(1);
   });
 
   it('leading the left bower leads trump, not its printed suit', () => {

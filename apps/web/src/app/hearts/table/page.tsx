@@ -7,10 +7,7 @@ import type { HeartsModeId } from '@/lib/hearts/modes';
 import { heartsModeForRules } from '@/lib/hearts/modes';
 import { heartsTableView } from '@/lib/hearts/view';
 import { useSoloTable } from '@/lib/table/useSoloTable';
-import {
-  HeartsTransport,
-  type HeartsSnapshot,
-} from '@/lib/solo/HeartsTransport';
+import { HeartsTransport, type HeartsSnapshot } from '@/lib/solo/HeartsTransport';
 import { botKey, buildMatchRecord, friendKey, useHistoryStore } from '@/stores/history';
 import { useMatchFlowStore } from '@/stores/matchFlow';
 import { useProfileStore } from '@/stores/profile';

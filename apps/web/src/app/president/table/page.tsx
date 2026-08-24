@@ -4,10 +4,7 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from '
 import { useRouter } from 'next/navigation';
 import type { GameSession } from '@parlour/engine';
 import { PresidentTableScreen } from '@/components/table/president/PresidentTableScreen';
-import {
-  PresidentTransport,
-  type PresidentSnapshot,
-} from '@/lib/solo/PresidentTransport';
+import { PresidentTransport, type PresidentSnapshot } from '@/lib/solo/PresidentTransport';
 import { presidentModeForRules } from '@/lib/president/modes';
 import { presidentTableView } from '@/lib/president/view';
 import { useSoloTable } from '@/lib/table/useSoloTable';

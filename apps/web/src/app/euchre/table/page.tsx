@@ -5,10 +5,7 @@ import { useRouter } from 'next/navigation';
 import { type LegalMove } from '@parlour/engine';
 import type { EuchreSuit } from '@parlour/game-euchre';
 import { EuchreTableScreen } from '@/components/table/euchre/EuchreTableScreen';
-import {
-  EuchreTransport,
-  type EuchreSnapshot,
-} from '@/lib/solo/EuchreTransport';
+import { EuchreTransport, type EuchreSnapshot } from '@/lib/solo/EuchreTransport';
 import { euchreModeForRules } from '@/lib/euchre/modes';
 import { euchreTableView, type EuchreTableView } from '@/lib/euchre/view';
 import { useSoloTable } from '@/lib/table/useSoloTable';
