@@ -1,14 +1,9 @@
 import {
   applyPreset,
-  chooseBotMove,
   createSession,
-  makeRng,
-  sessionApply,
-  type AppliedEvent,
-  type FxEvent,
+  type BotPolicy,
   type GameSession,
   type LegalMove,
-  type RuleError,
 } from '@parlour/engine';
 import {
   createGinMatchDef,
@@ -19,9 +14,9 @@ import {
   type GinMatchState,
   type PersonaDef,
 } from '@parlour/game-gin';
-import type { BotPolicy } from '@parlour/engine';
 import type { GinModeId } from '@/lib/gin/modes';
 import type { BotTier } from '@/stores/setup';
+import { adaptSessionApply, SoloAuthority, type SoloDispatch } from './SoloAuthority';
 
 /** House opponents — avatar ids match the app's cast so seats read cohesively. */
 const PERSONA_AVATARS = ['peg', 'roo', 'marge', 'benny', 'knuckles', 'pat'] as const;
@@ -48,112 +43,89 @@ export interface GinSnapshot {
   matchWinner: number | null;
 }
 
-export interface GinDispatch {
-  events: readonly AppliedEvent[];
-  fx: readonly FxEvent[];
-  rejected: RuleError | null;
-  snapshot: GinSnapshot;
-}
+export type GinDispatch = SoloDispatch<GinSnapshot>;
 
 /**
  * In-process authority for solo Gin. One deterministic match of
- * @parlour/game-gin against a house persona; the React table only renders its
- * snapshots. The bot answers the hand-end ready window instantly, so pacing
- * stays in the human's hands.
+ * @parlour/game-gin against a house persona; the bot answers the hand-end
+ * ready window instantly, so pacing stays in the human's hands.
  */
 export class GinTransport {
   private readonly def = createGinMatchDef();
   private readonly options: GinTransportOptions;
-  /** the persona's hand-level brain */
-  private readonly handPolicy: ReturnType<typeof makeGinPersonaBot>;
-  /** the same brain adapted to match-level views (answers `ready` instantly) */
   private readonly policy: BotPolicy<GinMatchState> & { persona: PersonaDef };
-  private session: GameSession<GinMatchState, GinConfig>;
+  private readonly authority: SoloAuthority<
+    GameSession<GinMatchState, GinConfig>,
+    GinSnapshot,
+    GinMatchState
+  >;
 
   constructor(options: GinTransportOptions) {
     this.options = options;
-    this.handPolicy = makeGinPersonaBot(personaForTier(options.botTier));
-    const hand = this.handPolicy;
+    const handPolicy = makeGinPersonaBot(personaForTier(options.botTier));
     this.policy = {
-      id: hand.id,
-      label: hand.label,
-      tier: hand.tier,
-      persona: hand.persona,
+      id: handPolicy.id,
+      label: handPolicy.label,
+      tier: handPolicy.tier,
+      persona: handPolicy.persona,
       chooseMove(view, seat, legal, rng, ctx) {
         if (view.folded) return legal.find((move) => move.id === 'ready') ?? null;
-        return hand.chooseMove(view.hand, seat, legal, rng, ctx);
+        return handPolicy.chooseMove(view.hand, seat, legal, rng, ctx);
       },
     };
-    this.session = createSession(this.def, {
+    const session = createSession(this.def, {
       seed: options.seed | 0,
       config: applyPreset(ginConfigSchema, options.mode),
       seats: 2,
     });
+    this.authority = new SoloAuthority(
+      {
+        snapshot: (live): GinSnapshot => ({
+          mode: options.mode,
+          players: this.players(),
+          session: live,
+          matchWinner: live.result?.winner ?? null,
+        }),
+        apply: adaptSessionApply(this.def),
+        isPlaying: (live) => live.status === 'playing',
+        bots: {
+          seed: options.seed,
+          actor: (live) => live.phase.actor,
+          legalMoves: (live, seat) => this.def.flow.legalMovesFor!(live.state, live.phase, seat),
+          playerView: (live, seat) => this.def.playerView(live.state, seat),
+          policy: () => this.policy,
+          rngFork: (live) => `hand:${live.state.handIndex}:ev:${live.log.length}`,
+          untilHumanGuard: 500,
+          botRejectedMessage: ({ choice, rejected }) => `${choice.id}: ${rejected.message}`,
+        },
+      },
+      session,
+    );
   }
 
   getSnapshot(): GinSnapshot {
-    return {
-      mode: this.options.mode,
-      players: this.players(),
-      session: this.session,
-      matchWinner: this.session.result?.winner ?? null,
-    };
+    return this.authority.getSnapshot();
   }
 
   /** Moves the seat that must act right now may choose from. */
   legalMoves(): readonly LegalMove[] {
-    if (this.session.status !== 'playing') return [];
-    const actor = this.session.phase.actor;
+    const session = this.authority.getLive();
+    if (session.status !== 'playing') return [];
+    const actor = session.phase.actor;
     if (actor === null) return [];
-    return this.def.flow.legalMovesFor!(this.session.state, this.session.phase, actor);
+    return this.def.flow.legalMovesFor!(session.state, session.phase, actor);
   }
 
-  /** Human seat 0 acts; the engine validates turn and legality. */
   dispatch(move: string, payload?: unknown): GinDispatch {
-    if (this.session.status !== 'playing') {
-      return this.reject('match-ended', 'the match has ended');
-    }
-    const outcome = sessionApply(this.def, this.session, 0, move, payload);
-    if (outcome.rejected) return this.reject(outcome.rejected.code, outcome.rejected.message);
-    this.session = outcome.session;
-    return { events: outcome.events, fx: outcome.fx, rejected: null, snapshot: this.getSnapshot() };
+    return this.authority.dispatch(move, payload);
   }
 
   playBotTurn(): GinDispatch {
-    const seat = this.session.phase.actor;
-    if (this.session.status !== 'playing' || seat === null || seat === 0) {
-      return this.reject('not-bot-turn', 'no bot is currently acting');
-    }
-    const legal = this.def.flow.legalMovesFor!(this.session.state, this.session.phase, seat);
-    if (legal.length === 0) throw new Error(`bot seat ${seat} has no legal move`);
-    const rng = makeRng(this.options.seed).fork(
-      `hand:${this.session.state.handIndex}:ev:${this.session.log.length}`,
-    );
-    const view = this.def.playerView(this.session.state, seat);
-    const choice = chooseBotMove(this.policy, view, seat, legal, rng) ?? legal[0]!;
-    return this.apply(seat, choice.id, choice.payload);
+    return this.authority.playBotTurn();
   }
 
-  /** Plays every bot decision until the human's seat must act again. */
   playBotsUntilHuman(): GinDispatch[] {
-    const outcomes: GinDispatch[] = [];
-    let guard = 0;
-    while (
-      this.session.status === 'playing' &&
-      this.session.phase.actor !== null &&
-      this.session.phase.actor !== 0
-    ) {
-      if (guard++ >= 500) throw new Error('bot loop did not return control after 500 actions');
-      outcomes.push(this.playBotTurn());
-    }
-    return outcomes;
-  }
-
-  private apply(seat: number, move: string, payload?: unknown): GinDispatch {
-    const applied = sessionApply(this.def, this.session, seat, move, payload);
-    if (applied.rejected) throw new Error(`${move}: ${applied.rejected.message}`);
-    this.session = applied.session;
-    return { events: applied.events, fx: applied.fx, rejected: null, snapshot: this.getSnapshot() };
+    return this.authority.playBotsUntilHuman();
   }
 
   private players(): GinPlayer[] {
@@ -175,10 +147,6 @@ export class GinTransport {
         isBot: true,
       },
     ];
-  }
-
-  private reject(code: string, message: string): GinDispatch {
-    return { events: [], fx: [], rejected: { code, message }, snapshot: this.getSnapshot() };
   }
 }
 

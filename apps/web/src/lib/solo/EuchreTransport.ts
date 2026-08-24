@@ -1,17 +1,7 @@
-import {
-  applyPreset,
-  chooseBotMove,
-  createSession,
-  makeRng,
-  sessionApply,
-  type AppliedEvent,
-  type FxEvent,
-  type GameSession,
-  type LegalMove,
-  type RuleError,
-} from '@parlour/engine';
+import { applyPreset, createSession, type GameSession, type LegalMove } from '@parlour/engine';
 import { createEuchreDef, tierBot, type EuchreRules, type EuchreState } from '@parlour/game-euchre';
 import type { EuchreModeId } from '@/lib/euchre/modes';
+import { adaptSessionApply, SoloAuthority, type SoloDispatch } from './SoloAuthority';
 
 /** House partners and opponents sit in table order around seat 0. */
 const EUCHRE_CAST = [
@@ -42,99 +32,76 @@ export interface EuchreSnapshot {
   matchWinnerTeam: 0 | 1 | null;
 }
 
-export interface EuchreDispatch {
-  events: readonly AppliedEvent[];
-  fx: readonly FxEvent[];
-  rejected: RuleError | null;
-  snapshot: EuchreSnapshot;
-}
+export type EuchreDispatch = SoloDispatch<EuchreSnapshot>;
 
 /**
  * In-process authority for solo euchre. The full match — every hand, score and
  * dealer rotation — lives inside one deterministic engine session, so this
- * transport only routes moves and bot turns. Mirrors WildTransport's contract
- * so the euchre table page rhymes with the others.
+ * facade only projects snapshots and names the house seats.
  */
 export class EuchreTransport {
   private readonly def = createEuchreDef();
   private readonly options: EuchreTransportOptions;
-  private readonly policy;
-  private session: GameSession<EuchreState, EuchreRules>;
+  private readonly authority: SoloAuthority<
+    GameSession<EuchreState, EuchreRules>,
+    EuchreSnapshot,
+    EuchreState
+  >;
 
   constructor(options: EuchreTransportOptions) {
     this.options = options;
-    this.policy = tierBot(options.botTier ?? 2);
-    this.session = createSession(this.def, {
+    const policy = tierBot(options.botTier ?? 2);
+    const session = createSession(this.def, {
       seed: options.seed | 0,
       config: applyPreset(this.def.configSchema, presetForMode(options.mode)),
       seats: 4,
     });
+    this.authority = new SoloAuthority(
+      {
+        snapshot: (live): EuchreSnapshot => ({
+          mode: options.mode,
+          players: this.players(),
+          session: live,
+          matchWinnerTeam: matchWinnerTeamOf(live),
+        }),
+        apply: adaptSessionApply(this.def),
+        isPlaying: (live) => live.status === 'playing',
+        bots: {
+          seed: options.seed,
+          actor: (live) => live.phase.actor,
+          legalMoves: (live) => this.def.flow.legalMoves(live.state, live.phase),
+          playerView: (live, seat) => this.def.playerView(live.state, seat),
+          policy: () => policy,
+          rngFork: (live) => `hand:${live.state.handNo}:event:${live.log.length}`,
+          untilHumanGuard: 500,
+        },
+      },
+      session,
+    );
   }
 
   getSnapshot(): EuchreSnapshot {
-    return {
-      mode: this.options.mode,
-      players: this.players(),
-      session: this.session,
-      matchWinnerTeam: matchWinnerTeamOf(this.session),
-    };
+    return this.authority.getSnapshot();
   }
 
   legalMoves(): readonly LegalMove[] {
-    if (this.session.status !== 'playing') return [];
-    const seat = this.session.phase.actor;
+    const session = this.authority.getLive();
+    if (session.status !== 'playing') return [];
+    const seat = session.phase.actor;
     if (seat === null || seat !== 0) return [];
-    return this.def.flow.legalMoves(this.session.state, this.session.phase);
+    return this.def.flow.legalMoves(session.state, session.phase);
   }
 
-  /** Human seat 0 acts; the engine validates turn/legality. */
   dispatch(move: string, payload?: unknown): EuchreDispatch {
-    if (this.session.status !== 'playing') {
-      return this.reject('match-ended', 'the match has ended');
-    }
-    const outcome = sessionApply(this.def, this.session, 0, move, payload);
-    if (outcome.rejected) return this.reject(outcome.rejected.code, outcome.rejected.message);
-    this.session = outcome.session;
-    return { events: outcome.events, fx: outcome.fx, rejected: null, snapshot: this.getSnapshot() };
+    return this.authority.dispatch(move, payload);
   }
 
   playBotTurn(): EuchreDispatch {
-    const seat = this.session.phase.actor;
-    if (this.session.status !== 'playing' || seat === null || seat === 0) {
-      return this.reject('not-bot-turn', 'no bot is currently acting');
-    }
-    const legal = this.def.flow.legalMoves(this.session.state, this.session.phase);
-    if (legal.length === 0) throw new Error(`bot seat ${seat} has no legal move`);
-    const rng = makeRng(this.options.seed).fork(
-      `hand:${this.session.state.handNo}:event:${this.session.log.length}`,
-    );
-    const view = this.def.playerView(this.session.state, seat);
-    const choice = chooseBotMove(this.policy, view, seat, legal, rng) ?? legal[0]!;
-    const applied = sessionApply(this.def, this.session, seat, choice.id, choice.payload);
-    if (applied.rejected) {
-      throw new Error(`${this.policy.id} chose ${choice.id}: ${applied.rejected.message}`);
-    }
-    this.session = applied.session;
-    return {
-      events: applied.events,
-      fx: applied.fx,
-      rejected: null,
-      snapshot: this.getSnapshot(),
-    };
+    return this.authority.playBotTurn();
   }
 
   playBotsUntilHuman(): EuchreDispatch[] {
-    const outcomes: EuchreDispatch[] = [];
-    let guard = 0;
-    while (
-      this.session.status === 'playing' &&
-      this.session.phase.actor !== null &&
-      this.session.phase.actor !== 0
-    ) {
-      if (guard++ >= 500) throw new Error('bot loop did not return control after 500 actions');
-      outcomes.push(this.playBotTurn());
-    }
-    return outcomes;
+    return this.authority.playBotsUntilHuman();
   }
 
   private players(): EuchreSoloPlayer[] {
@@ -152,10 +119,6 @@ export class EuchreTransport {
         isBot: true,
       })),
     ];
-  }
-
-  private reject(code: string, message: string): EuchreDispatch {
-    return { events: [], fx: [], rejected: { code, message }, snapshot: this.getSnapshot() };
   }
 }
 

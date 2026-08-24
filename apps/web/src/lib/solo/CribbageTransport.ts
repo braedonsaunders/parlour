@@ -1,16 +1,4 @@
-import {
-  chooseBotMove,
-  createMatch,
-  makeRng,
-  matchApply,
-  matchNextRound,
-  type AppliedEvent,
-  type FxEvent,
-  type LegalMove,
-  type MatchOutcome,
-  type MatchSession,
-  type RuleError,
-} from '@parlour/engine';
+import { createMatch, matchNextRound, type LegalMove, type MatchSession } from '@parlour/engine';
 import {
   createCribbageMatchDef,
   tierBot,
@@ -20,6 +8,7 @@ import {
 } from '@parlour/game-cribbage';
 import type { CribbageModeId } from '@/lib/cribbage/modes';
 import type { CribbageBotTier } from '@/stores/cribbageSetup';
+import { adaptMatchApply, SoloAuthority, type SoloDispatch } from './SoloAuthority';
 
 const BOT_FOR_TIER = {
   1: { name: 'Doc Skunk', avatarId: 'rust', personaId: 'doc-skunk' },
@@ -51,37 +40,63 @@ export interface CribbageSnapshot {
   match: CribbageMatchSession;
 }
 
-export interface CribbageDispatch {
-  events: readonly AppliedEvent[];
-  fx: readonly FxEvent[];
-  rejected: RuleError | null;
-  snapshot: CribbageSnapshot;
-}
+export type CribbageDispatch = SoloDispatch<CribbageSnapshot>;
 
 /** In-process deterministic match authority for solo Cribbage. */
 export class CribbageTransport {
   private readonly def = createCribbageMatchDef();
-  private match: CribbageMatchSession;
+  private readonly options: CribbageTransportOptions;
+  private readonly authority: SoloAuthority<CribbageMatchSession, CribbageSnapshot, CribbageState>;
 
-  constructor(private readonly options: CribbageTransportOptions) {
-    this.match = createMatch(this.def, {
+  constructor(options: CribbageTransportOptions) {
+    this.options = options;
+    const match = createMatch(this.def, {
       seed: options.seed | 0,
       config: options.rules,
       seats: 2,
     }).session;
+    const policy = tierBot(options.botTier);
+    this.authority = new SoloAuthority(
+      {
+        snapshot: (live): CribbageSnapshot => ({
+          mode: options.mode,
+          players: this.players(),
+          match: live,
+        }),
+        apply: adaptMatchApply(this.def),
+        isPlaying: (live) => live.status === 'playing',
+        afterApply: ({ live, events, fx }) => {
+          if (live.status !== 'round-over') return;
+          const next = matchNextRound(this.def, live);
+          if (next.rejected) throw new Error(next.rejected.message);
+          return {
+            live: next.session,
+            events: [...events, ...next.events],
+            fx: [...fx, ...next.fx],
+          };
+        },
+        bots: {
+          seed: options.seed,
+          actor: (live) => (this.legalMovesOn(live, 1).length > 0 ? 1 : null),
+          legalMoves: (live, seat) => this.legalMovesOn(live, seat),
+          playerView: (live, seat) => this.def.game.playerView(live.round.state, seat),
+          policy: () => policy,
+          rngFork: (live) => `round:${live.roundIndex}:event:${live.round.log.length}:seat:1`,
+          hasTurn: (live) => live.status === 'playing' && this.legalMovesOn(live, 1).length > 0,
+          notBotTurn: { code: 'not-bot-turn', message: 'the house has no decision to make' },
+          stopped: { code: 'match-ended', message: 'the match has ended' },
+        },
+      },
+      match,
+    );
   }
 
   getSnapshot(): CribbageSnapshot {
-    return { mode: this.options.mode, players: this.players(), match: this.match };
+    return this.authority.getSnapshot();
   }
 
   legalMoves(seat = 0): readonly LegalMove[] {
-    if (this.match.status !== 'playing') return [];
-    const { round } = this.match;
-    return (
-      round.def.flow.legalMovesFor?.(round.state, round.phase, seat) ??
-      (round.phase.actor === seat ? round.def.flow.legalMoves(round.state, round.phase) : [])
-    );
+    return this.legalMovesOn(this.authority.getLive(), seat);
   }
 
   humanCanAct(): boolean {
@@ -93,44 +108,20 @@ export class CribbageTransport {
   }
 
   dispatch(move: string, payload?: unknown): CribbageDispatch {
-    if (this.match.status !== 'playing') return this.reject('match-ended', 'the match has ended');
-    const outcome = matchApply(this.def, this.match, 0, move, payload);
-    if (outcome.rejected) return this.reject(outcome.rejected.code, outcome.rejected.message);
-    return this.accept(outcome);
+    return this.authority.dispatch(move, payload);
   }
 
   playBotTurn(): CribbageDispatch {
-    if (this.match.status !== 'playing') return this.reject('match-ended', 'the match has ended');
-    const legal = this.legalMoves(1);
-    if (legal.length === 0) return this.reject('not-bot-turn', 'the house has no decision to make');
-    const policy = tierBot(this.options.botTier);
-    const rng = makeRng(this.options.seed).fork(
-      `round:${this.match.roundIndex}:event:${this.match.round.log.length}:seat:1`,
-    );
-    const choice =
-      chooseBotMove(policy, this.def.game.playerView(this.match.round.state, 1), 1, legal, rng) ??
-      legal[0]!;
-    const outcome = matchApply(this.def, this.match, 1, choice.id, choice.payload);
-    if (outcome.rejected) {
-      throw new Error(`${policy.id} chose ${choice.id}: ${outcome.rejected.message}`);
-    }
-    return this.accept(outcome);
+    return this.authority.playBotTurn();
   }
 
-  private accept(
-    outcome: MatchOutcome<CribbageState, CribbageConfig, CribbageMatchState>,
-  ): CribbageDispatch {
-    let events = [...outcome.events];
-    let fx = [...outcome.fx];
-    this.match = outcome.session;
-    if (this.match.status === 'round-over') {
-      const next = matchNextRound(this.def, this.match);
-      if (next.rejected) throw new Error(next.rejected.message);
-      this.match = next.session;
-      events = [...events, ...next.events];
-      fx = [...fx, ...next.fx];
-    }
-    return { events, fx, rejected: null, snapshot: this.getSnapshot() };
+  private legalMovesOn(match: CribbageMatchSession, seat: number): readonly LegalMove[] {
+    if (match.status !== 'playing') return [];
+    const { round } = match;
+    return (
+      round.def.flow.legalMovesFor?.(round.state, round.phase, seat) ??
+      (round.phase.actor === seat ? round.def.flow.legalMoves(round.state, round.phase) : [])
+    );
   }
 
   private players(): CribbagePlayer[] {
@@ -145,9 +136,5 @@ export class CribbageTransport {
       },
       { seat: 1, ...bot, isBot: true },
     ];
-  }
-
-  private reject(code: string, message: string): CribbageDispatch {
-    return { events: [], fx: [], rejected: { code, message }, snapshot: this.getSnapshot() };
   }
 }

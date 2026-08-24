@@ -1,17 +1,11 @@
 import {
   applyPreset,
-  chooseBotMove,
   createMatch,
-  makeRng,
-  matchApply,
   matchNextRound,
-  type AppliedEvent,
-  type FxEvent,
   type GameSession,
   type LegalMove,
   type MatchResult,
   type MatchSession,
-  type RuleError,
 } from '@parlour/engine';
 import {
   createHeartsMatchDef,
@@ -24,6 +18,7 @@ import {
 } from '@parlour/game-hearts';
 import type { HeartsModeId } from '@/lib/hearts/modes';
 import type { BotTier } from '@/stores/setup';
+import { adaptMatchApply, SoloAuthority, type SoloDispatch } from './SoloAuthority';
 
 /** House opponents — personas map onto the shared avatar cast. */
 const SEAT_PERSONAS = ['rose', 'flint', 'dove'] as const;
@@ -50,19 +45,14 @@ export interface HeartsSnapshot {
   matchWinner: number | null;
 }
 
-export interface HeartsDispatch {
-  events: readonly AppliedEvent[];
-  fx: readonly FxEvent[];
-  rejected: RuleError | null;
-  snapshot: HeartsSnapshot;
-}
+export type HeartsDispatch = SoloDispatch<HeartsSnapshot>;
 
 type HeartsMatchSession = MatchSession<HeartsState, HeartsRules, HeartsMatchState>;
 
 /**
  * In-process authority for solo Hearts. A deterministic multi-hand match
  * (@parlour/engine MatchDef): rotating passes, cumulative points, game-over at
- * the configured threshold. The React table only renders its snapshots.
+ * the configured threshold. Passing uses untilHuman, not phase.actor.
  */
 export class HeartsTransport {
   private readonly matchDef = createHeartsMatchDef();
@@ -72,8 +62,7 @@ export class HeartsTransport {
     player: { name: string; avatarId: string };
     botTier?: BotTier;
   };
-  private readonly policy;
-  private session: HeartsMatchSession;
+  private readonly authority: SoloAuthority<HeartsMatchSession, HeartsSnapshot, HeartsState>;
 
   constructor(options: {
     mode: HeartsModeId;
@@ -84,112 +73,118 @@ export class HeartsTransport {
     botTier?: BotTier;
   }) {
     this.options = options;
-    this.policy = HEARTS_BOTS[(options.botTier ?? 2) - 1]!;
-    this.session = createMatch(this.matchDef, {
+    const policy = HEARTS_BOTS[(options.botTier ?? 2) - 1]!;
+    const session = createMatch(this.matchDef, {
       seed: options.seed | 0,
       config: options.config ?? applyPreset(heartsConfigSchema, options.mode),
       seats: 4,
     }).session;
+    this.authority = new SoloAuthority(
+      {
+        snapshot: (live): HeartsSnapshot => ({
+          mode: options.mode,
+          round: live.roundIndex + 1,
+          players: this.players(),
+          hand: live.round,
+          scores: [...live.match.scores],
+          status: live.status,
+          handResult: live.history.at(-1) ?? null,
+          matchResult: live.result,
+          matchWinner: live.result?.winner ?? null,
+        }),
+        apply: adaptMatchApply(this.matchDef),
+        isPlaying: (live) => live.status === 'playing',
+        ended: {
+          code: 'round-over',
+          message: 'the hand is over — deal the next one',
+        },
+        bots: {
+          seed: options.seed,
+          actor: (live) => this.pendingBotSeat(live),
+          legalMoves: (live, seat) =>
+            this.matchDef.game.flow.legalMovesFor?.(live.round.state, live.round.phase, seat) ?? [],
+          playerView: (live, seat) => this.matchDef.game.playerView(live.round.state, seat),
+          policy: () => policy,
+          rngFork: (live, seat) => `hand:${live.roundIndex}:event:${live.round.log.length}:${seat}`,
+          hasTurn: (live) => this.pendingBotSeat(live) !== null,
+          untilHuman: (live) => live.status === 'playing' && !this.humanPendingFor(live),
+          untilHumanGuard: 200,
+          untilHumanMessage: 'bot loop did not reach the human after 200 actions',
+          notBotTurn: { code: 'not-bot-turn', message: 'no bot is currently deciding' },
+        },
+      },
+      session,
+    );
   }
 
   getSnapshot(): HeartsSnapshot {
-    const { session } = this;
-    return {
-      mode: this.options.mode,
-      round: session.roundIndex + 1,
-      players: this.players(),
-      hand: session.round,
-      scores: [...session.match.scores],
-      status: session.status,
-      handResult: session.history.at(-1) ?? null,
-      matchResult: session.result,
-      matchWinner: session.result?.winner ?? null,
-    };
+    return this.authority.getSnapshot();
   }
 
   /** Moves offered to the human seat right now (empty while others act). */
   legalMovesForSeat(seat = 0): readonly LegalMove[] {
-    if (this.session.status !== 'playing') return [];
-    const { state, phase } = this.session.round;
+    const session = this.authority.getLive();
+    if (session.status !== 'playing') return [];
+    const { state, phase } = session.round;
     return this.matchDef.game.flow.legalMovesFor?.(state, phase, seat) ?? [];
   }
 
   dispatch(move: string, payload?: unknown): HeartsDispatch {
-    if (this.session.status !== 'playing') {
-      return this.reject('round-over', 'the hand is over — deal the next one');
-    }
-    const outcome = matchApply(this.matchDef, this.session, 0, move, payload);
-    if (outcome.rejected) return this.reject(outcome.rejected.code, outcome.rejected.message);
-    this.session = outcome.session;
-    return this.publish(outcome.events, [...outcome.fx], null);
+    return this.authority.dispatch(move, payload);
   }
 
-  /** Drives one acting bot decision (a pass pick, a card, a showdown reveal). */
   playBotTurn(): HeartsDispatch {
-    const pending = this.pendingBotSeat();
-    if (pending === null) return this.reject('not-bot-turn', 'no bot is currently deciding');
-    const [seat] = pending;
-    const policy = this.policy;
-    const state = this.session.round.state;
-    const legal =
-      this.matchDef.game.flow.legalMovesFor?.(state, this.session.round.phase, seat) ?? [];
-    if (legal.length === 0) throw new Error(`bot seat ${seat} has no legal move`);
-    const rng = makeRng(this.options.seed).fork(
-      `hand:${this.session.roundIndex}:event:${this.session.round.log.length}:${seat}`,
-    );
-    const view = this.matchDef.game.playerView(state, seat);
-    const choice = chooseBotMove(policy, view, seat, legal, rng) ?? legal[0]!;
-    const outcome = matchApply(this.matchDef, this.session, seat, choice.id, choice.payload);
-    if (outcome.rejected) {
-      throw new Error(`${policy.id} chose ${choice.id}: ${outcome.rejected.message}`);
-    }
-    this.session = outcome.session;
-    return this.publish(outcome.events, [...outcome.fx], null);
+    return this.authority.playBotTurn();
   }
 
   /** True when seat 0 owes a decision (its pass pick or its turn). */
   humanPending(): boolean {
-    if (this.session.status !== 'playing') return false;
-    const { state } = this.session.round;
-    if (state.handOver) return true; // nothing to do but score/advance
-    if (state.passing) return state.selections[0] === null;
-    return state.turn === 0;
+    return this.humanPendingFor(this.authority.getLive());
   }
 
   playBotsUntilHuman(): HeartsDispatch[] {
-    const outcomes: HeartsDispatch[] = [];
-    let guard = 0;
-    while (!this.humanPending()) {
-      if (guard++ >= 200) throw new Error('bot loop did not reach the human after 200 actions');
-      outcomes.push(this.playBotTurn());
-    }
-    return outcomes;
+    return this.authority.playBotsUntilHuman();
   }
 
   /** Opens the next hand of the match (round-over only). */
   startNextHand(): HeartsDispatch {
-    if (this.session.status === 'ended') {
-      return this.reject('match-ended', 'the match has ended');
+    const session = this.authority.getLive();
+    if (session.status === 'ended') {
+      return this.authority.reject('match-ended', 'the match has ended');
     }
-    if (this.session.status !== 'round-over') {
-      return this.reject('hand-playing', 'the current hand is not over');
+    if (session.status !== 'round-over') {
+      return this.authority.reject('hand-playing', 'the current hand is not over');
     }
-    const outcome = matchNextRound(this.matchDef, this.session);
-    if (outcome.rejected) return this.reject(outcome.rejected.code, outcome.rejected.message);
-    this.session = outcome.session;
-    return this.publish([], [...outcome.fx], null);
+    const outcome = matchNextRound(this.matchDef, session);
+    if (outcome.rejected) {
+      return this.authority.reject(outcome.rejected.code, outcome.rejected.message);
+    }
+    return this.authority.accept({
+      live: outcome.session,
+      events: outcome.events,
+      fx: outcome.fx,
+      rejected: outcome.rejected,
+    });
   }
 
-  private pendingBotSeat(): readonly [number] | null {
-    if (this.session.status !== 'playing') return null;
-    const { state, phase } = this.session.round;
+  private humanPendingFor(session: HeartsMatchSession): boolean {
+    if (session.status !== 'playing') return false;
+    const { state } = session.round;
+    if (state.handOver) return true;
+    if (state.passing) return state.selections[0] === null;
+    return state.turn === 0;
+  }
+
+  private pendingBotSeat(session: HeartsMatchSession): number | null {
+    if (session.status !== 'playing') return null;
+    const { state, phase } = session.round;
     if (state.handOver) return null;
     if (state.passing) {
       const seat = state.selections.findIndex((picked) => picked === null);
-      return seat >= 0 ? [seat as number] : null;
+      return seat >= 0 ? seat : null;
     }
     if (phase.actor === null || phase.actor === 0) return null;
-    return [phase.actor];
+    return phase.actor;
   }
 
   private players(): HeartsPlayer[] {
@@ -210,18 +205,6 @@ export class HeartsTransport {
         };
       }),
     ];
-  }
-
-  private publish(
-    events: readonly AppliedEvent[],
-    fx: readonly FxEvent[],
-    rejected: RuleError | null,
-  ): HeartsDispatch {
-    return { events, fx, rejected, snapshot: this.getSnapshot() };
-  }
-
-  private reject(code: string, message: string): HeartsDispatch {
-    return { events: [], fx: [], rejected: { code, message }, snapshot: this.getSnapshot() };
   }
 }
 

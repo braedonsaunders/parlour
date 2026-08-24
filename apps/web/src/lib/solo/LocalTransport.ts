@@ -1,15 +1,4 @@
-import {
-  Fx,
-  chooseBotMove,
-  createSession,
-  makeRng,
-  sessionApply,
-  type AppliedEvent,
-  type FxEvent,
-  type GameSession,
-  type LegalMove,
-  type RuleError,
-} from '@parlour/engine';
+import { Fx, createSession, type FxEvent, type GameSession, type LegalMove } from '@parlour/engine';
 import {
   PERSONAS,
   blitzConfigSchema,
@@ -21,6 +10,7 @@ import {
 } from '@parlour/game-blitz';
 import type { ModeId } from '@/lib/modes';
 import type { BotTier, SeatCount } from '@/stores/setup';
+import { adaptSessionApply, SoloAuthority, type SoloDispatch } from './SoloAuthority';
 
 const STARTING_LIVES = 3;
 const FIRST_TO_WINS = 3;
@@ -63,14 +53,9 @@ export interface MatchMetrics {
   knockWins: number;
 }
 
-export interface LocalDispatch {
-  events: readonly AppliedEvent[];
-  fx: readonly FxEvent[];
-  rejected: RuleError | null;
-  snapshot: SoloSnapshot;
-}
+export type LocalDispatch = SoloDispatch<SoloSnapshot>;
 
-type Listener = (outcome: LocalDispatch) => void;
+type BlitzSession = GameSession<BlitzState, BlitzConfig>;
 
 /**
  * In-process authority for solo play. It composes deterministic Blitz rounds
@@ -80,8 +65,7 @@ export class LocalTransport {
   private readonly def = createBlitzDef();
   private readonly options: LocalTransportOptions;
   private readonly policies: ReturnType<typeof makePersonaBot>[];
-  private readonly listeners = new Set<Listener>();
-  private session: GameSession<BlitzState, BlitzConfig>;
+  private readonly authority: SoloAuthority<BlitzSession, SoloSnapshot, BlitzState>;
   private round = 1;
   private lives: number[];
   private wins: number[];
@@ -102,103 +86,88 @@ export class LocalTransport {
       knocks: 0,
       knockWins: 0,
     }));
-    this.session = this.createRound();
-    if (this.session.status === 'ended') {
-      const fx = [...(this.session.setupFx ?? [])];
-      this.scoreRound(fx);
-      this.session = { ...this.session, setupFx: fx };
+    let session = this.createRound();
+    if (session.status === 'ended') {
+      const fx = [...(session.setupFx ?? [])];
+      this.scoreRound(session, fx);
+      session = { ...session, setupFx: fx };
     }
+    this.authority = new SoloAuthority(
+      {
+        snapshot: (live): SoloSnapshot => ({
+          mode: options.mode,
+          round: this.round,
+          players: this.players(),
+          session: live,
+          lives: this.lives,
+          wins: this.wins,
+          metrics: this.metrics.map((metric) => ({ ...metric })),
+          startedAtMs: options.startedAtMs ?? 0,
+          durationMs: options.mode === 'timed' ? TIMED_DURATION_MS : null,
+          matchWinner: this.matchWinner,
+        }),
+        apply: adaptSessionApply(this.def),
+        isPlaying: (live) => live.status === 'playing' && this.matchWinner === null,
+        blockDispatch: () =>
+          this.matchWinner !== null
+            ? { code: 'match-ended', message: 'the match has ended' }
+            : null,
+        afterApply: ({ live, fx }) => {
+          if (live.status === 'ended') this.scoreRound(live, fx);
+        },
+        bots: {
+          seed: options.seed,
+          actor: (live) => live.phase.actor,
+          legalMoves: (live) => this.def.flow.legalMoves(live.state, live.phase),
+          playerView: (live, seat) => this.def.playerView(live.state, seat),
+          policy: (seat) => {
+            const policy = this.policies[seat - 1];
+            if (!policy) throw new Error(`no bot policy for seat ${seat}`);
+            return policy;
+          },
+          rngFork: (live) => `round:${this.round}:event:${live.log.length}`,
+          untilHumanGuard: 100,
+        },
+      },
+      session,
+    );
   }
 
   getSnapshot(): SoloSnapshot {
-    return {
-      mode: this.options.mode,
-      round: this.round,
-      players: this.players(),
-      session: this.session,
-      lives: this.lives,
-      wins: this.wins,
-      metrics: this.metrics.map((metric) => ({ ...metric })),
-      startedAtMs: this.options.startedAtMs ?? 0,
-      durationMs: this.options.mode === 'timed' ? TIMED_DURATION_MS : null,
-      matchWinner: this.matchWinner,
-    };
+    return this.authority.getSnapshot();
   }
 
   legalMoves(): readonly LegalMove[] {
-    if (this.matchWinner !== null || this.session.status !== 'playing') return [];
-    return this.def.flow.legalMoves(this.session.state, this.session.phase);
+    const session = this.authority.getLive();
+    if (this.matchWinner !== null || session.status !== 'playing') return [];
+    return this.def.flow.legalMoves(session.state, session.phase);
   }
 
   dispatch(move: string, payload?: unknown): LocalDispatch {
-    if (this.matchWinner !== null) return this.reject('match-ended', 'the match has ended');
-    const outcome = sessionApply(this.def, this.session, 0, move, payload);
-    if (outcome.rejected) return this.reject(outcome.rejected.code, outcome.rejected.message);
-    this.session = outcome.session;
-    const fx = [...outcome.fx];
-    if (this.session.status === 'ended') this.scoreRound(fx);
-    return this.publish({
-      events: outcome.events,
-      fx,
-      rejected: null,
-      snapshot: this.getSnapshot(),
-    });
+    return this.authority.dispatch(move, payload);
   }
 
   playBotsUntilHuman(): LocalDispatch[] {
-    const outcomes: LocalDispatch[] = [];
-    let guard = 0;
-    while (
-      this.matchWinner === null &&
-      this.session.status === 'playing' &&
-      this.session.phase.actor !== 0
-    ) {
-      if (guard++ >= 100) throw new Error('bot loop did not return control after 100 actions');
-      outcomes.push(this.playBotTurn());
-    }
-    return outcomes;
+    return this.authority.playBotsUntilHuman();
   }
 
   playBotTurn(): LocalDispatch {
-    const seat = this.session.phase.actor;
-    if (this.session.status !== 'playing' || seat === null || seat === 0) {
-      return this.reject('not-bot-turn', 'no bot is currently acting');
-    }
-    const policy = this.policies[seat - 1];
-    if (!policy) throw new Error(`no bot policy for seat ${seat}`);
-    const legal = this.def.flow.legalMoves(this.session.state, this.session.phase);
-    if (legal.length === 0) throw new Error(`bot seat ${seat} has no legal move`);
-    const rng = makeRng(this.options.seed).fork(
-      `round:${this.round}:event:${this.session.log.length}`,
-    );
-    const choice =
-      chooseBotMove(policy, this.def.playerView(this.session.state, seat), seat, legal, rng) ??
-      legal[0]!;
-    const applied = sessionApply(this.def, this.session, seat, choice.id, choice.payload);
-    if (applied.rejected) {
-      throw new Error(`${policy.id} chose ${choice.id}: ${applied.rejected.message}`);
-    }
-    this.session = applied.session;
-    const fx = [...applied.fx];
-    if (this.session.status === 'ended') this.scoreRound(fx);
-    return this.publish({
-      events: applied.events,
-      fx,
-      rejected: null,
-      snapshot: this.getSnapshot(),
-    });
+    return this.authority.playBotTurn();
   }
 
   startNextRound(): LocalDispatch {
-    if (this.session.status !== 'ended')
-      return this.reject('round-playing', 'the round is not over');
-    if (this.matchWinner !== null) return this.reject('match-ended', 'the match has ended');
+    const session = this.authority.getLive();
+    if (session.status !== 'ended') {
+      return this.authority.reject('round-playing', 'the round is not over');
+    }
+    if (this.matchWinner !== null) {
+      return this.authority.reject('match-ended', 'the match has ended');
+    }
     this.round += 1;
     this.roundScored = false;
-    this.session = this.createRound();
-    const fx = [...(this.session.setupFx ?? [])];
-    if (this.session.status === 'ended') this.scoreRound(fx);
-    return this.publish({ events: [], fx, rejected: null, snapshot: this.getSnapshot() });
+    const next = this.createRound();
+    const fx = [...(next.setupFx ?? [])];
+    return this.authority.accept({ live: next, events: [], fx });
   }
 
   tick(nowMs: number): SoloSnapshot {
@@ -211,12 +180,11 @@ export class LocalTransport {
     return this.getSnapshot();
   }
 
-  subscribe(listener: Listener): () => void {
-    this.listeners.add(listener);
-    return () => this.listeners.delete(listener);
+  subscribe(listener: (outcome: LocalDispatch) => void): () => void {
+    return this.authority.subscribe(listener);
   }
 
-  private createRound(): GameSession<BlitzState, BlitzConfig> {
+  private createRound(): BlitzSession {
     return createSession(this.def, {
       seed: (this.options.seed + (this.round - 1) * 9_973) | 0,
       config: blitzConfigSchema.defaults(),
@@ -243,20 +211,19 @@ export class LocalTransport {
     ];
   }
 
-  private scoreRound(fx: FxEvent[]): void {
+  private scoreRound(session: BlitzSession, fx: FxEvent[]): void {
     if (this.roundScored) return;
     this.roundScored = true;
-    const outcome = this.session.state.outcome;
+    const outcome = session.state.outcome;
     const winners =
-      outcome?.winners ??
-      (this.session.result?.winner === null ? [] : [this.session.result?.winner]);
+      outcome?.winners ?? (session.result?.winner === null ? [] : [session.result?.winner]);
 
     if (outcome?.reason === 'blitz') {
       for (const winner of winners) {
         if (winner !== undefined) this.metrics[winner]!.blitzes += 1;
       }
     }
-    const knocker = this.session.state.knocker;
+    const knocker = session.state.knocker;
     if (knocker !== null) {
       this.metrics[knocker]!.knocks += 1;
       if (winners.includes(knocker)) this.metrics[knocker]!.knockWins += 1;
@@ -283,20 +250,6 @@ export class LocalTransport {
       const winner = this.wins.findIndex((wins) => wins >= FIRST_TO_WINS);
       if (winner >= 0) this.matchWinner = winner;
     }
-  }
-
-  private reject(code: string, message: string): LocalDispatch {
-    return {
-      events: [],
-      fx: [],
-      rejected: { code, message },
-      snapshot: this.getSnapshot(),
-    };
-  }
-
-  private publish(outcome: LocalDispatch): LocalDispatch {
-    for (const listener of this.listeners) listener(outcome);
-    return outcome;
   }
 }
 

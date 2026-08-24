@@ -1,15 +1,4 @@
-import {
-  applyPreset,
-  chooseBotMove,
-  createSession,
-  makeRng,
-  sessionApply,
-  type AppliedEvent,
-  type FxEvent,
-  type GameSession,
-  type LegalMove,
-  type RuleError,
-} from '@parlour/engine';
+import { applyPreset, createSession, type GameSession, type LegalMove } from '@parlour/engine';
 import {
   presidentGame,
   presidentBots,
@@ -20,6 +9,12 @@ import {
 } from '@parlour/game-president';
 import type { PresidentModeId } from '@/lib/president/modes';
 import type { BotTier } from '@/stores/setup';
+import {
+  adaptSessionApply,
+  sessionLegalMoves,
+  SoloAuthority,
+  type SoloDispatch,
+} from './SoloAuthority';
 
 /** House opponents — names match the avatar cast so the table reads cohesively. */
 const PRESIDENT_BOTS = [
@@ -56,23 +51,21 @@ export interface PresidentSnapshot {
   matchWinner: number | null;
 }
 
-export interface PresidentDispatch {
-  events: readonly AppliedEvent[];
-  fx: readonly FxEvent[];
-  rejected: RuleError | null;
-  snapshot: PresidentSnapshot;
-}
+export type PresidentDispatch = SoloDispatch<PresidentSnapshot>;
 
 /**
  * In-process authority for solo President. One deterministic multi-deal match
- * of @parlour/game-president against house bots; the React table only renders
- * snapshots. Mirrors WildTransport's contract so table pages rhyme.
+ * of @parlour/game-president against house bots; this facade projects seats
+ * and snapshots onto the shared session authority.
  */
 export class PresidentTransport {
   private readonly def = presidentGame;
   private readonly options: PresidentTransportOptions;
-  private readonly policy;
-  private session: GameSession<PresidentState, PresidentRules>;
+  private readonly authority: SoloAuthority<
+    GameSession<PresidentState, PresidentRules>,
+    PresidentSnapshot,
+    PresidentState
+  >;
 
   constructor(options: PresidentTransportOptions) {
     if (
@@ -83,71 +76,56 @@ export class PresidentTransport {
       throw new Error(`president requires ${MIN_SEATS}–${MAX_SEATS} seats`);
     }
     this.options = options;
-    this.policy = presidentBots[(options.botTier ?? 2) - 1]!;
-    this.session = createSession(this.def, {
+    const policy = presidentBots[(options.botTier ?? 2) - 1]!;
+    const session = createSession(this.def, {
       seed: options.seed | 0,
       config: options.rules ?? applyPreset(this.def.configSchema, options.mode),
       seats: options.seats,
     });
+    this.authority = new SoloAuthority(
+      {
+        snapshot: (live): PresidentSnapshot => ({
+          mode: options.mode,
+          players: this.players(),
+          session: live,
+          matchWinner: live.result?.winner ?? null,
+        }),
+        apply: adaptSessionApply(this.def),
+        isPlaying: (live) => live.status === 'playing',
+        bots: {
+          seed: options.seed,
+          actor: (live) => live.phase.actor,
+          legalMoves: (live, seat) => sessionLegalMoves(this.def, live, seat),
+          playerView: (live, seat) => this.def.playerView(live.state, seat),
+          policy: () => policy,
+          rngFork: (live) => `event:${live.log.length}`,
+          untilHumanGuard: 2000,
+        },
+      },
+      session,
+    );
   }
 
   getSnapshot(): PresidentSnapshot {
-    return {
-      mode: this.options.mode,
-      players: this.players(),
-      session: this.session,
-      matchWinner: this.session.result?.winner ?? null,
-    };
+    return this.authority.getSnapshot();
   }
 
   legalMoves(): readonly LegalMove[] {
-    if (this.session.status !== 'playing') return [];
-    const phase = this.session.phase;
-    return this.def.flow.legalMoves(this.session.state, phase);
+    const session = this.authority.getLive();
+    if (session.status !== 'playing') return [];
+    return this.def.flow.legalMoves(session.state, session.phase);
   }
 
-  /** Human seat 0 acts; the engine validates actor/turn/phase legality. */
   dispatch(move: string, payload?: unknown): PresidentDispatch {
-    if (this.session.status !== 'playing') {
-      return this.reject('match-ended', 'the match has ended');
-    }
-    const outcome = sessionApply(this.def, this.session, 0, move, payload);
-    if (outcome.rejected) return this.reject(outcome.rejected.code, outcome.rejected.message);
-    this.session = outcome.session;
-    return { events: outcome.events, fx: outcome.fx, rejected: null, snapshot: this.getSnapshot() };
+    return this.authority.dispatch(move, payload);
   }
 
   playBotTurn(): PresidentDispatch {
-    const seat = this.session.phase.actor;
-    if (this.session.status !== 'playing' || seat === null || seat === 0) {
-      return this.reject('not-bot-turn', 'no bot is currently acting');
-    }
-    const policy = this.policy;
-    const legal = this.def.flow.legalMovesFor
-      ? this.def.flow.legalMovesFor(this.session.state, this.session.phase, seat)
-      : this.def.flow.legalMoves(this.session.state, this.session.phase);
-    if (legal.length === 0) throw new Error(`bot seat ${seat} has no legal move`);
-    const rng = makeRng(this.options.seed).fork(`event:${this.session.log.length}`);
-    const choice =
-      chooseBotMove(policy, this.def.playerView(this.session.state, seat), seat, legal, rng) ??
-      legal[0]!;
-    const applied = sessionApply(this.def, this.session, seat, choice.id, choice.payload);
-    if (applied.rejected) {
-      throw new Error(`${policy.id} chose ${choice.id}: ${applied.rejected.message}`);
-    }
-    this.session = applied.session;
-    return { events: applied.events, fx: applied.fx, rejected: null, snapshot: this.getSnapshot() };
+    return this.authority.playBotTurn();
   }
 
   playBotsUntilHuman(): PresidentDispatch[] {
-    const outcomes: PresidentDispatch[] = [];
-    let guard = 0;
-    while (this.session.status === 'playing' && this.session.phase.actor !== 0) {
-      if (guard++ >= 2000) throw new Error('bot loop did not return control after 2000 actions');
-      if (this.session.phase.actor === null) break;
-      outcomes.push(this.playBotTurn());
-    }
-    return outcomes;
+    return this.authority.playBotsUntilHuman();
   }
 
   private players(): PresidentPlayer[] {
@@ -164,9 +142,5 @@ export class PresidentTransport {
         isBot: true,
       })),
     ];
-  }
-
-  private reject(code: string, message: string): PresidentDispatch {
-    return { events: [], fx: [], rejected: { code, message }, snapshot: this.getSnapshot() };
   }
 }
