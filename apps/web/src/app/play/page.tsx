@@ -6,12 +6,14 @@ import { useState } from 'react';
 import { blitzHowToPlay } from '@parlour/game-blitz';
 import { HowToPlayButton } from '@/components/HowToPlay';
 import { useCenteredCarousel } from '@/hooks/useCenteredCarousel';
-import { MODES, type ModeDef, type PreviewKind } from '@/lib/modes';
+import { GameArt } from '@/components/GameArt';
+import { getGame } from '@/lib/games';
+import { MODES, type ModeDef } from '@/lib/modes';
 import { useSetupStore } from '@/stores/setup';
 import styles from '@/styles/modes.module.css';
 import gameStyles from '@/styles/games.module.css';
 
-const SEAT_OPTIONS = [2, 3, 4] as const;
+const SEAT_OPTIONS = getGame('blitz').seats;
 const TIERS = [
   { tier: 1, label: 'Easy' },
   { tier: 2, label: 'Medium' },
@@ -151,7 +153,7 @@ function ModeTile({
         }}
       >
         <span className={styles.tileGlow} />
-        <Preview kind={def.preview} />
+        <GameArt cards={def.art} motif={def.motif} />
         <span className={styles.tagline}>{def.tagline}</span>
         <h2 className={styles.modeName}>{def.name}</h2>
         <span className={styles.facts}>
@@ -164,33 +166,6 @@ function ModeTile({
         <p className={styles.description}>{def.description}</p>
       </button>
     </div>
-  );
-}
-
-function Preview({ kind }: { kind: PreviewKind }) {
-  return (
-    <span className={styles.preview}>
-      {kind === 'lives' && (
-        <span className={styles.chipRow}>
-          <span className={styles.lifeChip} />
-          <span className={styles.lifeChip} />
-          <span className={styles.lifeChip} />
-        </span>
-      )}
-      {kind === 'snap' && (
-        <>
-          <span className={styles.snapPile} />
-          <span className={styles.snapCard}>31</span>
-          <span className={styles.snapCard}>K♠</span>
-        </>
-      )}
-      {kind === 'clock' && (
-        <span className={styles.clockFace}>
-          <span className={styles.clockHand} />
-          <span className={styles.clockTick} />
-        </span>
-      )}
-    </span>
   );
 }
 

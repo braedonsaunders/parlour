@@ -2,8 +2,9 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { GameArt } from '@/components/GameArt';
 import { HowToPlayButton } from '@/components/HowToPlay';
-import { GAMES, type GameDef, type GamePreviewKind } from '@/lib/games';
+import { GAMES, type GameCatalogEntry } from '@/lib/games';
 import modeStyles from '@/styles/modes.module.css';
 import gameStyles from '@/styles/games.module.css';
 
@@ -47,7 +48,7 @@ export default function GameSelectPage() {
   );
 }
 
-function GameTile({ def, onSelect }: { def: GameDef; onSelect?: () => void }) {
+function GameTile({ def, onSelect }: { def: GameCatalogEntry; onSelect?: () => void }) {
   const shelved = !onSelect;
   return (
     // The rules button is a sibling of the tile, not a child: a tile is itself
@@ -74,7 +75,7 @@ function GameTile({ def, onSelect }: { def: GameDef; onSelect?: () => void }) {
         }}
       >
         {shelved && <span className={gameStyles.soonRibbon}>Soon</span>}
-        <Preview kind={def.preview} />
+        <GameArt cards={def.art} />
         <span className={modeStyles.tagline}>{def.tagline}</span>
         <h2 className={modeStyles.modeName}>
           {def.name} <span className="text-base font-bold text-dusk-100/80">· {def.subtitle}</span>
@@ -89,27 +90,5 @@ function GameTile({ def, onSelect }: { def: GameDef; onSelect?: () => void }) {
         <p className={modeStyles.description}>{def.description}</p>
       </button>
     </div>
-  );
-}
-
-function Preview({ kind }: { kind: GamePreviewKind }) {
-  return (
-    <span className={modeStyles.preview}>
-      {kind === 'blitz-fan' && (
-        <>
-          <span className={gameStyles.fanCard}>A♠</span>
-          <span className={gameStyles.fanCard}>31</span>
-          <span className={gameStyles.fanCard}>K♠</span>
-        </>
-      )}
-      {kind === 'wild-fan' && (
-        <>
-          <span className={gameStyles.wildCard}>7</span>
-          <span className={gameStyles.wildCard}>⤺</span>
-          <span className={gameStyles.wildCard}>⊘</span>
-          <span className={gameStyles.wildCard}>+4</span>
-        </>
-      )}
-    </span>
   );
 }
