@@ -83,3 +83,17 @@ test('an explicit choice outranks the device language', async ({ browser }) => {
   await expect(page.getByTestId('play')).toHaveText('Play');
   await context.close();
 });
+
+test('the shelf and its rules sheet speak the chosen language', async ({ page }) => {
+  await page.goto('/');
+  await page.getByTestId('language-button').click();
+  await page.getByTestId('language-option-es').click();
+
+  await page.goto('/games/');
+  // Game copy lives in the packs and is translated by an overlay; this is the
+  // proof that the overlay actually reaches the screen rather than only the
+  // unit tests.
+  await expect(page.getByText('La estantería de juegos')).toBeVisible();
+  await expect(page.getByTestId('game-hearts')).toContainText('Corazones');
+  await expect(page.getByPlaceholder('Buscar juegos…')).toBeVisible();
+});

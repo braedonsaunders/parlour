@@ -92,3 +92,38 @@ shared prop shape would cost more than it saved.
 Any new player-facing string goes in `apps/web/src/lib/i18n/messages/en.ts`.
 `Messages` is derived from that file, so every other locale stops compiling
 until it has the key too — a locale ships complete or not at all.
+
+## 6. Translate the game's own copy
+
+The pack keeps its English. Each language carries an *overlay* keyed to it, in
+`apps/web/src/lib/i18n/gameContent/<locale>/<game>.ts`:
+
+```ts
+export const mygameEs: GameCopy = {
+  name: '…', subtitle: '…', tagline: '…', description: '…',
+  facts: ['…', '…', '…'],                    // same length as the pack's
+  howToPlay: { summary: '…', objective: '…', sections: [/* same order & count */] },
+  modes: { classic: { name: '…', tagline: '…', description: '…', facts: [/* … */] } },
+  fields: { myToggle: { label: '…', help: '…' } },
+  presets: { classic: '…' },
+};
+```
+
+Register it in that locale's `index.ts` and `gameContent.test.ts` does the rest:
+it walks the pack and fails if any string is missing, if any array changed
+length, or if a sentence was left in English. A pack edit therefore breaks the
+build until the translation catches up — which is the point, because an overlay
+cannot otherwise notice that the words underneath it moved.
+
+Every field is optional at runtime, so a partial locale degrades to mixed
+language rather than to blank cards.
+
+### Rendering it
+
+- Shelf and rules sheet: `useLocalizedGames()` / `useLocalizedGame(id)`.
+- Setup-screen mode tiles: wrap the app's own list —
+  `useLocalizedModes('mygame', MYGAME_MODES)` in place of `MYGAME_MODES`.
+- Rule settings panel: `useLocalizedSchema('mygame', mygameConfig)`.
+
+The app's `lib/<game>/modes.ts` duplicates the pack's catalog modes under the
+same ids, so one translation covers both.

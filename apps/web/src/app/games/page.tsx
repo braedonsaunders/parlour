@@ -6,7 +6,8 @@ import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { GameArt } from '@/components/GameArt';
 import { HowToPlayButton } from '@/components/HowToPlay';
-import { GAMES, type GameCatalogEntry } from '@/lib/games';
+import { type GameCatalogEntry } from '@/lib/games';
+import { useLocalizedGames } from '@/lib/i18n/gameContent';
 import { filterGames } from '@/lib/gameSearch';
 import modeStyles from '@/styles/modes.module.css';
 import gameStyles from '@/styles/games.module.css';
@@ -15,11 +16,14 @@ export default function GameSelectPage() {
   const t = useT();
   const router = useRouter();
   const [query, setQuery] = useState('');
-  const visibleGames = useMemo(() => filterGames(GAMES, query), [query]);
+  // The shelf reads the localized catalog, so tiles, facts and the rules sheet
+  // are all in the player's language — and search matches what they can see.
+  const games = useLocalizedGames();
+  const visibleGames = useMemo(() => filterGames(games, query), [games, query]);
   const hasQuery = query.trim().length > 0;
   const resultLabel = hasQuery
     ? t.count('shelf.resultsFound', visibleGames.length)
-    : t('shelf.readyToPlay', { count: GAMES.length });
+    : t('shelf.readyToPlay', { count: games.length });
 
   return (
     <main className={gameStyles.page}>
