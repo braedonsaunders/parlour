@@ -9,7 +9,9 @@ export function validatePresenceSnapshot(snapshot: unknown, maxSeats: number): P
     typeof snapshot !== 'object' ||
     !Number.isInteger(maxSeats) ||
     maxSeats < 2 ||
-    maxSeats > 4
+    // The shared shell seats up to eight (President's full ring); per-game
+    // capacity lives in lib/rooms/seatRange.
+    maxSeats > 8
   ) {
     throw new Error('invalid presence snapshot');
   }
@@ -134,10 +136,13 @@ export class MultiplayerState {
     return localHash === remoteHash ? null : { expectedSeq };
   }
 
-  expireAndElect(now: number): { changed: boolean; hostId: string; resend: PlayerAction[] } {
+  expireAndElect(
+    now: number,
+    timeoutMs = HEARTBEAT_TIMEOUT_MS,
+  ): { changed: boolean; hostId: string; resend: PlayerAction[] } {
     const expired = new Set<string>();
     for (const [peerId, seenAt] of this.lastSeen) {
-      if (peerId !== this.localPeerId && now - seenAt > HEARTBEAT_TIMEOUT_MS) {
+      if (peerId !== this.localPeerId && now - seenAt > timeoutMs) {
         expired.add(peerId);
         this.lastSeen.delete(peerId);
       }

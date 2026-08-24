@@ -41,7 +41,10 @@ export const ratscrewHowToPlay: HowToPlayDoc = {
       bullets: [
         { label: 'Double', text: 'two cards of the same rank back-to-back (7♦ 7♣)' },
         { label: 'Sandwich', text: 'same rank with one card between (7♦ Q♠ 7♥)' },
-        { label: 'Ten', text: 'two consecutive pip cards summing to ten (3♦ 7♠) — house-rule toggle' },
+        {
+          label: 'Ten',
+          text: 'two consecutive pip cards summing to ten (3♦ 7♠) — house-rule toggle',
+        },
       ],
     },
     {

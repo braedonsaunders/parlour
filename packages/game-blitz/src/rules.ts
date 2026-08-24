@@ -73,7 +73,7 @@ function reshuffleStock(state: BlitzState, ctx: MoveCtx): BlitzState {
   ctx.fx.emit(Fx.ShuffleStock, { cards: kept.length });
   return {
     ...state,
-    stock: ctx.rng.shuffle(kept),
+    stock: ctx.recycle ? [...ctx.recycle.issue] : ctx.rng.shuffle(kept),
     discard: [flipped],
   };
 }
@@ -83,14 +83,19 @@ function reshuffleStock(state: BlitzState, ctx: MoveCtx): BlitzState {
 // ---------------------------------------------------------------------------
 
 const drawStock: Move<BlitzState> = {
-  validate(state) {
+  validate(state, _seat, _payload, ctx) {
     if (state.stock.length === 0 && state.discard.length <= 1) {
       return { code: 'no-cards-to-draw', message: 'stock and discard are both exhausted' };
     }
     // Recycling a spent discard is the one moment a veiled round could quietly
     // go public: the pile is face up, so shuffling it as-is would make every
     // remaining draw readable. The room has to re-veil it first.
-    if (state.veiled && state.stock.length === 0 && state.discard.slice(1).some(isRealCard)) {
+    if (
+      state.veiled &&
+      state.stock.length === 0 &&
+      state.discard.slice(1).some(isRealCard) &&
+      !ctx?.recycle
+    ) {
       return {
         code: 'stock-not-reveiled',
         message: 'the discard pile must be re-veiled before it becomes the stock',

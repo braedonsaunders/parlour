@@ -118,14 +118,18 @@ export default function JoinPage() {
         session={roomSession}
         fallbackError={error}
         onConnected={(gameId) =>
-            router.replace(
-              gameId === 'wildpile'
-                ? '/wild/table'
-                : gameId === 'hearts'
-                  ? '/hearts/table'
-                  : '/table',
-            )
-          }
+          router.replace(
+            gameId === 'wildpile'
+              ? '/wild/table'
+              : gameId === 'hearts'
+                ? '/hearts/table'
+                : gameId === 'gin'
+                  ? '/gin/table'
+                  : gameId === 'president'
+                    ? '/president/table'
+                    : '/table',
+          )
+        }
       />
       <button
         type="button"
