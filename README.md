@@ -87,6 +87,8 @@ Knock too early and you hand the round away; chase the perfect 31 and someone el
 
 Same warm table, much louder deck. **Classic** plays it by the book; **Party** turns on draw-stacking and lets anyone slam an exact match down out of turn.
 
+<img src="docs/shots/wild-modes.png" alt="Choosing between Wild's Classic and Party rule sets" width="100%" />
+
 Playable cards lift and light up. Everything else dims. You never have to guess what is legal.
 
 <img src="docs/shots/wild-table.png" alt="A Wild table — legal cards lit, illegal cards dimmed" width="100%" />
