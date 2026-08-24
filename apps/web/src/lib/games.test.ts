@@ -1,11 +1,12 @@
 import { blitzCatalog } from '@parlour/game-blitz';
+import { cribbageCatalog } from '@parlour/game-cribbage';
 import { wildpileCatalog } from '@parlour/game-wildpile';
 import { describe, expect, it } from 'vitest';
 import { GAMES, getGame, getGameMode, isGameId, isGameModeId, modePreset } from './games';
 
 describe('game shelf catalog', () => {
   it('leads with blitz and keeps wild on deck (spec §11)', () => {
-    expect(GAMES.map((g) => g.id)).toEqual(['blitz', 'wild']);
+    expect(GAMES.map((g) => g.id)).toEqual(['blitz', 'cribbage', 'wild']);
   });
 
   it('every game carries complete presentation data', () => {
@@ -22,12 +23,13 @@ describe('game shelf catalog', () => {
 
   it('both games are playable and route to their setup screens (M5 exit)', () => {
     expect(getGame('blitz').href).toBe('/play');
+    expect(getGame('cribbage').href).toBe('/cribbage');
     expect(getGame('wild').href).toBe('/wild');
   });
 
   it('getGame resolves known ids and throws on unknown ones', () => {
     expect(getGame('blitz').id).toBe('blitz');
-    expect(() => getGame('cribbage' as never)).toThrow(/unknown game id/);
+    expect(() => getGame('nope' as never)).toThrow(/unknown game id/);
   });
 
   it('isGameId guards arbitrary input', () => {
@@ -39,6 +41,7 @@ describe('game shelf catalog', () => {
 
   it('takes every entry from the pack that owns it', () => {
     expect(getGame('blitz')).toBe(blitzCatalog);
+    expect(getGame('cribbage')).toBe(cribbageCatalog);
     expect(getGame('wild')).toBe(wildpileCatalog);
   });
 

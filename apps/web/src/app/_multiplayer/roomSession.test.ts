@@ -1,9 +1,14 @@
 import { applyPreset, stateHash } from '@parlour/engine';
+import { cribbageConfigSchema } from '@parlour/game-cribbage';
 import { wildpileConfig } from '@parlour/game-wildpile';
 import { afterEach, describe, expect, it } from 'vitest';
 import { NostrSignaling, type SignalPayload } from '@/lib/multiplayer/NostrSignaling';
 import type { RoomSettings } from '@/lib/multiplayer/types';
-import { MultiplayerRoomSession, wildMultiplayerSession } from './roomSession';
+import {
+  cribbageMultiplayerSession,
+  MultiplayerRoomSession,
+  wildMultiplayerSession,
+} from './roomSession';
 
 type SignalHandler = (sender: string, signal: SignalPayload) => void;
 
@@ -210,7 +215,11 @@ describe('multiplayer route composition', () => {
 
     expect(host.getSnapshot()).toMatchObject({ gameId: 'wildpile' });
     expect(guest.getSnapshot()).toMatchObject({ gameId: 'wildpile' });
-    expect(guest.getSnapshot().settings?.config).toMatchObject({ stackDrawTwo: true, stackDrawFour: true, jumpIn: true });
+    expect(guest.getSnapshot().settings?.config).toMatchObject({
+      stackDrawTwo: true,
+      stackDrawFour: true,
+      jumpIn: true,
+    });
 
     const hostSession = wildMultiplayerSession(host.getSnapshot());
     expect(hostSession).not.toBeNull();
@@ -224,6 +233,76 @@ describe('multiplayer route composition', () => {
     });
     expect(stateHash(wildMultiplayerSession(guest.getSnapshot())?.state)).toBe(
       stateHash(wildMultiplayerSession(host.getSnapshot())?.state),
+    );
+  });
+
+  it('runs a two-seat Cribbage room with replay-identical discard actions', async () => {
+    const broker = new MockSignalingBroker();
+    const rtc = new MockRtcNetwork();
+    const host = new MultiplayerRoomSession(
+      { name: 'Host', avatarId: 'ember', profileId: 'crib-host' },
+      {
+        signaling: broker.signaling('crib-host-peer'),
+        peerConnection: rtc.factory('host'),
+        seed: 121,
+      },
+    );
+    const guest = new MultiplayerRoomSession(
+      { name: 'Guest', avatarId: 'cobalt', profileId: 'crib-guest' },
+      {
+        signaling: broker.signaling('crib-guest-peer'),
+        peerConnection: rtc.factory('guest'),
+        seed: 7,
+      },
+    );
+    sessions.push(host, guest);
+
+    const room = await host.create({
+      gameId: 'cribbage',
+      seats: 2,
+      config: { ...cribbageConfigSchema.defaults, gamesToWin: 3 },
+    });
+    expect(host.getSnapshot().settings?.config).toMatchObject({ gamesToWin: 1 });
+    await guest.join(room.code);
+    await eventually(() => expect(guest.getSnapshot().localSeat).toBe(1));
+
+    const hostRound = cribbageMultiplayerSession(host.getSnapshot())!;
+    const hostDiscard = hostRound.def.flow.legalMovesFor!(hostRound.state, hostRound.phase, 0).find(
+      (move) => move.id === 'crib.discard',
+    )!;
+    host.send(hostDiscard.id, hostDiscard.payload);
+    await eventually(() => {
+      expect(cribbageMultiplayerSession(host.getSnapshot())?.log).toHaveLength(1);
+      expect(cribbageMultiplayerSession(guest.getSnapshot())?.log).toHaveLength(1);
+    });
+
+    const guestRound = cribbageMultiplayerSession(guest.getSnapshot())!;
+    const guestDiscard = guestRound.def.flow.legalMovesFor!(
+      guestRound.state,
+      guestRound.phase,
+      1,
+    ).find((move) => move.id === 'crib.discard')!;
+    guest.send(guestDiscard.id, guestDiscard.payload);
+    await eventually(() => {
+      expect(cribbageMultiplayerSession(host.getSnapshot())?.log).toHaveLength(2);
+      expect(cribbageMultiplayerSession(guest.getSnapshot())?.log).toHaveLength(2);
+    });
+
+    const hostSession = cribbageMultiplayerSession(host.getSnapshot())!;
+    const guestSession = cribbageMultiplayerSession(guest.getSnapshot())!;
+    expect(guestSession.log).toEqual(hostSession.log);
+    expect(stateHash(guestSession.state)).toBe(stateHash(hostSession.state));
+  });
+
+  it('rejects Cribbage room announcements with any seat count other than two', async () => {
+    const host = new MultiplayerRoomSession(
+      { name: 'Host', avatarId: 'ember', profileId: 'crib-host-invalid' },
+      { seed: 121 },
+    );
+    sessions.push(host);
+
+    await expect(host.create({ gameId: 'cribbage', seats: 3 })).rejects.toThrow(
+      'Cribbage rooms require exactly two seats',
     );
   });
 });
