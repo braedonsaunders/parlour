@@ -26,6 +26,7 @@
     "@parlour/game-ratscrew": "workspace:*",
     "@parlour/game-spades": "workspace:*",
     "@parlour/game-wildpile": "workspace:*",
+    "@vercel/analytics": "^2.0.1",
     "gsap": "^3.13.0",
     "howler": "^2.2.4",
     "motion": "^12.0.0",
@@ -33,8 +34,7 @@
     "nostr-tools": "^2.10.4",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
-    "zustand": "^5.0.10",
-    "@parlour/game-ratscrew": "workspace:*"
+    "zustand": "^5.0.10"
   },
   "devDependencies": {
     "@types/howler": "^2.2.12",

@@ -6,6 +6,7 @@ import { AudioDirector } from '@/components/AudioDirector';
 import { SceneStage } from '@/components/backgrounds/SceneStage';
 import { SplashScreen } from '@/components/SplashScreen';
 import { PwaRegister } from '@/components/PwaRegister';
+import { Analytics } from '@vercel/analytics/next';
 import './globals.css';
 
 const display = Baloo_2({
@@ -107,6 +108,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ComfortSync />
         <AudioDirector />
         <PwaRegister />
+        <Analytics />
       </body>
     </html>
   );
