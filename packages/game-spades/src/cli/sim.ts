@@ -65,10 +65,11 @@ console.log(`  — ${report.personas.passes ? 'PASS' : 'FAIL'}`);
 
 console.log('');
 console.log(
-  `gate 3 — symmetry team0 ${(report.symmetry.teamZeroShare === null
-    ? 'n/a'
-    : `${(report.symmetry.teamZeroShare * 100).toFixed(1)}%`
-  )} — ${report.symmetry.passes ? 'PASS' : 'FAIL'}`,
+  `gate 3 — symmetry team0 ${
+    report.symmetry.teamZeroShare === null
+      ? 'n/a'
+      : `${(report.symmetry.teamZeroShare * 100).toFixed(1)}%`
+  } — ${report.symmetry.passes ? 'PASS' : 'FAIL'}`,
 );
 
 if (report.stalls > 0) console.log(`(${report.stalls} stalled games)`);

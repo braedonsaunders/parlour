@@ -3,9 +3,11 @@
  *
  * Moves: `bid` {bid:1..13} · `bidNil` (no payload, only if nil) · `playCard` {card}
  * State: scores/bags/dealer/turn/leader/bids/trick/tricksBySeat/spadesBroken/
+ *        overtime (persists after a target tie) /
  *        lastHand (and lastHandSummary alias) with teams[] breakdown
  * Team: seat % 2
- * FX: card.fly, turn.ring, tricks.play, tricks.collect,
+ * FX: card.fly ({card:'??', from, to, dur} — no face ids on the deal),
+ *     turn.ring, tricks.play, tricks.collect,
  *     spades.bid, spades.bids-complete, spades.trick-collect, spades.spades-broken,
  *     spades.nil-made, spades.nil-failed, spades.hand-score, spades.bag-penalty,
  *     spades.score-chip, round.end
@@ -26,6 +28,7 @@ export {
   scoreTeam,
   matchOver,
   matchResult,
+  entersOvertime,
   teamContract,
   teamNonNilTricks,
   teamNilTricks,
@@ -39,6 +42,8 @@ export {
   rankOfCard,
   suitOfCard,
   isSpade,
+  compareCardIds,
+  byRankThenId,
   spadesTrickRules,
   teamOf,
   partnerOf,
@@ -46,7 +51,6 @@ export {
 } from './cards';
 export { spadesHowToPlay } from './howto';
 export { spadesCatalog } from './catalog';
-export { auditFollowSuit, reconstructHands } from './audit';
 export {
   TIER_BOTS,
   tierBot,

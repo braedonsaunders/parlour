@@ -1,9 +1,24 @@
 import { describe, expect, it } from 'vitest';
 import { Fx } from '@parlour/engine';
 import { followError, resolveTrickWinner } from '@parlour/tricks';
-import { HAND_SIZE, SPADES_SEATS, isSpade, rankOfCard, spadesTrickRules, suitOfCard } from './cards';
+import {
+  HAND_SIZE,
+  SPADES_SEATS,
+  isSpade,
+  rankOfCard,
+  spadesTrickRules,
+  suitOfCard,
+} from './cards';
 import { GAME_ID, SpadesFx, createSpadesDef } from './game';
-import { bidAround, driveHand, legalCards, mustStep, openSession, step } from './test-util';
+import {
+  bidAround,
+  driveHand,
+  legalCards,
+  mustStep,
+  openSession,
+  requireMove,
+  step,
+} from './test-util';
 import { spadesConfig } from './config';
 
 describe('setup', () => {
@@ -61,8 +76,14 @@ describe('bidding', () => {
   it('makes bidNil illegal when nil is off — legal bids are 1..13', () => {
     const session = openSession({ seed: 3, config: { nil: false } });
     const seat = session.state.turn;
-    expect(step(session, seat, 'bidNil').rejected).toBe('nil-disabled');
-    const legal = createSpadesDef().flow.legalMovesFor?.(session.state, session.phase, seat) ?? [];
+    const def = createSpadesDef();
+    // Session boundary: flow omits bidNil, so apply rejects as illegal-move.
+    expect(step(session, seat, 'bidNil').rejected).toBe('illegal-move');
+    // Reducer contract: the move itself still names the house-rule reason.
+    const verdict = requireMove('bidNil').validate(session.state, seat, undefined);
+    expect(verdict).not.toBe(true);
+    if (verdict !== true) expect(verdict.code).toBe('nil-disabled');
+    const legal = def.flow.legalMovesFor?.(session.state, session.phase, seat) ?? [];
     expect(legal.some((move) => move.id === 'bidNil')).toBe(false);
     expect(legal.map((move) => (move.payload as { bid?: number }).bid)).toEqual(
       Array.from({ length: 13 }, (_, i) => i + 1),
@@ -135,7 +156,7 @@ describe('broken-spades lead rule', () => {
   });
 
   it('allows an all-spades lead and rejects a mixed-hand spade lead', () => {
-    const def = createSpadesDef();
+    const playCard = requireMove('playCard');
     const base = {
       ...openSession({ seed: 1 }).state,
       stage: 'playing' as const,
@@ -143,11 +164,14 @@ describe('broken-spades lead rule', () => {
       leader: 0,
       trick: null,
       spadesBroken: false,
-      veiled: false,
     };
-    expect(def.moves.playCard.validate({ ...base, hands: [['S1', 'S2', 'S3'], ['H2'], ['D2'], ['C2']] }, 0, { card: 'S1' })).toBe(true);
     expect(
-      def.moves.playCard.validate({ ...base, hands: [['S1', 'H2'], ['H3'], ['D2'], ['C2']] }, 0, {
+      playCard.validate({ ...base, hands: [['S1', 'S2', 'S3'], ['H2'], ['D2'], ['C2']] }, 0, {
+        card: 'S1',
+      }),
+    ).toBe(true);
+    expect(
+      playCard.validate({ ...base, hands: [['S1', 'H2'], ['H3'], ['D2'], ['C2']] }, 0, {
         card: 'S1',
       }),
     ).not.toBe(true);
@@ -156,7 +180,10 @@ describe('broken-spades lead rule', () => {
 
 describe('a finished hand', () => {
   it('plays exactly 13 tricks, scores, and keeps lastHand after auto-advance', () => {
-    const session = driveHand(openSession({ seed: 33, config: { targetScore: 750 } }), [3, 3, 3, 4]);
+    const session = driveHand(
+      openSession({ seed: 33, config: { targetScore: 750 } }),
+      [3, 3, 3, 4],
+    );
     expect(session.state.lastHand!.tricksBySeat.reduce((a, b) => a + b, 0)).toBe(13);
     expect(session.state.lastHand).not.toBeNull();
     expect(session.state.lastHandSummary).toBe(session.state.lastHand);

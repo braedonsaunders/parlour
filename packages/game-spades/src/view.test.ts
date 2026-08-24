@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createSession, stateHash } from '@parlour/engine';
-import { DECK } from './cards';
+import { createSession } from '@parlour/engine';
 import { spadesConfig } from './config';
 import { spadesGame } from './game';
 
@@ -33,43 +32,47 @@ describe('playerView redaction', () => {
     }
   });
 
+  it('setup deal FX JSON scan does not expose opponent card IDs', () => {
+    const viewer = 0;
+    const session = createSession(spadesGame, { seed: 8_004, config, seats: 4 });
+    const fxJson = JSON.stringify(session.setupFx ?? []);
+    const dealt = session.state.hands.flat();
+    expect(dealt).toHaveLength(52);
+    for (const card of dealt) {
+      expect(fxJson.includes(`"${card}"`)).toBe(false);
+    }
+    for (const seat of [1, 2, 3] as const) {
+      for (const card of session.state.hands[seat] ?? []) {
+        expect(fxJson.includes(`"${card}"`)).toBe(false);
+      }
+    }
+    const deals = (session.setupFx ?? []).filter((event) => event.kind === 'card.fly');
+    expect(deals).toHaveLength(52);
+    for (const event of deals) {
+      const payload = event.payload as { card?: string; from?: string; to?: string; dur?: number };
+      expect(payload.from).toBe('stock');
+      expect(payload.to).toMatch(/^hand:[0-3]$/);
+      expect(payload.dur).toBe(220);
+      expect(payload.card === undefined || payload.card === '??').toBe(true);
+    }
+    const view = spadesGame.playerView(session.state, viewer);
+    expect(view.hands[viewer]).toEqual(session.state.hands[viewer]);
+    for (const seat of [1, 2, 3] as const) {
+      expect(view.hands[seat]!.every((card) => card === '??')).toBe(true);
+    }
+  });
+
   it('legalMovesFor a non-acting seat is empty (no leaked cards)', () => {
     const session = createSession(spadesGame, { seed: 8_003, config, seats: 4 });
     const actor = session.state.turn;
     const other = (actor + 1) % 4;
-    const leaked =
-      spadesGame.flow.legalMovesFor?.(session.state, session.phase, other) ?? [];
+    const leaked = spadesGame.flow.legalMovesFor?.(session.state, session.phase, other) ?? [];
     expect(leaked).toEqual([]);
   });
 });
 
 describe('veil support', () => {
-  it('declares a 52-card veiled deal with no public setup', () => {
-    expect(spadesGame.veil).toBeDefined();
-    const deck = spadesGame.veil!.deck(config);
-    expect(deck.cardIds).toHaveLength(DECK.cardIds.length);
-    expect(spadesGame.veil!.publicSetupFrom(4, config)).toBe(52);
-    expect(spadesGame.veil!.publicSetupReady([], 4, config)).toBe(true);
-  });
-
-  it('a veiled session hashes stably for the same ceremony order', () => {
-    const deckOrder = Array.from({ length: 52 }, (_, index) => `v#${index}`);
-    const a = createSession(spadesGame, {
-      seed: 9_001,
-      config,
-      seats: 4,
-      veiled: true,
-      deckOrder,
-    });
-    const b = createSession(spadesGame, {
-      seed: 9_001,
-      config,
-      seats: 4,
-      veiled: true,
-      deckOrder,
-    });
-    expect(a.state.veiled).toBe(true);
-    expect(stateHash(a.state)).toBe(stateHash(b.state));
-    expect(a.state.hands.flat().every((card) => card.startsWith('v#'))).toBe(true);
+  it('does not advertise Veil — spadesGame.veil is undefined', () => {
+    expect(spadesGame.veil).toBeUndefined();
   });
 });

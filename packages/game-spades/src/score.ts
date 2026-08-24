@@ -142,26 +142,38 @@ export function scoreHand(input: ScoreInput): {
   };
 }
 
-/** True when one team uniquely leads at or above the target after a hand. */
+/**
+ * True when one team uniquely leads after a hand. A first crossing of `target`
+ * still requires at least one team at/above it. Once `overtime` is set (a
+ * prior tie at/above target), any unequal score ends the match.
+ */
 export function matchOver(
   scores: readonly [number, number],
   target: number,
+  overtime = false,
 ): { winner: 0 | 1 } | null {
-  const reached = scores[0] >= target || scores[1] >= target;
-  if (!reached || scores[0] === scores[1]) return null;
-  return { winner: scores[0] > scores[1] ? 0 : 1 };
+  if (scores[0] === scores[1]) return null;
+  if (overtime || scores[0] >= target || scores[1] >= target) {
+    return { winner: scores[0] > scores[1] ? 0 : 1 };
+  }
+  return null;
+}
+
+export function entersOvertime(scores: readonly [number, number], target: number): boolean {
+  return scores[0] === scores[1] && scores[0] >= target;
 }
 
 export function matchResult(
   scores: readonly [number, number],
   bags: readonly [number, number],
   target: number,
+  overtime = false,
 ): {
   winner: SeatId;
   rankings: { seat: SeatId; rank: number; detail: Record<string, number> }[];
   reason: string;
 } | null {
-  const over = matchOver(scores, target);
+  const over = matchOver(scores, target, overtime);
   if (!over) return null;
   const losing: 0 | 1 = over.winner === 0 ? 1 : 0;
   const seats = (team: 0 | 1): SeatId[] => [...seatsOf(team)];

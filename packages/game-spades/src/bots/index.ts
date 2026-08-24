@@ -66,7 +66,8 @@ export function chooseFromProfile(
     }
     const match = legal.find(
       (move) =>
-        move.id === 'bid' && (move.payload as { bid?: number } | undefined)?.bid === Math.max(1, tricks),
+        move.id === 'bid' &&
+        (move.payload as { bid?: number } | undefined)?.bid === Math.max(1, tricks),
     );
     if (match) return match;
     return legal.find((move) => move.id === 'bid') ?? legal[0]!;

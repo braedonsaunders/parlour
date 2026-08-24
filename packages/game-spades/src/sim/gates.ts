@@ -206,7 +206,8 @@ export function runBalanceGates(opts: {
   const symmetry: SymmetryGate = {
     teamZeroShare: share,
     games: symmetryGames,
-    passes: share !== null && share >= thresholds.symmetryBandMin && share <= thresholds.symmetryBandMax,
+    passes:
+      share !== null && share >= thresholds.symmetryBandMin && share <= thresholds.symmetryBandMax,
   };
 
   const stalls =
@@ -222,6 +223,9 @@ export function runBalanceGates(opts: {
     symmetry,
     stalls,
     passed:
-      headToHead.passes && personas.passes && symmetry.passes && stallRate <= thresholds.maxStallRate,
+      headToHead.passes &&
+      personas.passes &&
+      symmetry.passes &&
+      stallRate <= thresholds.maxStallRate,
   };
 }

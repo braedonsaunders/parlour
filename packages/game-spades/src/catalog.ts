@@ -50,7 +50,8 @@ export const spadesCatalog: GameCatalogEntry<SpadesRules> = {
       preset: 'quick',
       name: 'Quick',
       tagline: 'First to 250',
-      description: 'Same rules, shorter race — 250 points and out. A whole match inside a lunch break.',
+      description:
+        'Same rules, shorter race — 250 points and out. A whole match inside a lunch break.',
       facts: ['game to 250', 'nil · bags', '~12 min'],
       accent: '#e29349',
       shade: '#96471c',

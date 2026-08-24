@@ -58,7 +58,19 @@ export function isSpade(card: CardId): boolean {
 }
 
 export function allSpades(cards: readonly CardId[]): boolean {
-  return cards.length > 0 && cards.every((card) => !isRealCard(card) || isSpade(card));
+  return cards.length > 0 && cards.every((card) => isSpade(card));
+}
+
+/** Locale-independent lexical order on card ids (UTF-16 code units). */
+export function compareCardIds(left: CardId, right: CardId): number {
+  if (left < right) return -1;
+  if (left > right) return 1;
+  return 0;
+}
+
+/** Ace-high rank, then explicit id order — never `localeCompare`. */
+export function byRankThenId(left: CardId, right: CardId): number {
+  return rankOfCard(left) - rankOfCard(right) || compareCardIds(left, right);
 }
 
 /**
@@ -90,5 +102,5 @@ export const orderSpadesHand: HandOrder = (cards) =>
     if (bSuit === null) return -1;
     const suitDiff = (HAND_SUIT_ORDER[aSuit] ?? 99) - (HAND_SUIT_ORDER[bSuit] ?? 99);
     if (suitDiff !== 0) return suitDiff;
-    return rankOfCard(left) - rankOfCard(right) || left.localeCompare(right);
+    return byRankThenId(left, right);
   });

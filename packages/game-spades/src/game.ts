@@ -1,10 +1,5 @@
 import {
   Fx,
-  dealOrder,
-  isVeilHandle,
-  veilHandleIndex,
-  veilSupport,
-  stateContainsCardId,
   type BotPolicy,
   type CardId,
   type FlowAdvance,
@@ -29,20 +24,18 @@ import {
 import { TIER_BOTS } from './bots';
 import {
   DECK,
-  DECK_SIZE,
   HAND_SIZE,
   SPADES_SEATS,
   SUIT_SPADES,
   TRICKS_PER_HAND,
   allSpades,
-  isRealCard,
   isSpade,
   spadesTrickRules,
   teamOf,
 } from './cards';
 import { spadesConfig, type SpadesRules } from './config';
 import { spadesHowToPlay } from './howto';
-import { matchOver, matchResult, scoreHand } from './score';
+import { entersOvertime, matchOver, matchResult, scoreHand } from './score';
 import type { HandSummary, SpadesBid, SpadesState } from './state';
 
 export const GAME_ID = 'spades';
@@ -74,17 +67,6 @@ function payloadBid(payload: unknown): number | null {
 function payloadCard(payload: unknown): CardId | null {
   const card = (payload as { card?: unknown } | undefined)?.card;
   return typeof card === 'string' && card.length > 0 ? card : null;
-}
-
-function payloadClaim(payload: unknown): 'all-spades' | null {
-  const claim = (payload as { claim?: unknown } | undefined)?.claim;
-  return claim === 'all-spades' ? 'all-spades' : null;
-}
-
-function payloadDeckOrder(payload: unknown): readonly CardId[] | null {
-  const order = (payload as { deckOrder?: unknown } | undefined)?.deckOrder;
-  if (!Array.isArray(order) || order.length !== DECK_SIZE) return null;
-  return order.every((id) => typeof id === 'string' && id.length > 0) ? (order as CardId[]) : null;
 }
 
 function hand(state: SpadesState, seat: SeatId): CardId[] {
@@ -119,7 +101,7 @@ function dealFreshHand(dealer: SeatId, order: readonly CardId[], fx: MoveCtx['fx
       hands[seat]!.push(card);
       fx.emit(
         Fx.DealCard,
-        { card, from: 'stock', to: `hand:${seat}`, dur: 220 },
+        { card: '??', from: 'stock', to: `hand:${seat}`, dur: 220 },
         (cursor - 1) * DEAL_STAGGER_MS,
       );
     }
@@ -127,10 +109,10 @@ function dealFreshHand(dealer: SeatId, order: readonly CardId[], fx: MoveCtx['fx
   return { hands, dealer, turn: leftOfDealer(dealer) };
 }
 
-function emptyMatch(config: SpadesRules, veiled: boolean): SpadesState {
+function emptyMatch(config: SpadesRules): SpadesState {
   return {
     rules: config,
-    veiled,
+    overtime: false,
     scores: [0, 0],
     bags: [0, 0],
     handNo: 1,
@@ -178,20 +160,16 @@ function completedBids(state: SpadesState): SpadesBid[] | null {
   return state.bids as SpadesBid[];
 }
 
-function claimVerified(state: SpadesState, seat: SeatId): boolean {
-  const cards = hand(state, seat);
-  return cards.every(isRealCard) && allSpades(cards);
-}
-
 function leadViolation(state: SpadesState, seat: SeatId, card: CardId): RuleError | null {
   if (state.trick !== null) return null;
   if (!isSpade(card)) return null;
   if (state.spadesBroken) return null;
-  if (state.veiled) {
-    return err('bad-claim', 'leading an unbroken spade under Veil needs an opened all-spades claim');
-  }
   if (allSpades(hand(state, seat))) return null;
   return err('spades-not-broken', 'spades have not been broken yet');
+}
+
+function decided(state: Pick<SpadesState, 'scores' | 'rules' | 'overtime'>) {
+  return matchOver(state.scores, state.rules.targetScore, state.overtime);
 }
 
 function followViolation(state: SpadesState, seat: SeatId, card: CardId): RuleError | null {
@@ -222,7 +200,10 @@ function applyBidRecord(
   }
 
   const lead = leftOfDealer(state.dealer);
-  const contracts = [teamContractOf(bids as SpadesBid[], 0), teamContractOf(bids as SpadesBid[], 1)];
+  const contracts = [
+    teamContractOf(bids as SpadesBid[], 0),
+    teamContractOf(bids as SpadesBid[], 1),
+  ];
   ctx.fx.emit(SpadesFx.BidsComplete, {
     bids,
     contracts,
@@ -233,7 +214,10 @@ function applyBidRecord(
 }
 
 function teamContractOf(bids: readonly SpadesBid[], team: 0 | 1): number {
-  return bids.reduce((sum, bid) => (teamOf(bid.seat) === team && !bid.nil ? sum + bid.tricks : sum), 0);
+  return bids.reduce(
+    (sum, bid) => (teamOf(bid.seat) === team && !bid.nil ? sum + bid.tricks : sum),
+    0,
+  );
 }
 
 const bid: Move<SpadesState> = {
@@ -272,23 +256,11 @@ const playCard: Move<SpadesState> = {
     if (state.turn !== seat) return err('not-your-turn', 'it is not your turn');
     const card = payloadCard(payload);
     if (!card) return err('bad-play', 'expected {card}');
-    if (isVeilHandle(card)) return err('card-still-veiled', 'the played card has not been opened yet');
     if (!hand(state, seat).includes(card)) return err('not-in-hand', `${card} is not in the hand`);
-
-    if (state.trick === null && isSpade(card) && !state.spadesBroken) {
-      if (!state.veiled) return leadViolation(state, seat, card) ?? true;
-      if (payloadClaim(payload) !== 'all-spades' || !claimVerified(state, seat)) {
-        return err(
-          'bad-claim',
-          'leading an unbroken spade under Veil needs an opened all-spades claim',
-        );
-      }
-    }
-
-    if (!state.veiled) {
-      const follow = followViolation(state, seat, card);
-      if (follow) return follow;
-    }
+    const lead = leadViolation(state, seat, card);
+    if (lead) return lead;
+    const follow = followViolation(state, seat, card);
+    if (follow) return follow;
     return true;
   },
   apply(state, seat, payload, ctx) {
@@ -409,13 +381,15 @@ const scoreHandMove: Move<SpadesState> = {
       rules: state.rules,
     });
     emitHandBreakdown(ctx.fx, scored.summary);
-    if (matchOver(scored.scores, state.rules.targetScore)) {
+    const overtime = state.overtime || entersOvertime(scored.scores, state.rules.targetScore);
+    if (matchOver(scored.scores, state.rules.targetScore, overtime)) {
       ctx.fx.emit(Fx.RoundEnd, { reason: 'match-over' }, 240);
     }
     return {
       ...state,
       scores: scored.scores,
       bags: scored.bags,
+      overtime,
       summary: scored.summary,
       lastHand: scored.summary,
       lastHandSummary: scored.summary,
@@ -426,17 +400,9 @@ const scoreHandMove: Move<SpadesState> = {
 
 const nextHand: Move<SpadesState> = {
   validate: () => true,
-  apply(state, _seat, payload, ctx) {
+  apply(state, _seat, _payload, ctx) {
     const dealer = nextSeat(state.dealer);
-    let order: readonly CardId[];
-    const ceremonyOrder = payloadDeckOrder(payload);
-    if (state.veiled) {
-      if (!ceremonyOrder) throw new Error('nextHand: veiled rooms require {deckOrder}');
-      order = ceremonyOrder;
-    } else {
-      if (ceremonyOrder) throw new Error('nextHand: open rooms shuffle for themselves');
-      order = ctx.rng.shuffle(DECK.cardIds);
-    }
+    const order = ctx.rng.shuffle([...DECK.cardIds]);
     const dealt = dealFreshHand(dealer, order, ctx.fx);
     return freshHand(
       { ...state, handNo: state.handNo + 1, dealer },
@@ -448,12 +414,11 @@ const nextHand: Move<SpadesState> = {
 
 function matchEndResult(state: SpadesState) {
   if (state.summary === null && state.lastHandSummary === null) return null;
-  const ended = matchResult(state.scores, state.bags, state.rules.targetScore);
+  const ended = matchResult(state.scores, state.bags, state.rules.targetScore, state.overtime);
   if (!ended) return null;
   // Only end once the just-finished hand has been folded (stage hand-over, or
   // a subsequent deal that kept lastHandSummary after a crossing hand).
-  if (state.stage !== 'hand-over' && !matchOver(state.scores, state.rules.targetScore)) return null;
-  if (state.stage !== 'hand-over') return ended;
+  if (state.stage !== 'hand-over' && !decided(state)) return null;
   return ended;
 }
 
@@ -464,9 +429,7 @@ function phaseFor(state: SpadesState): PhaseState {
     case 'playing':
       return { phase: 'playing', actor: state.turn, round: state.handNo };
     case 'hand-over':
-      return state.veiled && !matchOver(state.scores, state.rules.targetScore)
-        ? { phase: 'hand-over', actor: null, round: state.handNo, label: 'awaiting the next deal' }
-        : { phase: 'over', actor: null, round: state.handNo };
+      return { phase: 'over', actor: null, round: state.handNo };
   }
 }
 
@@ -480,27 +443,11 @@ function legalMovesForSeat(state: SpadesState, seat: SeatId): LegalMove[] {
 
   if (state.stage === 'playing' && state.turn === seat) {
     const cards = hand(state, seat).filter((card) => {
-      if (state.veiled) {
-        if (state.trick === null && isSpade(card) && !state.spadesBroken) {
-          return claimVerified(state, seat);
-        }
-        return isRealCard(card) || isVeilHandle(card);
-      }
       if (leadViolation(state, seat, card)) return false;
       if (followViolation(state, seat, card)) return false;
       return true;
     });
-    return cards.map((card) => {
-      const needsClaim =
-        state.veiled &&
-        state.trick === null &&
-        isSpade(card) &&
-        !state.spadesBroken;
-      return {
-        id: 'playCard',
-        payload: needsClaim ? { card, claim: 'all-spades' } : { card },
-      };
-    });
+    return cards.map((card) => ({ id: 'playCard', payload: { card } }));
   }
 
   return [];
@@ -523,7 +470,6 @@ const flow: GameDef<SpadesState, SpadesRules>['flow'] = {
     if (ended && state.stage === 'hand-over') return { phase: phaseFor(state), ended };
 
     if (state.stage === 'hand-over') {
-      if (state.veiled) return { phase: phaseFor(state) };
       return {
         phase: phaseFor(state),
         autoMoves: [{ seat: null, move: 'nextHand', reason: 'next deal' }],
@@ -543,26 +489,6 @@ const flow: GameDef<SpadesState, SpadesRules>['flow'] = {
 
     return { phase: phaseFor(state) };
   },
-
-  canInject(state, phase, moveId, payload) {
-    if (moveId !== 'spades.hand.order') {
-      return err('bad-injection', `${moveId} cannot be injected`);
-    }
-    if (!state.veiled || phase.phase !== 'hand-over' || matchOver(state.scores, state.rules.targetScore)) {
-      return err('injection-not-needed', 'this table deals for itself');
-    }
-    const order = payloadDeckOrder(payload);
-    if (!order) return err('bad-injection', 'expected {deckOrder} of 52 entries');
-    const freshFrom = DECK_SIZE * state.handNo;
-    const handles = order.filter(isVeilHandle).map(veilHandleIndex);
-    if (handles.length !== DECK_SIZE || handles.some((index) => index === null || index < freshFrom)) {
-      return err('stale-handles', `ceremony handles must be fresh (index ≥ ${freshFrom})`);
-    }
-    if (order.some((id) => !isVeilHandle(id) && stateContainsCardId(state, id))) {
-      return err('card-already-open', 'an opened card is already visible at the table');
-    }
-    return true;
-  },
 };
 
 export interface SpadesDefOptions {
@@ -580,18 +506,13 @@ export function createSpadesDef(options: SpadesDefOptions = {}): GameDef<SpadesS
     id: GAME_ID,
     howToPlay: spadesHowToPlay,
     configSchema: spadesConfig,
-    veil: veilSupport({
-      deck: DECK,
-      handSize: HAND_SIZE,
-      publicSetup: 'none',
-    }),
 
     setup(ctx) {
       if (!Number.isInteger(ctx.seats) || ctx.seats !== SPADES_SEATS) {
         throw new Error(`spades needs exactly ${SPADES_SEATS} seats`);
       }
-      const order = dealOrder(ctx, DECK);
-      return freshHand(emptyMatch(ctx.config, ctx.veiled === true), dealFreshHand(0, order, ctx.fx), null);
+      const order = ctx.rng.shuffle([...DECK.cardIds]);
+      return freshHand(emptyMatch(ctx.config), dealFreshHand(0, order, ctx.fx), null);
     },
 
     moves: {
@@ -600,7 +521,6 @@ export function createSpadesDef(options: SpadesDefOptions = {}): GameDef<SpadesS
       playCard,
       scoreHand: scoreHandMove,
       nextHand,
-      'spades.hand.order': nextHand,
     },
 
     flow,

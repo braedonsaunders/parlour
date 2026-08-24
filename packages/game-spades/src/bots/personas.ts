@@ -88,11 +88,17 @@ export function personaById(id: string): PersonaDef | undefined {
 export function makePersonaBot(id: string): BotPolicy<SpadesState> & { persona: PersonaDef } {
   const persona = personaById(id);
   if (!persona) throw new Error(`unknown persona: ${id}`);
-  const policy = makePolicy(`spades-persona-${persona.id}`, persona.name, persona.tier, persona.profile, {
-    name: persona.name,
-    avatar: persona.avatar,
-    blurb: persona.blurb,
-    emotes: persona.emotes,
-  });
+  const policy = makePolicy(
+    `spades-persona-${persona.id}`,
+    persona.name,
+    persona.tier,
+    persona.profile,
+    {
+      name: persona.name,
+      avatar: persona.avatar,
+      blurb: persona.blurb,
+      emotes: persona.emotes,
+    },
+  );
   return { ...policy, persona };
 }

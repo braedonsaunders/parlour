@@ -3,10 +3,11 @@ import {
   sessionApply,
   type AppliedEvent,
   type GameSession,
+  type Move,
   type SeatId,
 } from '@parlour/engine';
 import { spadesConfig, type SpadesRules } from './config';
-import { spadesGame } from './game';
+import { createSpadesDef, spadesGame } from './game';
 import type { SpadesState } from './state';
 
 export type SpadesSession = GameSession<SpadesState, SpadesRules>;
@@ -55,7 +56,10 @@ export function mustStep(
   return result.session;
 }
 
-export function bidAround(session: SpadesSession, bids: readonly (number | 'nil')[]): SpadesSession {
+export function bidAround(
+  session: SpadesSession,
+  bids: readonly (number | 'nil')[],
+): SpadesSession {
   let current = session;
   for (let i = 0; i < 4; i++) {
     const seat = current.state.turn;
@@ -68,12 +72,19 @@ export function bidAround(session: SpadesSession, bids: readonly (number | 'nil'
   return current;
 }
 
+export function requireMove(id: string): Move<SpadesState> {
+  const move = createSpadesDef().moves[id];
+  if (!move) throw new Error(`spades is missing move "${id}"`);
+  return move;
+}
+
 export function legalCards(session: SpadesSession, seat: SeatId): string[] {
   const moves =
     spadesGame.flow.legalMovesFor?.(session.state, session.phase, seat) ??
     spadesGame.flow.legalMoves(session.state, session.phase);
   return moves.flatMap((move) =>
-    move.id === 'playCard' && typeof (move.payload as { card?: unknown } | undefined)?.card === 'string'
+    move.id === 'playCard' &&
+    typeof (move.payload as { card?: unknown } | undefined)?.card === 'string'
       ? [(move.payload as { card: string }).card]
       : [],
   );

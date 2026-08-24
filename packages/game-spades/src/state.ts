@@ -40,7 +40,12 @@ export interface HandSummary {
  */
 export interface SpadesState {
   rules: SpadesRules;
-  veiled: boolean;
+  /**
+   * Set when a completed hand leaves the teams tied at or above target.
+   * Stays set for the rest of the match: any later unequal score ends it,
+   * even if both totals drop back below the posted target.
+   */
+  overtime: boolean;
   scores: readonly [number, number];
   bags: readonly [number, number];
   /** 1-based hand counter */
@@ -56,7 +61,7 @@ export interface SpadesState {
   trickWinners: readonly SeatId[];
   tricksBySeat: readonly number[];
   spadesBroken: boolean;
-  /** every card played this hand — Veil follow-suit audit trail */
+  /** every card played this hand, in play order */
   plays: readonly { seat: SeatId; card: CardId }[];
   /** this hand's result while `stage === 'hand-over'`; cleared on the next deal */
   summary: HandSummary | null;

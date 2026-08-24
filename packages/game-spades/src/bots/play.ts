@@ -1,5 +1,5 @@
 import type { CardId } from '@parlour/engine';
-import { isSpade, rankOfCard, suitOfCard } from '../cards';
+import { byRankThenId, compareCardIds, isSpade, rankOfCard, suitOfCard } from '../cards';
 import { currentWinner, ownHand, partnerIsWinning } from './evaluate';
 import type { SpadesState } from '../state';
 
@@ -15,11 +15,11 @@ export interface PlayParams {
 }
 
 function lowest(cards: readonly CardId[]): CardId {
-  return [...cards].sort((a, b) => rankOfCard(a) - rankOfCard(b) || a.localeCompare(b))[0]!;
+  return [...cards].sort(byRankThenId)[0]!;
 }
 
 function highest(cards: readonly CardId[]): CardId {
-  return [...cards].sort((a, b) => rankOfCard(b) - rankOfCard(a) || a.localeCompare(b))[0]!;
+  return [...cards].sort((a, b) => rankOfCard(b) - rankOfCard(a) || compareCardIds(a, b))[0]!;
 }
 
 function ofSuit(cards: readonly CardId[], suit: string): CardId[] {

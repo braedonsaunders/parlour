@@ -21,7 +21,14 @@ function bids(
 
 describe('reviewer scoring examples A–H', () => {
   it('A) bids 3+4, takes 8 => +71, 1 bag', () => {
-    const team = scoreTeam(bids({ tricks: 3 }, { tricks: 3 }, { tricks: 4 }, { tricks: 3 }), [4, 3, 4, 2], 0, 0, 0, on);
+    const team = scoreTeam(
+      bids({ tricks: 3 }, { tricks: 3 }, { tricks: 4 }, { tricks: 3 }),
+      [4, 3, 4, 2],
+      0,
+      0,
+      0,
+      on,
+    );
     expect(team.contract).toBe(7);
     expect(team.nonNilTricks).toBe(8);
     expect(team.made).toBe(true);
@@ -31,7 +38,14 @@ describe('reviewer scoring examples A–H', () => {
   });
 
   it('B) bid 7, takes 6 => -70, 0 new bags', () => {
-    const team = scoreTeam(bids({ tricks: 3 }, { tricks: 3 }, { tricks: 4 }, { tricks: 3 }), [3, 4, 3, 3], 0, 0, 0, on);
+    const team = scoreTeam(
+      bids({ tricks: 3 }, { tricks: 3 }, { tricks: 4 }, { tricks: 3 }),
+      [3, 4, 3, 3],
+      0,
+      0,
+      0,
+      on,
+    );
     expect(team.contract).toBe(7);
     expect(team.nonNilTricks).toBe(6);
     expect(team.made).toBe(false);
@@ -40,7 +54,14 @@ describe('reviewer scoring examples A–H', () => {
   });
 
   it('C) prior 9 bags, bid 5, takes 8 => +53-100=-47, bags=2', () => {
-    const team = scoreTeam(bids({ tricks: 2 }, { tricks: 3 }, { tricks: 3 }, { tricks: 3 }), [4, 3, 4, 2], 0, 0, 9, on);
+    const team = scoreTeam(
+      bids({ tricks: 2 }, { tricks: 3 }, { tricks: 3 }, { tricks: 3 }),
+      [4, 3, 4, 2],
+      0,
+      0,
+      9,
+      on,
+    );
     expect(team.contract).toBe(5);
     expect(team.nonNilTricks).toBe(8);
     expect(team.overtricks).toBe(3);
@@ -113,6 +134,18 @@ describe('reviewer scoring examples A–H', () => {
     expect(result?.rankings.filter((row) => row.rank === 1).map((row) => row.seat)).toEqual([0, 2]);
   });
 
+  it('overtime: [500,500] then [450,480] names a winner; [450,450] continues', () => {
+    expect(matchOver([500, 500], 500)).toBeNull();
+    expect(matchOver([450, 480], 500)).toBeNull();
+    expect(matchOver([450, 480], 500, true)).toEqual({ winner: 1 });
+    expect(matchOver([450, 450], 500, true)).toBeNull();
+    expect(
+      matchResult([450, 480], [0, 0], 500, true)
+        ?.rankings.filter((row) => row.rank === 1)
+        .map((row) => row.seat),
+    ).toEqual([1, 3]);
+  });
+
   it('H) bag penalty works from negative scores and multiple cycles', () => {
     const team = scoreTeam(
       bids({ tricks: 2 }, { tricks: 3 }, { tricks: 2 }, { tricks: 3 }),
@@ -133,7 +166,14 @@ describe('reviewer scoring examples A–H', () => {
 
 describe('config off paths', () => {
   it('bags off: made contract scores 10× with no overtrick points or bags', () => {
-    const team = scoreTeam(bids({ tricks: 3 }, { tricks: 3 }, { tricks: 4 }, { tricks: 3 }), [5, 3, 4, 1], 0, 0, 4, bagsOff);
+    const team = scoreTeam(
+      bids({ tricks: 3 }, { tricks: 3 }, { tricks: 4 }, { tricks: 3 }),
+      [5, 3, 4, 1],
+      0,
+      0,
+      4,
+      bagsOff,
+    );
     expect(team.delta).toBe(70);
     expect(team.bagsAfter).toBe(4);
     expect(team.bagPenalty).toBe(0);

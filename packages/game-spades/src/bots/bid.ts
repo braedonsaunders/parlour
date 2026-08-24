@@ -25,7 +25,8 @@ export function decideBid(state: SpadesState, seat: number, params: BidParams, r
     return 0;
   }
 
-  let bid = expected + params.aggression + (params.jitter === 0 ? 0 : (rng.float() - 0.5) * params.jitter);
+  let bid =
+    expected + params.aggression + (params.jitter === 0 ? 0 : (rng.float() - 0.5) * params.jitter);
   if (state.rules.bags) {
     const team = seat % 2;
     const bags = state.bags[team] ?? 0;
