@@ -24,11 +24,19 @@ The open room stays the fast default. Veil is a second tier because it adds a
 shuffle ceremony before the deal, a round trip per hidden card, and a different
 reconnect trade-off.
 
-**Players are not asked to choose between them.** The tier picker is gone. Every
-room now runs the collaborative deal below, which is always on and costs
-nothing; Veil is reserved for a competitive mode rather than offered as a
-question to somebody who wants to play cards. It is also still pre-review (slice
-8), which is its own reason not to enable it silently.
+**Players are not asked to choose between them, and no longer choose at all.**
+The tier picker is gone and so is the room option behind it: `tierFor` reads the
+tier off the game pack. A pack that ships a `veil` block hides hands, so its
+rooms do — eight of the nine room games — and one that does not plays the open
+tier with the collaborative deal below. Spades is the exception until its pack
+gets a veil block, which is game work rather than a flag.
+
+Deriving rather than announcing the tier also means a joining peer computes the
+same answer as the host from the same game id, so a forged announcement cannot
+talk a room down into the open tier.
+
+Veil is still pre-review (slice 8). Nothing here changes that, and the badge
+still says what is and is not covered.
 
 ## The collaborative deal — always on, every room
 
@@ -234,6 +242,23 @@ departed layer is what lets the remaining players keep drawing and playing their
 own hands. Reading the departed player's hand is a side effect of holding their
 layer, not the goal.
 
+**Resume before recovery.** A dropped seat is held open for a grace window
+first, because a player who comes back rebuilds their own layer and nothing is
+opened to anybody. Layers are no longer drawn but *derived*: the exponent, the
+permutation and the salt all come from a stream keyed by a per-room master seed
+and the epoch, so the same seat reproduces the same layer, and its round signing
+key is kept so it returns as the identity the header registered. The returning
+peer asks the table to replay the round — `veil.catchup` carries the header and
+every entry, each re-validated on arrival — then re-derives its secrets and
+checks them against commitments the transcript already holds. A layer that does
+not match is refused rather than played on with.
+
+This is what makes a two-seat disconnect survivable. Recovery still exists for
+the seat that never comes back, and is still reported as a privacy loss; it is
+simply no longer the first answer to a phone changing networks. Material lives
+in `localStorage` for the life of the room, keyed by room and profile: whoever
+can read it is already sitting at the browser holding the hand.
+
 **Bot takeover.** The authority host immediately drives a dropped seat through
 the game pack's ordinary bot policy, using the same legal-move enumeration and
 reducers as a human. In a veiled room the host opens the departed hand only as
@@ -274,12 +299,33 @@ clients carrying an encrypted, signed state token between calls, so the function
 needs no database. Useful for stronger rule enforcement, still a server
 authority, and therefore not the Veil default.
 
+## Several deals in one session
+
+A veiled deal is one ceremony over one deck, so a match spanning several hands
+needs a ceremony per hand. Epochs were always general — a recycled stock opens a
+fresh one, numbered on from where the last stopped — so the next hand's deck is
+that machinery pointed at the whole deck, and `redealPlan` reads the order off
+any epoch. A second hand therefore cannot reissue a handle the first one spent.
+
+The seam is the move. An open room deals its next hand from the session rng,
+which under Veil would hand every seat a readable deck mid-match, so the game
+stops and reports `VEILED_REDEAL_PENDING` through ordinary validation. The host
+sees it, runs a ceremony, and injects the move with the deck it produced; the
+move's own validation still runs, so an injected event cannot deal a hand the
+rules would refuse. Gin and cribbage both work this way.
+
 ## Cost, measured
 
 A 52-card ceremony is `seats × 52` modular exponentiations at 2048 bits — on the
-order of a second or two of main-thread work, which is why the lobby shows
-ceremony progress. Each hidden card costs one `seats - 1` hop chain. Both are
-stated in the tier picker before the room is opened.
+order of a second or two of work, which is why the lobby shows ceremony
+progress. Each hidden card costs one `seats - 1` hop chain.
+
+The shuffle yields to the event loop every few elements. A whole deck in one
+uninterrupted run starves the heartbeat timer, and a seat that misses enough
+heartbeats is declared gone — so a table could lose a player to its own shuffle.
+Yielding costs a few milliseconds and buys the timers back; it does not make the
+ceremony faster, and moving the group arithmetic into a worker is still the
+answer for jank on a slow phone.
 
 ## Implementation slices
 

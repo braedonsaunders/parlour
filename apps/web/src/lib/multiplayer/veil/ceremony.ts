@@ -25,7 +25,7 @@ import {
   decryptElement,
   generateLayerKey,
   randomPermutation,
-  shuffleLayer,
+  shuffleLayerAsync,
   type VeilCodebook,
   type VeilLayerKey,
 } from './sra';
@@ -159,7 +159,10 @@ export async function layShuffleLayer(
 ): Promise<LayerResult> {
   if (input.length !== epoch.cards.length) throw new Error('shuffle input is the wrong size');
   const secret = deriveLayerSecret(epoch, random);
-  const deck = shuffleLayer(input.map(elementFromHex), secret.key, secret.order).map(elementToHex);
+  // Chunked: a whole deck of modular exponentiations in one run starves the
+  // heartbeat timer, and a table should not lose a seat to its own shuffle.
+  const shuffled = await shuffleLayerAsync(input.map(elementFromHex), secret.key, secret.order);
+  const deck = shuffled.map(elementToHex);
   return {
     entry: { epoch: epoch.epoch, seat, deck, commitment: await commitLayer(secret) },
     secret,

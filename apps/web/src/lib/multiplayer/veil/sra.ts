@@ -259,3 +259,36 @@ export function shuffleLayer(
     order,
   );
 }
+
+/**
+ * How many elements to encrypt before letting the page breathe.
+ *
+ * A 2048-bit modular exponentiation is not slow; a deck of them in one
+ * uninterrupted run is. On a phone that run is long enough to starve the
+ * heartbeat timer, and a seat that misses enough heartbeats is declared gone —
+ * so a table could lose a player *to its own shuffle*. Yielding costs a few
+ * milliseconds of ceremony and buys back the timers.
+ */
+const SHUFFLE_CHUNK = 8;
+
+/** Lets pending timers and messages run. A microtask would not: they are tasks. */
+function yieldToEventLoop(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+/**
+ * {@link shuffleLayer}, in chunks, so the event loop keeps turning underneath a
+ * long ceremony. Identical output — the same deck, the same permutation.
+ */
+export async function shuffleLayerAsync(
+  deck: readonly bigint[],
+  key: Pick<VeilLayerKey, 'e'>,
+  order: readonly number[],
+): Promise<bigint[]> {
+  const encrypted: bigint[] = [];
+  for (const [index, element] of deck.entries()) {
+    encrypted.push(encryptElement(element, key));
+    if ((index + 1) % SHUFFLE_CHUNK === 0) await yieldToEventLoop();
+  }
+  return applyPermutation(encrypted, order);
+}
