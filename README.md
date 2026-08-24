@@ -20,7 +20,7 @@ Solo against bots or with friends on a four-letter room code — no accounts and
 
 </div>
 
-<img src="docs/shots/title.png" alt="parlour title screen — a campfire under the northern lights" width="100%" />
+<img src="docs/shots/title-fable.png" alt="parlour title screen — a campfire under the northern lights" width="100%" />
 
 ---
 
@@ -69,7 +69,7 @@ Write a rules module and you inherit catalog, bots, replay, settings, and help. 
 
 ## The shelf
 
-<img src="docs/shots/shelf.png" alt="The parlour game shelf" width="100%" />
+<img src="docs/shots/shelf-fable.png" alt="The parlour game shelf" width="100%" />
 
 | Game                         | What it is                                                                                     | Status       |
 | ---------------------------- | ---------------------------------------------------------------------------------------------- | ------------ |
@@ -92,21 +92,21 @@ Knock too early and you hand the round away; chase the perfect 31 and someone el
 | **Fast**    | First to 3 round wins, no eliminations, ~2–4 min          |
 | **Timed**   | 3:00 match clock, 7-second turn timers, sudden-death ties |
 
-<img src="docs/shots/blitz-table.png" alt="A Blitz table mid-round" width="100%" />
+<img src="docs/shots/blitz-table-fable.png" alt="A Blitz table mid-round" width="100%" />
 
 ### Wild · the shedding game
 
 Same warm table, much louder deck. **Classic** plays it by the book; **Party** turns on draw-stacking and lets anyone slam an exact match down out of turn.
 
-<img src="docs/shots/wild-modes.png" alt="Choosing between Wild's Classic and Party rule sets" width="100%" />
+<img src="docs/shots/wild-modes-fable.png" alt="Choosing between Wild's Classic and Party rule sets" width="100%" />
 
 Playable cards lift and light up. Everything else dims. You never have to guess what is legal.
 
-<img src="docs/shots/wild-table.png" alt="A Wild table — legal cards lit, illegal cards dimmed" width="100%" />
+<img src="docs/shots/wild-table-fable.png" alt="A Wild table — legal cards lit, illegal cards dimmed" width="100%" />
 
 ### Every match ends on a podium
 
-<img src="docs/shots/podium.png" alt="Match podium" width="100%" />
+<img src="docs/shots/podium-fable.png" alt="Match podium" width="100%" />
 
 ## Multiplayer comes with the engine
 
@@ -179,14 +179,14 @@ No engine changes, no forked runtime. Wild, Ratscrew, and everything after them 
 Installable PWA, offline-capable, and laid out for one thumb.
 
 <div align="center">
-<img src="docs/shots/mobile.png" alt="parlour on mobile" width="320" />
+<img src="docs/shots/mobile-fable.png" alt="parlour on mobile" width="320" />
 </div>
 
 ## Your table, your regulars
 
 No account, but not anonymous either. Everything lives in your browser: a name, a character, lifetime stats, and a running head-to-head record against every friend you have played.
 
-<img src="docs/shots/profile.png" alt="Profile screen with lifetime stats and rivalries" width="100%" />
+<img src="docs/shots/profile-fable.png" alt="Profile screen with lifetime stats and rivalries" width="100%" />
 
 ## Run it locally
 
