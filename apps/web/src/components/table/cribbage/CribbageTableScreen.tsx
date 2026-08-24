@@ -358,6 +358,7 @@ function LocalHand(
                   <PlayingCard
                     card={card}
                     disabled={!interactive}
+                    actionLabel={discarding ? 'Discard' : 'Play'}
                     onClick={() => (playable ? props.onPlay?.(card) : toggle(card))}
                   />
                 </span>

@@ -116,6 +116,11 @@ describe('CribbageTableScreen', () => {
     );
     const cards = container.querySelectorAll<HTMLButtonElement>('[data-hand-card] button');
     expect([...cards].map((card) => card.disabled)).toEqual([false, false, true]);
+    expect([...cards].map((card) => card.getAttribute('aria-label'))).toEqual([
+      'Play A of spades',
+      'Play 5 of hearts',
+      'Play 7 of diamonds',
+    ]);
     act(() => cards[1]?.click());
     expect(onPlay).toHaveBeenCalledWith('H5');
   });

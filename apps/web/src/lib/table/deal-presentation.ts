@@ -33,6 +33,8 @@ const LIVE_PRESENTATION: DealPresentation = {
   visibleCount: (_seat, finalCount) => finalCount,
 };
 
+const NO_LANDED_CUES: ReadonlySet<string> = new Set();
+
 function seatFromHandZone(zone: string): number | null {
   const match = /^hand:(\d+)$/.exec(zone);
   return match ? Number(match[1]) : null;
@@ -80,26 +82,29 @@ export function useDealPresentation(
       return null;
     }
   }, [events]);
-  const [landedCueIds, setLandedCueIds] = useState<ReadonlySet<string>>(() => new Set());
+  const [landed, setLanded] = useState<{
+    fxKey: string | number | null;
+    cueIds: ReadonlySet<string>;
+  }>(() => ({ fxKey: null, cueIds: NO_LANDED_CUES }));
+  const landedCueIds = landed.fxKey === fxKey ? landed.cueIds : NO_LANDED_CUES;
 
   useLayoutEffect(() => {
-    if (!plan) {
-      setLandedCueIds(new Set());
-      return;
-    }
+    if (!plan) return;
     const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
     if (reduced) {
-      setLandedCueIds(new Set(plan.cues.map(({ id }) => id)));
-      return;
+      const timer = window.setTimeout(
+        () => setLanded({ fxKey, cueIds: new Set(plan.cues.map(({ id }) => id)) }),
+        0,
+      );
+      return () => window.clearTimeout(timer);
     }
 
-    setLandedCueIds(new Set());
     const timers = plan.cues.map((cue) =>
       window.setTimeout(() => {
-        setLandedCueIds((current) => {
-          const next = new Set(current);
+        setLanded((current) => {
+          const next = new Set(current.fxKey === fxKey ? current.cueIds : NO_LANDED_CUES);
           next.add(cue.id);
-          return next;
+          return { fxKey, cueIds: next };
         });
       }, cue.startMs + cue.durationMs),
     );
