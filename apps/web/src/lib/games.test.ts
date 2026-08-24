@@ -19,6 +19,7 @@ describe('game shelf catalog', () => {
       'ratscrew',
       'euchre',
       'spades',
+      'ohhell',
       'klondike',
       'hearts',
       'gin',

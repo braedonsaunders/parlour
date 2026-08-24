@@ -22,6 +22,7 @@ const TABLE_ROUTES: Record<MultiplayerGameId, string> = {
   gin: '/gin/table',
   president: '/president/table',
   spades: '/spades/table',
+  ohhell: '/ohhell/table',
 };
 
 export function tableRouteFor(gameId: MultiplayerGameId): string {

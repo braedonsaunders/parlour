@@ -32,6 +32,9 @@ const SEAT_RANGES: Readonly<Record<MultiplayerGameId, SeatRange>> = {
   hearts: { min: 4, max: 4 },
   president: { min: 4, max: 8 },
   spades: { min: 4, max: 4 },
+  // The widest ring the shelf has. Oh Hell is why seatRangeFor exists as a
+  // table rather than a hard-coded 2-4.
+  ohhell: { min: 3, max: 7 },
 };
 
 export function seatRangeFor(gameId: string | null | undefined): SeatRange {

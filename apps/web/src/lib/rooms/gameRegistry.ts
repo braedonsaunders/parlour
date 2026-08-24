@@ -76,6 +76,7 @@ import {
   type SpadesRules,
   type SpadesState,
 } from '@parlour/game-spades';
+import { ohhellConfig, ohhellGame, type OhHellRules, type OhHellState } from '@parlour/game-ohhell';
 import {
   wildpileConfig,
   wildpileGame,
@@ -102,7 +103,8 @@ export type MultiplayerGameSession =
   | GameSession<HeartsState, HeartsRules>
   | GameSession<GinMatchState, GinConfig>
   | GameSession<PresidentState, PresidentRules>
-  | GameSession<SpadesState, SpadesRules>;
+  | GameSession<SpadesState, SpadesRules>
+  | GameSession<OhHellState, OhHellRules>;
 
 export type SessionAuthority = AuthorityAdapter & {
   getSession(): MultiplayerGameSession;
@@ -355,6 +357,17 @@ export const ROOM_GAMES: Record<MultiplayerGameId, RoomGamePack> = {
     name: 'Spades',
     configSchema: spadesConfig,
     createDef: createSpadesDef,
+    veilRefusal: MULTI_DEAL_VEIL_REFUSAL,
+  }),
+
+  ohhell: definePack<OhHellState, OhHellRules>({
+    id: 'ohhell',
+    name: 'Oh Hell!',
+    configSchema: ohhellConfig,
+    createDef: () => ohhellGame,
+    // A friend room is one deal, so the hand-size arc and the dealer rotation
+    // that make a *match* are solo-only for now. Say that rather than let a
+    // room imply the full arc.
     veilRefusal: MULTI_DEAL_VEIL_REFUSAL,
   }),
 };
