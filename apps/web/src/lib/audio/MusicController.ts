@@ -8,7 +8,10 @@ import {
   getMusicTrack,
   listMusicPacks,
   menuForPack,
+  moodForPack,
   playlistForPack,
+  type MusicMoodId,
+  type MusicTrack,
 } from '@/lib/audio/music';
 import { getAudioManager } from '@/lib/audio/AudioManager';
 
@@ -21,6 +24,8 @@ export type MusicState = {
   trackId: string | null;
   shuffle: boolean;
   packId: string;
+  /** Active game-state cue (e.g. `tense`), or null when the scene plays. */
+  mood: MusicMoodId | null;
 };
 
 export type MusicManagerPort = {
@@ -54,6 +59,7 @@ export class MusicController {
     trackId: null,
     shuffle: false,
     packId: BASE_PACK_ID,
+    mood: null,
   };
   private listeners = new Set<(state: MusicState) => void>();
   private voices = new Map<string, Voice>();
@@ -63,6 +69,8 @@ export class MusicController {
   private scene: SceneId = DEFAULT_SCENE;
   private inMenu = false;
   private transitionGeneration = 0;
+  /** Song the scene playlist was on when a mood took over, restored on release. */
+  private preMoodTrackId: string | null = null;
 
   constructor(manager: MusicManagerPort) {
     this.manager = manager;
@@ -175,7 +183,43 @@ export class MusicController {
       return;
     }
     const head = this.playablePlaylist()[0];
-    if (head) this.start(head.id, false);
+    if (head && head.id !== this.state.trackId) this.start(head.id, false);
+    else {
+      this.persist();
+      this.notify();
+    }
+  }
+
+  /**
+   * Game-state cues: `setMood('tense')` takes the table over with the mood's
+   * tracks, `setMood(null)` crossfades back to the song the scene was on. Any
+   * game can drive this from whatever its state implies — a match clock, a
+   * knock, a last card — and moods the active pack does not ship are ignored.
+   * Menus always keep their title theme, and moods are never persisted.
+   */
+  setMood(mood: MusicMoodId | null): void {
+    const resolved =
+      mood && moodForPack(getMusicPack(this.state.packId), mood).length > 0 ? mood : null;
+    if (resolved === this.state.mood) return;
+
+    const entering = resolved !== null;
+    const resumeId = entering ? null : this.preMoodTrackId;
+    this.preMoodTrackId = entering ? this.state.trackId : null;
+    this.state.mood = resolved;
+    this.history = [];
+
+    if (this.inMenu || !this.wantPlaying || this.state.status === 'idle') {
+      this.notify();
+      return;
+    }
+
+    const list = this.playablePlaylist();
+    const target = list.find((track) => track.id === resumeId) ?? list[0];
+    if (!target || target.id === this.state.trackId) {
+      this.notify();
+      return;
+    }
+    this.start(target.id, false);
   }
 
   /** Menu routes swap to the pack's title theme; table routes use scene playlists. */
@@ -203,11 +247,18 @@ export class MusicController {
     }
     this.voices.clear();
     this.state.status = 'idle';
+    this.state.mood = null;
+    this.preMoodTrackId = null;
     this.notify();
   }
 
   private playablePlaylist() {
     const pack = getMusicPack(this.state.packId);
+    const moodPool =
+      !this.inMenu && this.state.mood ? moodForPack(pack, this.state.mood) : ([] as MusicTrack[]);
+    const mood = moodPool.filter((track) => !this.voices.get(track.id)?.failed);
+    if (mood.length > 0) return mood;
+
     const pool = this.inMenu ? menuForPack(pack) : playlistForPack(pack, this.scene);
     const list = pool.filter((track) => !this.voices.get(track.id)?.failed);
     if (list.length > 0) return list;
@@ -358,7 +409,8 @@ export class MusicController {
         MUSIC_STORAGE_KEY,
         JSON.stringify({
           v: 1,
-          trackId: this.state.trackId,
+          // Moods are transient: remember the scene song they interrupted.
+          trackId: this.state.mood ? this.preMoodTrackId : this.state.trackId,
           shuffle: this.state.shuffle,
           packId: this.state.packId,
         }),

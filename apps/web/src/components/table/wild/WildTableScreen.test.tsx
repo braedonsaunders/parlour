@@ -2,6 +2,9 @@ import { act, createElement } from 'react';
 import { Fx } from '@parlour/engine';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { getMusicController } from '@/lib/audio/MusicController';
+import { DEFAULT_TENSE_WINDOW_MS } from '@/lib/audio/tension';
+import { WILD_MATCH_PACE_MS } from '@/lib/wild/modes';
 import type { WildTableView } from '@/lib/wild/view';
 import { WildTableScreen } from './WildTableScreen';
 
@@ -139,6 +142,29 @@ describe('WildTableScreen turn affordances', () => {
 
     act(() => container.querySelector<HTMLButtonElement>('[data-testid="confirm-quit"]')?.click());
     expect(onQuit).toHaveBeenCalledOnce();
+  });
+
+  it('arms the tense music cue for the final minute and releases it when the hand ends', () => {
+    vi.useFakeTimers();
+    act(() => root.render(createElement(WildTableScreen, { view: VIEW, fx: [], fxKey: 0 })));
+    expect(getMusicController().getState().mood).toBeNull();
+
+    act(() => void vi.advanceTimersByTime(WILD_MATCH_PACE_MS - DEFAULT_TENSE_WINDOW_MS - 1_000));
+    expect(getMusicController().getState().mood).toBeNull();
+
+    act(() => void vi.advanceTimersByTime(2_000));
+    expect(getMusicController().getState().mood).toBe('tense');
+
+    act(() =>
+      root.render(
+        createElement(WildTableScreen, {
+          view: { ...VIEW, activeSeat: null, decision: null },
+          fx: [],
+          fxKey: 0,
+        }),
+      ),
+    );
+    expect(getMusicController().getState().mood).toBeNull();
   });
 
   it('keeps Wild cards full size during center-to-hand flights', () => {

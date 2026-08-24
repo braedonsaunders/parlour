@@ -26,8 +26,8 @@ a whole playlist is missing, falls back to `parlour-ambience.wav`.
 Each trio should feel like one little EP for its scene: shared instrumentation
 and key family, with the **tense** arc calm → peak → resolve across the three
 songs so the cycling playlist breathes instead of flatlining. The two ★ songs
-stand alone: the menu theme plays on the title screen, and the tense cue is a
-pickable soundtrack (and an example mood-pack for games).
+stand alone: the menu theme plays on the title screen, and the tense cue is the
+built-in mood, played only when a game's state asks for it.
 
 ## How to generate (per song)
 
@@ -215,7 +215,7 @@ nostalgic pub-at-closing-time warmth, minimal and airy, instrumental only
 - **Mood/tense:** properly **tense** — someone knocked, clocks are running, every discard matters
 - **Energy:** 6/10, coiled and leaning forward without ever getting loud
 - **Tempo/key:** steady 100 BPM, E minor
-- **Plays:** pickable as the "Tense" soundtrack in settings; games can auto-switch to it via `setPack('tense')` for Timed mode or final turns
+- **Plays:** never pickable in settings — it is the `tense` **mood cue**, armed from game state via `useMusicMood('tense')` (Wild's closing minute, Timed mode's bell, final turns) and released back to the scene playlist afterwards
 
 ```
 Tense but playful parlor groove, pizzicato string ostinato, prepared piano hits,

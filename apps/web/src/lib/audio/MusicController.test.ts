@@ -123,6 +123,7 @@ describe('MusicController', () => {
       trackId: null,
       shuffle: false,
       packId: 'parlour',
+      mood: null,
     });
   });
 
@@ -226,18 +227,72 @@ describe('MusicController', () => {
     expect(controller.getState().trackId).toBe('casino-1');
   });
 
-  it('exposes the built-in tense pack as a selectable soundtrack', () => {
+  it('keeps tense out of the pack picker and arms it as a game-state mood', () => {
+    const controller = new MusicController(makeManager());
+    expect(controller.listPacks().map((pack) => pack.id)).not.toContain('tense');
+
+    controller.setScene('casino');
+    controller.play();
+    controller.next();
+    expect(controller.getState().trackId).toBe('casino-2');
+
+    controller.setMood('tense');
+    expect(controller.getState().mood).toBe('tense');
+    expect(controller.getState().trackId).toBe('tense-1');
+    expect(controller.getState().status).toBe('playing');
+    expect(howlFor('music-tense.mp3')).toBeDefined();
+
+    // The cue holds: neither the playlist end nor a scene change steals it back.
+    controller.next();
+    expect(controller.getState().trackId).toBe('tense-1');
+    controller.setScene('snug');
+    expect(controller.getState().trackId).toBe('tense-1');
+
+    // Releasing it returns to the song the table was on before the cue.
+    controller.setScene('casino');
+    controller.setMood(null);
+    expect(controller.getState().mood).toBeNull();
+    expect(controller.getState().trackId).toBe('casino-2');
+  });
+
+  it('falls back to the scene head when the pre-mood song is no longer available', () => {
     const controller = new MusicController(makeManager());
     controller.setScene('casino');
     controller.play();
-    expect(controller.getState().trackId).toBe('casino-1');
-
-    controller.setPack('tense');
-    expect(controller.getState().packId).toBe('tense');
-    expect(controller.getState().trackId).toBe('tense-1');
-    expect(howlFor('music-tense.mp3')).toBeDefined();
-
     controller.next();
+    controller.setMood('tense');
+
+    controller.setScene('snug');
+    controller.setMood(null);
+    expect(controller.getState().trackId).toBe('snug-1');
+  });
+
+  it('ignores moods the active pack does not ship', () => {
+    const controller = new MusicController(makeManager());
+    controller.play();
+    controller.setMood('sudden-death');
+    expect(controller.getState()).toMatchObject({ mood: null, trackId: 'campfire-1' });
+  });
+
+  it('never persists a mood and keeps the menu theme through one', () => {
+    const controller = new MusicController(makeManager());
+    controller.play();
+    controller.setMood('tense');
+    expect(JSON.parse(localStorage.getItem(MUSIC_STORAGE_KEY) ?? '{}').trackId).toBe('campfire-1');
+
+    controller.setMenu(true);
+    expect(controller.getState().trackId).toBe('title-1');
+
+    controller.setMenu(false);
+    expect(controller.getState().trackId).toBe('tense-1');
+  });
+
+  it('arms a mood while idle and applies it on the next play', () => {
+    const controller = new MusicController(makeManager());
+    controller.setMood('tense');
+    expect(controller.getState()).toMatchObject({ status: 'idle', mood: 'tense' });
+
+    controller.play();
     expect(controller.getState().trackId).toBe('tense-1');
   });
 

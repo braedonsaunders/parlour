@@ -2,7 +2,7 @@
 export type MusicContext = 'menu' | 'game';
 
 /**
- * Live game surfaces (scene playlists, tense packs); everything else — home,
+ * Live game surfaces (scene playlists, mood cues); everything else — home,
  * shelves, setup screens, lobbies — plays the pack's menu theme.
  */
 const GAME_ROUTE_PREFIXES = ['/table', '/wild/table', '/match-end'];

@@ -7,10 +7,11 @@ import {
   MENU_PLAYLIST,
   MUSIC_TRACKS,
   PARLOUR_PACK,
-  TENSE_PACK,
+  TENSE_PLAYLIST,
   getMusicPack,
   getMusicTrack,
   listMusicPacks,
+  moodForPack,
   playlistForPack,
   registerMusicPack,
   tracksForScene,
@@ -64,15 +65,37 @@ describe('music library', () => {
     }
   });
 
-  it('provides a menu theme on the base pack and a built-in tense pack', () => {
+  it('provides a menu theme on the base pack and keeps tense out of the picker', () => {
     expect(PARLOUR_PACK.menu).toEqual(MENU_PLAYLIST);
     expect(menuPlaylistSrc()).toContain('/audio/music/music-title.mp3');
-    expect(getMusicPack(TENSE_PACK.id)).toBe(TENSE_PACK);
-    expect(listMusicPacks().map((pack) => pack.id)).toContain('tense');
+
+    expect(getMusicPack('tense')).toBeUndefined();
+    expect(listMusicPacks().map((pack) => pack.id)).not.toContain('tense');
+
+    expect(PARLOUR_PACK.moods?.tense).toEqual(TENSE_PLAYLIST);
+    expect(moodForPack(PARLOUR_PACK, 'tense')[0]?.src).toContain('music-tense.mp3');
+    expect(moodForPack(PARLOUR_PACK, 'nope')).toEqual([]);
 
     for (const scene of SCENE_IDS) {
-      expect(playlistForPack(TENSE_PACK, scene)[0]?.src).toContain('music-tense.mp3');
+      expect(playlistForPack(PARLOUR_PACK, scene)).toEqual(tracksForScene(scene));
     }
+  });
+
+  it('lets a game pack override a mood and inherit the ones it omits', () => {
+    const own = { id: 'wild-tense', title: 'Pile Pressure', src: '/audio/music/wild-tense.mp3' };
+    registerMusicPack({
+      id: 'mood-game',
+      label: 'Mood Game',
+      playlists: {},
+      moods: { tense: [own] },
+    });
+    const pack = getMusicPack('mood-game');
+
+    expect(moodForPack(pack, 'tense')).toEqual([own]);
+    expect(getMusicTrack('wild-tense')).toEqual(own);
+    expect(moodForPack(pack, 'unknown-mood')).toEqual([]);
+
+    unregisterMusicPack('mood-game');
   });
 });
 

@@ -40,6 +40,12 @@ export const WILD_MODES: readonly WildModeDef[] = [
   },
 ];
 
+/**
+ * Wild deals once and runs about five minutes. There is no match clock, so this
+ * is the pace the tense music cue measures its final minute against.
+ */
+export const WILD_MATCH_PACE_MS = 300_000;
+
 const BY_ID = new Map(WILD_MODES.map((mode) => [mode.id, mode]));
 
 export function getWildMode(id: WildModeId): WildModeDef {

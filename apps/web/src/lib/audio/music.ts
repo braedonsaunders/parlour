@@ -12,7 +12,19 @@ export type MusicPack = {
   playlists: Partial<Record<SceneId, readonly MusicTrack[]>>;
   /** Title-screen theme; packs without one inherit the parlour menu theme. */
   menu?: readonly MusicTrack[];
+  /**
+   * Mood cues a running game can switch on from its own state (never pickable
+   * in settings). Moods a pack omits fall back to the parlour pack's.
+   */
+  moods?: Readonly<Record<string, readonly MusicTrack[]>>;
 };
+
+/**
+ * Shared mood vocabulary. Games drive these from game state — `tense` is the
+ * closing-stretch cue (Blitz's bell, Wild's final minute) — and may override
+ * any of them, or add their own ids, on the pack they register.
+ */
+export type MusicMoodId = 'tense' | (string & {});
 
 export type MusicTrack = {
   id: string;
@@ -51,8 +63,8 @@ export const MENU_PLAYLIST: readonly MusicTrack[] = [
   track('title-1', 'Pull Up a Chair', '/audio/music/music-title.mp3'),
 ];
 
-/** Tense table moments — pickable as its own soundtrack and usable by games. */
-const TENSE_PLAYLIST: readonly MusicTrack[] = [
+/** The `tense` mood cue — armed by game state, never offered in settings. */
+export const TENSE_PLAYLIST: readonly MusicTrack[] = [
   track('tense-1', 'Knock Knows', '/audio/music/music-tense.mp3'),
 ];
 
@@ -76,17 +88,7 @@ export const PARLOUR_PACK: MusicPack = {
     snug: SNUG_PLAYLIST,
   },
   menu: MENU_PLAYLIST,
-};
-
-/** Tense table moments — pickable soundtrack; games can switch to it mid-match. */
-export const TENSE_PACK: MusicPack = {
-  id: 'tense',
-  label: 'Tense',
-  playlists: {
-    campfire: TENSE_PLAYLIST,
-    casino: TENSE_PLAYLIST,
-    snug: TENSE_PLAYLIST,
-  },
+  moods: { tense: TENSE_PLAYLIST },
 };
 
 /** Plays when a playlist has no working songs (e.g. before Suno files land). */
@@ -98,10 +100,7 @@ export const FALLBACK_TRACK: MusicTrack = {
   loop: true,
 };
 
-const packs = new Map<string, MusicPack>([
-  [PARLOUR_PACK.id, PARLOUR_PACK],
-  [TENSE_PACK.id, TENSE_PACK],
-]);
+const packs = new Map<string, MusicPack>([[PARLOUR_PACK.id, PARLOUR_PACK]]);
 
 /** Games call this (client-side) to contribute their own soundtracks. */
 export function registerMusicPack(pack: MusicPack): void {
@@ -132,6 +131,10 @@ export function getMusicTrack(id: string | null | undefined): MusicTrack | undef
     }
     const menuHit = pack.menu?.find((candidate) => candidate.id === id);
     if (menuHit) return menuHit;
+    for (const list of Object.values(pack.moods ?? {})) {
+      const found = list.find((candidate) => candidate.id === id);
+      if (found) return found;
+    }
   }
   return undefined;
 }
@@ -153,4 +156,14 @@ export function playlistForPack(pack: MusicPack | undefined, scene: SceneId): Mu
 export function menuForPack(pack: MusicPack | undefined): MusicTrack[] {
   if (pack?.menu && pack.menu.length > 0) return [...pack.menu];
   return [...MENU_PLAYLIST];
+}
+
+/**
+ * Tracks for a mood cue, resolved against the parlour base. An empty result
+ * means the mood has no music, so the controller leaves the playlist alone.
+ */
+export function moodForPack(pack: MusicPack | undefined, mood: MusicMoodId): MusicTrack[] {
+  const own = pack?.moods?.[mood];
+  if (own && own.length > 0) return [...own];
+  return [...(PARLOUR_PACK.moods?.[mood] ?? [])];
 }

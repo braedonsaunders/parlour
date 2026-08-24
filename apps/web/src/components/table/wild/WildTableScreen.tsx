@@ -6,6 +6,9 @@ import { WILDPILE_COLORS, type WildpileColor } from '@parlour/game-wildpile';
 import { AnimatePresence, motion } from 'motion/react';
 import { getAvatar } from '@/lib/avatars';
 import { WILDPILE_SFX_PACK } from '@/lib/audio/sfx';
+import { useMatchTension } from '@/lib/audio/tension';
+import { WILD_MATCH_PACE_MS } from '@/lib/wild/modes';
+import { useMusicMood } from '@/stores/audio';
 import { type DealPresentation, useDealPresentation } from '@/lib/table/deal-presentation';
 import { buildFxTimeline, type FxCue } from '@/lib/table/fx-motion';
 import type { WildSeatView, WildTableView } from '@/lib/wild/view';
@@ -44,6 +47,14 @@ export function WildTableScreen(props: WildTableScreenProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const deal = useDealPresentation(props.fx, props.fxKey);
   useTableAudio(props.fx, props.fxKey, WILDPILE_SFX_PACK.id);
+
+  // The pile has no clock, so the tense cue rides Wild's five-minute pace and
+  // comes in for the closing minute; it releases when the hand is over.
+  const tense = useMatchTension({
+    expectedMs: WILD_MATCH_PACE_MS,
+    running: Boolean(view) && view?.activeSeat !== null,
+  });
+  useMusicMood(tense ? 'tense' : null);
 
   useEffect(() => {
     const gameWindow = window as Window & { render_game_to_text?: () => string };

@@ -15,7 +15,7 @@ import {
   type MusicController,
   type MusicState,
 } from '@/lib/audio/MusicController';
-import { BASE_PACK_ID } from '@/lib/audio/music';
+import { BASE_PACK_ID, type MusicMoodId } from '@/lib/audio/music';
 import { SOUND_MANIFEST } from '@/lib/audio/manifest';
 import { useSceneStore } from '@/stores/scene';
 import { useProfileStore } from '@/stores/profile';
@@ -49,6 +49,7 @@ export const useMusicStore = create<MusicStore>(() => ({
   trackId: null,
   shuffle: false,
   packId: BASE_PACK_ID,
+  mood: null,
   toggle: () => getMusicController().toggle(),
   next: () => getMusicController().next(),
   previous: () => getMusicController().previous(),
@@ -125,6 +126,20 @@ export function useMusicController(): MusicController {
   }, [manager]);
 
   return getMusicController(manager);
+}
+
+/**
+ * Declarative music mood for game screens: pass the cue the current game state
+ * implies (or null), and the soundtrack follows. Leaving the table releases it.
+ */
+export function useMusicMood(mood: MusicMoodId | null): void {
+  const controller = useMusicController();
+
+  useEffect(() => {
+    controller.setMood(mood);
+  }, [controller, mood]);
+
+  useEffect(() => () => getMusicController().setMood(null), []);
 }
 
 export function resetMusicBindingsForTests(): void {
