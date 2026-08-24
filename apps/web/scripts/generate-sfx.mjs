@@ -65,9 +65,12 @@ const sounds = [
   },
   {
     name: 'knock-thud',
-    duration: 1,
+    duration: 0.8,
+    outputDuration: 0.5,
+    sourceHitDuration: 0.16,
+    repeatAtMs: 190,
     prompt:
-      'A human fist knocks exactly once on a solid wooden card table: weighty low thump, short tabletop resonance, tiny nearby poker-chip rattle. Decisive, not violent.',
+      'Exactly two distinct human knuckle knocks on a solid wooden card table in a natural knock-knock rhythm: dry close-mic wood impacts with a clear short gap, tiny tabletop resonance, then silence. Firm and unmistakable, not violent.',
   },
   {
     name: 'life-chip-loss',
@@ -571,7 +574,16 @@ for (const sound of selected) {
   if (masterOnly) {
     if (!existsSync(output)) throw new Error(`Cannot master missing sound: ${sound.name}`);
     console.log(`master ${sound.name}`);
-    master(output, output, masterTargets[sound.name], sound.outputDuration, sound.mono);
+    master(
+      output,
+      output,
+      masterTargets[sound.name],
+      sound.outputDuration,
+      sound.mono,
+      sound.tempo,
+      sound.repeatAtMs,
+      sound.sourceHitDuration,
+    );
     continue;
   }
 
@@ -615,6 +627,8 @@ for (const sound of selected) {
       sound.outputDuration,
       sound.mono,
       sound.tempo,
+      sound.repeatAtMs,
+      sound.sourceHitDuration,
     );
   } finally {
     rmSync(source, { force: true });
@@ -626,19 +640,50 @@ for (const sound of selected) {
 
 console.log(`done: ${generated} generated, ${skipped} skipped, character cost ${characterCost}`);
 
-function master(input, output, targetLufs, outputDuration, mono = false, tempo) {
+function master(
+  input,
+  output,
+  targetLufs,
+  outputDuration,
+  mono = false,
+  tempo,
+  repeatAtMs,
+  sourceHitDuration,
+) {
   if (typeof targetLufs !== 'number') throw new Error(`Missing mastering target for ${output}`);
   const temporary = `${output}.master.mp3`;
-  const filters = [];
-  if (typeof tempo === 'number') filters.push(...atempoFilters(tempo));
+  const sourceFilters = [];
+  if (typeof tempo === 'number') sourceFilters.push(...atempoFilters(tempo));
+  if (typeof repeatAtMs === 'number') {
+    if (!(repeatAtMs > 0) || !(sourceHitDuration > 0)) {
+      throw new Error(`Invalid authored repeat for ${output}`);
+    }
+    sourceFilters.push(
+      `atrim=duration=${sourceHitDuration}`,
+      'asetpts=PTS-STARTPTS',
+      'asplit=2[first][second]',
+    );
+  }
+
+  const outputFilters = [];
   if (typeof outputDuration === 'number') {
     const fadeDuration = Math.min(0.04, outputDuration / 5);
-    filters.push(
+    outputFilters.push(
       `atrim=duration=${outputDuration}`,
       `afade=t=out:st=${outputDuration - fadeDuration}:d=${fadeDuration}`,
     );
   }
-  filters.push(`loudnorm=I=${targetLufs}:TP=-1.5:LRA=7`);
+  outputFilters.push(`loudnorm=I=${targetLufs}:TP=-1.5:LRA=7`);
+
+  const filterArgs =
+    typeof repeatAtMs === 'number'
+      ? [
+          '-filter_complex',
+          `[0:a]${sourceFilters.join(',')};[second]adelay=${repeatAtMs}:all=1,volume=0.94[delayed];[first][delayed]amix=inputs=2:duration=longest:normalize=0,${outputFilters.join(',')}[mastered]`,
+          '-map',
+          '[mastered]',
+        ]
+      : ['-af', [...sourceFilters, ...outputFilters].join(',')];
   const result = spawnSync(
     'ffmpeg',
     [
@@ -648,8 +693,7 @@ function master(input, output, targetLufs, outputDuration, mono = false, tempo) 
       'error',
       '-i',
       input,
-      '-af',
-      filters.join(','),
+      ...filterArgs,
       '-ar',
       '44100',
       ...(mono ? ['-ac', '1'] : []),

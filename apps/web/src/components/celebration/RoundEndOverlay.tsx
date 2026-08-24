@@ -98,7 +98,6 @@ function RoundEndChoreography({ fx, seats, livesBySeat, onNextRound }: RoundEndO
     }
 
     const audio = getAudioManager();
-    if (plan.kind === 'knock') audio.play(BLITZ_SFX.knock);
     if (plan.kind === 'blitz') audio.play(BLITZ_SFX.fanfare);
 
     for (const reveal of plan.reveals) {

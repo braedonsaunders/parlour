@@ -6,6 +6,13 @@ export interface SoundCue {
   rate?: number;
 }
 
+/** Blitz's signature knock lands with the engine event, before final turns begin. */
+export function blitzCuesForFx(fx: readonly FxEvent[]): SoundCue[] {
+  return fx.flatMap((event) =>
+    event.kind === Fx.Knock ? [{ id: 'blitz.knock', atMs: Math.max(0, event.at ?? 0) }] : [],
+  );
+}
+
 /** Shared table Foley. Game packs layer their namespaced cues over this stream. */
 export function parlourCuesForFx(fx: readonly FxEvent[]): SoundCue[] {
   const cues: SoundCue[] = [];

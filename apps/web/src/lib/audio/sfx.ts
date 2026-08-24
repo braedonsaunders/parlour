@@ -1,6 +1,6 @@
 import type { FxEvent } from '@parlour/engine';
 import type { SoundDef } from './AudioManager';
-import { parlourCuesForFx, wildpileCuesForFx, type SoundCue } from './cues';
+import { blitzCuesForFx, parlourCuesForFx, wildpileCuesForFx, type SoundCue } from './cues';
 import {
   cribbageCuesForFx,
   euchreCuesForFx,
@@ -146,6 +146,7 @@ export const BLITZ_SFX_PACK: SfxPack = {
     sound(BLITZ_SFX.fanfare, '/audio/sfx/blitz-burst.mp3', 0.92, 1, 800),
     sound(BLITZ_SFX.lifeLoss, '/audio/sfx/life-chip-loss.mp3', 0.85, 6, 35),
   ],
+  cuesForFx: blitzCuesForFx,
 };
 
 export const WILDPILE_SFX_PACK: SfxPack = {

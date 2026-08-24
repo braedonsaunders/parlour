@@ -268,7 +268,7 @@ describe('fx-driven table audio', () => {
     ]);
   });
 
-  it('leaves celebration sounds to their authored choreography', () => {
+  it('plays the Blitz knock immediately and leaves later celebration sounds choreographed', () => {
     expect(
       soundCuesForFx(
         [
@@ -278,6 +278,6 @@ describe('fx-driven table audio', () => {
         ],
         'blitz',
       ),
-    ).toEqual([]);
+    ).toEqual([{ id: 'blitz.knock', atMs: 0 }]);
   });
 });
