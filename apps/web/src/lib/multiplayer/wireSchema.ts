@@ -1,0 +1,345 @@
+import type { AppliedEvent, FxEvent, SeatId } from '@parlour/engine';
+import { EMOTES } from './emotes';
+import type { SeatPresence } from './resilience';
+import type { AppliedPacket, Emote, PlayerAction, ReplaySnapshot } from './types';
+
+const MAX_WIRE_BYTES = 512_000;
+const MAX_ID_LENGTH = 128;
+const MAX_LABEL_LENGTH = 128;
+const MAX_HASH_LENGTH = 256;
+const MAX_PEERS = 4;
+const MAX_SEATS = 4;
+const MAX_APPLIED_EVENTS = 64;
+const MAX_SNAPSHOT_EVENTS = 4_096;
+const MAX_FX_EVENTS = 256;
+const MAX_JSON_DEPTH = 16;
+const MAX_JSON_NODES = 4_096;
+const MAX_JSON_COLLECTION = 256;
+const MAX_JSON_STRING = 16_384;
+const MAX_SEQUENCE = 1_000_000;
+const MAX_TIMESTAMP = 8_640_000_000_000_000;
+const MAX_FX_OFFSET = 60_000;
+const MAX_CONFIG_NUMBER = 1_000_000;
+
+export type PeerDescriptor = { peerId: string; profileId: string };
+
+export type WireMessage =
+  | { type: 'hello'; profileId: string }
+  | {
+      type: 'welcome';
+      hostId: string;
+      seat: SeatId;
+      seats: Array<[SeatId, SeatPresence]>;
+      peers: PeerDescriptor[];
+      snapshot: ReplaySnapshot;
+    }
+  | { type: 'mesh.peers'; peers: PeerDescriptor[] }
+  | { type: 'intent'; action: PlayerAction }
+  | { type: 'applied'; packet: AppliedPacket }
+  | { type: 'heartbeat'; sentAt: number }
+  | { type: 'host.changed'; hostId: string; stateHash: string }
+  | { type: 'sync.request'; expectedSeq: number }
+  | { type: 'sync.snapshot'; snapshot: ReplaySnapshot }
+  | { type: 'emote'; emote: Emote };
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function hasOnlyKeys(value: Record<string, unknown>, required: string[], optional: string[] = []) {
+  const keys = Object.keys(value);
+  return (
+    required.every((key) => Object.hasOwn(value, key)) &&
+    keys.every((key) => required.includes(key) || optional.includes(key))
+  );
+}
+
+function isBoundedString(value: unknown, maxLength = MAX_ID_LENGTH): value is string {
+  return typeof value === 'string' && value.length > 0 && value.length <= maxLength;
+}
+
+function isNonNegativeInteger(value: unknown): value is number {
+  return Number.isSafeInteger(value) && (value as number) >= 0;
+}
+
+function isBoundedInteger(value: unknown, maximum: number): value is number {
+  return isNonNegativeInteger(value) && value <= maximum;
+}
+
+function isSeat(value: unknown): value is SeatId {
+  return isNonNegativeInteger(value) && value < MAX_SEATS;
+}
+
+function isJsonValue(value: unknown): boolean {
+  const pending: Array<{ value: unknown; depth: number }> = [{ value, depth: 0 }];
+  let nodes = 0;
+  while (pending.length > 0) {
+    const current = pending.pop()!;
+    nodes++;
+    if (nodes > MAX_JSON_NODES || current.depth > MAX_JSON_DEPTH) return false;
+    if (
+      current.value === null ||
+      typeof current.value === 'boolean' ||
+      (typeof current.value === 'number' &&
+        Number.isFinite(current.value) &&
+        Math.abs(current.value) <= Number.MAX_SAFE_INTEGER)
+    ) {
+      continue;
+    }
+    if (typeof current.value === 'string') {
+      if (current.value.length > MAX_JSON_STRING) return false;
+      continue;
+    }
+    if (Array.isArray(current.value)) {
+      if (current.value.length > MAX_JSON_COLLECTION) return false;
+      for (const child of current.value) pending.push({ value: child, depth: current.depth + 1 });
+      continue;
+    }
+    if (!isRecord(current.value)) return false;
+    const entries = Object.entries(current.value);
+    if (entries.length > MAX_JSON_COLLECTION) return false;
+    for (const [key, child] of entries) {
+      if (key.length > MAX_LABEL_LENGTH) return false;
+      pending.push({ value: child, depth: current.depth + 1 });
+    }
+  }
+  return true;
+}
+
+function isPeerDescriptor(value: unknown): value is PeerDescriptor {
+  return (
+    isRecord(value) &&
+    hasOnlyKeys(value, ['peerId', 'profileId']) &&
+    isBoundedString(value.peerId) &&
+    isBoundedString(value.profileId)
+  );
+}
+
+function isPeerDescriptors(value: unknown): value is PeerDescriptor[] {
+  return (
+    Array.isArray(value) &&
+    value.length <= MAX_PEERS &&
+    value.every(isPeerDescriptor) &&
+    new Set(value.map((peer) => peer.peerId)).size === value.length
+  );
+}
+
+function isSeatPresence(value: unknown): value is SeatPresence {
+  return (
+    isRecord(value) &&
+    hasOnlyKeys(value, ['peerId', 'profileId', 'bot']) &&
+    isBoundedString(value.peerId) &&
+    isBoundedString(value.profileId) &&
+    typeof value.bot === 'boolean'
+  );
+}
+
+function isSeats(value: unknown): value is Array<[SeatId, SeatPresence]> {
+  if (!Array.isArray(value) || value.length > MAX_SEATS) return false;
+  const seats = new Set<number>();
+  for (const entry of value) {
+    if (
+      !Array.isArray(entry) ||
+      entry.length !== 2 ||
+      !isSeat(entry[0]) ||
+      !isSeatPresence(entry[1]) ||
+      seats.has(entry[0])
+    ) {
+      return false;
+    }
+    seats.add(entry[0]);
+  }
+  return true;
+}
+
+function isPlayerAction(value: unknown): value is PlayerAction {
+  return (
+    isRecord(value) &&
+    hasOnlyKeys(value, ['id', 'seat', 'move'], ['payload']) &&
+    isBoundedString(value.id) &&
+    isSeat(value.seat) &&
+    isBoundedString(value.move, MAX_LABEL_LENGTH) &&
+    (!Object.hasOwn(value, 'payload') || isJsonValue(value.payload))
+  );
+}
+
+function isAppliedEvent(value: unknown): value is AppliedEvent {
+  return (
+    isRecord(value) &&
+    hasOnlyKeys(value, ['seq', 'seat', 'move'], ['payload', 'ts', 'automatic', 'hash']) &&
+    isBoundedInteger(value.seq, MAX_SEQUENCE) &&
+    (value.seat === null || isSeat(value.seat)) &&
+    isBoundedString(value.move, MAX_LABEL_LENGTH) &&
+    (!Object.hasOwn(value, 'payload') || isJsonValue(value.payload)) &&
+    (!Object.hasOwn(value, 'ts') || isBoundedInteger(value.ts, MAX_TIMESTAMP)) &&
+    (!Object.hasOwn(value, 'automatic') || typeof value.automatic === 'boolean') &&
+    (!Object.hasOwn(value, 'hash') || isBoundedString(value.hash, MAX_HASH_LENGTH))
+  );
+}
+
+function isFxEvent(value: unknown): value is FxEvent {
+  return (
+    isRecord(value) &&
+    hasOnlyKeys(value, ['kind'], ['payload', 'at']) &&
+    isBoundedString(value.kind, MAX_LABEL_LENGTH) &&
+    (!Object.hasOwn(value, 'payload') || isJsonValue(value.payload)) &&
+    (!Object.hasOwn(value, 'at') || isBoundedInteger(value.at, MAX_FX_OFFSET))
+  );
+}
+
+function isRoomSettings(value: unknown): boolean {
+  if (
+    !isRecord(value) ||
+    !hasOnlyKeys(value, ['gameId', 'seats', 'config']) ||
+    !isBoundedString(value.gameId, MAX_LABEL_LENGTH) ||
+    !Number.isInteger(value.seats) ||
+    (value.seats as number) < 2 ||
+    (value.seats as number) > MAX_SEATS ||
+    !isRecord(value.config)
+  ) {
+    return false;
+  }
+  const entries = Object.entries(value.config);
+  return (
+    entries.length <= 64 &&
+    entries.every(
+      ([key, setting]) =>
+        key.length > 0 &&
+        key.length <= MAX_LABEL_LENGTH &&
+        (typeof setting === 'boolean' ||
+          (typeof setting === 'number' &&
+            Number.isFinite(setting) &&
+            Math.abs(setting) <= MAX_CONFIG_NUMBER) ||
+          (typeof setting === 'string' && setting.length <= MAX_LABEL_LENGTH)),
+    )
+  );
+}
+
+function isReplaySnapshot(value: unknown): value is ReplaySnapshot {
+  return (
+    isRecord(value) &&
+    hasOnlyKeys(value, ['seed', 'log', 'stateHash', 'settings']) &&
+    isBoundedInteger(value.seed, 0xffff_ffff) &&
+    Array.isArray(value.log) &&
+    value.log.length <= MAX_SNAPSHOT_EVENTS &&
+    value.log.every((event, index) => isAppliedEvent(event) && event.seq === index) &&
+    isBoundedString(value.stateHash, MAX_HASH_LENGTH) &&
+    isRoomSettings(value.settings)
+  );
+}
+
+function isAppliedPacket(value: unknown): value is AppliedPacket {
+  return (
+    isRecord(value) &&
+    hasOnlyKeys(value, ['actionId', 'events', 'fx', 'stateHash']) &&
+    isBoundedString(value.actionId) &&
+    Array.isArray(value.events) &&
+    value.events.length > 0 &&
+    value.events.length <= MAX_APPLIED_EVENTS &&
+    value.events.every(
+      (event, index, events) =>
+        isAppliedEvent(event) && (index === 0 || event.seq === events[index - 1]!.seq + 1),
+    ) &&
+    Array.isArray(value.fx) &&
+    value.fx.length <= MAX_FX_EVENTS &&
+    value.fx.every(isFxEvent) &&
+    isBoundedString(value.stateHash, MAX_HASH_LENGTH)
+  );
+}
+
+function isWireMessage(value: unknown): value is WireMessage {
+  if (!isRecord(value) || typeof value.type !== 'string') return false;
+  switch (value.type) {
+    case 'hello':
+      return hasOnlyKeys(value, ['type', 'profileId']) && isBoundedString(value.profileId);
+    case 'welcome': {
+      if (
+        !hasOnlyKeys(value, ['type', 'hostId', 'seat', 'seats', 'peers', 'snapshot']) ||
+        !isBoundedString(value.hostId) ||
+        !isSeat(value.seat) ||
+        !isSeats(value.seats) ||
+        !isPeerDescriptors(value.peers) ||
+        !isReplaySnapshot(value.snapshot)
+      ) {
+        return false;
+      }
+      const roomSeats = value.snapshot.settings.seats;
+      return value.seat < roomSeats && value.seats.every(([seat]) => seat < roomSeats);
+    }
+    case 'mesh.peers':
+      return hasOnlyKeys(value, ['type', 'peers']) && isPeerDescriptors(value.peers);
+    case 'intent':
+      return hasOnlyKeys(value, ['type', 'action']) && isPlayerAction(value.action);
+    case 'applied':
+      return hasOnlyKeys(value, ['type', 'packet']) && isAppliedPacket(value.packet);
+    case 'heartbeat':
+      return (
+        hasOnlyKeys(value, ['type', 'sentAt']) && isBoundedInteger(value.sentAt, MAX_TIMESTAMP)
+      );
+    case 'host.changed':
+      return (
+        hasOnlyKeys(value, ['type', 'hostId', 'stateHash']) &&
+        isBoundedString(value.hostId) &&
+        isBoundedString(value.stateHash, MAX_HASH_LENGTH)
+      );
+    case 'sync.request':
+      return (
+        hasOnlyKeys(value, ['type', 'expectedSeq']) &&
+        isBoundedInteger(value.expectedSeq, MAX_SEQUENCE)
+      );
+    case 'sync.snapshot':
+      return hasOnlyKeys(value, ['type', 'snapshot']) && isReplaySnapshot(value.snapshot);
+    case 'emote':
+      return (
+        hasOnlyKeys(value, ['type', 'emote']) &&
+        typeof value.emote === 'string' &&
+        EMOTES.includes(value.emote as Emote)
+      );
+    default:
+      return false;
+  }
+}
+
+export function parseWire(data: string): WireMessage | null {
+  if (data.length > MAX_WIRE_BYTES) return null;
+  try {
+    const value: unknown = JSON.parse(data);
+    return isWireMessage(value) ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+function rejectionMessage(error: unknown): string {
+  return error instanceof Error ? error.message : 'Unknown receiver error';
+}
+
+export function dispatchWireData(
+  data: unknown,
+  receive: (message: WireMessage) => void | Promise<void>,
+  report: (message: string) => void,
+): void {
+  const safeReport = (message: string) => {
+    try {
+      report(message);
+    } catch {
+      // A consumer error must not turn hostile input into an uncaught channel callback.
+    }
+  };
+  if (typeof data !== 'string') {
+    safeReport('Malformed multiplayer packet');
+    return;
+  }
+  const message = parseWire(data);
+  if (!message) {
+    safeReport('Malformed multiplayer packet');
+    return;
+  }
+  try {
+    void Promise.resolve(receive(message)).catch((error: unknown) => {
+      safeReport(`Multiplayer packet rejected: ${rejectionMessage(error)}`);
+    });
+  } catch (error) {
+    safeReport(`Multiplayer packet rejected: ${rejectionMessage(error)}`);
+  }
+}
