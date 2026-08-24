@@ -258,6 +258,26 @@ describe('blitz round flow', () => {
     expect(sessionApply(def, opened, 0, 'discard', { card: top }).rejected).toBeUndefined();
   });
 
+  it('allows knocking with any hand value instead of drawing', () => {
+    const created = createSession(def, { seed: 11, config: DEFAULTS, seats: 2 });
+    const session: GameSession<BlitzState, BlitzConfig> = {
+      ...created,
+      state: freshState({
+        hands: [
+          ['S2', 'S3', 'S4'], // 9
+          ['H5', 'H6', 'H7'],
+        ],
+      }),
+    };
+
+    expect(def.flow.legalMoves(session.state, session.phase)).toContainEqual({ id: 'knock' });
+
+    const outcome = play(session, 0, 'knock');
+    expect(outcome.fx.map((event) => event.kind)).toEqual([Fx.Knock]);
+    expect(outcome.session.state.knocker).toBe(0);
+    expect(outcome.session.phase).toMatchObject({ phase: 'turn', actor: 1 });
+  });
+
   it('rejects a second knock and runs exactly one extra turn each before showdown', () => {
     let session = createSession(def, { seed: 11, config: DEFAULTS, seats: 3 });
 
