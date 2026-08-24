@@ -3,7 +3,7 @@ import { isSpade, rankOfCard, suitOfCard } from '../cards';
 import type { SpadesState } from '../state';
 
 export function ownHand(state: SpadesState, seat: number): CardId[] {
-  return (state.hands[seat] ?? []).filter((card) => card !== '??' && !card.startsWith('v#'));
+  return (state.hands[seat] ?? []).filter((card) => card !== '??');
 }
 
 export function expectedTricks(hand: readonly CardId[]): number {

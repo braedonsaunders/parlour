@@ -191,7 +191,7 @@ export function matchResult(
         detail: { team: losing, score: scores[losing], bags: bags[losing] },
       })),
     ],
-    reason: `first to ${target}`,
+    reason: overtime ? 'overtime' : `first to ${target}`,
   };
 }
 

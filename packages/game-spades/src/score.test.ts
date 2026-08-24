@@ -131,6 +131,7 @@ describe('reviewer scoring examples A–H', () => {
     expect(matchOver([499, 480], 500)).toBeNull();
     const result = matchResult([520, 510], [2, 4], 500);
     expect(result?.winner).toBe(0);
+    expect(result?.reason).toBe('first to 500');
     expect(result?.rankings.filter((row) => row.rank === 1).map((row) => row.seat)).toEqual([0, 2]);
   });
 
@@ -139,11 +140,9 @@ describe('reviewer scoring examples A–H', () => {
     expect(matchOver([450, 480], 500)).toBeNull();
     expect(matchOver([450, 480], 500, true)).toEqual({ winner: 1 });
     expect(matchOver([450, 450], 500, true)).toBeNull();
-    expect(
-      matchResult([450, 480], [0, 0], 500, true)
-        ?.rankings.filter((row) => row.rank === 1)
-        .map((row) => row.seat),
-    ).toEqual([1, 3]);
+    const result = matchResult([450, 480], [0, 0], 500, true);
+    expect(result?.rankings.filter((row) => row.rank === 1).map((row) => row.seat)).toEqual([1, 3]);
+    expect(result?.reason).toBe('overtime');
   });
 
   it('H) bag penalty works from negative scores and multiple cycles', () => {

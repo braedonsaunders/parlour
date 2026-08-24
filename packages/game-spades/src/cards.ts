@@ -12,7 +12,6 @@ export const SPADES_SEATS = 4;
 export const HAND_SIZE = 13;
 export const TRICKS_PER_HAND = HAND_SIZE;
 export const DECK = stdDeck();
-export const DECK_SIZE = DECK.cardIds.length;
 
 export const SUIT_CLUBS = 'clubs';
 export const SUIT_DIAMONDS = 'diamonds';
@@ -33,15 +32,11 @@ export function seatsOf(team: 0 | 1): readonly SeatId[] {
   return TABLE_TEAMS.seatsOf(team);
 }
 
-export function isRealCard(card: string): boolean {
-  return !card.startsWith('v#') && card !== '??';
-}
-
 export function suitOfCard(card: CardId): string | null {
   return DECK.faces[card]?.suit ?? null;
 }
 
-/** Printed rank from the std deck (A=1 … K=13), or −1 for handles. */
+/** Printed rank from the std deck (A=1 … K=13), or −1 if unknown. */
 export function printedRank(card: CardId): number {
   const rank = DECK.faces[card]?.rank;
   return typeof rank === 'number' ? rank : -1;
