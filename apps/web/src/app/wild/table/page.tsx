@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import { useWipeRouter } from '@/hooks/useWipeRouter';
 import {
   wildpileDiscardAllCards,
@@ -10,31 +10,25 @@ import {
 } from '@parlour/game-wildpile';
 import { WildTableScreen } from '@/components/table/wild/WildTableScreen';
 import { useSoloTable } from '@/lib/table/useSoloTable';
-import { usePodiumHandoff } from '@/lib/table/usePodiumHandoff';
 import { WildTransport, type WildSnapshot } from '@/lib/solo/WildTransport';
 import { wildModeForRules } from '@/lib/wild/modes';
 import { wildTableView } from '@/lib/wild/view';
-import { botKey, buildMatchRecord, friendKey, useHistoryStore } from '@/stores/history';
-import { useMatchFlowStore } from '@/stores/matchFlow';
+import {
+  leaveRoom,
+  roomMatchId,
+  roomSeats,
+  soloSeats,
+  useMatchReport,
+  useMultiplayerRoom,
+  useSoloTransport,
+} from '@/lib/table/useGameTable';
 import { useProfileStore } from '@/stores/profile';
 import { useWildSetupStore, wildRulesFor } from '@/stores/wildSetup';
-import {
-  clearActiveMultiplayerSession,
-  getActiveMultiplayerSession,
-  subscribeActiveMultiplayerSession,
-  multiplayerSession,
-  type MultiplayerRoomSession,
-} from '../../_multiplayer/roomSession';
+import { multiplayerSession, type MultiplayerRoomSession } from '../../_multiplayer/roomSession';
 
 export default function WildTablePage() {
-  const multiplayer = useSyncExternalStore(
-    subscribeActiveMultiplayerSession,
-    getActiveMultiplayerSession,
-    () => null,
-  );
-  if (multiplayer?.getSnapshot().gameId === 'wildpile') {
-    return <ActiveMultiplayerWildTable room={multiplayer} />;
-  }
+  const room = useMultiplayerRoom('wildpile');
+  if (room) return <ActiveMultiplayerWildTable room={room} />;
   return <SoloWildTablePage />;
 }
 
@@ -45,27 +39,21 @@ function SoloWildTablePage() {
   const botTier = useWildSetupStore((state) => state.botTier);
   const name = useProfileStore((state) => state.name);
   const avatarId = useProfileStore((state) => state.avatarId);
-  const [transport, setTransport] = useState<WildTransport | null>(null);
   const rules = wildRulesFor(mode, overrides);
   const rulesKey = JSON.stringify(rules);
 
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      setTransport(
-        new WildTransport({
-          mode,
-          seats,
-          seed: Date.now() | 0,
-          player: { name, avatarId },
-          botTier,
-          rules: JSON.parse(rulesKey) as typeof rules,
-        }),
-      );
-    }, 0);
-    return () => window.clearTimeout(timer);
-    // rulesKey stands in for the rules object so a fresh identity per render
-    // does not re-deal the table.
-  }, [avatarId, botTier, mode, name, seats, rulesKey]);
+  const transport = useSoloTransport(
+    () =>
+      new WildTransport({
+        mode,
+        seats,
+        seed: Date.now() | 0,
+        player: { name, avatarId },
+        botTier,
+        rules: JSON.parse(rulesKey) as typeof rules,
+      }),
+    [avatarId, botTier, mode, name, rulesKey, seats],
+  );
 
   if (!transport) return <WildTableScreen view={null} fx={[]} fxKey="loading" />;
   return <ActiveWildTable transport={transport} />;
@@ -73,19 +61,16 @@ function SoloWildTablePage() {
 
 function ActiveMultiplayerWildTable({ room }: { room: MultiplayerRoomSession }) {
   const router = useWipeRouter();
-  const setLastMatch = useMatchFlowStore((state) => state.setLastMatch);
-  const registerPlayAgain = useMatchFlowStore((state) => state.registerPlayAgain);
-  const recordResult = useProfileStore((state) => state.recordResult);
-  const recordMatch = useHistoryStore((state) => state.recordMatch);
   const snapshot = useSyncExternalStore(room.subscribe, room.getSnapshot, room.getSnapshot);
-  const reportedMatch = useRef(false);
-  const handOffToPodium = usePodiumHandoff();
   const [startedAtMs] = useState(() => Date.now());
-  const [localError, setLocalError] = useState<string | null>(null);
   const session = multiplayerSession<WildpileState, WildpileRules>(snapshot, 'wildpile');
   const localSeat = snapshot.localSeat;
+  const roomMode = session ? wildModeForRules(session.config) : 'classic';
   const matchEndsAt = startedAtMs + (session?.config.matchTimeMinutes ?? 5) * 60_000;
 
+  // Wild's send carries a third argument (the Veil reveals for the card being
+  // played), so it keeps its own wrapper rather than using `useRoomDispatch`.
+  const [localError, setLocalError] = useState<string | null>(null);
   const dispatch = useCallback(
     (move: string, payload?: unknown, reveals?: readonly string[]) => {
       try {
@@ -133,59 +118,16 @@ function ActiveMultiplayerWildTable({ room }: { room: MultiplayerRoomSession }) 
     return () => window.clearTimeout(timer);
   }, [matchEndsAt, room, session?.status, snapshot.isHost]);
 
-  useEffect(() => {
-    if (!session?.result || localSeat === null || reportedMatch.current) return;
-    reportedMatch.current = true;
-    const mode = wildModeForRules(session.config);
-    const id = `multiplayer:${snapshot.room?.code ?? 'room'}:${session.seed}:${
-      session.lastAppliedHash ?? session.log.length
-    }`;
-    recordResult({ won: session.result.winner === localSeat, blitzes: 0, knocks: 0, knockWins: 0 });
-    const seats = snapshot.seats.map((seat) => ({
-      seat: seat.seat,
-      name: seat.name,
-      avatarId: seat.avatarId,
-      kind: 'friend' as const,
-      key: friendKey(seat.profileId),
-    }));
-    const record = buildMatchRecord({
-      id,
-      at: Date.now(),
-      game: 'wild',
-      mode,
-      result: session.result,
-      localSeat,
-      seats,
-    });
-    if (record) recordMatch(record);
-    setLastMatch({
-      id,
-      result: session.result,
-      seats,
-      game: 'wild',
-      mode,
-      localSeat,
-    });
-    registerPlayAgain(() => {
-      router.push('/wild/create');
-    });
-    handOffToPodium(900, () => {
-      room.close();
-      clearActiveMultiplayerSession();
-      router.push('/match-end');
-    });
-  }, [
+  useMatchReport({
+    result: session?.result ?? null,
+    game: 'wild',
+    mode: roomMode,
     localSeat,
-    recordMatch,
-    recordResult,
-    registerPlayAgain,
-    room,
-    router,
-    session,
-    setLastMatch,
-    snapshot.room?.code,
-    snapshot.seats,
-  ]);
+    seats: roomSeats(snapshot.seats),
+    id: session ? roomMatchId(snapshot.room?.code, session) : '',
+    playAgain: () => router.push('/wild/create'),
+    onLeave: () => leaveRoom(room),
+  });
 
   if (!session || localSeat === null) {
     return (
@@ -236,8 +178,7 @@ function ActiveMultiplayerWildTable({ room }: { room: MultiplayerRoomSession }) 
       onPass={() => dispatch('pass')}
       onChallengeDrawFour={() => dispatch('challengeDrawFour')}
       onQuit={() => {
-        room.close();
-        clearActiveMultiplayerSession();
+        leaveRoom(room);
         router.push('/wild');
       }}
     />
@@ -246,22 +187,13 @@ function ActiveMultiplayerWildTable({ room }: { room: MultiplayerRoomSession }) 
 
 function ActiveWildTable({ transport }: { transport: WildTransport }) {
   const router = useWipeRouter();
-  const setLastMatch = useMatchFlowStore((state) => state.setLastMatch);
-  const registerPlayAgain = useMatchFlowStore((state) => state.registerPlayAgain);
-  const recordResult = useProfileStore((state) => state.recordResult);
-  const recordMatch = useHistoryStore((state) => state.recordMatch);
-  const reportedMatch = useRef<WildTransport | null>(null);
-  const handOffToPodium = usePodiumHandoff();
   const botPaceMs = useCallback(
     (current: WildSnapshot) =>
       current.session.phase.phase === 'play' ? 480 + (current.session.phase.actor ?? 0) * 90 : 240,
     [],
   );
-  // `round` feeds the bot-turn effect's dependency list, so an inline arrow
-  // re-armed the bot's think timer on every render of this table.
-  const round = useCallback((current: WildSnapshot) => current.session, []);
   const { snapshot, fx, fxKey, error, dispatch, accept } = useSoloTable(transport, {
-    round,
+    round: (current) => current.session,
     botPaceMs,
   });
   useEffect(() => {
@@ -292,40 +224,16 @@ function ActiveWildTable({ transport }: { transport: WildTransport }) {
     return () => window.clearTimeout(timer);
   }, [accept, snapshot.session.status, transport]);
 
-  useEffect(() => {
-    if (snapshot.matchWinner === null || reportedMatch.current === transport) return;
-    if (!snapshot.session.result) return;
-    reportedMatch.current = transport;
-    recordResult({ won: snapshot.matchWinner === 0, blitzes: 0, knocks: 0, knockWins: 0 });
-    const id = crypto.randomUUID();
-    const seats = snapshot.players.map((player) => ({
-      seat: player.seat,
-      name: player.name,
-      avatarId: player.avatarId,
-      kind: player.isBot ? ('bot' as const) : ('friend' as const),
-      key: player.isBot ? botKey(player.avatarId) : friendKey('local-wild-player'),
-    }));
-    const record = buildMatchRecord({
-      id,
-      at: Date.now(),
-      game: 'wild',
-      mode: snapshot.mode,
-      result: snapshot.session.result,
-      localSeat: 0,
-      seats,
-    });
-    if (record) recordMatch(record);
-    setLastMatch({
-      id,
-      result: snapshot.session.result,
-      seats,
-      game: 'wild',
-      mode: snapshot.mode,
-      localSeat: 0,
-    });
-    registerPlayAgain(() => router.push('/wild/table'));
-    handOffToPodium(900, () => router.push('/match-end'));
-  }, [recordMatch, recordResult, registerPlayAgain, router, setLastMatch, snapshot, transport]);
+  useMatchReport({
+    result: snapshot.matchWinner === null ? null : (snapshot.session.result ?? null),
+    game: 'wild',
+    mode: snapshot.mode,
+    localSeat: 0,
+    seats: soloSeats(snapshot.players),
+    id: `solo:wild:${snapshot.session.seed}`,
+    won: snapshot.matchWinner === 0,
+    playAgain: () => router.push('/wild/table'),
+  });
 
   const view = wildTableView(snapshot, transport.legalMoves());
 

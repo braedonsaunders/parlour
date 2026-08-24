@@ -1,35 +1,31 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
-import { useRouter } from 'next/navigation';
+import { useCallback, useSyncExternalStore } from 'react';
+import { useWipeRouter } from '@/hooks/useWipeRouter';
 import { type MatchResult } from '@parlour/engine';
 import { CribbageTableScreen } from '@/components/table/cribbage/CribbageTableScreen';
 import { cribbageModeForRules } from '@/lib/cribbage/modes';
-import { usePodiumHandoff } from '@/lib/table/usePodiumHandoff';
 import { cribbageTableView, type CribbageSnapshotLike } from '@/lib/cribbage/view';
 import { CribbageTransport } from '@/lib/solo/CribbageTransport';
 import { useSoloTable } from '@/lib/table/useSoloTable';
-import { botKey, buildMatchRecord, friendKey, useHistoryStore } from '@/stores/history';
-import { useMatchFlowStore } from '@/stores/matchFlow';
+import {
+  leaveRoom,
+  roomMatchId,
+  roomSeats,
+  soloSeats,
+  useMatchReport,
+  useMultiplayerRoom,
+  useRoomDispatch,
+  useSoloTransport,
+} from '@/lib/table/useGameTable';
 import { useProfileStore } from '@/stores/profile';
 import { cribbageRulesFor, useCribbageSetupStore } from '@/stores/cribbageSetup';
-import {
-  clearActiveMultiplayerSession,
-  multiplayerSession,
-  getActiveMultiplayerSession,
-  subscribeActiveMultiplayerSession,
-  type MultiplayerRoomSession,
-} from '../../_multiplayer/roomSession';
+import { multiplayerSession, type MultiplayerRoomSession } from '../../_multiplayer/roomSession';
 import type { CribbageConfig, CribbageState } from '@parlour/game-cribbage';
 
 export default function CribbageTablePage() {
-  const multiplayer = useSyncExternalStore(
-    subscribeActiveMultiplayerSession,
-    getActiveMultiplayerSession,
-    () => null,
-  );
-  if (multiplayer?.getSnapshot().gameId === 'cribbage')
-    return <MultiplayerTable room={multiplayer} />;
+  const room = useMultiplayerRoom('cribbage');
+  if (room) return <MultiplayerTable room={room} />;
   return <SoloTable />;
 }
 
@@ -39,36 +35,26 @@ function SoloTable() {
   const overrides = useCribbageSetupStore((state) => state.overrides);
   const name = useProfileStore((state) => state.name);
   const avatarId = useProfileStore((state) => state.avatarId);
-  const [transport, setTransport] = useState<CribbageTransport | null>(null);
   const rulesKey = JSON.stringify(cribbageRulesFor(mode, overrides));
 
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      setTransport(
-        new CribbageTransport({
-          mode,
-          botTier,
-          seed: Date.now() | 0,
-          player: { name, avatarId },
-          rules: JSON.parse(rulesKey) as CribbageConfig,
-        }),
-      );
-    }, 0);
-    return () => window.clearTimeout(timer);
-  }, [avatarId, botTier, mode, name, rulesKey]);
+  const transport = useSoloTransport(
+    () =>
+      new CribbageTransport({
+        mode,
+        botTier,
+        seed: Date.now() | 0,
+        player: { name, avatarId },
+        rules: JSON.parse(rulesKey) as CribbageConfig,
+      }),
+    [avatarId, botTier, mode, name, rulesKey],
+  );
 
   if (!transport) return <CribbageTableScreen view={null} fx={[]} fxKey="loading" />;
   return <ActiveSoloTable transport={transport} />;
 }
 
 function ActiveSoloTable({ transport }: { transport: CribbageTransport }) {
-  const router = useRouter();
-  const setLastMatch = useMatchFlowStore((state) => state.setLastMatch);
-  const registerPlayAgain = useMatchFlowStore((state) => state.registerPlayAgain);
-  const handOffToPodium = usePodiumHandoff();
-  const recordResult = useProfileStore((state) => state.recordResult);
-  const recordMatch = useHistoryStore((state) => state.recordMatch);
-  const reported = useRef(false);
+  const router = useWipeRouter();
   const botPaceMs = useCallback(
     (_current: ReturnType<CribbageTransport['getSnapshot']>) => 420,
     [],
@@ -78,34 +64,15 @@ function ActiveSoloTable({ transport }: { transport: CribbageTransport }) {
     botPaceMs,
   });
 
-  useEffect(() => {
-    const result = snapshot.match.result;
-    if (!result || reported.current) return;
-    reported.current = true;
-    const localSeat = 0;
-    const id = `solo:cribbage:${snapshot.match.seed}:${snapshot.match.roundLogs.length}`;
-    const seats = snapshot.players.map((player) => ({
-      seat: player.seat,
-      name: player.name,
-      avatarId: player.avatarId,
-      kind: player.isBot ? ('bot' as const) : ('friend' as const),
-      key: player.isBot ? botKey(player.personaId) : 'local:self',
-    }));
-    recordResult({ won: result.winner === localSeat, blitzes: 0, knocks: 0, knockWins: 0 });
-    const record = buildMatchRecord({
-      id,
-      at: Date.now(),
-      game: 'cribbage',
-      mode: snapshot.mode,
-      result,
-      localSeat,
-      seats,
-    });
-    if (record) recordMatch(record);
-    setLastMatch({ id, result, seats, game: 'cribbage', mode: snapshot.mode, localSeat });
-    registerPlayAgain(() => router.push('/cribbage'));
-    handOffToPodium(950, () => router.push('/match-end'));
-  }, [recordMatch, recordResult, registerPlayAgain, router, setLastMatch, snapshot]);
+  useMatchReport({
+    result: snapshot.match.result,
+    game: 'cribbage',
+    mode: snapshot.mode,
+    localSeat: 0,
+    seats: soloSeats(snapshot.players),
+    id: `solo:cribbage:${snapshot.match.seed}:${snapshot.match.roundLogs.length}`,
+    playAgain: () => router.push('/cribbage'),
+  });
 
   const legal = transport.legalMoves(0);
   const view = cribbageTableView(snapshot, legal, 0);
@@ -127,73 +94,24 @@ function ActiveSoloTable({ transport }: { transport: CribbageTransport }) {
 }
 
 function MultiplayerTable({ room }: { room: MultiplayerRoomSession }) {
-  const router = useRouter();
-  const setLastMatch = useMatchFlowStore((state) => state.setLastMatch);
-  const registerPlayAgain = useMatchFlowStore((state) => state.registerPlayAgain);
-  const handOffToPodium = usePodiumHandoff();
-  const recordResult = useProfileStore((state) => state.recordResult);
-  const recordMatch = useHistoryStore((state) => state.recordMatch);
+  const router = useWipeRouter();
   const snapshot = useSyncExternalStore(room.subscribe, room.getSnapshot, room.getSnapshot);
-  const reported = useRef(false);
-  const [localError, setLocalError] = useState<string | null>(null);
   const session = multiplayerSession<CribbageState, CribbageConfig>(snapshot, 'cribbage');
   const localSeat = snapshot.localSeat;
+  const roomMode = session ? cribbageModeForRules(session.config) : 'classic';
 
-  const dispatch = useCallback(
-    (move: string, payload?: unknown) => {
-      try {
-        room.send(move, payload);
-        setLocalError(null);
-      } catch (caught) {
-        setLocalError(caught instanceof Error ? caught.message : 'The move could not be sent.');
-      }
-    },
-    [room],
-  );
+  const { dispatch, error: localError } = useRoomDispatch(room);
 
-  useEffect(() => {
-    if (!session?.result || localSeat === null || reported.current) return;
-    reported.current = true;
-    const result = cribbageRoomResult(session.result);
-    const mode = cribbageModeForRules(session.config);
-    const id = `multiplayer:${snapshot.room?.code ?? 'room'}:${session.seed}:${session.lastAppliedHash ?? session.log.length}`;
-    const seats = snapshot.seats.map((seat) => ({
-      seat: seat.seat,
-      name: seat.name,
-      avatarId: seat.avatarId,
-      kind: 'friend' as const,
-      key: friendKey(seat.profileId),
-    }));
-    recordResult({ won: result.winner === localSeat, blitzes: 0, knocks: 0, knockWins: 0 });
-    const record = buildMatchRecord({
-      id,
-      at: Date.now(),
-      game: 'cribbage',
-      mode,
-      result,
-      localSeat,
-      seats,
-    });
-    if (record) recordMatch(record);
-    setLastMatch({ id, result, seats, game: 'cribbage', mode, localSeat });
-    registerPlayAgain(() => router.push('/cribbage/create'));
-    handOffToPodium(950, () => {
-      room.close();
-      clearActiveMultiplayerSession();
-      router.push('/match-end');
-    });
-  }, [
+  useMatchReport({
+    result: session?.result ? cribbageRoomResult(session.result) : null,
+    game: 'cribbage',
+    mode: roomMode,
     localSeat,
-    recordMatch,
-    recordResult,
-    registerPlayAgain,
-    room,
-    router,
-    session,
-    setLastMatch,
-    snapshot.room?.code,
-    snapshot.seats,
-  ]);
+    seats: roomSeats(snapshot.seats),
+    id: session ? roomMatchId(snapshot.room?.code, session) : '',
+    playAgain: () => router.push('/cribbage/create'),
+    onLeave: () => leaveRoom(room),
+  });
 
   if (!session || localSeat === null) {
     return (
@@ -246,8 +164,7 @@ function MultiplayerTable({ room }: { room: MultiplayerRoomSession }) {
       onClaim={() => dispatch('claim')}
       onSteal={() => dispatch('steal')}
       onQuit={() => {
-        room.close();
-        clearActiveMultiplayerSession();
+        leaveRoom(room);
         router.push('/cribbage');
       }}
     />

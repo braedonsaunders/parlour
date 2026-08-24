@@ -1,37 +1,32 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { useCallback, useSyncExternalStore } from 'react';
 import { useWipeRouter } from '@/hooks/useWipeRouter';
 import { type LegalMove } from '@parlour/engine';
 import type { EuchreSuit } from '@parlour/game-euchre';
 import { EuchreTableScreen } from '@/components/table/euchre/EuchreTableScreen';
 import { EuchreTransport, type EuchreSnapshot } from '@/lib/solo/EuchreTransport';
-import { usePodiumHandoff } from '@/lib/table/usePodiumHandoff';
 import { euchreModeForRules } from '@/lib/euchre/modes';
 import { euchreTableView, type EuchreTableView } from '@/lib/euchre/view';
 import { useSoloTable } from '@/lib/table/useSoloTable';
-import { botKey, buildMatchRecord, friendKey, useHistoryStore } from '@/stores/history';
-import { useMatchFlowStore } from '@/stores/matchFlow';
+import {
+  leaveRoom,
+  roomMatchId,
+  roomSeats,
+  soloSeats,
+  useMatchReport,
+  useMultiplayerRoom,
+  useRoomDispatch,
+  useSoloTransport,
+} from '@/lib/table/useGameTable';
 import { useProfileStore } from '@/stores/profile';
 import { useEuchreSetupStore } from '@/stores/euchreSetup';
-import {
-  clearActiveMultiplayerSession,
-  multiplayerSession,
-  getActiveMultiplayerSession,
-  subscribeActiveMultiplayerSession,
-  type MultiplayerRoomSession,
-} from '../../_multiplayer/roomSession';
+import { multiplayerSession, type MultiplayerRoomSession } from '../../_multiplayer/roomSession';
 import type { EuchreRules, EuchreState } from '@parlour/game-euchre';
 
 export default function EuchreTablePage() {
-  const multiplayer = useSyncExternalStore(
-    subscribeActiveMultiplayerSession,
-    getActiveMultiplayerSession,
-    () => null,
-  );
-  if (multiplayer?.getSnapshot().gameId === 'euchre') {
-    return <ActiveMultiplayerEuchreTable room={multiplayer} />;
-  }
+  const room = useMultiplayerRoom('euchre');
+  if (room) return <ActiveMultiplayerEuchreTable room={room} />;
   return <SoloEuchreTablePage />;
 }
 
@@ -44,21 +39,10 @@ function SoloEuchreTablePage() {
   const botTier = useEuchreSetupStore((state) => state.botTier);
   const name = useProfileStore((state) => state.name);
   const avatarId = useProfileStore((state) => state.avatarId);
-  const [transport, setTransport] = useState<EuchreTransport | null>(null);
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      setTransport(
-        new EuchreTransport({
-          mode,
-          seed: Date.now() | 0,
-          player: { name, avatarId },
-          botTier,
-        }),
-      );
-    }, 0);
-    return () => window.clearTimeout(timer);
-  }, [avatarId, botTier, mode, name]);
+  const transport = useSoloTransport(
+    () => new EuchreTransport({ mode, seed: Date.now() | 0, player: { name, avatarId }, botTier }),
+    [avatarId, botTier, mode, name],
+  );
 
   if (!transport) return <EuchreTableScreen view={null} fx={[]} fxKey="loading" />;
   return <ActiveSoloEuchreTable transport={transport} />;
@@ -66,12 +50,6 @@ function SoloEuchreTablePage() {
 
 function ActiveSoloEuchreTable({ transport }: { transport: EuchreTransport }) {
   const router = useWipeRouter();
-  const setLastMatch = useMatchFlowStore((state) => state.setLastMatch);
-  const registerPlayAgain = useMatchFlowStore((state) => state.registerPlayAgain);
-  const handOffToPodium = usePodiumHandoff();
-  const recordResult = useProfileStore((state) => state.recordResult);
-  const recordMatch = useHistoryStore((state) => state.recordMatch);
-  const reportedMatch = useRef<EuchreTransport | null>(null);
   const botPaceMs = useCallback(
     (current: EuchreSnapshot) =>
       current.session.state.stage === 'playing'
@@ -84,40 +62,17 @@ function ActiveSoloEuchreTable({ transport }: { transport: EuchreTransport }) {
     botPaceMs,
   });
 
-  useEffect(() => {
-    if (snapshot.matchWinnerTeam === null || reportedMatch.current === transport) return;
-    if (!snapshot.session.result) return;
-    reportedMatch.current = transport;
-    recordResult({ won: localWon(snapshot), blitzes: 0, knocks: 0, knockWins: 0 });
-    const id = crypto.randomUUID();
-    const seats = snapshot.players.map((player) => ({
-      seat: player.seat,
-      name: player.name,
-      avatarId: player.avatarId,
-      kind: player.isBot ? ('bot' as const) : ('friend' as const),
-      key: player.isBot ? botKey(player.avatarId) : friendKey('local-euchre-player'),
-    }));
-    const record = buildMatchRecord({
-      id,
-      at: Date.now(),
-      game: 'euchre',
-      mode: snapshot.mode,
-      result: snapshot.session.result,
-      localSeat: 0,
-      seats,
-    });
-    if (record) recordMatch(record);
-    setLastMatch({
-      id,
-      result: snapshot.session.result,
-      seats,
-      game: 'euchre',
-      mode: snapshot.mode,
-      localSeat: 0,
-    });
-    registerPlayAgain(() => router.push('/euchre/table'));
-    handOffToPodium(900, () => router.push('/match-end'));
-  }, [recordMatch, recordResult, registerPlayAgain, router, setLastMatch, snapshot, transport]);
+  useMatchReport({
+    result: snapshot.matchWinnerTeam === null ? null : snapshot.session.result,
+    game: 'euchre',
+    mode: snapshot.mode,
+    localSeat: 0,
+    seats: soloSeats(snapshot.players),
+    id: `solo:euchre:${snapshot.session.seed}`,
+    // Partnership game, and Euchre ranks both seats of the winning side 1,
+    // so the default "ranked first" predicate already reads as "my side won".
+    playAgain: () => router.push('/euchre/table'),
+  });
 
   const view = euchreTableView(snapshot, transport.legalMoves());
 
@@ -138,96 +93,29 @@ function ActiveSoloEuchreTable({ transport }: { transport: EuchreTransport }) {
   );
 }
 
-/** Team-aware win check: you won when your partnership reached the target first. */
-function localWon(snapshot: EuchreSnapshot): boolean {
-  const winnerTeam = snapshot.matchWinnerTeam;
-  if (winnerTeam === null) return false;
-  return winnerTeam === 0; // solo human always sits at seat 0
-}
-
 // ---------------------------------------------------------------------------
 // multiplayer
 // ---------------------------------------------------------------------------
 
 function ActiveMultiplayerEuchreTable({ room }: { room: MultiplayerRoomSession }) {
   const router = useWipeRouter();
-  const setLastMatch = useMatchFlowStore((state) => state.setLastMatch);
-  const registerPlayAgain = useMatchFlowStore((state) => state.registerPlayAgain);
-  const handOffToPodium = usePodiumHandoff();
-  const recordResult = useProfileStore((state) => state.recordResult);
-  const recordMatch = useHistoryStore((state) => state.recordMatch);
   const snapshot = useSyncExternalStore(room.subscribe, room.getSnapshot, room.getSnapshot);
-  const reportedMatch = useRef(false);
-  const [localError, setLocalError] = useState<string | null>(null);
   const session = multiplayerSession<EuchreState, EuchreRules>(snapshot, 'euchre');
   const localSeat = snapshot.localSeat;
+  const roomMode = session ? euchreModeForRules(session.config) : 'classic';
 
-  const dispatch = useCallback(
-    (move: string, payload?: unknown) => {
-      try {
-        room.send(move, payload);
-        setLocalError(null);
-      } catch (error) {
-        setLocalError(error instanceof Error ? error.message : 'The move could not be sent.');
-      }
-    },
-    [room],
-  );
+  const { dispatch, error: localError } = useRoomDispatch(room);
 
-  useEffect(() => {
-    if (!session?.result || localSeat === null || reportedMatch.current) return;
-    reportedMatch.current = true;
-    const mode = euchreModeForRules(session.config);
-    const id = `multiplayer:${snapshot.room?.code ?? 'room'}:${session.seed}:${
-      session.lastAppliedHash ?? session.log.length
-    }`;
-    const localRank = session.result.rankings.find((rank) => rank.seat === localSeat)?.rank ?? 99;
-    recordResult({ won: localRank === 1, blitzes: 0, knocks: 0, knockWins: 0 });
-    const seats = snapshot.seats.map((seat) => ({
-      seat: seat.seat,
-      name: seat.name,
-      avatarId: seat.avatarId,
-      kind: 'friend' as const,
-      key: friendKey(seat.profileId),
-    }));
-    const record = buildMatchRecord({
-      id,
-      at: Date.now(),
-      game: 'euchre',
-      mode,
-      result: session.result,
-      localSeat,
-      seats,
-    });
-    if (record) recordMatch(record);
-    setLastMatch({
-      id,
-      result: session.result,
-      seats,
-      game: 'euchre',
-      mode,
-      localSeat,
-    });
-    registerPlayAgain(() => {
-      router.push('/euchre/create');
-    });
-    handOffToPodium(900, () => {
-      room.close();
-      clearActiveMultiplayerSession();
-      router.push('/match-end');
-    });
-  }, [
+  useMatchReport({
+    result: session?.result ?? null,
+    game: 'euchre',
+    mode: roomMode,
     localSeat,
-    recordMatch,
-    recordResult,
-    registerPlayAgain,
-    room,
-    router,
-    session,
-    setLastMatch,
-    snapshot.room?.code,
-    snapshot.seats,
-  ]);
+    seats: roomSeats(snapshot.seats),
+    id: session ? roomMatchId(snapshot.room?.code, session) : '',
+    playAgain: () => router.push('/euchre/create'),
+    onLeave: () => leaveRoom(room),
+  });
 
   if (!session || localSeat === null) {
     return (
@@ -247,7 +135,7 @@ function ActiveMultiplayerEuchreTable({ room }: { room: MultiplayerRoomSession }
 
   const view: EuchreTableView = euchreTableView(
     {
-      mode: euchreModeForRules(session.config),
+      mode: roomMode,
       players: snapshot.seats.map((player) => ({
         seat: player.seat,
         name: player.name,
@@ -274,8 +162,7 @@ function ActiveMultiplayerEuchreTable({ room }: { room: MultiplayerRoomSession }
       onDiscard={(card) => dispatch('dealerDiscard', { card })}
       onPlay={(card) => dispatch('playCard', { card })}
       onQuit={() => {
-        room.close();
-        clearActiveMultiplayerSession();
+        leaveRoom(room);
         router.push('/euchre');
       }}
     />

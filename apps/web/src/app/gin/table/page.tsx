@@ -1,35 +1,30 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { useCallback, useSyncExternalStore } from 'react';
 import { useWipeRouter } from '@/hooks/useWipeRouter';
 import type { GinModeId } from '@/lib/gin/modes';
-import { usePodiumHandoff } from '@/lib/table/usePodiumHandoff';
 import { GinTableScreen } from '@/components/table/gin/GinTableScreen';
 import { GinTransport, type GinSnapshot } from '@/lib/solo/GinTransport';
 import { ginTableView } from '@/lib/gin/view';
 import { useSoloTable } from '@/lib/table/useSoloTable';
-import { botKey, buildMatchRecord, friendKey, useHistoryStore } from '@/stores/history';
-import { useMatchFlowStore } from '@/stores/matchFlow';
+import {
+  leaveRoom,
+  roomMatchId,
+  roomSeats,
+  soloSeats,
+  useMatchReport,
+  useMultiplayerRoom,
+  useRoomDispatch,
+  useSoloTransport,
+} from '@/lib/table/useGameTable';
 import { useProfileStore } from '@/stores/profile';
 import { useGinSetupStore } from '@/stores/ginSetup';
-import {
-  clearActiveMultiplayerSession,
-  getActiveMultiplayerSession,
-  subscribeActiveMultiplayerSession,
-  multiplayerSession,
-  type MultiplayerRoomSession,
-} from '../../_multiplayer/roomSession';
+import { multiplayerSession, type MultiplayerRoomSession } from '../../_multiplayer/roomSession';
 import type { GinConfig, GinMatchState } from '@parlour/game-gin';
 
 export default function GinTablePage() {
-  const multiplayer = useSyncExternalStore(
-    subscribeActiveMultiplayerSession,
-    getActiveMultiplayerSession,
-    () => null,
-  );
-  if (multiplayer?.getSnapshot().gameId === 'gin') {
-    return <ActiveMultiplayerGinTable room={multiplayer} />;
-  }
+  const room = useMultiplayerRoom('gin');
+  if (room) return <ActiveMultiplayerGinTable room={room} />;
   return <SoloGinTablePage />;
 }
 
@@ -38,21 +33,11 @@ function SoloGinTablePage() {
   const botTier = useGinSetupStore((state) => state.botTier);
   const name = useProfileStore((state) => state.name);
   const avatarId = useProfileStore((state) => state.avatarId);
-  const [transport, setTransport] = useState<GinTransport | null>(null);
 
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      setTransport(
-        new GinTransport({
-          mode,
-          botTier,
-          seed: Date.now() | 0,
-          player: { name, avatarId },
-        }),
-      );
-    }, 0);
-    return () => window.clearTimeout(timer);
-  }, [avatarId, mode, botTier, name]);
+  const transport = useSoloTransport(
+    () => new GinTransport({ mode, botTier, seed: Date.now() | 0, player: { name, avatarId } }),
+    [avatarId, mode, botTier, name],
+  );
 
   if (!transport) return <GinTableScreen view={null} fx={[]} fxKey="loading" />;
   return <SoloGinTable transport={transport} />;
@@ -60,12 +45,6 @@ function SoloGinTablePage() {
 
 function SoloGinTable({ transport }: { transport: GinTransport }) {
   const router = useWipeRouter();
-  const setLastMatch = useMatchFlowStore((state) => state.setLastMatch);
-  const registerPlayAgain = useMatchFlowStore((state) => state.registerPlayAgain);
-  const handOffToPodium = usePodiumHandoff();
-  const recordResult = useProfileStore((state) => state.recordResult);
-  const recordMatch = useHistoryStore((state) => state.recordMatch);
-  const reportedMatch = useRef<GinTransport | null>(null);
   const botPaceMs = useCallback(
     (current: GinSnapshot) =>
       current.session.state.folded && current.session.phase.phase === 'hand-end' ? 420 : 520,
@@ -76,39 +55,16 @@ function SoloGinTable({ transport }: { transport: GinTransport }) {
     botPaceMs,
   });
 
-  useEffect(() => {
-    if (snapshot.matchWinner === null || reportedMatch.current === transport) return;
-    reportedMatch.current = transport;
-    recordResult({ won: snapshot.matchWinner === 0, blitzes: 0, knocks: 0, knockWins: 0 });
-    const id = crypto.randomUUID();
-    const seats = snapshot.players.map((player) => ({
-      seat: player.seat,
-      name: player.name,
-      avatarId: player.avatarId,
-      kind: player.isBot ? ('bot' as const) : ('friend' as const),
-      key: player.isBot ? botKey(player.avatarId) : friendKey('local-gin-player'),
-    }));
-    const record = buildMatchRecord({
-      id,
-      at: Date.now(),
-      game: 'gin',
-      mode: snapshot.mode,
-      result: snapshot.session.result!,
-      localSeat: 0,
-      seats,
-    });
-    if (record) recordMatch(record);
-    setLastMatch({
-      id,
-      result: snapshot.session.result!,
-      seats,
-      game: 'gin',
-      mode: snapshot.mode,
-      localSeat: 0,
-    });
-    registerPlayAgain(() => router.push('/gin/table'));
-    handOffToPodium(900, () => router.push('/match-end'));
-  }, [recordMatch, recordResult, registerPlayAgain, router, setLastMatch, snapshot, transport]);
+  useMatchReport({
+    result: snapshot.matchWinner === null ? null : (snapshot.session.result ?? null),
+    game: 'gin',
+    mode: snapshot.mode,
+    localSeat: 0,
+    seats: soloSeats(snapshot.players),
+    id: `solo:gin:${snapshot.session.seed}`,
+    won: snapshot.matchWinner === 0,
+    playAgain: () => router.push('/gin/table'),
+  });
 
   const view = ginTableView(snapshot, transport.legalMoves());
 
@@ -133,81 +89,22 @@ function SoloGinTable({ transport }: { transport: GinTransport }) {
 
 function ActiveMultiplayerGinTable({ room }: { room: MultiplayerRoomSession }) {
   const router = useWipeRouter();
-  const setLastMatch = useMatchFlowStore((state) => state.setLastMatch);
-  const registerPlayAgain = useMatchFlowStore((state) => state.registerPlayAgain);
-  const handOffToPodium = usePodiumHandoff();
-  const recordResult = useProfileStore((state) => state.recordResult);
-  const recordMatch = useHistoryStore((state) => state.recordMatch);
   const snapshot = useSyncExternalStore(room.subscribe, room.getSnapshot, room.getSnapshot);
-  const reportedMatch = useRef(false);
-  const [localError, setLocalError] = useState<string | null>(null);
   const session = multiplayerSession<GinMatchState, GinConfig>(snapshot, 'gin');
   const localSeat = snapshot.localSeat;
 
-  const dispatch = useCallback(
-    (move: string, payload?: unknown) => {
-      try {
-        room.send(move, payload);
-        setLocalError(null);
-      } catch (error) {
-        setLocalError(error instanceof Error ? error.message : 'The move could not be sent.');
-      }
-    },
-    [room],
-  );
+  const { dispatch, error: localError } = useRoomDispatch(room);
 
-  useEffect(() => {
-    if (!session?.result || localSeat === null || reportedMatch.current) return;
-    reportedMatch.current = true;
-    const id = `multiplayer:${snapshot.room?.code ?? 'room'}:${session.seed}:${
-      session.lastAppliedHash ?? session.log.length
-    }`;
-    recordResult({ won: session.result.winner === localSeat, blitzes: 0, knocks: 0, knockWins: 0 });
-    const seats = snapshot.seats.map((seat) => ({
-      seat: seat.seat,
-      name: seat.name,
-      avatarId: seat.avatarId,
-      kind: 'friend' as const,
-      key: friendKey(seat.profileId),
-    }));
-    const record = buildMatchRecord({
-      id,
-      at: Date.now(),
-      game: 'gin',
-      mode: 'classic',
-      result: session.result,
-      localSeat,
-      seats,
-    });
-    if (record) recordMatch(record);
-    setLastMatch({
-      id,
-      result: session.result,
-      seats,
-      game: 'gin',
-      mode: 'classic',
-      localSeat,
-    });
-    registerPlayAgain(() => {
-      router.push('/gin/create');
-    });
-    handOffToPodium(900, () => {
-      room.close();
-      clearActiveMultiplayerSession();
-      router.push('/match-end');
-    });
-  }, [
+  useMatchReport({
+    result: session?.result ?? null,
+    game: 'gin',
+    mode: 'classic',
     localSeat,
-    recordMatch,
-    recordResult,
-    registerPlayAgain,
-    room,
-    router,
-    session,
-    setLastMatch,
-    snapshot.room?.code,
-    snapshot.seats,
-  ]);
+    seats: roomSeats(snapshot.seats),
+    id: session ? roomMatchId(snapshot.room?.code, session) : '',
+    playAgain: () => router.push('/gin/create'),
+    onLeave: () => leaveRoom(room),
+  });
 
   if (!session || localSeat === null) {
     return (
@@ -251,8 +148,7 @@ function ActiveMultiplayerGinTable({ room }: { room: MultiplayerRoomSession }) {
       onKnock={() => dispatch('knock')}
       onReady={() => dispatch('ready')}
       onQuit={() => {
-        room.close();
-        clearActiveMultiplayerSession();
+        leaveRoom(room);
         router.push('/gin');
       }}
     />

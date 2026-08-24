@@ -1,36 +1,31 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { useCallback, useSyncExternalStore } from 'react';
 import { useWipeRouter } from '@/hooks/useWipeRouter';
 import { type LegalMove } from '@parlour/engine';
 import { SpadesTableScreen } from '@/components/table/spades/SpadesTableScreen';
 import { SpadesTransport, type SpadesSnapshot } from '@/lib/solo/SpadesTransport';
-import { usePodiumHandoff } from '@/lib/table/usePodiumHandoff';
 import { spadesModeForRules } from '@/lib/spades/modes';
 import { spadesTableView, type SpadesTableView } from '@/lib/spades/view';
 import { useSoloTable } from '@/lib/table/useSoloTable';
-import { botKey, buildMatchRecord, friendKey, useHistoryStore } from '@/stores/history';
-import { useMatchFlowStore } from '@/stores/matchFlow';
+import {
+  leaveRoom,
+  roomMatchId,
+  roomSeats,
+  soloSeats,
+  useMatchReport,
+  useMultiplayerRoom,
+  useRoomDispatch,
+  useSoloTransport,
+} from '@/lib/table/useGameTable';
 import { useProfileStore } from '@/stores/profile';
 import { useSpadesSetupStore } from '@/stores/spadesSetup';
-import {
-  clearActiveMultiplayerSession,
-  multiplayerSession,
-  getActiveMultiplayerSession,
-  subscribeActiveMultiplayerSession,
-  type MultiplayerRoomSession,
-} from '../../_multiplayer/roomSession';
+import { multiplayerSession, type MultiplayerRoomSession } from '../../_multiplayer/roomSession';
 import type { SpadesRules, SpadesState } from '@parlour/game-spades';
 
 export default function SpadesTablePage() {
-  const multiplayer = useSyncExternalStore(
-    subscribeActiveMultiplayerSession,
-    getActiveMultiplayerSession,
-    () => null,
-  );
-  if (multiplayer?.getSnapshot().gameId === 'spades') {
-    return <ActiveMultiplayerSpadesTable room={multiplayer} />;
-  }
+  const room = useMultiplayerRoom('spades');
+  if (room) return <ActiveMultiplayerSpadesTable room={room} />;
   return <SoloSpadesTablePage />;
 }
 
@@ -43,21 +38,11 @@ function SoloSpadesTablePage() {
   const botTier = useSpadesSetupStore((state) => state.botTier);
   const name = useProfileStore((state) => state.name);
   const avatarId = useProfileStore((state) => state.avatarId);
-  const [transport, setTransport] = useState<SpadesTransport | null>(null);
 
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      setTransport(
-        new SpadesTransport({
-          mode,
-          seed: Date.now() | 0,
-          player: { name, avatarId },
-          botTier,
-        }),
-      );
-    }, 0);
-    return () => window.clearTimeout(timer);
-  }, [avatarId, botTier, mode, name]);
+  const transport = useSoloTransport(
+    () => new SpadesTransport({ mode, seed: Date.now() | 0, player: { name, avatarId }, botTier }),
+    [avatarId, botTier, mode, name],
+  );
 
   if (!transport) return <SpadesTableScreen view={null} fx={[]} fxKey="loading" />;
   return <ActiveSoloSpadesTable transport={transport} />;
@@ -65,12 +50,6 @@ function SoloSpadesTablePage() {
 
 function ActiveSoloSpadesTable({ transport }: { transport: SpadesTransport }) {
   const router = useWipeRouter();
-  const setLastMatch = useMatchFlowStore((state) => state.setLastMatch);
-  const registerPlayAgain = useMatchFlowStore((state) => state.registerPlayAgain);
-  const handOffToPodium = usePodiumHandoff();
-  const recordResult = useProfileStore((state) => state.recordResult);
-  const recordMatch = useHistoryStore((state) => state.recordMatch);
-  const reportedMatch = useRef<SpadesTransport | null>(null);
   // Bidding is a conversation; trick play keeps a human beat.
   const botPaceMs = useCallback(
     (current: SpadesSnapshot) =>
@@ -84,40 +63,17 @@ function ActiveSoloSpadesTable({ transport }: { transport: SpadesTransport }) {
     botPaceMs,
   });
 
-  useEffect(() => {
-    if (snapshot.matchWinnerTeam === null || reportedMatch.current === transport) return;
-    if (!snapshot.session.result) return;
-    reportedMatch.current = transport;
-    recordResult({ won: snapshot.matchWinnerTeam === 0, blitzes: 0, knocks: 0, knockWins: 0 });
-    const id = crypto.randomUUID();
-    const seats = snapshot.players.map((player) => ({
-      seat: player.seat,
-      name: player.name,
-      avatarId: player.avatarId,
-      kind: player.isBot ? ('bot' as const) : ('friend' as const),
-      key: player.isBot ? botKey(player.avatarId) : friendKey('local-spades-player'),
-    }));
-    const record = buildMatchRecord({
-      id,
-      at: Date.now(),
-      game: 'spades',
-      mode: snapshot.mode,
-      result: snapshot.session.result,
-      localSeat: 0,
-      seats,
-    });
-    if (record) recordMatch(record);
-    setLastMatch({
-      id,
-      result: snapshot.session.result,
-      seats,
-      game: 'spades',
-      mode: snapshot.mode,
-      localSeat: 0,
-    });
-    registerPlayAgain(() => router.push('/spades/table'));
-    handOffToPodium(900, () => router.push('/match-end'));
-  }, [recordMatch, recordResult, registerPlayAgain, router, setLastMatch, snapshot, transport]);
+  useMatchReport({
+    result: snapshot.matchWinnerTeam === null ? null : snapshot.session.result,
+    game: 'spades',
+    mode: snapshot.mode,
+    localSeat: 0,
+    seats: soloSeats(snapshot.players),
+    id: `solo:spades:${snapshot.session.seed}`,
+    // No `won` override needed: Spades ranks BOTH seats of the winning team 1,
+    // so "ranked first" already means "my side took it".
+    playAgain: () => router.push('/spades/table'),
+  });
 
   const view = spadesTableView(snapshot, transport.legalMoves());
 
@@ -142,89 +98,29 @@ function ActiveSoloSpadesTable({ transport }: { transport: SpadesTransport }) {
 
 function ActiveMultiplayerSpadesTable({ room }: { room: MultiplayerRoomSession }) {
   const router = useWipeRouter();
-  const setLastMatch = useMatchFlowStore((state) => state.setLastMatch);
-  const registerPlayAgain = useMatchFlowStore((state) => state.registerPlayAgain);
-  const handOffToPodium = usePodiumHandoff();
-  const recordResult = useProfileStore((state) => state.recordResult);
-  const recordMatch = useHistoryStore((state) => state.recordMatch);
   const snapshot = useSyncExternalStore(room.subscribe, room.getSnapshot, room.getSnapshot);
   const setSetupMode = useSpadesSetupStore((state) => state.setMode);
-  const reportedMatch = useRef(false);
-  const [localError, setLocalError] = useState<string | null>(null);
+  const { dispatch, error: localError } = useRoomDispatch(room);
   const session = multiplayerSession<SpadesState, SpadesRules>(snapshot, 'spades');
   const localSeat = snapshot.localSeat;
+  const mode = session ? spadesModeForRules(session.config) : 'classic';
 
-  const dispatch = useCallback(
-    (move: string, payload?: unknown) => {
-      try {
-        room.send(move, payload);
-        setLocalError(null);
-      } catch (error) {
-        setLocalError(error instanceof Error ? error.message : 'The move could not be sent.');
-      }
-    },
-    [room],
-  );
-
-  useEffect(() => {
-    if (!session?.result || localSeat === null || reportedMatch.current) return;
-    reportedMatch.current = true;
-    const mode = spadesModeForRules(session.config);
-    const id = `multiplayer:${snapshot.room?.code ?? 'room'}:${session.seed}:${
-      session.lastAppliedHash ?? session.log.length
-    }`;
-    const localRank = session.result.rankings.find((rank) => rank.seat === localSeat)?.rank ?? 99;
-    recordResult({ won: localRank === 1, blitzes: 0, knocks: 0, knockWins: 0 });
-    const seats = snapshot.seats.map((seat) => ({
-      seat: seat.seat,
-      name: seat.name,
-      avatarId: seat.avatarId,
-      kind: 'friend' as const,
-      key: friendKey(seat.profileId),
-    }));
-    const record = buildMatchRecord({
-      id,
-      at: Date.now(),
-      game: 'spades',
-      mode,
-      result: session.result,
-      localSeat,
-      seats,
-    });
-    if (record) recordMatch(record);
-    setLastMatch({
-      id,
-      result: session.result,
-      seats,
-      game: 'spades',
-      mode,
-      localSeat,
-    });
-    registerPlayAgain(() => {
+  useMatchReport({
+    result: session?.result ?? null,
+    game: 'spades',
+    mode,
+    localSeat,
+    seats: roomSeats(snapshot.seats),
+    id: session ? roomMatchId(snapshot.room?.code, session) : '',
+    playAgain: () => {
       // The new room is built from the setup store, so a rematch has to carry
       // the mode this match was actually played under. Without this a guest
       // who joined a Quick or Clean Books table would silently host Classic.
       setSetupMode(mode);
       router.push('/spades/create');
-    });
-    handOffToPodium(900, () => {
-      room.close();
-      clearActiveMultiplayerSession();
-      router.push('/match-end');
-    });
-  }, [
-    localSeat,
-    recordMatch,
-    recordResult,
-    registerPlayAgain,
-    room,
-    router,
-    session,
-    setLastMatch,
-    setSetupMode,
-    snapshot.room?.code,
-    snapshot.seats,
-  ]);
+    },
+    onLeave: () => leaveRoom(room),
+  });
 
   if (!session || localSeat === null) {
     return (
@@ -244,7 +140,7 @@ function ActiveMultiplayerSpadesTable({ room }: { room: MultiplayerRoomSession }
 
   const view: SpadesTableView = spadesTableView(
     {
-      mode: spadesModeForRules(session.config),
+      mode,
       players: snapshot.seats.map((player) => ({
         seat: player.seat,
         name: player.name,
@@ -269,8 +165,7 @@ function ActiveMultiplayerSpadesTable({ room }: { room: MultiplayerRoomSession }
       onBidNil={() => dispatch('bidNil')}
       onPlay={(card) => dispatch('playCard', { card })}
       onQuit={() => {
-        room.close();
-        clearActiveMultiplayerSession();
+        leaveRoom(room);
         router.push('/spades');
       }}
     />
