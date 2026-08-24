@@ -13,6 +13,7 @@ import { ohhellEs } from './ohhell';
 import { scopaEs } from './scopa';
 import { spiteEs } from './spite';
 import { klondikeEs } from './klondike';
+import { eightsEs } from './eights';
 
 /**
  * Spanish game copy, one file per shelf entry.
@@ -37,4 +38,5 @@ export const ES_GAMES: GameCopyBook = {
   scopa: scopaEs,
   spite: spiteEs,
   klondike: klondikeEs,
+  eights: eightsEs,
 };
