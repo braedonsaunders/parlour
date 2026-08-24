@@ -15,7 +15,8 @@ import { tierBot } from '../bots';
  *      15–35% band across 4-seat mixed-persona games.
  *
  * Pure and deterministic for a given (games, baseSeed) — the CLI is a thin
- * printer over this module.
+ * printer over this module. CI samples a small run; `pnpm sim -- --games 10000`
+ * is the full ladder. Do not pretend the default vitest suite is 10k games.
  */
 
 export interface GateThresholds {

@@ -51,6 +51,7 @@ export function HandRailCard({
       layout
       layoutId={`card:${cardId}`}
       className={styles.handCard}
+      role="listitem"
       data-hand-card
       data-playable={playable}
       data-just-drawn={justDrawn || undefined}
@@ -101,6 +102,7 @@ export function HandRail({ count, zone, label, dealState, children }: HandRailPr
     <div
       ref={railRef}
       className={styles.localHand}
+      role="list"
       style={
         {
           '--fan-n': fanN,

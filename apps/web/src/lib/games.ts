@@ -1,4 +1,4 @@
-import { modePreset, type GameCatalogEntry, type GameMode } from '@parlour/engine';
+import { modePreset, type GameCatalogEntry, type GameMode, type RuleValues } from '@parlour/engine';
 import { blitzCatalog } from '@parlour/game-blitz';
 import { cribbageCatalog } from '@parlour/game-cribbage';
 import { euchreCatalog } from '@parlour/game-euchre';
@@ -7,6 +7,19 @@ import { heartsCatalog } from '@parlour/game-hearts';
 import { presidentCatalog } from '@parlour/game-president';
 import { wildpileCatalog } from '@parlour/game-wildpile';
 import { ratscrewCatalog } from '@parlour/game-ratscrew';
+
+/**
+ * Pack catalogs are generic over their rule config. `ConfigSchema<C>` is
+ * invariant in C, so `GameCatalogEntry<BlitzConfig>` is not assignable to
+ * `GameCatalogEntry` (defaults to `RuleValues`). This is a centralized
+ * existential widening at the registry edge — one cast, not eight, and not
+ * a closed type hole. Closing it for real belongs in `@parlour/engine` via a
+ * non-generic presentation view. Identity is preserved so callers can still
+ * `===` a pack catalog.
+ */
+function shelfEntry<C extends RuleValues>(entry: GameCatalogEntry<C>): GameCatalogEntry {
+  return entry as GameCatalogEntry;
+}
 
 /**
  * The parlour shelf.
@@ -27,14 +40,14 @@ export type GameId =
   'blitz' | 'cribbage' | 'wild' | 'ratscrew' | 'euchre' | 'hearts' | 'gin' | 'president';
 
 const SHELF: readonly GameCatalogEntry[] = [
-  blitzCatalog as GameCatalogEntry,
-  cribbageCatalog as GameCatalogEntry,
-  wildpileCatalog as GameCatalogEntry,
-  ratscrewCatalog as GameCatalogEntry,
-  euchreCatalog as GameCatalogEntry,
-  heartsCatalog as GameCatalogEntry,
-  ginCatalog as GameCatalogEntry,
-  presidentCatalog as GameCatalogEntry,
+  shelfEntry(blitzCatalog),
+  shelfEntry(cribbageCatalog),
+  shelfEntry(wildpileCatalog),
+  shelfEntry(ratscrewCatalog),
+  shelfEntry(euchreCatalog),
+  shelfEntry(heartsCatalog),
+  shelfEntry(ginCatalog),
+  shelfEntry(presidentCatalog),
 ];
 
 export type { GameCatalogEntry, GameMode };

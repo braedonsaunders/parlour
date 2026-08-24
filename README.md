@@ -54,7 +54,7 @@ That one line pays for everything downstream. Same seed plus the same events mea
 
 ### What a new game gets for free
 
-Write a rules module and you inherit the whole table:
+Write a rules module and you inherit catalog, bots, replay, settings, and help. The table page is still per-game until the shared shell lands.
 
 |                    |                                                           |
 | ------------------ | --------------------------------------------------------- |
@@ -71,16 +71,16 @@ Write a rules module and you inherit the whole table:
 
 <img src="docs/shots/shelf.png" alt="The parlour game shelf" width="100%" />
 
-| Game                         | What it is                                                                                     | Status              |
-| ---------------------------- | ---------------------------------------------------------------------------------------------- | ------------------- |
-| **Blitz** · the 31 game      | Draw, swap, and knock your way to 31 in one suit. Classic, Fast, and Timed formats.            | **Playable**        |
-| **Wild** · the shedding game | 108 cards of skips, reverses, draw-fours, and jump-ins. Classic or Party house rules.          | **Playable**        |
-| **Egyptian Ratscrew**        | Flip, challenge on face cards, and slap doubles and sandwiches inside a real-time slap window. | Rules module landed |
-| **Gin Rummy**                | Meld, knock, go gin — and undercut the player who knocked too soon.                            | In the build        |
-| **Hearts**                   | Pass three, dodge the Queen, break hearts, or shoot the moon.                                  | In the build        |
-| **Euchre**                   | Order it up, name trump, go alone, and march the hand.                                         | In the build        |
-| **Cribbage**                 | Peg the board, count the show, and try not to get skunked.                                     | In the build        |
-| **President**                | Slam sets, clear the pile, and trade cards between President and Scum.                         | In the build        |
+| Game                         | What it is                                                                                     | Status       |
+| ---------------------------- | ---------------------------------------------------------------------------------------------- | ------------ |
+| **Blitz** · the 31 game      | Draw, swap, and knock your way to 31 in one suit. Classic, Fast, and Timed formats.            | **Playable** |
+| **Wild** · the shedding game | 112 cards of skips, draw-fours, color dumps, and jump-ins. Classic or Party house rules.       | **Playable** |
+| **Egyptian Ratscrew**        | Flip, challenge on face cards, and slap doubles and sandwiches inside a real-time slap window. | **Playable** |
+| **Gin Rummy**                | Meld, knock, go gin — and undercut the player who knocked too soon.                            | **Playable** |
+| **Hearts**                   | Pass three, dodge the Queen, break hearts, or shoot the moon.                                  | **Playable** |
+| **Euchre**                   | Order it up, name trump, go alone, and march the hand.                                         | **Playable** |
+| **Cribbage**                 | Peg the board, count the show, and try not to get skunked.                                     | **Playable** |
+| **President**                | Slam sets, clear the pile, and trade cards between President and Scum.                         | **Playable** |
 
 ### Blitz · the 31 game
 
@@ -126,7 +126,7 @@ No game server exists. Nothing to sign up for and nothing to leak, because there
 
 ## The bots are tested like a game, not like a function
 
-Blitz ships a headless simulator that plays **10,000 games per gate** and fails the build if the bot ladder stops making sense:
+Blitz ships a headless simulator whose **full ladder is 10,000 games per gate**. CI runs a smaller deterministic sample so the rest of the monorepo still gets tested; `pnpm sim -- --games 10000` is the complete check:
 
 ```
 gate 1 — Hard vs Easy head-to-head
@@ -225,7 +225,9 @@ parlour/
 - [x] Installable PWA and native macOS, Windows, and Linux releases
 - [x] Second and third games built entirely on the public engine API
 - [x] Veiled-deck primitives in the engine
-- [ ] The rest of the shelf: Gin, Hearts, Euchre, Cribbage, President
+- [x] The rest of the first shelf: Gin, Hearts, Euchre, Cribbage, President, Ratscrew
+- [ ] Platform paydown — shared table shell, room registry, CI that does not bail on the first package
+- [ ] Next titles (not this wave): Spades, then daily-seeded Klondike/FreeCell, then Spite & Malice
 
 ## License
 

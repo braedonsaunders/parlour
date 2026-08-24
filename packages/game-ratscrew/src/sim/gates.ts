@@ -94,9 +94,14 @@ export function personaFor(id: string) {
   return persona;
 }
 
-export function runBalanceGates(opts: { games: number; baseSeed?: number }): GateReport {
+export function runBalanceGates(opts: {
+  games: number;
+  baseSeed?: number;
+  thresholds?: Partial<GateThresholds>;
+}): GateReport {
   const baseSeed = opts.baseSeed ?? 20260823;
   const games = opts.games;
+  const thresholds = { ...DEFAULT_THRESHOLDS, ...opts.thresholds };
 
   // gate 1 — hard vs easy head-to-head, alternating seats
   const duel = { hard: 0, easy: 0 };
@@ -126,7 +131,7 @@ export function runBalanceGates(opts: { games: number; baseSeed?: number }): Gat
     hardWinRate,
     easyWinRate,
     games: duelGames,
-    passes: hardWinRate >= DEFAULT_THRESHOLDS.headToHeadMin,
+    passes: hardWinRate >= thresholds.headToHeadMin,
   };
 
   // gate 2 — mixed four-seat band
@@ -142,9 +147,7 @@ export function runBalanceGates(opts: { games: number; baseSeed?: number }): Gat
   }
   const rows = rates(tally(mixed));
   const personasPasses = rows.every(
-    (row) =>
-      row.winRate >= DEFAULT_THRESHOLDS.personaBandMin &&
-      row.winRate <= DEFAULT_THRESHOLDS.personaBandMax,
+    (row) => row.winRate >= thresholds.personaBandMin && row.winRate <= thresholds.personaBandMax,
   );
 
   // gate 3 — seeded determinism on a small sample
@@ -177,7 +180,7 @@ export function runBalanceGates(opts: { games: number; baseSeed?: number }): Gat
     determinism: { samples, passes: deterministic },
     stalls,
     avgEvents,
-    thresholds: DEFAULT_THRESHOLDS,
+    thresholds,
     passed: headToHead.passes && personasPasses && deterministic && stalls === 0,
   };
 }

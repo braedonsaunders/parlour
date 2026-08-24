@@ -13,7 +13,8 @@ import { heartsConfigSchema } from '../config';
  * measurable skill ladder. Hearts deals more variance than Blitz — four hidden
  * hands swing hard — so gates are calibrated on measured bands, not vibes:
  * gate 1 keeps Sharp clearly ahead of Harmless; gate 2 keeps every persona
- * inside a healthy band in mixed company.
+ * inside a healthy band in mixed company. CI coverage lives in
+ * `src/gates.test.ts` (small samples); this module is the full-ladder runner.
  */
 export const DEFAULT_THRESHOLDS = {
   hardVsEasyMin: 0.32,

@@ -32,7 +32,7 @@ jobs:
         run: pnpm --filter './packages/**' --filter @parlour/web -r type-check
 
       - name: Test
-        run: pnpm test
+        run: pnpm -r --no-bail test
 
       - name: Build
         run: pnpm build
