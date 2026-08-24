@@ -1,10 +1,10 @@
-import { aggregateWinRates, simulateGames } from '@parlour/engine';
-import { ratscrewGame } from '../game';
+import { GAME_ID } from '../index';
+import { DEFAULT_THRESHOLDS, runBalanceGates } from '../sim/gates';
 
 /**
- * Headless Ratscrew bot simulator: `pnpm sim -- --games 1000` plays house
- * bots vs bots across rotating seat orders and reports win distribution.
- * Exit code 0 unless a match stalls (which is a flow bug, not a balance one).
+ * Headless Ratscrew persona simulator: `pnpm sim -- --games 500` plays
+ * reaction-time bots vs bots on a virtual match clock and enforces the
+ * balance gates. Exit code 0 = all gates pass.
  */
 
 interface Args {
@@ -13,18 +13,22 @@ interface Args {
 }
 
 function parseArgs(argv: readonly string[]): Args {
-  let games = 1000;
+  let games = 500;
   let seed: number | undefined;
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
-    if (arg === '--') continue;
+    if (arg === '--') continue; // pnpm inserts a bare -- when forwarding args
     if (arg === '--games') {
       const value = Number(argv[++i]);
-      if (!Number.isInteger(value) || value <= 0) fail(`--games must be a positive integer`);
+      if (!Number.isInteger(value) || value <= 0) {
+        fail(`--games must be a positive integer, got ${String(argv[i])}`);
+      }
       games = value;
     } else if (arg === '--seed') {
       const value = Number(argv[++i]);
-      if (!Number.isInteger(value)) fail(`--seed must be an integer`);
+      if (!Number.isInteger(value)) {
+        fail(`--seed must be an integer, got ${String(argv[i])}`);
+      }
       seed = value;
     } else {
       fail(`unknown argument: ${String(arg)} (usage: sim [--games N] [--seed N])`);
@@ -39,32 +43,46 @@ function fail(message: string): never {
 }
 
 const args = parseArgs(process.argv.slice(2));
-const policy = ratscrewGame.bots[0];
-if (!policy) throw new Error('ratscrew ships no bot policy');
 
-console.log(`parlour ${ratscrewGame.id} bot simulation — ${args.games} games`);
+console.log(`parlour ${GAME_ID} bot simulation — ${args.games} games per gate`);
+console.log(
+  `gates: bolt ≥ ${(DEFAULT_THRESHOLDS.headToHeadMin * 100).toFixed(0)}% vs rusty · persona band ` +
+    `${(DEFAULT_THRESHOLDS.personaBandMin * 100).toFixed(0)}–${(DEFAULT_THRESHOLDS.personaBandMax * 100).toFixed(0)}% · seeded replay`,
+);
 
 const t0 = Date.now();
-const records = simulateGames(ratscrewGame, args.games, {
-  baseSeed: args.seed ?? 20260823,
-  maxEvents: 20_000,
-  tolerateStalls: true,
-  seatPoliciesFor: () => [policy, policy, policy, policy],
-  seatLabelsFor: () => ['house', 'house', 'house', 'house'],
-});
+const report = runBalanceGates({ games: args.games, baseSeed: args.seed });
 const seconds = ((Date.now() - t0) / 1000).toFixed(1);
 
-const stalled = records.filter((record) => record.stalled).length;
-const events = records.reduce((sum, record) => sum + record.events, 0) / records.length;
+console.log('');
+console.log('gate 1 — Bolt vs Rusty head-to-head (seats alternate)');
+console.log(
+  `  bolt ${(report.headToHead.hardWinRate * 100).toFixed(1)}% vs rusty ${(report.headToHead.easyWinRate * 100).toFixed(1)}%` +
+    ` over ${report.headToHead.games} games — ${report.headToHead.passes ? 'PASS' : 'FAIL'}`,
+);
 
 console.log('');
-for (const row of aggregateWinRates(records, (_record, seat) => `seat ${seat}`)) {
+console.log('gate 2 — persona win-rate band in 4-seat mixed games');
+for (const row of report.personas.rows) {
+  const flag =
+    row.winRate < report.thresholds.personaBandMin || row.winRate > report.thresholds.personaBandMax
+      ? ' ✗'
+      : '';
   console.log(
-    `  ${row.key.padEnd(8)} ${(row.winRate * 100).toFixed(1)}% over ${row.games} games`,
+    `  ${row.key.padEnd(8)} ${(row.winRate * 100).toFixed(1)}% (${row.games} games)${flag}`,
   );
 }
+console.log(`  — ${report.personas.passes ? 'PASS' : 'FAIL'}`);
+
 console.log('');
 console.log(
-  `avg ${(events.toFixed(0))} events/game${stalled > 0 ? ` · ${stalled} STALLED` : ''} — done in ${seconds}s`,
+  `gate 3 — determinism: ${report.determinism.samples} sampled matches replay hash-identically — ${
+    report.determinism.passes ? 'PASS' : 'FAIL'
+  }`,
 );
-process.exit(stalled > 0 ? 1 : 0);
+
+if (report.stalls > 0) console.log(`(${report.stalls} stalled matches)`);
+console.log('');
+console.log(`avg ${report.avgEvents.toFixed(0)} authority events per game`);
+console.log(`${report.passed ? 'ALL GATES PASS' : 'GATES FAILED'} in ${seconds}s`);
+process.exit(report.passed ? 0 : 1);

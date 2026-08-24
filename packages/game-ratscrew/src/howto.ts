@@ -5,13 +5,13 @@ export const ratscrewHowToPlay: HowToPlayDoc = {
   summary:
     'Take turns flipping cards onto a shared pile and SLAP your way to winning every card on the table.',
   objective:
-    'Win all the cards. When everyone else runs out, you win the match. You win cards by slapping patterns or by playing face cards your opponents can’t answer.',
+    'Win all 52 cards. You grow your stack by slapping patterns first or by laying face cards your opponents can’t answer. When everyone else is out of cards — or slaps their way back in — you win the match.',
   sections: [
     {
       heading: 'The flip',
       body: [
         'Starting with you, players take turns placing the top card of their own face-down stack onto the center pile, turning it away from themselves so nobody peeks.',
-        'If your stack runs dry you’re out of the round — watch the pile anyway, a slap can still be your moment.',
+        'If your stack runs dry you stop flipping — but with Slap back in on, one lucky slap puts you right back in the game.',
       ],
     },
     {
@@ -41,7 +41,16 @@ export const ratscrewHowToPlay: HowToPlayDoc = {
       bullets: [
         { label: 'Double', text: 'two cards of the same rank back-to-back (7♦ 7♣)' },
         { label: 'Sandwich', text: 'same rank with one card between (7♦ Q♠ 7♥)' },
+        { label: 'Marriage', text: 'a King and Queen back-to-back, either order (K♦ Q♠) — house-rule toggle' },
         { label: 'Ten', text: 'two consecutive pip cards summing to ten (3♦ 7♠) — house-rule toggle' },
+        { label: 'Top-bottom', text: 'the top card matches the very bottom card of the pile — house-rule toggle' },
+        { label: 'Run', text: 'three climbing or falling ranks in a row (4-5-6 or 9-8-7) — house-rule toggle' },
+      ],
+    },
+    {
+      heading: 'Mis-slaps',
+      body: [
+        'Slapping when no pattern is live costs you: with Mis-slap burns on, your top card slides under the pile as a penalty. Nerves are expensive — keep your eyes on the cards, not the crowd.',
       ],
     },
     {
@@ -49,15 +58,17 @@ export const ratscrewHowToPlay: HowToPlayDoc = {
       body: ['Tune the chaos in room settings before you start:'],
       bullets: [
         { label: 'Doubles / Sandwiches', text: 'the classic slap patterns, both on by default' },
-        { label: 'Tens', text: 'adds sum-to-ten slaps for extra mayhem' },
+        { label: 'Marriage / Tens / Top-bottom / Runs', text: 'extra patterns, all off by default for a classic table' },
+        { label: 'Mis-slap burns a card', text: 'on by default; turn it off and only live patterns can be slapped at all' },
+        { label: 'Slap back in when out', text: 'empty-handed players may still slap a live pattern to win the pile and re-enter' },
         { label: 'Slap window', text: 'how long the race stays open — shorter means meaner' },
       ],
     },
     {
       heading: 'Table manners',
       body: [
-        'Slaps only count while a pattern is live — the engine won’t accept an early or late slap, so keep your eyes on the pile, not your nerves.',
-        'The pile winner slides it under their stack without shuffling and flips next. Last player holding cards wins.',
+        'The pile winner slides it under their stack without shuffling and flips next. Last player holding every card wins the match.',
+        'A short grace moment keeps long-distance slaps honest: the table waits a beat past the window before calling it closed.',
       ],
     },
   ],
