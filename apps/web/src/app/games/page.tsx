@@ -90,6 +90,14 @@ function Preview({ kind }: { kind: GamePreviewKind }) {
           <span className={gameStyles.fanCard}>K♠</span>
         </>
       )}
+      {kind === 'ratscrew-fan' && (
+        <>
+          <span className={gameStyles.wildCard}>7♦</span>
+          <span className={gameStyles.wildCard}>7♣</span>
+          <span className={gameStyles.wildCard}>SLAP!</span>
+          <span className={gameStyles.wildCard}>K♠</span>
+        </>
+      )}
       {kind === 'wild-fan' && (
         <>
           <span className={gameStyles.wildCard}>7</span>

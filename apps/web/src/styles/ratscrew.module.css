@@ -1,0 +1,263 @@
+/* Rat Screw table chrome — sits on top of the shared table.module.css stage. */
+
+.centerPile {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-width: 9.5rem;
+  min-height: 8.4rem;
+}
+
+.pileFan {
+  position: relative;
+  display: grid;
+  place-items: center;
+}
+
+.pileFan > * {
+  grid-area: 1 / 1;
+}
+
+.pileCountChip {
+  position: absolute;
+  bottom: -1.1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 0.1rem 0.6rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, rgb(12 10 18 / 78%) 100%, transparent);
+  border: 1px solid rgb(255 255 255 / 12%);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: rgb(255 244 224 / 88%);
+  white-space: nowrap;
+}
+
+.challengeBanner {
+  position: absolute;
+  top: clamp(5.4rem, 12vh, 7rem);
+  left: 50%;
+  translate: -50% 0;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.42rem 0.95rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, rgb(20 14 26 / 86%) 100%, transparent);
+  border: 1px solid rgb(255 255 255 / 10%);
+  box-shadow: 0 10px 30px rgb(0 0 0 / 35%);
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: rgb(255 244 224 / 92%);
+  z-index: 3;
+}
+
+.challengePips {
+  display: inline-flex;
+  gap: 0.28rem;
+}
+
+.challengePip {
+  width: 0.52rem;
+  height: 0.52rem;
+  border-radius: 999px;
+  background: #e29349;
+  box-shadow: 0 0 0 2px rgb(226 147 73 / 25%);
+}
+
+.challengePip[data-spent='true'] {
+  background: rgb(255 255 255 / 16%);
+  box-shadow: none;
+}
+
+.slapBanner {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  z-index: 4;
+}
+
+.slapCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.8rem 1.6rem 0.9rem;
+  border-radius: 1.4rem;
+  background: color-mix(in srgb, rgb(24 12 16 / 88%) 100%, transparent);
+  border: 2px solid rgb(226 147 73 / 65%);
+  box-shadow:
+    0 18px 50px rgb(0 0 0 / 45%),
+    0 0 34px rgb(226 147 73 / 28%);
+}
+
+.slapWord {
+  font-family: var(--font-display, system-ui);
+  font-size: clamp(1.7rem, 4.4vw, 2.6rem);
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  color: #ffd9a0;
+  text-shadow: 0 2px 0 rgb(96 44 10 / 80%);
+  animation: slapPop 240ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes slapPop {
+  0% {
+    transform: scale(0.4) rotate(-7deg);
+    opacity: 0;
+  }
+  70% {
+    transform: scale(1.08) rotate(1deg);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+.windowBar {
+  width: min(15rem, 42vw);
+  height: 0.44rem;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgb(255 255 255 / 14%);
+}
+
+.windowBarFill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #ffd9a0, #e2743c);
+  transform-origin: left center;
+  animation: windowDrain linear forwards;
+}
+
+@keyframes windowDrain {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
+
+.actionRail {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.9rem;
+}
+
+.slapButton {
+  position: relative;
+  min-width: clamp(11rem, 30vw, 17rem);
+  padding-block: 0.95rem;
+  font-size: 1.35rem;
+  letter-spacing: 0.05em;
+  background: linear-gradient(180deg, #ffb45c, #d95f2b);
+  color: #38160a;
+  border: 2px solid rgb(255 214 150 / 75%);
+  box-shadow:
+    0 10px 26px rgb(217 95 43 / 40%),
+    inset 0 -3px 0 rgb(96 44 10 / 45%);
+}
+
+.slapButton[data-racing='true'] {
+  animation: slapPulse 420ms ease-in-out infinite alternate;
+}
+
+@keyframes slapPulse {
+  from {
+    transform: scale(1);
+    filter: brightness(1);
+  }
+  to {
+    transform: scale(1.05);
+    filter: brightness(1.14);
+  }
+}
+
+.slapButton:disabled {
+  filter: saturate(0.35) brightness(0.72);
+  animation: none;
+  box-shadow: none;
+}
+
+.flipButton {
+  min-width: clamp(8.4rem, 20vw, 12rem);
+}
+
+.stackChip {
+  position: absolute;
+  bottom: -0.4rem;
+  right: -0.6rem;
+  padding: 0.1rem 0.55rem;
+  border-radius: 999px;
+  background: rgb(12 10 18 / 82%);
+  border: 1px solid rgb(255 255 255 / 14%);
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: rgb(255 244 224 / 90%);
+  white-space: nowrap;
+}
+
+/* burst layer ---------------------------------------------------------- */
+
+.burstLayer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.seatBurst {
+  position: absolute;
+  translate: -50% -50%;
+  display: grid;
+  place-items: center;
+}
+
+.burstRing {
+  position: absolute;
+  width: 3rem;
+  height: 3rem;
+  border-radius: 999px;
+  border: 3px solid #ffcf87;
+  animation: burstRing 520ms ease-out forwards;
+}
+
+@keyframes burstRing {
+  from {
+    transform: scale(0.4);
+    opacity: 0.95;
+  }
+  to {
+    transform: scale(2.6);
+    opacity: 0;
+  }
+}
+
+.burstLabel {
+  position: relative;
+  padding: 0.18rem 0.7rem;
+  border-radius: 999px;
+  background: rgb(20 12 16 / 88%);
+  border: 1px solid rgb(255 207 135 / 55%);
+  color: #ffd9a0;
+  font-weight: 900;
+  font-size: 0.82rem;
+  letter-spacing: 0.07em;
+  animation: slapPop 260ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.burstLabel[data-tone='burn'] {
+  border-color: rgb(255 120 100 / 55%);
+  color: #ffb3a3;
+}
+
+.burstLabel[data-tone='comeback'] {
+  border-color: rgb(140 235 180 / 55%);
+  color: #b9f4d2;
+}

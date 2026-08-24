@@ -1,6 +1,6 @@
-export type GameId = 'blitz' | 'wild';
+export type GameId = 'blitz' | 'wild' | 'ratscrew';
 
-export type GamePreviewKind = 'blitz-fan' | 'wild-fan';
+export type GamePreviewKind = 'blitz-fan' | 'wild-fan' | 'ratscrew-fan';
 
 export interface GameDef {
   id: GameId;
@@ -46,6 +46,19 @@ export const GAMES: readonly GameDef[] = [
     shade: '#7c2c3e',
     preview: 'wild-fan',
     href: '/wild',
+  },
+  {
+    id: 'ratscrew',
+    name: 'Rat Screw',
+    subtitle: 'the slap game',
+    tagline: 'Slap the pile first',
+    description:
+      'Flip onto a shared pile and slap doubles, sandwiches and more before anyone else. Real-time reflexes, face-card challenges, mis-slap burns.',
+    facts: ['2–4 players', 'real-time slaps', 'solo or friends'],
+    accent: '#8f5fb5',
+    shade: '#4a2a68',
+    preview: 'ratscrew-fan',
+    href: '/ratscrew',
   },
 ];
 

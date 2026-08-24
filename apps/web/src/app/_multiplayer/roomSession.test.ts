@@ -1,9 +1,14 @@
 import { applyPreset, stateHash } from '@parlour/engine';
+import { ratscrewConfigSchema, type RatscrewState } from '@parlour/game-ratscrew';
 import { wildpileConfig } from '@parlour/game-wildpile';
 import { afterEach, describe, expect, it } from 'vitest';
 import { NostrSignaling, type SignalPayload } from '@/lib/multiplayer/NostrSignaling';
 import type { RoomSettings } from '@/lib/multiplayer/types';
-import { MultiplayerRoomSession, wildMultiplayerSession } from './roomSession';
+import {
+  MultiplayerRoomSession,
+  ratscrewMultiplayerSession,
+  wildMultiplayerSession,
+} from './roomSession';
 
 type SignalHandler = (sender: string, signal: SignalPayload) => void;
 
@@ -226,4 +231,94 @@ describe('multiplayer route composition', () => {
       stateHash(wildMultiplayerSession(host.getSnapshot())?.state),
     );
   });
+
+  it('races Rat Screw slaps through the authority with hash-identical logs', async () => {
+    const broker = new MockSignalingBroker();
+    const rtc = new MockRtcNetwork();
+    const host = new MultiplayerRoomSession(
+      { name: 'Host', avatarId: 'ember', profileId: 'rat-host' },
+      {
+        signaling: broker.signaling('rat-host-peer'),
+        peerConnection: rtc.factory('host'),
+        seed: 4242,
+      },
+    );
+    const guest = new MultiplayerRoomSession(
+      { name: 'Guest', avatarId: 'mint', profileId: 'rat-guest' },
+      {
+        signaling: broker.signaling('rat-guest-peer'),
+        peerConnection: rtc.factory('guest'),
+        seed: 99,
+      },
+    );
+    sessions.push(host, guest);
+
+    const room = await host.create({
+      gameId: 'ratscrew',
+      seats: 2,
+      config: ratscrewConfigSchema.resolve({ slapWindowMs: 400 }),
+    });
+    await guest.join(room.code);
+    await eventually(() => expect(guest.getSnapshot().localSeat).toBe(1));
+    expect(host.getSnapshot()).toMatchObject({ gameId: 'ratscrew' });
+    expect(ratscrewMultiplayerSession(guest.getSnapshot())).not.toBeNull();
+
+    // Drive a slice of real play: flips until a window opens, then both seats
+    // slam at once — arrival order on the authority decides the winner.
+    const stateOf = (session: ReturnType<typeof ratscrewMultiplayerSession>) =>
+      session!.state as RatscrewState;
+    let windowsSeen = 0;
+    for (let step = 0; step < 60; step++) {
+      const hostSession = ratscrewMultiplayerSession(host.getSnapshot())!;
+      if (hostSession.status !== 'playing') break;
+      const state = stateOf(hostSession);
+      if (state.window) {
+        windowsSeen += 1;
+        // both peers slap; whichever intent lands first takes the pile
+        host.send('slap');
+        guest.send('slap');
+        await eventually(() => {
+          expect(ratscrewMultiplayerSession(host.getSnapshot())?.state.window).toBeNull();
+          expect(ratscrewMultiplayerSession(guest.getSnapshot())?.state.window).toBeNull();
+        });
+      } else {
+        const before = ratscrewMultiplayerSession(host.getSnapshot())!.log.length;
+        const turn = state.turn;
+        (turn === 0 ? host : guest).send('flip');
+        await eventually(() => {
+          const h = ratscrewMultiplayerSession(host.getSnapshot())!;
+          const g = ratscrewMultiplayerSession(guest.getSnapshot())!;
+          expect(h.log.length).toBeGreaterThan(before);
+          expect(g.log.length).toBe(h.log.length);
+        });
+      }
+      // every authority event replays identically on the guest
+      // (`ts` is transport wall-clock garnish and never part of state)
+      const settledHost = ratscrewMultiplayerSession(host.getSnapshot())!;
+      const strip = (log: typeof settledHost.log) =>
+        log.map(({ seq, seat, move, payload, atMs, hash, automatic, injected }) => ({
+          seq,
+          seat,
+          move,
+          payload,
+          atMs,
+          hash,
+          automatic,
+          injected,
+        }));
+      expect(strip(ratscrewMultiplayerSession(guest.getSnapshot())!.log)).toEqual(
+        strip(settledHost.log),
+      );
+    }
+    expect(windowsSeen).toBeGreaterThan(0);
+
+    // final authority identity across every flip, slap and auto-resolved event
+    const hostFinal = ratscrewMultiplayerSession(host.getSnapshot())!;
+    const guestFinal = ratscrewMultiplayerSession(guest.getSnapshot())!;
+    expect(guestFinal.log.map((event) => event.hash)).toEqual(
+      hostFinal.log.map((event) => event.hash),
+    );
+    expect(stateHash(guestFinal.state)).toBe(stateHash(hostFinal.state));
+    expect(stateHash(guestFinal.state)).toBe(hostFinal.lastAppliedHash);
+  }, 30_000);
 });

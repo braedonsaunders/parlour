@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { GAMES, getGame, isGameId } from './games';
 
 describe('game shelf catalog', () => {
-  it('leads with blitz and keeps wild on deck (spec §11)', () => {
-    expect(GAMES.map((g) => g.id)).toEqual(['blitz', 'wild']);
+  it('leads with blitz and keeps every game on deck (spec §11)', () => {
+    expect(GAMES.map((g) => g.id)).toEqual(['blitz', 'wild', 'ratscrew']);
   });
 
   it('every game carries complete presentation data', () => {

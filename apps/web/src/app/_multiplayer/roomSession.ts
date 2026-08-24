@@ -14,6 +14,12 @@ import {
   type WildpileState,
 } from '@parlour/game-wildpile';
 import {
+  ratscrewConfigSchema,
+  ratscrewGame,
+  type RatscrewConfig,
+  type RatscrewState,
+} from '@parlour/game-ratscrew';
+import {
   EngineAuthority,
   P2PTransport,
   type AppliedPacket,
@@ -35,7 +41,7 @@ import {
 import { NostrSignaling, type RoomAnnouncement } from '@/lib/multiplayer/NostrSignaling';
 import { validateRoomCode } from '@/lib/rooms/code';
 
-export type MultiplayerGameId = 'blitz' | 'wildpile';
+export type MultiplayerGameId = 'blitz' | 'wildpile' | 'ratscrew';
 
 /** What the room badge shows about privacy — see lib/multiplayer/veil. */
 export type MultiplayerSecurity = {
@@ -48,7 +54,9 @@ export type MultiplayerSecurity = {
   ceremony: { laid: number; seats: number; ready: boolean };
 };
 export type MultiplayerGameSession =
-  GameSession<BlitzState, BlitzConfig> | GameSession<WildpileState, WildpileRules>;
+  | GameSession<BlitzState, BlitzConfig>
+  | GameSession<WildpileState, WildpileRules>
+  | GameSession<RatscrewState, RatscrewConfig>;
 
 export type MultiplayerProfile = {
   name: string;
@@ -594,6 +602,14 @@ export function blitzMultiplayerSession(
     : null;
 }
 
+export function ratscrewMultiplayerSession(
+  snapshot: MultiplayerRoomSnapshot,
+): GameSession<RatscrewState, RatscrewConfig> | null {
+  return snapshot.gameId === 'ratscrew'
+    ? (snapshot.session as GameSession<RatscrewState, RatscrewConfig> | null)
+    : null;
+}
+
 export function wildMultiplayerSession(
   snapshot: MultiplayerRoomSnapshot,
 ): GameSession<WildpileState, WildpileRules> | null {
@@ -649,6 +665,14 @@ function resolveRoomSettings(settings: RoomSettings): RoomSettings {
       security,
     };
   }
+  if (settings.gameId === 'ratscrew') {
+    return {
+      gameId: 'ratscrew',
+      seats: settings.seats,
+      config: ratscrewConfigSchema.resolve(settings.config as Partial<RatscrewConfig>),
+      security,
+    };
+  }
   throw new Error(`unsupported room game: ${settings.gameId}`);
 }
 
@@ -665,6 +689,18 @@ function createRoomRuntime(
   const veiled = settings.security === 'veil' && deckOrder !== undefined;
   const veil = veiled ? { veiled: true, deckOrder } : {};
   const runtimeSettings: RoomSettings = veiled ? settings : { ...settings, security: 'open' };
+  if (settings.gameId === 'ratscrew') {
+    const config = settings.config as RatscrewConfig;
+    const session = createSession(ratscrewGame, { seed, config, seats: settings.seats, ...veil });
+    const authority = new EngineAuthority({
+      def: ratscrewGame,
+      session,
+      settings: runtimeSettings,
+      onSeatBot,
+    });
+    return { session, authority };
+  }
+
   if (settings.gameId === 'wildpile') {
     const config = settings.config as WildpileRules;
     const session = createSession(wildpileGame, { seed, config, seats: settings.seats, ...veil });
