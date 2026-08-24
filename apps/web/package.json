@@ -21,6 +21,7 @@
     "@parlour/game-gin": "workspace:*",
     "@parlour/game-hearts": "workspace:*",
     "@parlour/game-president": "workspace:*",
+    "@parlour/game-ratscrew": "workspace:*",
     "@parlour/game-wildpile": "workspace:*",
     "gsap": "^3.13.0",
     "howler": "^2.2.4",
@@ -29,7 +30,8 @@
     "nostr-tools": "^2.10.4",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
-    "zustand": "^5.0.10"
+    "zustand": "^5.0.10",
+    "@parlour/game-ratscrew": "workspace:*"
   },
   "devDependencies": {
     "@types/howler": "^2.2.12",

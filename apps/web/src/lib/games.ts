@@ -6,6 +6,7 @@ import { ginCatalog } from '@parlour/game-gin';
 import { heartsCatalog } from '@parlour/game-hearts';
 import { presidentCatalog } from '@parlour/game-president';
 import { wildpileCatalog } from '@parlour/game-wildpile';
+import { ratscrewCatalog } from '@parlour/game-ratscrew';
 
 /**
  * The parlour shelf.
@@ -22,12 +23,14 @@ import { wildpileCatalog } from '@parlour/game-wildpile';
  * union because saved match history is keyed on it — a typo there would
  * silently orphan someone's results rather than fail the build.
  */
-export type GameId = 'blitz' | 'cribbage' | 'wild' | 'euchre' | 'hearts' | 'gin' | 'president';
+export type GameId =
+  'blitz' | 'cribbage' | 'wild' | 'ratscrew' | 'euchre' | 'hearts' | 'gin' | 'president';
 
 const SHELF: readonly GameCatalogEntry[] = [
   blitzCatalog as GameCatalogEntry,
   cribbageCatalog as GameCatalogEntry,
   wildpileCatalog as GameCatalogEntry,
+  ratscrewCatalog as GameCatalogEntry,
   euchreCatalog as GameCatalogEntry,
   heartsCatalog as GameCatalogEntry,
   ginCatalog as GameCatalogEntry,

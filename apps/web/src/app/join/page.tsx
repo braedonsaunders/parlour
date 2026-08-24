@@ -121,17 +121,19 @@ export default function JoinPage() {
           router.replace(
             gameId === 'wildpile'
               ? '/wild/table'
-              : gameId === 'euchre'
-                ? '/euchre/table'
-                : gameId === 'cribbage'
-                  ? '/cribbage/table'
-                  : gameId === 'hearts'
-                    ? '/hearts/table'
-                    : gameId === 'gin'
-                      ? '/gin/table'
-                      : gameId === 'president'
-                        ? '/president/table'
-                        : '/table',
+              : gameId === 'ratscrew'
+                ? '/ratscrew/table'
+                : gameId === 'euchre'
+                  ? '/euchre/table'
+                  : gameId === 'cribbage'
+                    ? '/cribbage/table'
+                    : gameId === 'hearts'
+                      ? '/hearts/table'
+                      : gameId === 'gin'
+                        ? '/gin/table'
+                        : gameId === 'president'
+                          ? '/president/table'
+                          : '/table',
           )
         }
       />

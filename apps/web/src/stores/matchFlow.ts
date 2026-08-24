@@ -7,6 +7,7 @@ import type { ModeId } from '@/lib/modes';
 import type { CribbageModeId } from '@/lib/cribbage/modes';
 import type { GinModeId } from '@/lib/gin/modes';
 import type { WildModeId } from '@/lib/wild/modes';
+import type { RatscrewModeId } from '@/lib/ratscrew/modes';
 import type { PresidentModeId } from '@/lib/president/modes';
 import type { RecordedSeat } from '@/stores/history';
 
@@ -29,6 +30,7 @@ export interface MatchSnapshot {
     | ModeId
     | CribbageModeId
     | WildModeId
+    | RatscrewModeId
     | EuchreModeId
     | HeartsModeId
     | GinModeId

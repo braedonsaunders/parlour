@@ -13,6 +13,7 @@ describe('game shelf catalog', () => {
       'blitz',
       'cribbage',
       'wild',
+      'ratscrew',
       'euchre',
       'hearts',
       'gin',
@@ -36,6 +37,7 @@ describe('game shelf catalog', () => {
     expect(getGame('blitz').href).toBe('/play');
     expect(getGame('cribbage').href).toBe('/cribbage');
     expect(getGame('wild').href).toBe('/wild');
+    expect(getGame('ratscrew').href).toBe('/ratscrew');
     expect(getGame('euchre').href).toBe('/euchre');
     expect(getGame('hearts').href).toBe('/hearts');
     expect(getGame('gin').href).toBe('/gin');
