@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { motion } from 'motion/react';
 import { AvatarBadge } from '@/components/AvatarBadge';
+import { MainMenuMuteButton } from '@/components/MainMenuMuteButton';
 import { useAudioManager } from '@/stores/audio';
 import { useProfileStore } from '@/stores/profile';
 import { getAvatar } from '@/lib/avatars';
@@ -28,6 +29,8 @@ export default function TitlePage() {
 
   return (
     <main className="flex min-h-dvh flex-col items-center justify-center gap-5 px-6 text-center">
+      <MainMenuMuteButton />
+
       <Link
         href="/profile"
         aria-label="Open your profile"

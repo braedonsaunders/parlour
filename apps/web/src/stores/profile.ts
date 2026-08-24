@@ -18,6 +18,11 @@ export type ProfileSettings = {
   reducedMotion: boolean;
   hapticsEnabled: boolean;
   lastHouseRulePreset: string;
+  audioMuted: {
+    master: boolean;
+    music: boolean;
+    sfx: boolean;
+  };
 };
 
 export type MatchOutcome = {
@@ -53,6 +58,11 @@ export const DEFAULT_PROFILE_SETTINGS: ProfileSettings = {
   reducedMotion: false,
   hapticsEnabled: true,
   lastHouseRulePreset: 'classic-pub',
+  audioMuted: {
+    master: false,
+    music: false,
+    sfx: false,
+  },
 };
 
 export function applyResult(stats: ProfileStats, outcome: MatchOutcome): ProfileStats {
@@ -104,6 +114,21 @@ export const useProfileStore = create<ProfileState>()(
         stats: state.stats,
         settings: state.settings,
       }),
+      merge: (persistedState, currentState) => {
+        const persisted = persistedState as Partial<ProfileState>;
+        return {
+          ...currentState,
+          ...persisted,
+          settings: {
+            ...currentState.settings,
+            ...persisted.settings,
+            audioMuted: {
+              ...currentState.settings.audioMuted,
+              ...persisted.settings?.audioMuted,
+            },
+          },
+        };
+      },
     },
   ),
 );
