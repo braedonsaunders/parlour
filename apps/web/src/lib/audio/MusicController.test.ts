@@ -27,14 +27,16 @@ const { FakeHowl } = vi.hoisted(() => {
   class FakeHowl {
     static instances: FakeHowl[] = [];
     src: string;
+    format: string[] | undefined;
     loop: boolean;
     playingIds = new Set<number>();
     handlers = new Map<string, Set<() => void>>();
     stopped = false;
     unloaded = false;
 
-    constructor(opts: { src: string[]; loop?: boolean }) {
+    constructor(opts: { src: string[]; format?: string[]; loop?: boolean }) {
       this.src = opts.src[0]!;
+      this.format = opts.format;
       this.loop = opts.loop ?? false;
       FakeHowl.instances.push(this);
     }
@@ -134,7 +136,7 @@ describe('MusicController', () => {
 
     expect(controller.getState().trackId).toBe('casino-1');
     expect(controller.getState().status).toBe('playing');
-    expect(howlFor('music-casino-1.mp3')?.loop).toBe(false);
+    expect(howlFor('music-casino-1.m4a')).toMatchObject({ format: ['m4a'], loop: false });
 
     controller.next();
     expect(controller.getState().trackId).toBe('casino-2');
@@ -146,7 +148,7 @@ describe('MusicController', () => {
     expect(controller.getState().trackId).toBe('campfire-1');
 
     for (const expected of ['campfire-2', 'campfire-3', 'campfire-1']) {
-      howlFor(`music-${controller.getState().trackId}.mp3`)?.emit('end');
+      howlFor(`music-${controller.getState().trackId}.m4a`)?.emit('end');
       expect(controller.getState().trackId).toBe(expected);
     }
     expect(controller.getState().status).toBe('playing');
@@ -157,7 +159,7 @@ describe('MusicController', () => {
     controller.play();
     controller.pause();
 
-    howlFor('music-campfire-1.mp3')?.emit('end');
+    howlFor('music-campfire-1.m4a')?.emit('end');
     expect(controller.getState().trackId).toBe('campfire-1');
     expect(controller.getState().status).toBe('paused');
   });
@@ -183,7 +185,7 @@ describe('MusicController', () => {
     expect(FakeHowl.instances.length).toBe(voiceCountBefore + 1);
 
     vi.advanceTimersByTime(1000);
-    const retired = howlFor('music-campfire-1.mp3');
+    const retired = howlFor('music-campfire-1.m4a');
     expect(retired?.stopped || retired?.unloaded).toBe(true);
   });
 
@@ -194,10 +196,10 @@ describe('MusicController', () => {
 
     controller.setMenu(true);
     expect(controller.getState().trackId).toBe('title-1');
-    expect(howlFor('music-title.mp3')).toBeDefined();
+    expect(howlFor('music-title.m4a')).toBeDefined();
 
     // Single-song playlist wraps on itself.
-    howlFor('music-title.mp3')?.emit('end');
+    howlFor('music-title.m4a')?.emit('end');
     expect(controller.getState().trackId).toBe('title-1');
 
     controller.setMenu(false);
@@ -240,7 +242,7 @@ describe('MusicController', () => {
     expect(controller.getState().mood).toBe('tense');
     expect(controller.getState().trackId).toBe('tense-1');
     expect(controller.getState().status).toBe('playing');
-    expect(howlFor('music-tense.mp3')).toBeDefined();
+    expect(howlFor('music-tense.m4a')).toBeDefined();
 
     // The cue holds: neither the playlist end nor a scene change steals it back.
     controller.next();
@@ -319,7 +321,7 @@ describe('MusicController', () => {
     // Idle switch applies on the next play.
     controller.play();
     expect(controller.getState().trackId).toBe('wild-a');
-    expect(howlFor('wild-a.mp3')).toBeDefined();
+    expect(howlFor('wild-a.mp3')).toMatchObject({ format: undefined });
 
     unregisterPackForTest();
     FakeHowl.instances.length = 0;
@@ -331,11 +333,11 @@ describe('MusicController', () => {
     const controller = new MusicController(makeManager());
     controller.play();
 
-    howlFor('music-campfire-1.mp3')?.emit('loaderror');
+    howlFor('music-campfire-1.m4a')?.emit('loaderror');
     expect(controller.getState().trackId).toBe('campfire-2');
-    howlFor('music-campfire-2.mp3')?.emit('loaderror');
+    howlFor('music-campfire-2.m4a')?.emit('loaderror');
     expect(controller.getState().trackId).toBe('campfire-3');
-    howlFor('music-campfire-3.mp3')?.emit('loaderror');
+    howlFor('music-campfire-3.m4a')?.emit('loaderror');
 
     expect(controller.getState().trackId).toBe(FALLBACK_TRACK.id);
     expect(howlFor('parlour-ambience.wav')?.loop).toBe(true);

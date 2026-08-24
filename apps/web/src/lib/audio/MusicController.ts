@@ -299,7 +299,10 @@ export class MusicController {
     this.notify();
   }
 
-  private startVoice(track: { src: string; loop?: boolean; title: string }, trackId: string): void {
+  private startVoice(
+    track: { src: string; format?: string; loop?: boolean; title: string },
+    trackId: string,
+  ): void {
     const generation = ++this.transitionGeneration;
 
     for (const [id, voice] of this.voices) {
@@ -326,7 +329,13 @@ export class MusicController {
     }
 
     const voice: Voice = {
-      howl: new Howl({ src: [track.src], loop: track.loop ?? false, html5: false, volume: 0 }),
+      howl: new Howl({
+        src: [track.src],
+        ...(track.format ? { format: [track.format] } : {}),
+        loop: track.loop ?? false,
+        html5: false,
+        volume: 0,
+      }),
       soundId: null,
       gain: 0,
       failed: false,

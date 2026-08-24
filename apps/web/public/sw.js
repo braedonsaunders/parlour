@@ -4,6 +4,9 @@ importScripts('/precache-manifest.js');
 const manifest = self.__PARLOUR_PRECACHE ?? { version: 'shell', urls: [] };
 const PRECACHE = `parlour-precache-${manifest.version}`;
 const RUNTIME = `parlour-runtime-${manifest.version}`;
+const MUSIC_RUNTIME = `parlour-music-${manifest.version}`;
+const MUSIC_PATH_PREFIX = '/audio/music/';
+const MUSIC_CACHE_MAX_ENTRIES = 4;
 const REQUIRED_SHELL = [
   '/',
   '/offline.html',
@@ -18,11 +21,17 @@ function cacheable(response) {
   return response.ok && response.type === 'basic';
 }
 
-async function cacheResponse(cacheName, request, response) {
+async function cacheResponse(cacheName, request, response, maxEntries) {
   if (!cacheable(response)) return;
   const copy = response.clone();
   const cache = await caches.open(cacheName);
   await cache.put(request, copy);
+  if (maxEntries === undefined) return;
+
+  const keys = await cache.keys();
+  await Promise.all(
+    keys.slice(0, Math.max(0, keys.length - maxEntries)).map((key) => cache.delete(key)),
+  );
 }
 
 function navigationCandidates(url) {
@@ -62,7 +71,13 @@ self.addEventListener('activate', (event) => {
       .then((keys) =>
         Promise.all(
           keys
-            .filter((key) => key.startsWith('parlour-') && key !== PRECACHE && key !== RUNTIME)
+            .filter(
+              (key) =>
+                key.startsWith('parlour-') &&
+                key !== PRECACHE &&
+                key !== RUNTIME &&
+                key !== MUSIC_RUNTIME,
+            )
             .map((key) => caches.delete(key)),
         ),
       )
@@ -94,10 +109,14 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  const cacheFirst = caches.match(request, { ignoreSearch: true }).then(async (cached) => {
+  const isMusic = url.pathname.startsWith(MUSIC_PATH_PREFIX);
+  const cacheName = isMusic ? MUSIC_RUNTIME : RUNTIME;
+  const maxEntries = isMusic ? MUSIC_CACHE_MAX_ENTRIES : undefined;
+  const cacheFirst = caches.open(cacheName).then(async (cache) => {
+    const cached = await cache.match(request, { ignoreSearch: true });
     if (cached) return { response: cached, cacheWrite: Promise.resolve() };
     const response = await fetch(request);
-    return { response, cacheWrite: cacheResponse(RUNTIME, request, response) };
+    return { response, cacheWrite: cacheResponse(cacheName, request, response, maxEntries) };
   });
 
   event.respondWith(cacheFirst.then(({ response }) => response));

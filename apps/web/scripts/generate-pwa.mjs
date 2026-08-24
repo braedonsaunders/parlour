@@ -70,6 +70,6 @@ if (process.argv[1] && resolve(process.argv[1]) === SCRIPT_PATH) {
   const result = await generatePrecacheManifest(process.argv[2]);
   const size = (result.totalBytes / (1024 * 1024)).toFixed(1);
   console.log(
-    `[parlour] precached ${result.urls.length} app files (${size} MB); music remains on-demand`,
+    `[parlour] precached ${result.urls.length} app files (${size} MB); music caches on first play`,
   );
 }

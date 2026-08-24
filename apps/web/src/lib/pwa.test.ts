@@ -58,6 +58,9 @@ describe('installable offline shell', () => {
     expect(worker).toContain("importScripts('/precache-manifest.js')");
     expect(worker).toContain("event.data?.type === 'SKIP_WAITING'");
     expect(worker).toContain('`parlour-runtime-${manifest.version}`');
+    expect(worker).toContain('`parlour-music-${manifest.version}`');
+    expect(worker).toContain("const MUSIC_PATH_PREFIX = '/audio/music/'");
+    expect(worker).toContain('const MUSIC_CACHE_MAX_ENTRIES = 4');
     expect(worker).not.toContain(
       "self.addEventListener('install', (event) => {\n  self.skipWaiting",
     );
@@ -75,7 +78,7 @@ describe('installable offline shell', () => {
       writeFileSync(join(directory, 'index.html'), '<main>parlour</main>');
       writeFileSync(join(directory, 'games/index.html'), '<main>games</main>');
       writeFileSync(join(directory, '_next/static/app.js'), 'console.log("app")');
-      writeFileSync(join(directory, 'audio/music/title.mp3'), 'large soundtrack');
+      writeFileSync(join(directory, 'audio/music/title.m4a'), 'large soundtrack');
       writeFileSync(join(directory, 'audio/sfx/deal-card.mp3'), 'lightweight game cue');
       writeFileSync(join(directory, 'sw.js'), 'worker source');
 
@@ -91,7 +94,7 @@ describe('installable offline shell', () => {
       expect(generated).not.toContain('/audio/music/');
       expect(generated).not.toContain('"/sw.js"');
 
-      writeFileSync(join(directory, 'audio/music/title.mp3'), 'replacement soundtrack');
+      writeFileSync(join(directory, 'audio/music/title.m4a'), 'replacement soundtrack');
       execFileSync(process.execPath, [join(process.cwd(), 'scripts/generate-pwa.mjs'), directory]);
       const musicUpdate = readFileSync(join(directory, 'precache-manifest.js'), 'utf8');
       expect(musicUpdate).not.toContain('/audio/music/');

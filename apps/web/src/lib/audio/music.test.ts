@@ -1,4 +1,4 @@
-import { readFileSync, statSync } from 'node:fs';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
@@ -30,7 +30,8 @@ describe('music library', () => {
       expect(playlist, `${scene} ships three songs`).toHaveLength(3);
       for (const song of playlist) {
         expect(song.title.trim()).not.toBe('');
-        expect(song.src).toBe(`/audio/music/music-${song.id}.mp3`);
+        expect(song.src).toBe(`/audio/music/music-${song.id}.m4a`);
+        expect(song.format).toBe('m4a');
       }
     }
   });
@@ -48,32 +49,33 @@ describe('music library', () => {
   it('resolves lookups across songs, packs, menu theme, and fallback', () => {
     expect(MUSIC_TRACKS.length).toBe(11);
     expect(getMusicTrack('campfire-1')?.title).toBe('Ember Watch');
-    expect(getMusicTrack('title-1')?.src).toContain('music-title.mp3');
-    expect(getMusicTrack('tense-1')?.src).toContain('music-tense.mp3');
+    expect(getMusicTrack('title-1')?.src).toContain('music-title.m4a');
+    expect(getMusicTrack('tense-1')?.src).toContain('music-tense.m4a');
     expect(getMusicTrack('nope')).toBeUndefined();
   });
 
-  it('ships every declared track as a valid non-empty MP3', () => {
+  it('ships every declared track as non-empty AAC-LC in an M4A container', () => {
     expect(MUSIC_TRACKS.length).toBeGreaterThan(0);
     for (const song of MUSIC_TRACKS) {
       const path = join(process.cwd(), 'public', song.src);
       expect(statSync(path).size, `${song.id} is not an empty placeholder`).toBeGreaterThan(50_000);
-      const header = readFileSync(path);
-      const hasId3 = header.subarray(0, 3).toString() === 'ID3';
-      const hasFrameSync = header[0] === 0xff && (header[1]! & 0xe0) === 0xe0;
-      expect(hasId3 || hasFrameSync, `${song.id} is not an MPEG audio file`).toBe(true);
+      const header = readFileSync(path).subarray(0, 12);
+      expect(header.subarray(4, 8).toString(), `${song.id} is not an ISO BMFF file`).toBe('ftyp');
     }
+
+    const libraryFiles = readdirSync(join(process.cwd(), 'public/audio/music'));
+    expect(libraryFiles.filter((name) => name.endsWith('.mp3'))).toEqual([]);
   });
 
   it('provides a menu theme on the base pack and keeps tense out of the picker', () => {
     expect(PARLOUR_PACK.menu).toEqual(MENU_PLAYLIST);
-    expect(menuPlaylistSrc()).toContain('/audio/music/music-title.mp3');
+    expect(menuPlaylistSrc()).toContain('/audio/music/music-title.m4a');
 
     expect(getMusicPack('tense')).toBeUndefined();
     expect(listMusicPacks().map((pack) => pack.id)).not.toContain('tense');
 
     expect(PARLOUR_PACK.moods?.tense).toEqual(TENSE_PLAYLIST);
-    expect(moodForPack(PARLOUR_PACK, 'tense')[0]?.src).toContain('music-tense.mp3');
+    expect(moodForPack(PARLOUR_PACK, 'tense')[0]?.src).toContain('music-tense.m4a');
     expect(moodForPack(PARLOUR_PACK, 'nope')).toEqual([]);
 
     for (const scene of SCENE_IDS) {

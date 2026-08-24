@@ -30,6 +30,8 @@ export type MusicTrack = {
   id: string;
   title: string;
   src: string;
+  /** Explicit Howler codec hint; omit when the source extension is sufficient. */
+  format?: string;
   /** Per-track scale inside the music channel gain. */
   volume?: number;
   /** Ambience-style tracks repeat themselves; songs advance the playlist instead. */
@@ -37,35 +39,35 @@ export type MusicTrack = {
 };
 
 function track(id: string, title: string, src: string, volume?: number): MusicTrack {
-  return { id, title, src, ...(volume === undefined ? {} : { volume }) };
+  return { id, title, src, format: 'm4a', ...(volume === undefined ? {} : { volume }) };
 }
 
 const CAMPFIRE_PLAYLIST: readonly MusicTrack[] = [
-  track('campfire-1', 'Ember Watch', '/audio/music/music-campfire-1.mp3'),
-  track('campfire-2', 'Crickets & Coals', '/audio/music/music-campfire-2.mp3', 0.95),
-  track('campfire-3', 'Smoke Signals', '/audio/music/music-campfire-3.mp3'),
+  track('campfire-1', 'Ember Watch', '/audio/music/music-campfire-1.m4a'),
+  track('campfire-2', 'Crickets & Coals', '/audio/music/music-campfire-2.m4a', 0.95),
+  track('campfire-3', 'Smoke Signals', '/audio/music/music-campfire-3.m4a'),
 ];
 
 const CASINO_PLAYLIST: readonly MusicTrack[] = [
-  track('casino-1', 'Velvet Hour', '/audio/music/music-casino-1.mp3'),
-  track('casino-2', 'Midnight Chip Lead', '/audio/music/music-casino-2.mp3', 0.95),
-  track('casino-3', 'House Whiskey', '/audio/music/music-casino-3.mp3'),
+  track('casino-1', 'Velvet Hour', '/audio/music/music-casino-1.m4a'),
+  track('casino-2', 'Midnight Chip Lead', '/audio/music/music-casino-2.m4a', 0.95),
+  track('casino-3', 'House Whiskey', '/audio/music/music-casino-3.m4a'),
 ];
 
 const SNUG_PLAYLIST: readonly MusicTrack[] = [
-  track('snug-1', 'Turf & Timber', '/audio/music/music-snug-1.mp3'),
-  track('snug-2', 'Last Bus Home', '/audio/music/music-snug-2.mp3', 0.95),
-  track('snug-3', 'The Quiet Round', '/audio/music/music-snug-3.mp3'),
+  track('snug-1', 'Turf & Timber', '/audio/music/music-snug-1.m4a'),
+  track('snug-2', 'Last Bus Home', '/audio/music/music-snug-2.m4a', 0.95),
+  track('snug-3', 'The Quiet Round', '/audio/music/music-snug-3.m4a'),
 ];
 
 /** Title-screen theme, played on menu routes instead of a scene playlist. */
 export const MENU_PLAYLIST: readonly MusicTrack[] = [
-  track('title-1', 'Pull Up a Chair', '/audio/music/music-title.mp3'),
+  track('title-1', 'Pull Up a Chair', '/audio/music/music-title.m4a'),
 ];
 
 /** The `tense` mood cue — armed by game state, never offered in settings. */
 export const TENSE_PLAYLIST: readonly MusicTrack[] = [
-  track('tense-1', 'Knock Knows', '/audio/music/music-tense.mp3'),
+  track('tense-1', 'Knock Knows', '/audio/music/music-tense.m4a'),
 ];
 
 /** Flat view of every shipped track — handy for validation and tooling. */
