@@ -14,7 +14,7 @@ import type { MultiplayerSecurity } from '@/app/_multiplayer/roomSession';
  * Every word below is still deliberate. The badge says what is covered and what
  * is not: a fair deal is not a hidden hand, and an open room is readable by a
  * modified client. Parlour Veil remains the real guarantee about *hands* and is
- * never described as "cheat-proof" — see docs/VEILED-DECK-PROTOCOL.md.
+ * never described as "cheat-proof" — see apps/web/src/lib/multiplayer/veil.
  */
 
 /** In-room badge: the guarantee, the audit state, and what recovery costs. */

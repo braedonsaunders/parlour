@@ -120,7 +120,7 @@ export interface WildpileState {
    * True when the round is dealt under Veil: hands and stock hold opaque
    * handles. A card becomes readable the moment it is played, so ordinary play
    * needs no rule changes — only jump-in does, because the table can no longer
-   * tell who is holding a match. See docs/VEILED-DECK-PROTOCOL.md.
+   * tell who is holding a match. See apps/web/src/lib/multiplayer/veil.
    */
   veiled: boolean;
 }

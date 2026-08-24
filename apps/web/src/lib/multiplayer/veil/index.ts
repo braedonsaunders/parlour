@@ -1,7 +1,7 @@
 /**
  * Parlour Veil — opt-in hidden hands for friend rooms, with no game server.
  *
- * Design: docs/VEILED-DECK-PROTOCOL.md. Engine seam: `@parlour/engine`'s
+ * Design: apps/web/src/lib/multiplayer/veil. Engine seam: `@parlour/engine`'s
  * veil.ts (opaque handles, reveals recorded on the event log). This directory
  * is the client half: the shuffle ceremony, private dealing, the signed
  * transcript, disconnect recovery and the after-match audit.

@@ -84,7 +84,7 @@ describe('a veiled spades hand', () => {
 
   // The authority holds handles, so it cannot see what a seat could have
   // followed with. The protocol audits a revoke after the match instead of
-  // pretending to catch it live — see docs/VEILED-DECK-PROTOCOL.md.
+  // pretending to catch it live — see apps/web/src/lib/multiplayer/veil.
   it('does not enforce following suit against cards it cannot read', () => {
     const session = bidAround(veiledSession().session);
     const leader = session.state.turn;

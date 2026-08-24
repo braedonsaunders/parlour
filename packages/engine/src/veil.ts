@@ -1,6 +1,6 @@
 /**
  * Veil handles — the engine half of the Parlour Veil privacy protocol
- * (docs/VEILED-DECK-PROTOCOL.md).
+ * (apps/web/src/lib/multiplayer/veil).
  *
  * A veiled room deals *handles* instead of card faces. The public reducer keeps
  * owning turn order, counts, zones and every visible card; it simply never sees

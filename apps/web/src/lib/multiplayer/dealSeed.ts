@@ -17,7 +17,7 @@
  * What it does not do, stated plainly because the UI repeats it: it does not
  * hide your hand. An open room still replays the whole game on every device, so
  * a modified client can read any hand. That is what Parlour Veil is for — see
- * docs/VEILED-DECK-PROTOCOL.md — and a veiled room gets this guarantee from the
+ * apps/web/src/lib/multiplayer/veil — and a veiled room gets this guarantee from the
  * shuffle ceremony instead, which is strictly stronger.
  *
  * The one residual: whoever reveals last sees every other nonce before sending

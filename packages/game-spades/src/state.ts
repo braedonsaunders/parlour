@@ -46,7 +46,7 @@ export interface SpadesState {
    * The rules that depend on what a seat *holds* cannot be checked against
    * handles, so they change shape rather than pretending: following suit is
    * audited after the match instead of enforced live, and leading spades early
-   * needs the hand opened as a claim. See docs/VEILED-DECK-PROTOCOL.md.
+   * needs the hand opened as a claim. See apps/web/src/lib/multiplayer/veil.
    */
   veiled: boolean;
   /**

@@ -639,7 +639,7 @@ const flow: GameDef<EuchreState, EuchreRules>['flow'] = {
 
   /**
    * Veiled rooms receive each new deal through an injected ceremony order —
-   * the sanctioned path for outside facts (docs/VEILED-DECK-PROTOCOL.md §5).
+   * the sanctioned path for outside facts (apps/web/src/lib/multiplayer/veil).
    */
   canInject(state, phase, moveId, payload) {
     if (moveId !== 'euchre.hand.order') {

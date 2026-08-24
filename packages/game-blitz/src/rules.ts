@@ -212,7 +212,7 @@ const knock: Move<BlitzState> = {
 };
 
 // ---------------------------------------------------------------------------
-// veil moves — the honest cost of hiding hands (docs/VEILED-DECK-PROTOCOL.md §5)
+// veil moves — the honest cost of hiding hands (apps/web/src/lib/multiplayer/veil)
 // ---------------------------------------------------------------------------
 
 /**
