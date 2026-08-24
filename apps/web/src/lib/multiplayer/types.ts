@@ -1,4 +1,4 @@
-import type { AppliedEvent, FxEvent, RuleValues, SeatId } from '@parlour/engine';
+import type { AppliedEvent, CardRecycle, FxEvent, RuleValues, SeatId } from '@parlour/engine';
 
 export type PeerId = string;
 export type ProfileId = string;
@@ -36,8 +36,8 @@ export type PlayerAction = {
    * rejects them there rather than treating them as a free card swap.
    */
   reveals?: readonly (readonly [string, string])[];
-  /** Cards going back under the veil, e.g. a recycled discard pile. */
-  conceals?: readonly (readonly [string, string])[];
+  /** A public spent pile exchanged for the handles from a fresh Veil epoch. */
+  recycle?: CardRecycle;
 };
 
 export type AppliedPacket = {

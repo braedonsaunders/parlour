@@ -1,7 +1,12 @@
 import { createRoomCode, roomJoinUrl, validateRoomCode } from '../rooms/code';
 import { seatRangeFor } from '../rooms/seatRange';
 import { NostrSignaling, type RoomAnnouncement, type SignalPayload } from './NostrSignaling';
-import { HEARTBEAT_INTERVAL_MS, MultiplayerState, validatePresenceSnapshot } from './resilience';
+import {
+  HEARTBEAT_INTERVAL_MS,
+  HEARTBEAT_TIMEOUT_MS,
+  MultiplayerState,
+  validatePresenceSnapshot,
+} from './resilience';
 import { validateEmote } from './emotes';
 import { DuplicateActionError } from './EngineAuthority';
 import { dispatchWireData, type PeerDescriptor, type WireMessage } from './wireSchema';
@@ -39,6 +44,8 @@ type PeerLink = {
   pc: RTCPeerConnection;
   channel?: RTCDataChannel;
   pendingIce: RTCIceCandidateInit[];
+  /** DataChannels are ordered, so async packet handling must stay ordered too. */
+  inbox: Promise<void>;
   profileId?: string;
 };
 
@@ -51,6 +58,8 @@ type P2PTransportOptions = {
   iceServers?: RTCIceServer[];
   origin?: string;
   now?: () => number;
+  heartbeatIntervalMs?: number;
+  heartbeatTimeoutMs?: number;
   randomBytes?: (length: number) => Uint8Array;
   peerConnection?: (configuration: RTCConfiguration) => RTCPeerConnection;
 };
@@ -63,6 +72,8 @@ export class P2PTransport implements Transport {
   private readonly iceServers: RTCIceServer[];
   private readonly origin: string;
   private readonly now: () => number;
+  private readonly heartbeatIntervalMs: number;
+  private readonly heartbeatTimeoutMs: number;
   private readonly randomBytes: (length: number) => Uint8Array;
   private readonly peerConnection: (configuration: RTCConfiguration) => RTCPeerConnection;
   private readonly links = new Map<string, PeerLink>();
@@ -94,6 +105,8 @@ export class P2PTransport implements Transport {
     this.iceServers = options.iceServers ?? DEFAULT_ICE_SERVERS;
     this.origin = options.origin ?? window.location.origin;
     this.now = options.now ?? (() => Date.now());
+    this.heartbeatIntervalMs = options.heartbeatIntervalMs ?? HEARTBEAT_INTERVAL_MS;
+    this.heartbeatTimeoutMs = options.heartbeatTimeoutMs ?? HEARTBEAT_TIMEOUT_MS;
     this.randomBytes =
       options.randomBytes ??
       ((length) => {
@@ -142,6 +155,22 @@ export class P2PTransport implements Transport {
     this.resilience?.trackPending(action);
     if (this.isHost()) void this.applyAsHost(action);
     else this.sendTo(this.resilience!.hostId, { type: 'intent', action });
+  }
+
+  /**
+   * Submits a move on behalf of a seat a bot has taken over.
+   *
+   * Authorised narrowly: only the host, and only for a seat the presence layer
+   * has actually marked as a bot. That is what keeps this from being a way to
+   * play someone else's turn — a seat with a live peer behind it is refused
+   * even to the host.
+   */
+  sendAsBot(action: PlayerAction): void {
+    this.assertReady();
+    if (!this.isHost()) throw new Error('only the host authority may play a bot seat');
+    const occupant = this.resilience!.seats.get(action.seat);
+    if (!occupant?.bot) throw new Error(`seat ${action.seat} is not being played by a bot`);
+    void this.applyAsHost(action);
   }
 
   inject(move: string, payload?: unknown): void {
@@ -239,7 +268,7 @@ export class P2PTransport implements Transport {
     this.signalSubscription = this.signaling.subscribe(code, (sender, signal) => {
       void this.receiveSignal(sender, signal);
     });
-    this.heartbeatTimer = setInterval(() => this.heartbeat(), HEARTBEAT_INTERVAL_MS);
+    this.heartbeatTimer = setInterval(() => this.heartbeat(), this.heartbeatIntervalMs);
   }
 
   private handle(code: string): RoomHandle {
@@ -264,7 +293,7 @@ export class P2PTransport implements Transport {
 
   private createLink(peerId: string): PeerLink {
     const pc = this.peerConnection({ iceServers: this.iceServers });
-    const link: PeerLink = { pc, pendingIce: [] };
+    const link: PeerLink = { pc, pendingIce: [], inbox: Promise.resolve() };
     this.links.set(peerId, link);
     pc.onicecandidate = (event) => {
       if (event.candidate) {
@@ -295,7 +324,13 @@ export class P2PTransport implements Transport {
     channel.onmessage = (event) => {
       dispatchWireData(
         event.data,
-        (message) => this.receiveWire(peerId, message),
+        (message) => {
+          const next = link.inbox.then(() => this.receiveWire(peerId, message));
+          // Keep a rejected packet from wedging every packet after it while
+          // returning the original promise so dispatchWireData still reports it.
+          link.inbox = next.catch(() => undefined);
+          return next;
+        },
         (message) => this.emitPresence({ kind: 'error', message }),
       );
     };
@@ -513,7 +548,7 @@ export class P2PTransport implements Transport {
     this.broadcast({ type: 'heartbeat', sentAt: this.now() });
     const before = new Map(this.resilience.seats);
     const beforePresence = this.resilience.exportPresence();
-    const election = this.resilience.expireAndElect(this.now());
+    const election = this.resilience.expireAndElect(this.now(), this.heartbeatTimeoutMs);
     for (const [seat, occupant] of this.resilience.seats) {
       if (!before.get(seat)?.bot && occupant.bot) {
         this.authority.setSeatBot(seat, true);

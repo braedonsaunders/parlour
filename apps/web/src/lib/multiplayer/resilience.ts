@@ -136,10 +136,13 @@ export class MultiplayerState {
     return localHash === remoteHash ? null : { expectedSeq };
   }
 
-  expireAndElect(now: number): { changed: boolean; hostId: string; resend: PlayerAction[] } {
+  expireAndElect(
+    now: number,
+    timeoutMs = HEARTBEAT_TIMEOUT_MS,
+  ): { changed: boolean; hostId: string; resend: PlayerAction[] } {
     const expired = new Set<string>();
     for (const [peerId, seenAt] of this.lastSeen) {
-      if (peerId !== this.localPeerId && now - seenAt > HEARTBEAT_TIMEOUT_MS) {
+      if (peerId !== this.localPeerId && now - seenAt > timeoutMs) {
         expired.add(peerId);
         this.lastSeen.delete(peerId);
       }

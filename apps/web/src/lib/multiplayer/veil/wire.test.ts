@@ -23,6 +23,13 @@ function signedEntry(overrides: Record<string, unknown> = {}) {
   };
 }
 
+function signedRecycle(overrides: Record<string, unknown> = {}) {
+  return signedEntry({
+    kind: 'ceremony.recycle',
+    payload: { epoch: 1, cards: ['H2', 'D4'], participants: [0, 1], ...overrides },
+  });
+}
+
 const header = {
   roundId: 'ABCD:1:0',
   gameId: 'blitz',
@@ -37,6 +44,7 @@ describe('veil wire validation', () => {
     expect(isVeilMessage({ type: 'veil.hello', seat: 0, publicKey: 'k0' })).toBe(true);
     expect(isVeilMessage({ type: 'veil.header', header })).toBe(true);
     expect(isVeilMessage({ type: 'veil.entry', entry: signedEntry() })).toBe(true);
+    expect(isVeilMessage({ type: 'veil.entry', entry: signedRecycle() })).toBe(true);
     expect(
       isVeilMessage({ type: 'veil.peel', epoch: 0, position: 3, forSeat: 1, locked: ELEMENT }),
     ).toBe(true);
@@ -103,6 +111,27 @@ describe('veil wire validation', () => {
       isVeilMessage({
         type: 'veil.entry',
         entry: signedEntry({ payload: layerEntry({ commitment: 'nope' }) }),
+      }),
+    ).toBe(false);
+  });
+
+  it('type-checks a recycle declaration and rejects opaque transcript kinds', () => {
+    expect(
+      isVeilMessage({
+        type: 'veil.entry',
+        entry: signedRecycle({ cards: ['H2', 'H2'] }),
+      }),
+    ).toBe(false);
+    expect(
+      isVeilMessage({
+        type: 'veil.entry',
+        entry: signedRecycle({ participants: [0, 0] }),
+      }),
+    ).toBe(false);
+    expect(
+      isVeilMessage({
+        type: 'veil.entry',
+        entry: signedEntry({ kind: 'ceremony.unknown', payload: {} }),
       }),
     ).toBe(false);
   });
