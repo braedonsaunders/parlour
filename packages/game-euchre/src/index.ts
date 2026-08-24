@@ -15,6 +15,7 @@ export {
   EUCHRE_SUITS,
   EUCHRE_SUIT_NAMES,
   effectiveSuit,
+  type EuchreSuit,
   isLeftBower,
   isRightBower,
   leftBowerSuit,

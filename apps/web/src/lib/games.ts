@@ -1,6 +1,6 @@
-export type GameId = 'blitz' | 'wild';
+export type GameId = 'blitz' | 'wild' | 'euchre';
 
-export type GamePreviewKind = 'blitz-fan' | 'wild-fan';
+export type GamePreviewKind = 'blitz-fan' | 'wild-fan' | 'euchre-fan';
 
 export interface GameDef {
   id: GameId;
@@ -46,6 +46,19 @@ export const GAMES: readonly GameDef[] = [
     shade: '#7c2c3e',
     preview: 'wild-fan',
     href: '/wild',
+  },
+  {
+    id: 'euchre',
+    name: 'Euchre',
+    subtitle: 'the partner game',
+    tagline: 'Take tricks for your team',
+    description:
+      'Order it up, name your trump, and chase bowers with the player across the table. First team to ten takes the match.',
+    facts: ['4 players · 2v2', 'trick-taking', 'solo or friends'],
+    accent: '#5fae7b',
+    shade: '#2f6b48',
+    preview: 'euchre-fan',
+    href: '/euchre',
   },
 ];
 

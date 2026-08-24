@@ -44,6 +44,9 @@ importers:
       '@parlour/game-blitz':
         specifier: workspace:*
         version: link:../../packages/game-blitz
+      '@parlour/game-euchre':
+        specifier: workspace:*
+        version: link:../../packages/game-euchre
       '@parlour/game-wildpile':
         specifier: workspace:*
         version: link:../../packages/game-wildpile

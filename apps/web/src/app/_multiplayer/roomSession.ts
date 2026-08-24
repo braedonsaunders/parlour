@@ -8,6 +8,12 @@ import {
   type BlitzState,
 } from '@parlour/game-blitz';
 import {
+  createEuchreDef,
+  euchreConfig,
+  type EuchreRules,
+  type EuchreState,
+} from '@parlour/game-euchre';
+import {
   wildpileConfig,
   wildpileGame,
   type WildpileRules,
@@ -25,9 +31,11 @@ import {
 import { NostrSignaling, type RoomAnnouncement } from '@/lib/multiplayer/NostrSignaling';
 import { validateRoomCode } from '@/lib/rooms/code';
 
-export type MultiplayerGameId = 'blitz' | 'wildpile';
+export type MultiplayerGameId = 'blitz' | 'wildpile' | 'euchre';
 export type MultiplayerGameSession =
-  GameSession<BlitzState, BlitzConfig> | GameSession<WildpileState, WildpileRules>;
+  | GameSession<BlitzState, BlitzConfig>
+  | GameSession<WildpileState, WildpileRules>
+  | GameSession<EuchreState, EuchreRules>;
 
 export type MultiplayerProfile = {
   name: string;
@@ -108,6 +116,9 @@ export class MultiplayerRoomSession {
 
   async create(options: CreateRoomOptions): Promise<RoomHandle> {
     if (options.seats < 2 || options.seats > 4) throw new Error('rooms require 2–4 seats');
+    if (options.gameId === 'euchre' && options.seats !== 4) {
+      throw new Error('euchre rooms require exactly four seats');
+    }
     const settings = resolveRoomSettings({
       gameId: options.gameId ?? 'blitz',
       seats: options.seats,
@@ -356,6 +367,14 @@ export function wildMultiplayerSession(
     : null;
 }
 
+export function euchreMultiplayerSession(
+  snapshot: MultiplayerRoomSnapshot,
+): GameSession<EuchreState, EuchreRules> | null {
+  return snapshot.gameId === 'euchre'
+    ? (snapshot.session as GameSession<EuchreState, EuchreRules> | null)
+    : null;
+}
+
 function resolveRoomSettings(settings: RoomSettings): RoomSettings {
   if (!Number.isInteger(settings.seats) || settings.seats < 2 || settings.seats > 4) {
     throw new Error('rooms require 2–4 seats');
@@ -374,6 +393,14 @@ function resolveRoomSettings(settings: RoomSettings): RoomSettings {
       config: wildpileConfig.resolve(settings.config as Partial<WildpileRules>),
     };
   }
+  if (settings.gameId === 'euchre') {
+    if (settings.seats !== 4) throw new Error('euchre rooms require exactly four seats');
+    return {
+      gameId: 'euchre',
+      seats: settings.seats,
+      config: euchreConfig.resolve(settings.config as Partial<EuchreRules>),
+    };
+  }
   throw new Error(`unsupported room game: ${settings.gameId}`);
 }
 
@@ -382,6 +409,13 @@ function createRoomRuntime(
   seed: number,
   onSeatBot: (seat: number, bot: boolean) => void,
 ): { session: MultiplayerGameSession; authority: SessionAuthority } {
+  if (settings.gameId === 'euchre') {
+    const def = createEuchreDef();
+    const config = settings.config as EuchreRules;
+    const session = createSession(def, { seed, config, seats: settings.seats });
+    const authority = new EngineAuthority({ def, session, settings, onSeatBot });
+    return { session, authority };
+  }
   if (settings.gameId === 'wildpile') {
     const config = settings.config as WildpileRules;
     const session = createSession(wildpileGame, { seed, config, seats: settings.seats });

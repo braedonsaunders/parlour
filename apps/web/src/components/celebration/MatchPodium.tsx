@@ -121,7 +121,12 @@ export function MatchPodium({
               {entry.seat === snapshot.localSeat && ' (you)'}
             </span>
             <dl className={styles.statsRow}>
-              {snapshot.game === 'wild' ? (
+              {snapshot.game === 'euchre' ? (
+                <div>
+                  <dt>Team score</dt>
+                  <dd>{teamScoreOf(snapshot, entry.seat)}</dd>
+                </div>
+              ) : snapshot.game === 'wild' ? (
                 <div>
                   <dt>Cards left</dt>
                   <dd>{entry.cardsLeft ?? 0}</dd>
@@ -154,7 +159,18 @@ export function MatchPodium({
   );
 }
 
+function teamScoreOf(snapshot: MatchSnapshot, seat: number): number {
+  const detail = snapshot.result.rankings.find((rank) => rank.seat === seat)?.detail;
+  const score = detail && typeof detail === 'object' && 'score' in detail
+    ? (detail as { score?: unknown }).score
+    : undefined;
+  return typeof score === 'number' ? score : 0;
+}
+
 function modeLine(snapshot: MatchSnapshot): string {
+  if (snapshot.game === 'euchre') {
+    return `Euchre · ${typeof snapshot.mode === 'string' ? snapshot.mode.replace('-', ' ') : 'classic pub'}`;
+  }
   if (snapshot.game === 'wild') {
     return snapshot.mode === 'party' ? 'Wild · party pile' : 'Wild · classic pile';
   }

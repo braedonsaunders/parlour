@@ -20,7 +20,7 @@ export interface MatchSnapshot {
   seats: readonly RecordedSeat[];
   /** Which shelf game produced this match; absent means Blitz (pre-Wild callers). */
   game?: GameId;
-  mode: ModeId | WildModeId;
+  mode: ModeId | WildModeId | (string & {});
   /** The human's seat, for jingle-vs-sting and the "you" framing; null when absent. */
   localSeat: number | null;
 }
