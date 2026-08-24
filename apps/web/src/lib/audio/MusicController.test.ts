@@ -240,18 +240,21 @@ describe('MusicController', () => {
 
     controller.setMood('tense');
     expect(controller.getState().mood).toBe('tense');
-    expect(controller.getState().trackId).toBe('tense-1');
+    expect(controller.getState().trackId).toBe('tense-casino');
     expect(controller.getState().status).toBe('playing');
-    expect(howlFor('music-tense.m4a')).toBeDefined();
+    expect(howlFor('music-tense-casino.m4a')).toBeDefined();
 
-    // The cue holds: neither the playlist end nor a scene change steals it back.
+    // The cue holds through playlist navigation, while scene changes select the
+    // matching themed tense cue.
     controller.next();
-    expect(controller.getState().trackId).toBe('tense-1');
+    expect(controller.getState().trackId).toBe('tense-casino');
     controller.setScene('snug');
-    expect(controller.getState().trackId).toBe('tense-1');
+    expect(controller.getState().trackId).toBe('tense-snug');
+    expect(howlFor('music-tense-snug.m4a')).toBeDefined();
 
     // Releasing it returns to the song the table was on before the cue.
     controller.setScene('casino');
+    expect(controller.getState().trackId).toBe('tense-casino');
     controller.setMood(null);
     expect(controller.getState().mood).toBeNull();
     expect(controller.getState().trackId).toBe('casino-2');
@@ -286,7 +289,7 @@ describe('MusicController', () => {
     expect(controller.getState().trackId).toBe('title-1');
 
     controller.setMenu(false);
-    expect(controller.getState().trackId).toBe('tense-1');
+    expect(controller.getState().trackId).toBe('tense-campfire');
   });
 
   it('arms a mood while idle and applies it on the next play', () => {
@@ -295,7 +298,37 @@ describe('MusicController', () => {
     expect(controller.getState()).toMatchObject({ status: 'idle', mood: 'tense' });
 
     controller.play();
-    expect(controller.getState().trackId).toBe('tense-1');
+    expect(controller.getState().trackId).toBe('tense-campfire');
+  });
+
+  it('uses tense music authored by the active game pack', () => {
+    const gameTense = {
+      id: 'game-tense',
+      title: 'Game Pressure',
+      src: '/audio/music/game-tense.m4a',
+      format: 'm4a',
+    };
+    registerMusicPack({
+      id: 'tense-game',
+      label: 'Tense Game',
+      playlists: {},
+      moods: { tense: [gameTense] },
+    });
+
+    const controller = new MusicController(makeManager());
+    controller.setScene('casino');
+    controller.setPack('tense-game');
+    controller.play();
+    controller.setMood('tense');
+
+    expect(controller.getState()).toMatchObject({
+      packId: 'tense-game',
+      mood: 'tense',
+      trackId: 'game-tense',
+    });
+    expect(howlFor('game-tense.m4a')).toMatchObject({ format: ['m4a'] });
+
+    unregisterMusicPack('tense-game');
   });
 
   it('keeps a scene change idle-safe but applies it on the next play', () => {

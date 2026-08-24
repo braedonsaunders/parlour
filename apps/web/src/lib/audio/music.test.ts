@@ -7,7 +7,7 @@ import {
   MENU_PLAYLIST,
   MUSIC_TRACKS,
   PARLOUR_PACK,
-  TENSE_PLAYLIST,
+  TENSE_PLAYLISTS,
   getMusicPack,
   getMusicTrack,
   listMusicPacks,
@@ -47,10 +47,12 @@ describe('music library', () => {
   });
 
   it('resolves lookups across songs, packs, menu theme, and fallback', () => {
-    expect(MUSIC_TRACKS.length).toBe(11);
+    expect(MUSIC_TRACKS.length).toBe(13);
     expect(getMusicTrack('campfire-1')?.title).toBe('Ember Watch');
     expect(getMusicTrack('title-1')?.src).toContain('music-title.m4a');
-    expect(getMusicTrack('tense-1')?.src).toContain('music-tense.m4a');
+    expect(getMusicTrack('tense-campfire')?.src).toContain('music-tense-campfire.m4a');
+    expect(getMusicTrack('tense-casino')?.src).toContain('music-tense-casino.m4a');
+    expect(getMusicTrack('tense-snug')?.src).toContain('music-tense-snug.m4a');
     expect(getMusicTrack('nope')).toBeUndefined();
   });
 
@@ -74,8 +76,12 @@ describe('music library', () => {
     expect(getMusicPack('tense')).toBeUndefined();
     expect(listMusicPacks().map((pack) => pack.id)).not.toContain('tense');
 
-    expect(PARLOUR_PACK.moods?.tense).toEqual(TENSE_PLAYLIST);
-    expect(moodForPack(PARLOUR_PACK, 'tense')[0]?.src).toContain('music-tense.m4a');
+    for (const scene of SCENE_IDS) {
+      expect(PARLOUR_PACK.sceneMoods?.[scene]?.tense).toEqual(TENSE_PLAYLISTS[scene]);
+      expect(moodForPack(PARLOUR_PACK, 'tense', scene)[0]?.src).toContain(
+        `music-tense-${scene}.m4a`,
+      );
+    }
     expect(moodForPack(PARLOUR_PACK, 'nope')).toEqual([]);
 
     for (const scene of SCENE_IDS) {
@@ -83,7 +89,7 @@ describe('music library', () => {
     }
   });
 
-  it('lets a game pack override a mood and inherit the ones it omits', () => {
+  it('lets a game pack globally override tense music and inherit moods it omits', () => {
     const own = { id: 'wild-tense', title: 'Pile Pressure', src: '/audio/music/wild-tense.mp3' };
     registerMusicPack({
       id: 'mood-game',
@@ -93,11 +99,35 @@ describe('music library', () => {
     });
     const pack = getMusicPack('mood-game');
 
-    expect(moodForPack(pack, 'tense')).toEqual([own]);
+    expect(moodForPack(pack, 'tense', 'campfire')).toEqual([own]);
+    expect(moodForPack(pack, 'tense', 'casino')).toEqual([own]);
+    expect(moodForPack(pack, 'tense', 'snug')).toEqual([own]);
     expect(getMusicTrack('wild-tense')).toEqual(own);
     expect(moodForPack(pack, 'unknown-mood')).toEqual([]);
 
     unregisterMusicPack('mood-game');
+  });
+
+  it('lets a game pack override one scene mood and inherit themed Parlour cues elsewhere', () => {
+    const own = {
+      id: 'casino-sudden-death',
+      title: 'Loaded Dice',
+      src: '/audio/music/casino-sudden-death.m4a',
+    };
+    registerMusicPack({
+      id: 'scene-mood-game',
+      label: 'Scene Mood Game',
+      playlists: {},
+      sceneMoods: { casino: { tense: [own] } },
+    });
+    const pack = getMusicPack('scene-mood-game');
+
+    expect(moodForPack(pack, 'tense', 'casino')).toEqual([own]);
+    expect(moodForPack(pack, 'tense', 'campfire')).toEqual(TENSE_PLAYLISTS.campfire);
+    expect(moodForPack(pack, 'tense', 'snug')).toEqual(TENSE_PLAYLISTS.snug);
+    expect(getMusicTrack('casino-sudden-death')).toEqual(own);
+
+    unregisterMusicPack('scene-mood-game');
   });
 });
 

@@ -1,4 +1,4 @@
-import type { SceneId } from '@/stores/scene';
+import { DEFAULT_SCENE, type SceneId } from '@/stores/scene';
 
 /**
  * A soundtrack pack: named set of playlists any game can ship. The built-in
@@ -14,9 +14,16 @@ export type MusicPack = {
   menu?: readonly MusicTrack[];
   /**
    * Mood cues a running game can switch on from its own state (never pickable
-   * in settings). Moods a pack omits fall back to the parlour pack's.
+   * in settings). This is the simple game-pack authoring path: a global cue
+   * such as `moods: { tense: [...] }` overrides every background.
    */
   moods?: Readonly<Record<string, readonly MusicTrack[]>>;
+  /**
+   * Optional background-specific mood cues. These win over the pack's global
+   * moods; omitted scenes and moods fall back through the global cue and then
+   * the matching Parlour background.
+   */
+  sceneMoods?: Partial<Record<SceneId, Readonly<Record<string, readonly MusicTrack[]>>>>;
 };
 
 /**
@@ -65,10 +72,12 @@ export const MENU_PLAYLIST: readonly MusicTrack[] = [
   track('title-1', 'Pull Up a Chair', '/audio/music/music-title.m4a'),
 ];
 
-/** The `tense` mood cue — armed by game state, never offered in settings. */
-export const TENSE_PLAYLIST: readonly MusicTrack[] = [
-  track('tense-1', 'Knock Knows', '/audio/music/music-tense.m4a'),
-];
+/** Background-native `tense` cues — armed by game state, never shown in settings. */
+export const TENSE_PLAYLISTS: Readonly<Record<SceneId, readonly MusicTrack[]>> = {
+  campfire: [track('tense-campfire', 'Ember Rush', '/audio/music/music-tense-campfire.m4a')],
+  casino: [track('tense-casino', 'House Edge', '/audio/music/music-tense-casino.m4a')],
+  snug: [track('tense-snug', 'Last Orders', '/audio/music/music-tense-snug.m4a')],
+};
 
 /** Flat view of every shipped track — handy for validation and tooling. */
 export const MUSIC_TRACKS: readonly MusicTrack[] = [
@@ -76,7 +85,7 @@ export const MUSIC_TRACKS: readonly MusicTrack[] = [
   ...CASINO_PLAYLIST,
   ...SNUG_PLAYLIST,
   ...MENU_PLAYLIST,
-  ...TENSE_PLAYLIST,
+  ...Object.values(TENSE_PLAYLISTS).flat(),
 ];
 
 export const BASE_PACK_ID = 'parlour';
@@ -90,7 +99,11 @@ export const PARLOUR_PACK: MusicPack = {
     snug: SNUG_PLAYLIST,
   },
   menu: MENU_PLAYLIST,
-  moods: { tense: TENSE_PLAYLIST },
+  sceneMoods: {
+    campfire: { tense: TENSE_PLAYLISTS.campfire },
+    casino: { tense: TENSE_PLAYLISTS.casino },
+    snug: { tense: TENSE_PLAYLISTS.snug },
+  },
 };
 
 /** Plays when a playlist has no working songs (e.g. before Suno files land). */
@@ -137,6 +150,12 @@ export function getMusicTrack(id: string | null | undefined): MusicTrack | undef
       const found = list.find((candidate) => candidate.id === id);
       if (found) return found;
     }
+    for (const sceneMoods of Object.values(pack.sceneMoods ?? {})) {
+      for (const list of Object.values(sceneMoods ?? {})) {
+        const found = list.find((candidate) => candidate.id === id);
+        if (found) return found;
+      }
+    }
   }
   return undefined;
 }
@@ -164,8 +183,20 @@ export function menuForPack(pack: MusicPack | undefined): MusicTrack[] {
  * Tracks for a mood cue, resolved against the parlour base. An empty result
  * means the mood has no music, so the controller leaves the playlist alone.
  */
-export function moodForPack(pack: MusicPack | undefined, mood: MusicMoodId): MusicTrack[] {
-  const own = pack?.moods?.[mood];
-  if (own && own.length > 0) return [...own];
+export function moodForPack(
+  pack: MusicPack | undefined,
+  mood: MusicMoodId,
+  scene: SceneId = DEFAULT_SCENE,
+): MusicTrack[] {
+  const ownScene = pack?.sceneMoods?.[scene]?.[mood];
+  if (ownScene && ownScene.length > 0) return [...ownScene];
+
+  const ownGlobal = pack?.moods?.[mood];
+  if (ownGlobal && ownGlobal.length > 0) return [...ownGlobal];
+
+  if (pack?.id === PARLOUR_PACK.id) return [];
+
+  const baseScene = PARLOUR_PACK.sceneMoods?.[scene]?.[mood];
+  if (baseScene && baseScene.length > 0) return [...baseScene];
   return [...(PARLOUR_PACK.moods?.[mood] ?? [])];
 }

@@ -199,7 +199,9 @@ export class MusicController {
    */
   setMood(mood: MusicMoodId | null): void {
     const resolved =
-      mood && moodForPack(getMusicPack(this.state.packId), mood).length > 0 ? mood : null;
+      mood && moodForPack(getMusicPack(this.state.packId), mood, this.scene).length > 0
+        ? mood
+        : null;
     if (resolved === this.state.mood) return;
 
     const entering = resolved !== null;
@@ -255,7 +257,9 @@ export class MusicController {
   private playablePlaylist() {
     const pack = getMusicPack(this.state.packId);
     const moodPool =
-      !this.inMenu && this.state.mood ? moodForPack(pack, this.state.mood) : ([] as MusicTrack[]);
+      !this.inMenu && this.state.mood
+        ? moodForPack(pack, this.state.mood, this.scene)
+        : ([] as MusicTrack[]);
     const mood = moodPool.filter((track) => !this.voices.get(track.id)?.failed);
     if (mood.length > 0) return mood;
 
