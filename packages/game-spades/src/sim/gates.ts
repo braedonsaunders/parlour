@@ -1,0 +1,227 @@
+import {
+  aggregateWinRates,
+  simulateGames,
+  type SimulationRecord,
+  type WinRateRow,
+} from '@parlour/engine';
+import { createSpadesDef } from '../game';
+import { makePersonaBot, PERSONAS } from '../bots/personas';
+import { tierBot } from '../bots';
+import { spadesConfig } from '../config';
+
+/**
+ * Machine-checked balance gates for partnership Spades:
+ *   1. Hard partnership beats Easy partnership ≥ 55% (seats swap halves).
+ *   2. Persona team-win credit stays inside a wide mixed-table band.
+ *   3. Identical policies give team 0 a ~45–55% share.
+ *   4. Stall rate ≤ 0.5%.
+ */
+
+export interface GateThresholds {
+  headToHeadMin: number;
+  personaBandMin: number;
+  personaBandMax: number;
+  symmetryBandMin: number;
+  symmetryBandMax: number;
+  maxStallRate: number;
+}
+
+export const DEFAULT_THRESHOLDS: GateThresholds = {
+  headToHeadMin: 0.55,
+  personaBandMin: 0.25,
+  personaBandMax: 0.75,
+  symmetryBandMin: 0.4,
+  symmetryBandMax: 0.6,
+  maxStallRate: 0.005,
+};
+
+export interface HeadToHeadGate {
+  hardWinRate: number;
+  easyWinRate: number;
+  games: number;
+  passes: boolean;
+}
+
+export interface PersonaGate {
+  rows: WinRateRow[];
+  failures: string[];
+  games: number;
+  passes: boolean;
+}
+
+export interface SymmetryGate {
+  teamZeroShare: number | null;
+  games: number;
+  passes: boolean;
+}
+
+export interface GateReport {
+  gamesPerPhase: number;
+  baseSeed: number;
+  thresholds: GateThresholds;
+  headToHead: HeadToHeadGate;
+  personas: PersonaGate;
+  symmetry: SymmetryGate;
+  stalls: number;
+  passed: boolean;
+}
+
+const gameDef = () => createSpadesDef();
+const quickConfig = () => spadesConfig.resolve({ targetScore: 250 });
+
+function alternating<T>(values: readonly T[]): (gameIndex: number) => readonly T[] {
+  const flipped = [values[1]!, values[0]!, values[3]!, values[2]!];
+  return (gameIndex) => (gameIndex % 2 === 0 ? values : flipped);
+}
+
+const PERSONA_COMBOS: string[][] = (() => {
+  const combos: string[][] = [];
+  const walk = (start: number, current: number[]) => {
+    if (current.length === 4) {
+      combos.push(current.map((index) => PERSONAS[index]!.id));
+      return;
+    }
+    for (let p = start; p < PERSONAS.length; p++) walk(p + 1, [...current, p]);
+  };
+  walk(0, []);
+  return combos;
+})();
+
+function recordLabel(record: SimulationRecord, seat: number): string {
+  const label = record.labels?.[seat];
+  if (!label) throw new Error('simulation record is missing a seat label');
+  return label;
+}
+
+function countStalls(records: readonly SimulationRecord[]): number {
+  let count = 0;
+  for (const record of records) if (record.stalled) count += 1;
+  return count;
+}
+
+export function teamWinShare(records: readonly SimulationRecord[], team: 0 | 1): number | null {
+  let credits = 0;
+  let counted = 0;
+  for (const record of records) {
+    if (record.stalled || !record.result) continue;
+    counted += 1;
+    const winners = record.winners.filter((seat) => seat % 2 === team);
+    credits += winners.length / 2;
+  }
+  return counted > 0 ? credits / counted : null;
+}
+
+export function personaTeamRates(
+  records: readonly SimulationRecord[],
+): { key: string; games: number; rate: number }[] {
+  const rows = new Map<string, { games: number; wins: number }>();
+  for (const record of records) {
+    if (record.stalled || !record.result || record.winners.length === 0) continue;
+    const winningTeam = record.winners[0]! % 2;
+    for (let seat = 0; seat < record.seats; seat++) {
+      const key = record.labels?.[seat];
+      if (!key) continue;
+      const row = rows.get(key) ?? { games: 0, wins: 0 };
+      row.games += 1;
+      if (seat % 2 === winningTeam) row.wins += 1;
+      rows.set(key, row);
+    }
+  }
+  return [...rows.entries()]
+    .map(([key, row]) => ({ key, games: row.games, rate: row.wins / Math.max(1, row.games) }))
+    .sort((a, b) => a.key.localeCompare(b.key));
+}
+
+export function runBalanceGates(opts: {
+  games: number;
+  baseSeed?: number;
+  thresholds?: GateThresholds;
+}): GateReport {
+  const games = opts.games;
+  if (!Number.isInteger(games) || games <= 0) {
+    throw new Error(`runBalanceGates: games must be a positive integer, got ${games}`);
+  }
+  const baseSeed = opts.baseSeed ?? 20_260_824;
+  const thresholds = opts.thresholds ?? DEFAULT_THRESHOLDS;
+
+  const h2hRecords = simulateGames(gameDef(), games, {
+    baseSeed,
+    config: quickConfig(),
+    tolerateStalls: true,
+    maxEvents: 8_000,
+    seatPoliciesFor: alternating([tierBot(3), tierBot(1), tierBot(3), tierBot(1)]),
+    seatLabelsFor: alternating(['hard', 'easy', 'hard', 'easy']),
+  });
+  const h2hRows = aggregateWinRates(h2hRecords, recordLabel);
+  const hardWinRate = h2hRows.find((row) => row.key === 'hard')?.winRate ?? 0;
+  const easyWinRate = h2hRows.find((row) => row.key === 'easy')?.winRate ?? 0;
+  const headToHead: HeadToHeadGate = {
+    hardWinRate,
+    easyWinRate,
+    games,
+    passes: hardWinRate >= thresholds.headToHeadMin,
+  };
+
+  const personaRecords = simulateGames(gameDef(), games, {
+    baseSeed: baseSeed ^ 0x5eed,
+    config: quickConfig(),
+    tolerateStalls: true,
+    maxEvents: 8_000,
+    seatPoliciesFor: (index) =>
+      (PERSONA_COMBOS[index % PERSONA_COMBOS.length] as string[]).map((id) => makePersonaBot(id)),
+    seatLabelsFor: (index) => PERSONA_COMBOS[index % PERSONA_COMBOS.length] as string[],
+  });
+  const personaRows = personaTeamRates(personaRecords).map((row) => ({
+    key: row.key,
+    games: row.games,
+    credits: row.rate * row.games,
+    winRate: row.rate,
+  }));
+  const failures: string[] = [];
+  for (const row of personaRows) {
+    if (row.winRate < thresholds.personaBandMin || row.winRate > thresholds.personaBandMax) {
+      failures.push(
+        `${row.key}: win credit ${(row.winRate * 100).toFixed(1)}% outside band ` +
+          `${(thresholds.personaBandMin * 100).toFixed(0)}–${(thresholds.personaBandMax * 100).toFixed(0)}%`,
+      );
+    }
+  }
+  const personas: PersonaGate = {
+    rows: personaRows,
+    failures,
+    games,
+    passes: failures.length === 0 && personaRows.length === PERSONAS.length,
+  };
+
+  const symmetryGames = Math.max(8, Math.floor(games / 4));
+  const symmetricRecords = simulateGames(gameDef(), symmetryGames, {
+    baseSeed: baseSeed ^ 0xa11ce,
+    config: quickConfig(),
+    tolerateStalls: true,
+    maxEvents: 8_000,
+    seatPoliciesFor: () => [tierBot(2), tierBot(2), tierBot(2), tierBot(2)],
+    seatLabelsFor: () => ['medium', 'medium', 'medium', 'medium'],
+  });
+  const share = teamWinShare(symmetricRecords, 0);
+  const symmetry: SymmetryGate = {
+    teamZeroShare: share,
+    games: symmetryGames,
+    passes: share !== null && share >= thresholds.symmetryBandMin && share <= thresholds.symmetryBandMax,
+  };
+
+  const stalls =
+    countStalls(h2hRecords) + countStalls(personaRecords) + countStalls(symmetricRecords);
+  const stallRate = stalls / Math.max(1, games * 2 + symmetryGames);
+
+  return {
+    gamesPerPhase: games,
+    baseSeed,
+    thresholds,
+    headToHead,
+    personas,
+    symmetry,
+    stalls,
+    passed:
+      headToHead.passes && personas.passes && symmetry.passes && stallRate <= thresholds.maxStallRate,
+  };
+}
