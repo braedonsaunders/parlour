@@ -29,6 +29,12 @@ import {
   type WildpileState,
 } from '@parlour/game-wildpile';
 import {
+  cribbageConfigSchema,
+  createCribbageDef,
+  type CribbageConfig,
+  type CribbageState,
+} from '@parlour/game-cribbage';
+import {
   heartsConfigSchema,
   heartsGame,
   type HeartsRules,
@@ -64,7 +70,7 @@ import { NostrSignaling, type RoomAnnouncement } from '@/lib/multiplayer/NostrSi
 import { validateRoomCode } from '@/lib/rooms/code';
 import { hasValidSeatCount, seatRangeFor } from '@/lib/rooms/seatRange';
 
-export type MultiplayerGameId = 'blitz' | 'wildpile' | 'hearts' | 'gin' | 'president';
+export type MultiplayerGameId = 'blitz' | 'cribbage' | 'wildpile' | 'hearts' | 'gin' | 'president';
 
 /** What the room badge shows about privacy — see lib/multiplayer/veil. */
 export type MultiplayerSecurity = {
@@ -86,6 +92,7 @@ export type MultiplayerSecurity = {
 };
 export type MultiplayerGameSession =
   | GameSession<BlitzState, BlitzConfig>
+  | GameSession<CribbageState, CribbageConfig>
   | GameSession<WildpileState, WildpileRules>
   | GameSession<HeartsState, HeartsRules>
   | GameSession<GinMatchState, GinConfig>
@@ -945,6 +952,14 @@ export function wildMultiplayerSession(
     : null;
 }
 
+export function cribbageMultiplayerSession(
+  snapshot: MultiplayerRoomSnapshot,
+): GameSession<CribbageState, CribbageConfig> | null {
+  return snapshot.gameId === 'cribbage'
+    ? (snapshot.session as GameSession<CribbageState, CribbageConfig> | null)
+    : null;
+}
+
 export function heartsMultiplayerSession(
   snapshot: MultiplayerRoomSnapshot,
 ): GameSession<HeartsState, HeartsRules> | null {
@@ -970,6 +985,7 @@ function gameDefFor(settings: RoomSettings) {
   if (settings.gameId === 'hearts') return heartsGame;
   if (settings.gameId === 'gin') return createGinMatchDef();
   if (settings.gameId === 'wildpile') return wildpileGame;
+  if (settings.gameId === 'cribbage') return createCribbageDef();
   if (settings.gameId === 'president') return presidentGame;
   return createBlitzDef();
 }
@@ -1021,6 +1037,22 @@ function resolveRoomSettings(settings: RoomSettings): RoomSettings {
       seats: settings.seats,
       config: wildpileConfig.resolve(settings.config as Partial<WildpileRules>),
       security,
+    };
+  }
+  if (settings.gameId === 'cribbage') {
+    if (settings.seats !== 2) throw new Error('Cribbage rooms require exactly two seats');
+    if (security === 'veil') {
+      throw new Error('Cribbage friend rooms use open replay until multi-deal re-veiling ships');
+    }
+    const config = cribbageConfigSchema.resolve(settings.config as Partial<CribbageConfig>);
+    return {
+      gameId: 'cribbage',
+      seats: 2,
+      // Friend rooms currently represent one replayable GameSession. Match
+      // Play is deliberately solo until room snapshots carry MatchSession
+      // round logs, so never let a forged announcement imply best-of-three.
+      config: { ...config, gamesToWin: 1 },
+      security: 'open',
     };
   }
   if (settings.gameId === 'hearts') {
@@ -1089,6 +1121,14 @@ function createRoomRuntime(
     const config = settings.config as PresidentRules;
     const session = createSession(presidentGame, { seed, config, seats: settings.seats, ...veil });
     const authority = new EngineAuthority({ def: presidentGame, session, ...common });
+    return { session, authority };
+  }
+
+  if (settings.gameId === 'cribbage') {
+    const def = createCribbageDef();
+    const config = settings.config as CribbageConfig;
+    const session = createSession(def, { seed, config, seats: 2 });
+    const authority = new EngineAuthority({ def, session, settings: runtimeSettings, onSeatBot });
     return { session, authority };
   }
 

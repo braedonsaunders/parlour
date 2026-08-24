@@ -1,5 +1,6 @@
 import { modePreset, type GameCatalogEntry, type GameMode } from '@parlour/engine';
 import { blitzCatalog } from '@parlour/game-blitz';
+import { cribbageCatalog } from '@parlour/game-cribbage';
 import { heartsCatalog } from '@parlour/game-hearts';
 import { ginCatalog } from '@parlour/game-gin';
 import { presidentCatalog } from '@parlour/game-president';
@@ -20,10 +21,11 @@ import { wildpileCatalog } from '@parlour/game-wildpile';
  * union because saved match history is keyed on it — a typo there would
  * silently orphan someone's results rather than fail the build.
  */
-export type GameId = 'blitz' | 'wild' | 'hearts' | 'gin' | 'president';
+export type GameId = 'blitz' | 'cribbage' | 'wild' | 'hearts' | 'gin' | 'president';
 
 const SHELF: readonly GameCatalogEntry[] = [
   blitzCatalog as GameCatalogEntry,
+  cribbageCatalog as GameCatalogEntry,
   wildpileCatalog as GameCatalogEntry,
   heartsCatalog as GameCatalogEntry,
   ginCatalog as GameCatalogEntry,
