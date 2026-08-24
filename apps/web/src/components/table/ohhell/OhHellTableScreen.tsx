@@ -162,83 +162,82 @@ export function OhHellTableScreen({
               ))}
             </ul>
           </div>
-        </div>
-      </TablePlayfield>
-
-      {local ? (
-        <div className={styles.localRow}>
-          <AvatarBadge avatarId={local.avatarId} size="clamp(2.6rem, 4.4vw, 3.6rem)" />
-          <SeatNameplate name={local.name} />
-          <ScorePips seat={local} handSize={view.handSize} />
-        </div>
-      ) : null}
-
-      <HandRail count={view.hand.length} zone={`hand:${view.localSeat}`} label="Your hand">
-        {view.hand.map((card, index) => (
-          <HandRailCard
-            key={card}
-            cardId={card}
-            index={index}
-            count={view.hand.length}
-            playable={playable.has(card)}
-          >
-            <PlayingCard
-              card={card}
-              actionLabel="Play"
-              disabled={busy || !playable.has(card)}
-              onClick={playable.has(card) ? () => onPlay?.(card) : undefined}
+          {view.decision === 'bid' ? (
+            <BidRail
+              options={view.bidOptions}
+              forbidden={view.forbiddenBid}
+              handSize={view.handSize}
+              busy={busy}
+              onBid={onBid}
             />
-          </HandRailCard>
-        ))}
-      </HandRail>
+          ) : null}
 
-      {view.decision === 'bid' ? (
-        <BidRail
-          options={view.bidOptions}
-          forbidden={view.forbiddenBid}
-          handSize={view.handSize}
-          busy={busy}
-          onBid={onBid}
-        />
-      ) : null}
+          {view.decision === 'trump' ? (
+            <div className={styles.actionRail} role="group" aria-label="Name trump">
+              <p className={styles.railPrompt}>The flip turned a Wizard — name trump.</p>
+              <div className={styles.railButtons}>
+                {view.trumpChoices.map((suit) => (
+                  <button
+                    key={suit}
+                    type="button"
+                    className={styles.trumpButton}
+                    disabled={busy}
+                    onClick={() => onChooseTrump?.(suit)}
+                    aria-label={`Name ${suit} trump`}
+                  >
+                    <span aria-hidden="true">{SUIT_GLYPH[suit] ?? ''}</span>
+                    <small>{suit}</small>
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : null}
 
-      {view.decision === 'trump' ? (
-        <div className={styles.actionRail} role="group" aria-label="Name trump">
-          <p className={styles.railPrompt}>The flip turned a Wizard — name trump.</p>
-          <div className={styles.railButtons}>
-            {view.trumpChoices.map((suit) => (
-              <button
-                key={suit}
-                type="button"
-                className={styles.trumpButton}
-                disabled={busy}
-                onClick={() => onChooseTrump?.(suit)}
-                aria-label={`Name ${suit} trump`}
-              >
-                <span aria-hidden="true">{SUIT_GLYPH[suit] ?? ''}</span>
-                <small>{suit}</small>
-              </button>
-            ))}
+          {local ? (
+            <div className={styles.localRow}>
+              <AvatarBadge avatarId={local.avatarId} size="clamp(2.6rem, 4.4vw, 3.6rem)" />
+              <SeatNameplate name={local.name} />
+              <ScorePips seat={local} handSize={view.handSize} />
+            </div>
+          ) : null}
+        </div>
+
+        <HandRail count={view.hand.length} zone={`hand:${view.localSeat}`} label="Your hand">
+          {view.hand.map((card, index) => (
+            <HandRailCard
+              key={card}
+              cardId={card}
+              index={index}
+              count={view.hand.length}
+              playable={playable.has(card)}
+            >
+              <PlayingCard
+                card={card}
+                actionLabel="Play"
+                disabled={busy || !playable.has(card)}
+                onClick={playable.has(card) ? () => onPlay?.(card) : undefined}
+              />
+            </HandRailCard>
+          ))}
+        </HandRail>
+
+        {view.roundOver && !view.matchOver ? (
+          <div className={styles.roundEnd} data-testid="ohhell-round-end">
+            <h2>Round {view.round} scored</h2>
+            <ul>
+              {view.seats.map((seat) => (
+                <li key={seat.seat} data-standing={seat.standing}>
+                  <b>{seat.name}</b> bid {seat.bid ?? 0}, took {seat.tricksWon} ·{' '}
+                  <span>{seat.score}</span>
+                </li>
+              ))}
+            </ul>
+            <button type="button" className={styles.nextRound} onClick={() => onNextRound?.()}>
+              Deal round {Math.min(view.round + 1, view.rounds)}
+            </button>
           </div>
-        </div>
-      ) : null}
-
-      {view.roundOver && !view.matchOver ? (
-        <div className={styles.roundEnd} data-testid="ohhell-round-end">
-          <h2>Round {view.round} scored</h2>
-          <ul>
-            {view.seats.map((seat) => (
-              <li key={seat.seat} data-standing={seat.standing}>
-                <b>{seat.name}</b> bid {seat.bid ?? 0}, took {seat.tricksWon} ·{' '}
-                <span>{seat.score}</span>
-              </li>
-            ))}
-          </ul>
-          <button type="button" className={styles.nextRound} onClick={() => onNextRound?.()}>
-            Deal round {Math.min(view.round + 1, view.rounds)}
-          </button>
-        </div>
-      ) : null}
+        ) : null}
+      </TablePlayfield>
 
       <TableMenu open={menu.isOpen} onClose={menu.close} onQuit={menu.quit} />
       <span hidden data-fx-key={String(fxKey)} data-fx-count={fx.length} />

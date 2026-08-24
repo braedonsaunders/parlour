@@ -19,16 +19,8 @@ import {
   type EuchreRules,
   type EuchreState,
 } from '@parlour/game-euchre';
-import {
-  ginConfigSchema,
-  type GinConfig,
-  type GinMatchState,
-} from '@parlour/game-gin';
-import {
-  presidentConfig,
-  type PresidentRules,
-  type PresidentState,
-} from '@parlour/game-president';
+import { ginConfigSchema, type GinConfig, type GinMatchState } from '@parlour/game-gin';
+import { presidentConfig, type PresidentRules, type PresidentState } from '@parlour/game-president';
 import {
   ratscrewConfigSchema,
   type RatscrewConfig,
@@ -41,11 +33,7 @@ import {
   type SpadesState,
 } from '@parlour/game-spades';
 import { spadesModeForRules } from '@/lib/spades/modes';
-import {
-  wildpileConfig,
-  type WildpileRules,
-  type WildpileState,
-} from '@parlour/game-wildpile';
+import { wildpileConfig, type WildpileRules, type WildpileState } from '@parlour/game-wildpile';
 import { afterEach, describe, expect, it } from 'vitest';
 import { EngineAuthority } from '@/lib/multiplayer';
 import { NostrSignaling, type SignalPayload } from '@/lib/multiplayer/NostrSignaling';

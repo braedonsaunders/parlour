@@ -1,12 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { generateLayerKey, randomPermutation } from './sra';
 import { createIdentity, exportIdentity, restoreIdentity, signValue, verifyValue } from './signing';
-import {
-  clearRoundMaterial,
-  layerStream,
-  loadRoundMaterial,
-  saveRoundMaterial,
-} from './material';
+import { clearRoundMaterial, layerStream, loadRoundMaterial, saveRoundMaterial } from './material';
 
 const ROOM = 'QRST';
 const OWNER = 'profile-a';
@@ -75,9 +70,9 @@ describe('a seat that comes back', () => {
     const afterReload = await signValue(restored.identity, 'test', { hello: 'table' });
     // Both signatures verify under the public key in the header — ECDSA is
     // randomised, so the bytes differ while the signer does not.
-    expect(await verifyValue(material.identity.publicKey, 'test', { hello: 'table' }, signature)).toBe(
-      true,
-    );
+    expect(
+      await verifyValue(material.identity.publicKey, 'test', { hello: 'table' }, signature),
+    ).toBe(true);
     expect(
       await verifyValue(material.identity.publicKey, 'test', { hello: 'table' }, afterReload),
     ).toBe(true);

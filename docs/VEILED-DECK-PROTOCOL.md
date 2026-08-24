@@ -245,7 +245,7 @@ layer, not the goal.
 
 **Resume before recovery.** A dropped seat is held open for a grace window
 first, because a player who comes back rebuilds their own layer and nothing is
-opened to anybody. Layers are no longer drawn but *derived*: the exponent, the
+opened to anybody. Layers are no longer drawn but _derived_: the exponent, the
 permutation and the salt all come from a stream keyed by a per-room master seed
 and the epoch, so the same seat reproduces the same layer, and its round signing
 key is kept so it returns as the identity the header registered. The returning
@@ -328,7 +328,7 @@ own shuffle. `shuffleClient` posts each layer to a shared worker and the ceremon
 awaits the answer.
 
 Two properties matter more than the speed. The worker and the fallback run the
-*same* pure job, so they cannot shuffle differently — a layer that differed
+_same_ pure job, so they cannot shuffle differently — a layer that differed
 between paths would fail its own commitment check and wedge the round. And a
 worker that cannot be created, dies or reports an error is not fatal: the job
 runs in-thread instead, chunked so the timers still turn. Losing the worker

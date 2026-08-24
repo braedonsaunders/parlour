@@ -15,9 +15,7 @@ export interface ShuffleRequest extends ShuffleJob {
   id: number;
 }
 
-export type ShuffleResponse =
-  | { id: number; deck: string[] }
-  | { id: number; error: string };
+export type ShuffleResponse = { id: number; deck: string[] } | { id: number; error: string };
 
 const scope = self as unknown as DedicatedWorkerGlobalScope;
 

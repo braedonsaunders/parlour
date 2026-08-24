@@ -12,12 +12,30 @@
     linear-gradient(180deg, rgba(28, 12, 22, 0.1), rgba(20, 8, 16, 0.22));
 }
 
+/*
+ * The playfield is the only positioned box on a table (`inset: 0`), and
+ * `.screen` is not a flow container — so every region places itself against
+ * the felt rather than stacking. Laying these out in normal flow put the seat
+ * row, the local plate and the hand rail all at the top of the screen on top
+ * of each other.
+ */
 .board {
+  position: absolute;
+  inset: 0;
   display: grid;
-  gap: clamp(0.6rem, 1.6vh, 1.2rem);
-  grid-template-rows: auto 1fr;
-  height: 100%;
-  min-height: 0;
+  grid-template-rows: auto 1fr auto auto;
+  /*
+   * The seat row takes what it needs and the centre gets the rest, rather than
+   * both being placed at magic percentages. That matters most at seven seats on
+   * a phone, where the row wraps to two and a percentage-placed trump card ends
+   * up behind it.
+   *
+   * Top clears the HUD pill; bottom clears the hand rail, the local plate and
+   * the bid rail stacked above it.
+   */
+  /* Bottom clears only the hand rail now; the bid rail and the local plate
+     are grid rows of their own, so nothing has to be guessed past them. */
+  padding: clamp(7.2rem, 14vh, 8.5rem) 0 12.6rem;
 }
 
 /*
@@ -29,23 +47,59 @@
  * a flow layout that simply grows.
  */
 .seats {
+  position: relative;
+  z-index: 4;
+  justify-self: center;
   display: flex;
   flex-wrap: wrap;
   align-items: flex-start;
   justify-content: center;
-  gap: clamp(0.5rem, 1.6vw, 1.3rem);
+  gap: clamp(0.3rem, 1.2vw, 0.9rem);
   margin: 0;
   padding: 0;
+  /* Leaves the HUD pill and the menu button their corners at every width. */
+  width: min(60rem, 78vw);
   list-style: none;
 }
 
+/*
+ * `position: relative` is load-bearing, not tidiness.
+ *
+ * The shared seat plate paints its card fan with `position: absolute`, so
+ * without a positioned seat every fan escapes to the nearest positioned
+ * ancestor and they all stack in one place. The accent tokens matter for the
+ * same reason: the shared nameplate paints its pill from them, and a seat that
+ * does not declare them renders an unreadable plate.
+ */
 .seat {
+  --seat-accent: #6b3d55;
+  --seat-shade: #381c2c;
+  position: relative;
+  z-index: 4;
   display: grid;
   justify-items: center;
-  gap: 0.2rem;
-  padding: 0.35rem 0.5rem;
+  gap: 0.15rem;
+  /* Wide enough for the nameplate pill, narrow enough that seven fit. */
+  width: clamp(5.2rem, 11vw, 7.5rem);
+  padding: 0.3rem 0.25rem;
   border-radius: var(--radius-chunky);
   transition: background var(--dur-feedback) var(--ease-settle);
+}
+
+/*
+ * Flow the fan instead of floating it above the plate. In this layout there is
+ * no reserved space above a seat to float into — the HUD is there — so it sits
+ * in the grid and contributes its own height.
+ */
+.seat [data-opponent-fan] {
+  position: static;
+  z-index: 0;
+  transform: none;
+  margin-bottom: 0.1rem;
+}
+
+.seat [data-opponent-fan] > * {
+  margin-inline: -0.72rem;
 }
 
 .seat[data-active] {
@@ -54,11 +108,13 @@
 }
 
 .centre {
+  position: relative;
+  z-index: 3;
+  place-self: center;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: clamp(1rem, 4vw, 3rem);
-  min-height: 0;
 }
 
 .trump {
@@ -103,11 +159,17 @@
   translate: 0 -0.35rem;
 }
 
+/* The last grid row, directly above the hand rail. */
 .localRow {
+  position: relative;
+  z-index: 12;
+  justify-self: center;
   display: flex;
   align-items: center;
-  justify-content: center;
   gap: 0.6rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: var(--radius-pill);
+  background: rgba(8, 20, 26, 0.42);
 }
 
 /*
@@ -119,29 +181,31 @@
  */
 .pips {
   display: flex;
-  gap: 0.45rem;
+  gap: 0.18rem;
   margin: 0;
+  width: 100%;
   font-variant-numeric: tabular-nums;
 }
 
 .pips span {
   display: grid;
+  flex: 1 1 0;
   justify-items: center;
-  min-width: 2rem;
-  padding: 0.12rem 0.3rem;
+  min-width: 0;
+  padding: 0.12rem 0.15rem;
   border-radius: 0.45rem;
   background: rgba(8, 20, 26, 0.42);
-  font-size: 0.92rem;
+  font-size: clamp(0.72rem, 1.5vw, 0.92rem);
   font-weight: 700;
   line-height: 1.05;
 }
 
 .pips small {
   color: var(--ink-dim);
-  font-size: 0.58rem;
+  font-size: clamp(0.46rem, 1vw, 0.58rem);
   font-weight: 500;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.02em;
 }
 
 .pips[data-standing='exact'] .tricks {
@@ -170,11 +234,28 @@
   font-weight: 700;
 }
 
+/*
+ * The third grid row, not a floating panel.
+ *
+ * Absolutely positioning it above the hand meant the trump card and the bid
+ * buttons were placed independently, and at three or four seats — where the
+ * centre band is tallest — they landed on top of each other. In the grid the
+ * centre simply gets less room when a rail is showing.
+ */
 .actionRail {
+  position: relative;
+  z-index: 40;
+  justify-self: center;
+  margin-bottom: 0.4rem;
   display: grid;
   justify-items: center;
   gap: 0.4rem;
-  padding: 0.5rem clamp(0.6rem, 3vw, 1.4rem) 0.8rem;
+  width: max-content;
+  max-width: min(94vw, 44rem);
+  padding: 0.6rem 0.9rem;
+  border-radius: var(--radius-chunky);
+  background: rgba(12, 26, 32, 0.92);
+  box-shadow: var(--shadow-ambient);
 }
 
 .railPrompt {
@@ -234,6 +315,7 @@
 
 .roundEnd {
   position: absolute;
+  z-index: 45;
   inset: auto 0 4.5rem;
   display: grid;
   justify-items: center;

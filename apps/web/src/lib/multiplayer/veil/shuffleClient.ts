@@ -60,7 +60,11 @@ export class ShuffleRunner {
   private nextId = 1;
   private readonly pending = new Map<
     number,
-    { resolve: (deck: string[]) => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout> }
+    {
+      resolve: (deck: string[]) => void;
+      reject: (error: Error) => void;
+      timer: ReturnType<typeof setTimeout>;
+    }
   >();
 
   constructor(private readonly factory: ShuffleWorkerFactory = defaultFactory) {}

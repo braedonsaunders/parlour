@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -5,6 +7,12 @@ import { ohhellTableView } from '@/lib/ohhell/view';
 import { OhHellTransport } from '@/lib/solo/OhHellTransport';
 import { DEFAULT_PROFILE_SETTINGS, useProfileStore } from '@/stores/profile';
 import { OhHellTableScreen } from './OhHellTableScreen';
+
+const OHHELL_STYLES = readFileSync(join(process.cwd(), 'src/styles/ohhell.module.css'), 'utf8');
+const SEAT_PLATE = readFileSync(
+  join(process.cwd(), 'src/components/table/shell/SeatPlate.tsx'),
+  'utf8',
+);
 
 let container: HTMLDivElement;
 let root: Root;
@@ -171,5 +179,72 @@ describe('OhHellTableScreen', () => {
     // another round on top of it.
     render({ ...view, roundOver: true, matchOver: true });
     expect(container.querySelector('[data-testid="ohhell-round-end"]')).toBeNull();
+  });
+
+  /*
+   * Layout contract.
+   *
+   * jsdom has no layout engine, so these assert the structural facts that
+   * decided the geometry — every one of them was a real defect first. The
+   * measurements themselves came from driving a real browser at 390x844
+   * through 1280x800 at three, four, five, six and seven seats.
+   */
+  describe('seating layout', () => {
+    it('positions the seat so the shared card fan cannot escape it', () => {
+      // `.opponentCards` paints with `position: absolute`. A seat that is not
+      // itself positioned sends every fan to the nearest positioned ancestor,
+      // which stacked all of them in one place at the top of the felt.
+      const seat = /\.seat \{([^}]*)\}/.exec(OHHELL_STYLES)?.[1] ?? '';
+      expect(seat).toContain('position: relative');
+      // The shared nameplate paints its pill from these; a seat that does not
+      // declare them renders an unreadable plate.
+      expect(seat).toContain('--seat-accent');
+      expect(seat).toContain('--seat-shade');
+    });
+
+    it('opts the fan out of absolute positioning through a stable hook', () => {
+      // `styles.opponentCards` is a hashed CSS-module class, so this stylesheet
+      // cannot name it — the same trap that left three Klondike rules dead.
+      expect(SEAT_PLATE).toContain('data-opponent-fan');
+      expect(OHHELL_STYLES).toContain('.seat [data-opponent-fan]');
+      expect(OHHELL_STYLES).not.toContain(':global(.opponentCards)');
+    });
+
+    it('lays the board out as a grid rather than at magic percentages', () => {
+      // Seats / centre / rail / local plate are grid rows, so the trump card
+      // cannot be placed behind a seat row that wrapped, and the bid rail
+      // cannot be placed on top of the player's own plate.
+      const board = /\.board \{([^}]*)\}/.exec(OHHELL_STYLES)?.[1] ?? '';
+      expect(board).toContain('display: grid');
+      expect(board).toContain('grid-template-rows: auto 1fr auto auto');
+      expect(board).toContain('padding:');
+    });
+
+    it('keeps every region inside the playfield', () => {
+      // `.screen` is not a flow container and the playfield is the only box
+      // with `inset: 0`. A region rendered as a sibling of the playfield stacks
+      // at the top of the screen — which is exactly how the hand rail, the
+      // local plate and the bid rail ended up piled on the seats.
+      const { transport } = { transport: table() };
+      render(viewOf(transport));
+      const playfield = container.querySelector('section[aria-label="Oh Hell table"]')!;
+      for (const sel of [
+        '[data-testid="ohhell-board"]',
+        '[data-zone^="hand:"]',
+        '[data-testid="ohhell-seat-0"]',
+      ]) {
+        expect(playfield.querySelector(sel), sel).not.toBeNull();
+      }
+    });
+
+    it('fits the pip row inside the plate it belongs to', () => {
+      // Three fixed-width chips ran wider than the seat, so adjacent seats'
+      // numbers collided even though the plates themselves did not.
+      const pips = /\.pips \{([^}]*)\}/.exec(OHHELL_STYLES)?.[1] ?? '';
+      expect(pips).toContain('width: 100%');
+      const pipSpan = /\.pips span \{([^}]*)\}/.exec(OHHELL_STYLES)?.[1] ?? '';
+      expect(pipSpan).toContain('min-width: 0');
+      expect(pipSpan).toContain('flex: 1 1 0');
+    });
   });
 });

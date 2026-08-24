@@ -486,11 +486,7 @@ export class VeilSession {
    * issue handles that collide with the first one's spent cards, and the engine
    * refuses those precisely so this cannot happen quietly.
    */
-  redealPlan(
-    epoch: number,
-    support: VeilSupport,
-    publicSetup: readonly CardId[],
-  ): VeilDealPlan {
+  redealPlan(epoch: number, support: VeilSupport, publicSetup: readonly CardId[]): VeilDealPlan {
     const current = this.epochs.get(epoch);
     if (!current) throw new Error(`deck epoch ${epoch} has not been opened`);
     if (!support.publicSetupReady(publicSetup, this.options.seats, this.options.config)) {

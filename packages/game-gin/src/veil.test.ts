@@ -252,9 +252,9 @@ describe('gin under Veil', () => {
       code: VEILED_REDEAL_PENDING,
     });
     // An open match is unaffected: it still deals itself the next hand.
-    expect(
-      matchDef.moves['next.hand']!.validate({ ...folded, veiled: false }, 0, undefined),
-    ).toBe(true);
+    expect(matchDef.moves['next.hand']!.validate({ ...folded, veiled: false }, 0, undefined)).toBe(
+      true,
+    );
   });
 
   it('resolves presets without the removed lock knob', () => {

@@ -3,7 +3,13 @@ import { describe, expect, it, vi } from 'vitest';
 // A shuffle is real modular exponentiation, so these get room to pay for it.
 vi.setConfig({ testTimeout: 120_000, hookTimeout: 120_000 });
 
-import { buildCodebook, elementToHex, generateLayerKey, randomPermutation, shuffleLayer } from './sra';
+import {
+  buildCodebook,
+  elementToHex,
+  generateLayerKey,
+  randomPermutation,
+  shuffleLayer,
+} from './sra';
 import { runShuffleJob } from './shuffleJob';
 import { ShuffleRunner, type ShuffleWorkerLike } from './shuffleClient';
 import type { ShuffleResponse } from './shuffle.worker';
@@ -36,7 +42,9 @@ class FakeWorker implements ShuffleWorkerLike {
     const { id, ...job } = message as { id: number } & Parameters<typeof runShuffleJob>[0];
     queueMicrotask(() => {
       if (this.behaviour === 'error') {
-        this.onmessage?.({ data: { id, error: 'worker refused' } } as MessageEvent<ShuffleResponse>);
+        this.onmessage?.({
+          data: { id, error: 'worker refused' },
+        } as MessageEvent<ShuffleResponse>);
         return;
       }
       this.onmessage?.({

@@ -159,9 +159,13 @@ export async function layerStream(
   roomCode: string,
   epoch: number,
 ): Promise<(length: number) => Uint8Array> {
-  const key = await crypto.subtle.importKey('raw', fromHex(masterSeed) as BufferSource, 'HKDF', false, [
-    'deriveBits',
-  ]);
+  const key = await crypto.subtle.importKey(
+    'raw',
+    fromHex(masterSeed) as BufferSource,
+    'HKDF',
+    false,
+    ['deriveBits'],
+  );
   const salt = utf8(`parlour.veil/layer|${roomCode}`);
   const chunks: Uint8Array[] = [];
   for (let chunk = 0; chunk < STREAM_CHUNKS; chunk++) {
