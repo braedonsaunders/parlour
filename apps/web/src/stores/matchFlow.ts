@@ -1,14 +1,23 @@
 import { create } from 'zustand';
 import type { MatchResult } from '@parlour/engine';
-import type { SeatInfo } from '@/lib/seats';
 import type { GameId } from '@/lib/games';
 import type { ModeId } from '@/lib/modes';
 import type { WildModeId } from '@/lib/wild/modes';
+import type { RecordedSeat } from '@/stores/history';
 
 /** Everything the podium needs about the finished match. */
 export interface MatchSnapshot {
+  /**
+   * Matches the history record id for this match, so the end screen can find
+   * the ledger entry it just wrote and stand the rivalry up around it.
+   */
+  id?: string;
   result: MatchResult;
-  seats: readonly SeatInfo[];
+  /**
+   * Seats carry their history keys as well as their faces — the same roster the
+   * ledger was written with, so opponents stay identifiable after the match.
+   */
+  seats: readonly RecordedSeat[];
   /** Which shelf game produced this match; absent means Blitz (pre-Wild callers). */
   game?: GameId;
   mode: ModeId | WildModeId;

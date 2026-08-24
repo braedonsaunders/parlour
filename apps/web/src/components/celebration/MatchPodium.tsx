@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, type ReactNode } from 'react';
 import gsap from 'gsap';
 import type { MatchSnapshot } from '@/stores/matchFlow';
 import { derivePodium } from '@/lib/match/podium';
@@ -11,7 +11,14 @@ import styles from '@/styles/podium.module.css';
 
 const RANK_MEDALS = ['#ffd9a0', '#cfd8dc', '#e2a07c'] as const;
 
-export function MatchPodium({ snapshot }: { snapshot: MatchSnapshot }) {
+export function MatchPodium({
+  snapshot,
+  children,
+}: {
+  snapshot: MatchSnapshot;
+  /** Rendered inside the stage under the plaques — standings, extra flourishes. */
+  children?: ReactNode;
+}) {
   const entries = useMemo(
     () => derivePodium(snapshot.result, snapshot.seats),
     [snapshot.result, snapshot.seats],
@@ -58,6 +65,7 @@ export function MatchPodium({ snapshot }: { snapshot: MatchSnapshot }) {
   }, [entries.length]);
 
   const winner = entries.find((entry) => entry.isWinner) ?? null;
+  const winnerName = winner?.seat === snapshot.localSeat ? 'You' : winner?.name;
   const localWon =
     snapshot.localSeat === null ? true : winner !== null && winner.seat === snapshot.localSeat;
 
@@ -76,7 +84,7 @@ export function MatchPodium({ snapshot }: { snapshot: MatchSnapshot }) {
         <h1 className="font-display text-4xl font-extrabold tracking-tight text-hearth-50 sm:text-5xl">
           {winner ? (
             <>
-              <span data-testid="winner-name">{winner.name}</span> takes the match
+              <span data-testid="winner-name">{winnerName}</span> won the match
             </>
           ) : (
             'Match complete'
@@ -140,6 +148,8 @@ export function MatchPodium({ snapshot }: { snapshot: MatchSnapshot }) {
           </li>
         ))}
       </ol>
+
+      {children}
     </div>
   );
 }

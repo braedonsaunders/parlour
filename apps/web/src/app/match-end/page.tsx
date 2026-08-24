@@ -2,14 +2,25 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import { MatchPodium } from '@/components/celebration/MatchPodium';
+import { MatchRivalry } from '@/components/celebration/MatchRivalry';
+import { deriveRivalry, hasRivalryToShow } from '@/lib/match/rivalry';
+import { useHistoryStore } from '@/stores/history';
 import { useMatchFlowStore } from '@/stores/matchFlow';
+import { useProfileStore } from '@/stores/profile';
 
 export default function MatchEndPage() {
   const router = useRouter();
   const snapshot = useMatchFlowStore((s) => s.lastMatch);
   const playAgainHandler = useMatchFlowStore((s) => s.playAgain);
+  const records = useHistoryStore((s) => s.records);
+  const profileAvatarId = useProfileStore((s) => s.avatarId);
+  const profileName = useProfileStore((s) => s.name);
+
+  const rivalry = useMemo(() => deriveRivalry(records, snapshot?.id), [records, snapshot?.id]);
+  // the seat you actually sat in wins over the profile, which may have moved on
+  const you = snapshot?.seats.find((seat) => seat.seat === snapshot.localSeat);
 
   const playAgain = useCallback(() => {
     if (playAgainHandler) {
@@ -23,7 +34,15 @@ export default function MatchEndPage() {
     <main className="flex min-h-dvh flex-col items-center justify-center">
       {snapshot ? (
         <>
-          <MatchPodium snapshot={snapshot} />
+          <MatchPodium snapshot={snapshot}>
+            {hasRivalryToShow(rivalry) && (
+              <MatchRivalry
+                rivalry={rivalry}
+                youName={you?.name?.trim() || profileName.trim() || 'You'}
+                youAvatarId={you?.avatarId ?? profileAvatarId}
+              />
+            )}
+          </MatchPodium>
           <div className="fixed bottom-8 left-0 right-0 z-10 flex justify-center gap-3">
             <button
               type="button"

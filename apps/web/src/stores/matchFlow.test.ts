@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { MatchResult } from '@parlour/engine';
+import { botKey, friendKey } from './history';
 import { useMatchFlowStore, type MatchSnapshot } from './matchFlow';
 
 const SNAPSHOT: MatchSnapshot = {
@@ -12,9 +13,11 @@ const SNAPSHOT: MatchSnapshot = {
     ],
   } satisfies MatchResult,
   seats: [
-    { seat: 0, name: 'You', avatarId: 'ember' },
-    { seat: 1, name: 'Juniper', avatarId: 'juniper' },
+    { seat: 0, name: 'You', avatarId: 'ember', kind: 'friend', key: friendKey('me') },
+    { seat: 1, name: 'Juniper', avatarId: 'juniper', kind: 'bot', key: botKey('juniper') },
   ],
+  id: 'match-1',
+  game: 'blitz',
   mode: 'classic',
   localSeat: 0,
 };

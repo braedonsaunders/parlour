@@ -89,6 +89,13 @@ function ActiveMultiplayerWildTable({ room }: { room: MultiplayerRoomSession }) 
       session.lastAppliedHash ?? session.log.length
     }`;
     recordResult({ won: session.result.winner === localSeat, blitzes: 0, knocks: 0, knockWins: 0 });
+    const seats = snapshot.seats.map((seat) => ({
+      seat: seat.seat,
+      name: seat.name,
+      avatarId: seat.avatarId,
+      kind: 'friend' as const,
+      key: friendKey(seat.profileId),
+    }));
     const record = buildMatchRecord({
       id,
       at: Date.now(),
@@ -96,18 +103,13 @@ function ActiveMultiplayerWildTable({ room }: { room: MultiplayerRoomSession }) 
       mode,
       result: session.result,
       localSeat,
-      seats: snapshot.seats.map((seat) => ({
-        seat: seat.seat,
-        name: seat.name,
-        avatarId: seat.avatarId,
-        kind: 'friend' as const,
-        key: friendKey(seat.profileId),
-      })),
+      seats,
     });
     if (record) recordMatch(record);
     setLastMatch({
+      id,
       result: session.result,
-      seats: snapshot.seats.map(({ seat, name, avatarId }) => ({ seat, name, avatarId })),
+      seats,
       game: 'wild',
       mode,
       localSeat,
@@ -236,25 +238,28 @@ function ActiveWildTable({ transport }: { transport: WildTransport }) {
     if (!snapshot.session.result) return;
     reportedMatch.current = transport;
     recordResult({ won: snapshot.matchWinner === 0, blitzes: 0, knocks: 0, knockWins: 0 });
+    const id = crypto.randomUUID();
+    const seats = snapshot.players.map((player) => ({
+      seat: player.seat,
+      name: player.name,
+      avatarId: player.avatarId,
+      kind: player.isBot ? ('bot' as const) : ('friend' as const),
+      key: player.isBot ? botKey(player.avatarId) : friendKey('local-wild-player'),
+    }));
     const record = buildMatchRecord({
-      id: crypto.randomUUID(),
+      id,
       at: Date.now(),
       game: 'wild',
       mode: snapshot.mode,
       result: snapshot.session.result,
       localSeat: 0,
-      seats: snapshot.players.map((player) => ({
-        seat: player.seat,
-        name: player.name,
-        avatarId: player.avatarId,
-        kind: player.isBot ? ('bot' as const) : ('friend' as const),
-        key: player.isBot ? botKey(player.avatarId) : friendKey('local-wild-player'),
-      })),
+      seats,
     });
     if (record) recordMatch(record);
     setLastMatch({
+      id,
       result: snapshot.session.result,
-      seats: snapshot.players.map(({ seat, name, avatarId }) => ({ seat, name, avatarId })),
+      seats,
       game: 'wild',
       mode: snapshot.mode,
       localSeat: 0,
