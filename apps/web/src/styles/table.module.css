@@ -85,6 +85,41 @@
   top: 47%;
   translate: 0 -50%;
 }
+/* Wide-table ring (5–8 seats): opponents fill the upper arc between the
+   side seats. Generic positions — any game can opt in per table. */
+.seat4 {
+  left: 15%;
+  top: 16%;
+}
+.seat5 {
+  left: 33%;
+  top: 2.2%;
+}
+.seat6 {
+  right: 33%;
+  top: 2.2%;
+}
+.seat7 {
+  right: 15%;
+  top: 16%;
+}
+
+/* Compact plaques whenever the table hosts more than four seats. */
+.compactRing .seat {
+  width: clamp(5rem, 8.6vw, 7rem);
+}
+.compactRing .avatar {
+  width: clamp(2.5rem, 4.2vw, 3.4rem);
+  border-width: 3px;
+  border-radius: 0.9rem;
+}
+.compactRing .nameplate {
+  font-size: clamp(0.58rem, 1vw, 0.74rem);
+  padding: 0.16rem 0.55rem;
+}
+.compactRing .opponentCards > * {
+  margin-inline: -1.45rem;
+}
 .seatEliminated {
   filter: grayscale(0.8);
   opacity: 0.45;
@@ -907,6 +942,22 @@ button.card:not(:disabled):hover {
     right: 3%;
     top: 7.2rem;
     translate: 0 0;
+  }
+  .seat4 {
+    left: 12%;
+    top: 6.2rem;
+  }
+  .seat5 {
+    left: 30%;
+    top: 3.4rem;
+  }
+  .seat6 {
+    right: 30%;
+    top: 3.4rem;
+  }
+  .seat7 {
+    right: 12%;
+    top: 6.2rem;
   }
   .seat1 .opponentCards {
     transform: rotate(8deg);

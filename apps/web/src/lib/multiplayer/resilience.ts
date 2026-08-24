@@ -9,7 +9,9 @@ export function validatePresenceSnapshot(snapshot: unknown, maxSeats: number): P
     typeof snapshot !== 'object' ||
     !Number.isInteger(maxSeats) ||
     maxSeats < 2 ||
-    maxSeats > 4
+    // The shared shell seats up to eight (President's full ring); per-game
+    // capacity lives in lib/rooms/seatRange.
+    maxSeats > 8
   ) {
     throw new Error('invalid presence snapshot');
   }

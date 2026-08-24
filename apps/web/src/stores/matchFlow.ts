@@ -4,6 +4,7 @@ import type { GameId } from '@/lib/games';
 import type { ModeId } from '@/lib/modes';
 import type { GinModeId } from '@/lib/gin/modes';
 import type { WildModeId } from '@/lib/wild/modes';
+import type { PresidentModeId } from '@/lib/president/modes';
 import type { RecordedSeat } from '@/stores/history';
 
 /** Everything the podium needs about the finished match. */
@@ -21,7 +22,7 @@ export interface MatchSnapshot {
   seats: readonly RecordedSeat[];
   /** Which shelf game produced this match; absent means Blitz (pre-Wild callers). */
   game?: GameId;
-  mode: ModeId | WildModeId | GinModeId;
+  mode: ModeId | WildModeId | GinModeId | PresidentModeId;
   /** The human's seat, for jingle-vs-sting and the "you" framing; null when absent. */
   localSeat: number | null;
 }
