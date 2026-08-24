@@ -53,7 +53,10 @@
 
 .sheet {
   display: grid;
-  grid-template-rows: auto 1fr;
+  /* `1fr` alone is minmax(auto, 1fr), so the body refuses to shrink and
+     overflow:hidden clips the last sections. Zero the minimum so long
+     rules scroll inside the sheet instead of running off the glass. */
+  grid-template-rows: auto minmax(0, 1fr);
   width: min(34rem, 100%);
   max-height: min(44rem, 100%);
   padding: 0;
@@ -114,6 +117,7 @@
 
 .body {
   display: grid;
+  min-height: 0;
   gap: 1.1rem;
   padding: 1.1rem 1.2rem 1.4rem;
   overflow-y: auto;

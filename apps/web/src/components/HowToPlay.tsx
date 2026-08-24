@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import type { HowToPlayDoc } from '@parlour/engine';
 import styles from '@/styles/howto.module.css';
 
@@ -32,7 +33,12 @@ export function HowToPlayModal({ open, onClose, doc, title, subtitle }: HowToPla
 
   if (!open) return null;
 
-  return (
+  // The trigger lives on tiles and inside the table menu. Those hosts use
+  // `backdrop-filter` and overflow, which turn `position: fixed` into a
+  // local overlay — the sheet then centres in the tile/menu and clips.
+  // Portaling to `document.body` keeps every entry matching the setup-header
+  // sheet, which already sits on the viewport.
+  const sheet = (
     <div
       className={styles.overlay}
       role="dialog"
@@ -93,6 +99,8 @@ export function HowToPlayModal({ open, onClose, doc, title, subtitle }: HowToPla
       </div>
     </div>
   );
+
+  return typeof document === 'undefined' ? sheet : createPortal(sheet, document.body);
 }
 
 export type HowToPlayButtonProps = {

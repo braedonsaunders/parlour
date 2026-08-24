@@ -18,6 +18,7 @@ const DOC: HowToPlayDoc = {
 describe('HowToPlay', () => {
   let container: HTMLDivElement;
   let root: Root;
+  const overlay = () => document.querySelector('[data-testid="how-to-play"]');
 
   beforeEach(() => {
     container = document.createElement('div');
@@ -37,7 +38,7 @@ describe('HowToPlay', () => {
       ),
     );
 
-    const sheet = container.querySelector('[data-testid="how-to-play"]');
+    const sheet = overlay();
     expect(sheet?.textContent).toContain('A tiny demo game.');
     expect(sheet?.textContent).toContain('Run out of demo cards.');
     expect(sheet?.textContent).toContain('Play a card.');
@@ -46,22 +47,33 @@ describe('HowToPlay', () => {
     expect(sheet?.querySelector('dd')?.textContent).toBe('skips the next seat');
   });
 
+  it('mounts on document.body so a filtered tile or menu cannot trap it', () => {
+    act(() =>
+      root.render(
+        createElement(HowToPlayModal, { open: true, onClose: vi.fn(), doc: DOC, title: 'Demo' }),
+      ),
+    );
+
+    expect(overlay()?.parentElement).toBe(document.body);
+    expect(container.querySelector('[data-testid="how-to-play"]')).toBeNull();
+  });
+
   it('stays closed until asked, and shuts on the close button, backdrop and Escape', () => {
     const onClose = vi.fn();
     act(() =>
       root.render(createElement(HowToPlayModal, { open: false, onClose, doc: DOC, title: 'Demo' })),
     );
-    expect(container.querySelector('[data-testid="how-to-play"]')).toBeNull();
+    expect(overlay()).toBeNull();
 
     act(() =>
       root.render(createElement(HowToPlayModal, { open: true, onClose, doc: DOC, title: 'Demo' })),
     );
     act(() =>
-      container.querySelector<HTMLButtonElement>('[data-testid="close-how-to-play"]')?.click(),
+      document.querySelector<HTMLButtonElement>('[data-testid="close-how-to-play"]')?.click(),
     );
     expect(onClose).toHaveBeenCalledTimes(1);
 
-    act(() => container.querySelector<HTMLElement>('[data-testid="how-to-play"]')?.click());
+    act(() => overlay()?.click());
     expect(onClose).toHaveBeenCalledTimes(2);
 
     act(() => void window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })));
@@ -73,7 +85,7 @@ describe('HowToPlay', () => {
     act(() =>
       root.render(createElement(HowToPlayModal, { open: true, onClose, doc: DOC, title: 'Demo' })),
     );
-    act(() => container.querySelector<HTMLElement>('[role="document"]')?.click());
+    act(() => overlay()?.querySelector<HTMLElement>('[role="document"]')?.click());
     expect(onClose).not.toHaveBeenCalled();
   });
 
@@ -95,7 +107,8 @@ describe('HowToPlay', () => {
     expect(trigger?.getAttribute('aria-label')).toBe('How to play Demo Game');
     act(() => trigger?.click());
 
-    expect(container.querySelector('[data-testid="how-to-play"]')).not.toBeNull();
+    expect(overlay()).not.toBeNull();
+    expect(overlay()?.parentElement).toBe(document.body);
     expect(onTileClick).not.toHaveBeenCalled();
   });
 
