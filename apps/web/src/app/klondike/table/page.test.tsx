@@ -14,7 +14,7 @@ let root: Root;
 
 beforeEach(() => {
   router.push.mockReset();
-  useKlondikeSetupStore.setState({ mode: 'daily', run: null });
+  useKlondikeSetupStore.setState({ mode: 'daily', run: null, winnableOnly: false });
   useKlondikeStatsStore.getState().reset();
   Object.defineProperty(window, 'matchMedia', {
     configurable: true,
@@ -62,15 +62,29 @@ describe('Klondike table route', () => {
 
   it('offers a new seed only for non-daily runs', async () => {
     const original = makeKlondikeRun('classic', { randomSeed: 31, id: 'classic-original' });
-    useKlondikeSetupStore.setState({ mode: 'classic', run: original });
+    useKlondikeSetupStore.setState({ mode: 'classic', run: original, winnableOnly: false });
     await act(async () => root.render(<KlondikeTablePage />));
 
-    act(() =>
-      container.querySelector<HTMLButtonElement>('[data-testid="klondike-new-deal"]')!.click(),
-    );
+    // Dealing is async now: a winnable-only table is searched for off-thread.
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>('[data-testid="klondike-new-deal"]')!.click();
+    });
     const next = useKlondikeSetupStore.getState().run;
     expect(next?.mode).toBe('classic');
     expect(next?.dailyKey).toBeNull();
     expect(next?.id).not.toBe(original.id);
   });
+
+  it('deals a proven table when winnable-only is on', async () => {
+    const original = makeKlondikeRun('classic', { randomSeed: 31, id: 'classic-original' });
+    useKlondikeSetupStore.setState({ mode: 'classic', run: original, winnableOnly: true });
+    await act(async () => root.render(<KlondikeTablePage />));
+
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>('[data-testid="klondike-new-deal"]')!.click();
+    });
+    const next = useKlondikeSetupStore.getState().run;
+    expect(next?.id).not.toBe(original.id);
+    expect(next?.winnable).toBe(true);
+  }, 60_000);
 });

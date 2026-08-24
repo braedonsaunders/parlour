@@ -19,6 +19,8 @@ export default function KlondikeSetupPage() {
   const router = useWipeRouter();
   const storedMode = useKlondikeSetupStore((state) => state.mode);
   const startRun = useKlondikeSetupStore((state) => state.start);
+  const winnableOnly = useKlondikeSetupStore((state) => state.winnableOnly);
+  const setWinnableOnly = useKlondikeSetupStore((state) => state.setWinnableOnly);
   const [mode, setMode] = useState<KlondikeModeId>(storedMode);
   const [starting, setStarting] = useState(false);
   const todayKey = utcDailyKey(new Date());
@@ -29,8 +31,11 @@ export default function KlondikeSetupPage() {
   const start = () => {
     if (starting) return;
     setStarting(true);
-    startRun(mode, { now: new Date() });
-    router.push('/klondike/table');
+    // Searching for a winnable deal is asynchronous; a failed search still deals,
+    // so the table is reached either way.
+    void startRun(mode, { now: new Date() })
+      .catch(() => undefined)
+      .finally(() => router.push('/klondike/table'));
   };
 
   return (
@@ -77,7 +82,9 @@ export default function KlondikeSetupPage() {
           <p className="mt-2 text-sm text-dusk-100/85">
             {today
               ? `Best: ${today.bestMoves} moves · ${formatTime(today.bestTimeMs)}`
-              : 'A deterministic Draw Three deal shared by every player. Some shuffled deals may not be solvable.'}
+              : winnableOnly
+                ? 'A deterministic Draw Three deal shared by every player, checked all the way through before it reaches you.'
+                : 'A deterministic Draw Three deal shared by every player, straight off the shuffle — roughly one table in five cannot be cleared.'}
           </p>
           <p className="mt-3 text-xs font-bold uppercase tracking-[0.16em] text-dusk-200">
             {streak} day streak
@@ -95,6 +102,7 @@ export default function KlondikeSetupPage() {
       </section>
 
       <div className="mx-auto mb-9 flex flex-col items-center gap-3">
+        <WinnableToggle checked={winnableOnly} onChange={setWinnableOnly} disabled={starting} />
         <button
           type="button"
           className="btn-fat w-72 text-lg"
@@ -103,7 +111,9 @@ export default function KlondikeSetupPage() {
           disabled={starting}
         >
           {starting
-            ? 'Laying out the cards…'
+            ? winnableOnly
+              ? 'Finding a winnable deal…'
+              : 'Laying out the cards…'
             : mode === 'daily'
               ? "Play today's deal"
               : `Play ${mode}`}
@@ -114,6 +124,49 @@ export default function KlondikeSetupPage() {
         </p>
       </div>
     </main>
+  );
+}
+
+function WinnableToggle({
+  checked,
+  onChange,
+  disabled,
+}: {
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  disabled: boolean;
+}) {
+  return (
+    <div className="flex max-w-xl flex-col items-center gap-1">
+      <button
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        disabled={disabled}
+        data-testid="klondike-winnable-only"
+        onClick={() => onChange(!checked)}
+        className="pill-soft flex items-center gap-2.5 py-1.5 pl-2 pr-4 text-sm font-bold text-dusk-100 transition-transform duration-150 ease-pop hover:-translate-y-0.5 hover:text-hearth-200 disabled:pointer-events-none disabled:opacity-60"
+      >
+        <span
+          aria-hidden="true"
+          className={`relative h-5 w-9 shrink-0 rounded-full transition-colors duration-150 ${
+            checked ? 'bg-hearth-400/70' : 'bg-dusk-200/25'
+          }`}
+        >
+          <span
+            className={`absolute top-0.5 h-4 w-4 rounded-full bg-hearth-50 transition-transform duration-150 ease-pop ${
+              checked ? 'translate-x-[1.15rem]' : 'translate-x-0.5'
+            }`}
+          />
+        </span>
+        Winnable deals only
+      </button>
+      <p className="px-4 text-center text-xs text-dusk-200/80">
+        {checked
+          ? 'Every table is solved end to end before it is dealt, so a loss is always yours to take back.'
+          : 'Straight shuffles, dead tables and all — the way Klondike has always dealt.'}
+      </p>
+    </div>
   );
 }
 

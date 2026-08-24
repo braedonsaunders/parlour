@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { KlondikeTableScreen } from '@/components/table/klondike/KlondikeTableScreen';
 import {
+  dealKlondikeRun,
   makeKlondikeRun,
   rulesForKlondikeMode,
   utcDailyKey,
@@ -65,8 +66,11 @@ function ActiveKlondikeTable({
   const recordWin = useKlondikeStatsStore((state) => state.recordWin);
   const dailyResults = useKlondikeStatsStore((state) => state.dailyResults);
   const recordProfileResult = useProfileStore((state) => state.recordResult);
+  const winnableOnly = useKlondikeSetupStore((state) => state.winnableOnly);
   const [elapsedMs, setElapsedMs] = useState(0);
   const [finishing, setFinishing] = useState(false);
+  /** A winnable-deal search runs off-thread, so the table waits for the next deal. */
+  const [dealing, setDealing] = useState(false);
   const won = snapshot.session.status === 'ended';
   const reported = useRef(false);
   const startedAt = useRef(0);
@@ -135,9 +139,13 @@ function ActiveKlondikeTable({
   }, [onRun, run]);
 
   const newDeal = useCallback(() => {
-    if (run.mode === 'daily') return;
-    onRun(makeKlondikeRun(run.mode));
-  }, [onRun, run.mode]);
+    if (run.mode === 'daily' || dealing) return;
+    setDealing(true);
+    void dealKlondikeRun(run.mode, { winnableOnly })
+      .then(onRun)
+      .catch(() => onRun(makeKlondikeRun(run.mode)))
+      .finally(() => setDealing(false));
+  }, [dealing, onRun, run.mode, winnableOnly]);
 
   const todayKey = utcDailyKey(new Date());
   return (
@@ -148,7 +156,7 @@ function ActiveKlondikeTable({
       elapsedMs={elapsedMs}
       dailyResult={run.dailyKey ? dailyResultFor(dailyResults, run.dailyKey) : null}
       streak={dailyStreak(dailyResults, todayKey)}
-      busy={finishing}
+      busy={finishing || dealing}
       error={error}
       onDispatch={dispatch}
       onUndo={() => accept(transport.undo())}
