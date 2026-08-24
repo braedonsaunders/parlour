@@ -17,6 +17,11 @@ export type TableFxLayerProps = {
    * from a second, game-specific layer.
    */
   presentation?: 'live' | 'hidden';
+  /**
+   * Profile-level calm motion. Optional: omitted, the layer keeps honouring the
+   * OS media query exactly as before.
+   */
+  reduced?: boolean;
   /** Extra flights a table paints outside the shared cue timeline. */
   children?: ReactNode;
 };
@@ -46,11 +51,12 @@ export function TableFxLayer({
   rootRef,
   renderCue,
   presentation = 'live',
+  reduced = false,
   children,
 }: TableFxLayerProps) {
   const planned = useMemo(() => planFxTimeline(fx), [fx]);
 
-  useFxAnimation(planned.cues, rootRef, fxKey);
+  useFxAnimation(planned.cues, rootRef, fxKey, reduced);
 
   return (
     <div

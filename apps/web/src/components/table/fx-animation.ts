@@ -30,11 +30,34 @@ export function useFxAnimation(
   cues: readonly FxCue[],
   rootRef: RefObject<HTMLElement | null>,
   key: string | number,
+  /**
+   * Profile-level calm motion. Optional so every existing caller keeps the
+   * OS-media-query behaviour it already had; the two are OR-ed, never swapped.
+   */
+  forceReduced = false,
 ) {
   useEffect(() => {
     const root = rootRef.current;
     if (!root || cues.length === 0) return;
-    const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+    const reduced =
+      forceReduced || (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false);
+
+    if (reduced) {
+      // Calm motion has to mean no waiting, not merely no travel. Flashing each
+      // cue at its own `startMs` still stretched an opening deal across every
+      // stagger — 52 cues at 65ms is well over three seconds of a player
+      // watching nothing move. The state these flights narrate is already
+      // resolved immediately for a reduced-motion player (deal admission
+      // settles on the next tick), so the flights have nothing left to say.
+      const context = gsap.context(() => {
+        for (const cue of cues) {
+          const element = root.querySelector<HTMLElement>(`[data-fx-cue="${cue.id}"]`);
+          if (element) gsap.set(element, { autoAlpha: 0 });
+        }
+      }, root);
+      return () => context.revert();
+    }
+
     const bounds = root.getBoundingClientRect();
     const context = gsap.context(() => {
       const timeline = gsap.timeline();
@@ -42,12 +65,6 @@ export function useFxAnimation(
         const element = root.querySelector<HTMLElement>(`[data-fx-cue="${cue.id}"]`);
         if (!element) continue;
         const start = cue.startMs / 1000;
-        if (reduced) {
-          timeline
-            .set(element, { autoAlpha: 1 }, start)
-            .set(element, { autoAlpha: 0 }, start + 0.01);
-          continue;
-        }
         if (
           cue.type === 'deal' ||
           cue.type === 'flip' ||
@@ -272,7 +289,7 @@ export function useFxAnimation(
       }
     }, root);
     return () => context.revert();
-  }, [cues, rootRef, key]);
+  }, [cues, rootRef, key, forceReduced]);
 }
 
 export type FlightPoint = {

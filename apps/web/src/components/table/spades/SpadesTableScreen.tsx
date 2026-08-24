@@ -139,7 +139,12 @@ export function SpadesTableScreen(props: SpadesTableScreenProps) {
         <TrickZone view={view} />
         <LocalHand view={view} busy={localBusy} onPlay={props.onPlay} deal={deal} />
         {/* Shared flights paint first; named Spades moments stay readable above them. */}
-        <SharedCueLayer fx={props.fx} fxKey={props.fxKey} rootRef={rootRef} />
+        <SharedCueLayer
+          fx={props.fx}
+          fxKey={props.fxKey}
+          rootRef={rootRef}
+          reduced={reducedMotion}
+        />
         <SpadesFxLayer
           fx={props.fx}
           fxKey={props.fxKey}
@@ -604,16 +609,19 @@ function SharedCueLayer({
   fx,
   fxKey,
   rootRef,
+  reduced = false,
 }: {
   fx: readonly FxEvent[];
   fxKey: string | number;
   rootRef: RefObject<HTMLElement | null>;
+  reduced?: boolean;
 }) {
   return (
     <TableFxLayer
       fx={fx}
       fxKey={fxKey}
       rootRef={rootRef}
+      reduced={reduced}
       presentation="hidden"
       renderCue={(cue) => {
         if (cue.type === 'deal') {

@@ -867,3 +867,91 @@ describe('SpadesTableScreen orientation', () => {
     expect(notice.textContent).toContain('sideways');
   });
 });
+
+describe('SpadesTableScreen shared flight layer under calm motion', () => {
+  /** A real opening deal: 52 staggered DealCard cues, four seats, round-robin. */
+  function openingDeal() {
+    const cues = [];
+    for (let card = 0; card < 13; card++) {
+      for (let step = 1; step <= 4; step++) {
+        const seat = (3 + step) % 4;
+        cues.push({
+          kind: 'card.fly',
+          payload: { card: '??', from: 'stock', to: `hand:${seat}`, dur: 220 },
+          at: (card * 4 + step - 1) * 65,
+        });
+      }
+    }
+    return cues;
+  }
+
+  const TRICK_CUES = [
+    { kind: 'tricks.play', payload: { card: 'C2', seat: 0, index: 0 }, at: 3_500 },
+    { kind: 'tricks.collect', payload: { seat: 2, cards: ['C2'], count: 1 }, at: 3_800 },
+    { kind: 'turn.ring', payload: { seat: 2 }, at: 3_900 },
+  ];
+
+  afterEach(() => {
+    useProfileStore.setState((state) => ({
+      ...state,
+      settings: { ...state.settings, reducedMotion: false },
+    }));
+  });
+
+  it('leaves no shared deal or trick timeline when the profile asks for calm', () => {
+    vi.useFakeTimers();
+    useProfileStore.setState((state) => ({
+      ...state,
+      settings: { ...state.settings, reducedMotion: true },
+    }));
+
+    const fx = [...openingDeal(), ...TRICK_CUES];
+    act(() =>
+      root.render(
+        createElement(SpadesTableScreen, { view: playingView(), fx, fxKey: 'calm-shared' }),
+      ),
+    );
+
+    // Every shared flight, trick play, collect and turn ring — settled at once.
+    const flights = [...container.querySelectorAll<HTMLElement>('[data-card-flight]')];
+    expect(flights.length).toBeGreaterThanOrEqual(52);
+    const cueNodes = [...container.querySelectorAll<HTMLElement>('[data-fx-cue]')];
+    expect(cueNodes.length).toBeGreaterThan(52);
+    for (const node of cueNodes) {
+      expect(node.style.visibility).toBe('hidden');
+      expect(node.style.opacity).toBe('0');
+      // Hidden in place: no travel was staged for it.
+      expect(node.style.transform === '' || node.style.transform === 'none').toBe(true);
+    }
+
+    // The last deal cue would land near 3.4s and the turn ring near 3.9s.
+    // Nothing may surface at any point along that stretch.
+    for (const step of [0, 500, 1_000, 2_000, 3_500, 4_000, 6_000]) {
+      act(() => void vi.advanceTimersByTime(step));
+      for (const node of container.querySelectorAll<HTMLElement>('[data-fx-cue]')) {
+        expect(node.style.visibility).toBe('hidden');
+      }
+    }
+
+    // The hand itself is fully dealt and playable, not merely invisible.
+    const text = textSurface();
+    expect(text.status).toBe('ready');
+    expect(text.hand).toHaveLength(13);
+  });
+
+  it('still stages the shared flights when calm motion is off', () => {
+    vi.useFakeTimers();
+    const fx = [...openingDeal(), ...TRICK_CUES];
+    act(() =>
+      root.render(
+        createElement(SpadesTableScreen, { view: playingView(), fx, fxKey: 'lively-shared' }),
+      ),
+    );
+    const cueNodes = [...container.querySelectorAll<HTMLElement>('[data-fx-cue]')];
+    expect(cueNodes.length).toBeGreaterThan(52);
+    // The reduced path hides every cue synchronously via `gsap.set`. The lively
+    // path hands them to a timeline instead, so they are emphatically not all
+    // hidden the moment the effect runs — that difference is the whole fix.
+    expect(cueNodes.every((node) => node.style.visibility === 'hidden')).toBe(false);
+  });
+});
