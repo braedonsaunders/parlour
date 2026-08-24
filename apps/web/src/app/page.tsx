@@ -70,8 +70,7 @@ export default function TitlePage() {
         custom={0.12}
         className="max-w-md text-balance text-dusk-100/90"
       >
-        A cozy little table in a small warm world. Pick a game off the shelf and deal in — sly bots,
-        quick rounds, and one very loud celebration.
+        A cozy card game engine for quick rounds and loud victories.
       </motion.p>
 
       <motion.div
