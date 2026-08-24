@@ -84,6 +84,7 @@ export function GinTableScreen(props: GinTableScreenProps) {
           return view && local ? deal.visibleCards(view.hand, local.seat) : [];
         })(),
         deadwood: deal.dealing ? null : (view?.deadwood ?? null),
+        canKnock: view?.canKnock ?? false,
         legal: deal.dealing ? null : (view?.legal ?? null),
         scores: view ? view.players.map((p) => ({ seat: p.seat, score: p.score })) : [],
         handEnd: view?.handEnd
