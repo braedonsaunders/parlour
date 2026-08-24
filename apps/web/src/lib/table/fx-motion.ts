@@ -37,7 +37,13 @@ export type FxCue =
   | (BaseCue & { type: 'blitz'; seat: number; handValue: number })
   | (BaseCue & { type: 'showdown'; seat: number; handValue: number })
   | (BaseCue & { type: 'chip-loss'; seat: number; livesLeft: number })
-  | (BaseCue & { type: 'turn'; seat: number });
+  | (BaseCue & { type: 'turn'; seat: number })
+  | (BaseCue & {
+      type: 'gin-burst';
+      burst: 'gin' | 'big-gin' | 'undercut';
+      seat: number;
+    })
+  | (BaseCue & { type: 'layoff'; card: string; from: Zone; to: Zone });
 
 type Payload = Record<string, unknown>;
 
@@ -151,14 +157,20 @@ function cueFor(event: FxEvent, index: number): FxCue | null {
         handValue: numberField(event, 'handValue'),
         durationMs: FX_TIMING.blitzMs,
       };
-    case Fx.ShowdownReveal:
+    case Fx.ShowdownReveal: {
+      // Blitz stamps handValue; Gin stamps deadwood — either drives the reveal
+      const value = payloadOf(event).handValue ?? payloadOf(event).deadwood;
+      if (typeof value !== 'number' || !Number.isFinite(value)) {
+        throw new Error(`${event.kind} fx requires a finite handValue or deadwood`);
+      }
       return {
         ...base,
         type: 'showdown',
         seat: numberField(event, 'seat'),
-        handValue: numberField(event, 'handValue'),
+        handValue: value,
         durationMs: FX_TIMING.showdownMs,
       };
+    }
     case Fx.ChipLoss:
       return {
         ...base,
@@ -173,6 +185,26 @@ function cueFor(event: FxEvent, index: number): FxCue | null {
         type: 'turn',
         seat: numberField(event, 'seat'),
         durationMs: FX_TIMING.settleMs * 3,
+      };
+    case 'gin.gin':
+    case 'gin.big-gin':
+    case 'gin.undercut':
+      return {
+        ...base,
+        type: 'gin-burst',
+        burst:
+          event.kind === 'gin.gin' ? 'gin' : event.kind === 'gin.big-gin' ? 'big-gin' : 'undercut',
+        seat: numberField(event, 'seat'),
+        durationMs: event.kind === 'gin.undercut' ? 700 : event.kind === 'gin.big-gin' ? 1100 : 900,
+      };
+    case 'gin.layoff':
+      return {
+        ...base,
+        type: 'layoff',
+        card: stringField(event, 'card'),
+        from: zoneField(event, 'from'),
+        to: zoneField(event, 'to'),
+        durationMs: FX_TIMING.cardFlightMs + FX_TIMING.settleMs,
       };
     default:
       return null;

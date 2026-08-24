@@ -51,7 +51,8 @@ export function useFxAnimation(
           cue.type === 'deal' ||
           cue.type === 'flip' ||
           cue.type === 'draw' ||
-          cue.type === 'discard'
+          cue.type === 'discard' ||
+          cue.type === 'layoff'
         ) {
           const from = zonePoint(cue.from, root, bounds);
           const to = zonePoint(cue.to, root, bounds);
@@ -69,7 +70,11 @@ export function useFxAnimation(
           const arcPeak = Math.min(from.y, to.y) - arcHeight;
           const apexAt = start + flightDuration * 0.48;
           const landingRotation =
-            cue.type === 'discard' ? discardRotation(cue.card, 0) : direction * 2;
+            cue.type === 'layoff'
+              ? 0
+              : cue.type === 'discard'
+                ? discardRotation(cue.card, 0)
+                : direction * 2;
           element.style.setProperty('--flight-angle', `${Math.atan2(dy, dx)}rad`);
           timeline
             .set(element, { x: from.x, y: from.y, autoAlpha: 1 }, start)
@@ -154,7 +159,7 @@ export function useFxAnimation(
               start + flightDuration * 0.45,
             );
           }
-        } else if (cue.type === 'knock' || cue.type === 'blitz') {
+        } else if (cue.type === 'knock' || cue.type === 'blitz' || cue.type === 'gin-burst') {
           timeline
             .fromTo(
               element,

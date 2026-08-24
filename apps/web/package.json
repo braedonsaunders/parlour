@@ -16,6 +16,7 @@
   "dependencies": {
     "@parlour/engine": "workspace:*",
     "@parlour/game-blitz": "workspace:*",
+    "@parlour/game-gin": "workspace:*",
     "@parlour/game-president": "workspace:*",
     "@parlour/game-wildpile": "workspace:*",
     "gsap": "^3.13.0",

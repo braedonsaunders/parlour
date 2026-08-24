@@ -84,18 +84,20 @@ export function useDealPresentation(
 
   useLayoutEffect(() => {
     if (!plan) {
-      // Deferred to a microtask: still lands before paint, but never chains a
-      // synchronous render cascade out of the layout effect itself.
-      queueMicrotask(() => setLandedCueIds(new Set()));
-      return;
+      const clear = window.setTimeout(() => setLandedCueIds(new Set()), 0);
+      return () => window.clearTimeout(clear);
     }
     const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
     if (reduced) {
-      queueMicrotask(() => setLandedCueIds(new Set(plan.cues.map(({ id }) => id))));
-      return;
+      // reduced motion skips the choreography entirely; land everything at once
+      const markAll = window.setTimeout(
+        () => setLandedCueIds(new Set(plan.cues.map(({ id }) => id))),
+        0,
+      );
+      return () => window.clearTimeout(markAll);
     }
 
-    queueMicrotask(() => setLandedCueIds(new Set()));
+    const reset = window.setTimeout(() => setLandedCueIds(new Set()), 0);
     const timers = plan.cues.map((cue) =>
       window.setTimeout(() => {
         setLandedCueIds((current) => {
@@ -105,7 +107,10 @@ export function useDealPresentation(
         });
       }, cue.startMs + cue.durationMs),
     );
-    return () => timers.forEach((timer) => window.clearTimeout(timer));
+    return () => {
+      window.clearTimeout(reset);
+      timers.forEach((timer) => window.clearTimeout(timer));
+    };
   }, [fxKey, plan]);
 
   if (!plan) return LIVE_PRESENTATION;
