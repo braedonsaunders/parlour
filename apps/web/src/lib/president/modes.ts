@@ -1,54 +1,18 @@
+import type { GameMode } from '@parlour/engine';
 import type { PresidentRules } from '@parlour/game-president';
+import { gameModes, isGameModeId } from '@/lib/games';
 
 export type PresidentModeId = 'classic' | 'rapid' | 'marathon';
 
-export interface PresidentModeDef {
-  id: PresidentModeId;
-  name: string;
-  tagline: string;
-  description: string;
-  facts: readonly string[];
-  accent: string;
-  shade: string;
-}
+export type PresidentModeDef = GameMode;
 
 /**
- * President's table settings — presentation for @parlour/game-president's
- * config presets (`classic` / `rapid` / `marathon`). Rule values live in the
- * package schema; this catalog is presentation only, mirroring lib/wild/modes.
+ * President's table settings, straight from the pack's shelf entry. Rule
+ * values live in @parlour/game-president's config schema and the presentation
+ * lives beside them in its catalog; this module is only the app-side name for
+ * that list.
  */
-export const PRESIDENT_MODES: readonly PresidentModeDef[] = [
-  {
-    id: 'classic',
-    name: 'Classic',
-    tagline: 'The full ladder',
-    description:
-      'Crowns, tributes and comebacks — first to eleven points takes the parlour. The way the pub plays it.',
-    facts: ['first to 11', 'trading on', '2 clears'],
-    accent: '#d9a441',
-    shade: '#8a5c14',
-  },
-  {
-    id: 'rapid',
-    name: 'Rapid',
-    tagline: 'Short and spicy',
-    description:
-      'First to seven keeps the table moving. Same rules, fewer deals, louder comebacks.',
-    facts: ['first to 7', '~10 min', 'great with 6+'],
-    accent: '#c2593f',
-    shade: '#7a2f1f',
-  },
-  {
-    id: 'marathon',
-    name: 'Marathon',
-    tagline: 'Long reigns',
-    description:
-      'Twenty-one points of politics. Scums become presidents, dynasties rise and fall.',
-    facts: ['first to 21', 'long session', 'full arc'],
-    accent: '#4ba1ba',
-    shade: '#25586e',
-  },
-];
+export const PRESIDENT_MODES: readonly PresidentModeDef[] = gameModes('president');
 
 /** A comfortable full-table match; the tense-music cue measures against this. */
 export const PRESIDENT_MATCH_PACE_MS = 900_000;
@@ -62,9 +26,14 @@ export function getPresidentMode(id: PresidentModeId): PresidentModeDef {
 }
 
 export function isPresidentModeId(value: unknown): value is PresidentModeId {
-  return typeof value === 'string' && BY_ID.has(value as PresidentModeId);
+  return isGameModeId('president', value);
 }
 
+/**
+ * Best-fit mode label for a set of rules that arrived over the wire. Tables
+ * can be tuned knob by knob, so this is presentation only — never a rules
+ * source.
+ */
 export function presidentModeForRules(rules: PresidentRules): PresidentModeId {
   if (rules.targetPoints <= 7) return 'rapid';
   if (rules.targetPoints >= 21) return 'marathon';

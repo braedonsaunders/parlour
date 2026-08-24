@@ -14,10 +14,22 @@ export const presidentHowToPlay: HowToPlayDoc = {
         'Moving clockwise, each player must top the pile with the SAME set size at a strictly higher rank, or pass.',
       ],
       bullets: [
-        { label: 'Rank order', text: '3 is low, rising through A, with the 2 sitting above everything' },
-        { label: 'Passing', text: 'a pass only skips this beat — if someone else tops the pile later in the trick, you are back in (unless the locked-pass house rule is on)' },
-        { label: 'Winning the trick', text: 'when everyone else has passed, the pile is swept and the winner leads anything they like' },
-        { label: 'A 2 clears', text: 'a lone 2 instantly wins the pile and keeps the lead — house rule, on by default' },
+        {
+          label: 'Rank order',
+          text: '3 is low, rising through A, with the 2 sitting above everything',
+        },
+        {
+          label: 'Passing',
+          text: 'a pass only skips this beat — if someone else tops the pile later in the trick, you are back in (unless the locked-pass house rule is on)',
+        },
+        {
+          label: 'Winning the trick',
+          text: 'when everyone else has passed, the pile is swept and the winner leads anything they like',
+        },
+        {
+          label: 'A 2 clears',
+          text: 'a lone 2 instantly wins the pile and keeps the lead — house rule, on by default',
+        },
       ],
     },
     {
@@ -40,7 +52,10 @@ export const presidentHowToPlay: HowToPlayDoc = {
         'Before the next deal, the low seats pay tribute from their fresh hands and the high seats return their pick:',
       ],
       bullets: [
-        { label: 'Scum → President', text: 'the Scum’s two best cards; the President sends back any two' },
+        {
+          label: 'Scum → President',
+          text: 'the Scum’s two best cards; the President sends back any two',
+        },
         { label: 'Vice Scum → Vice President', text: 'one card each way' },
         { label: 'Off toggle', text: 'turn trading off in room settings for a purer free-for-all' },
       ],
@@ -49,10 +64,19 @@ export const presidentHowToPlay: HowToPlayDoc = {
       heading: 'House rules',
       body: ['Tune the table in room settings before you start:'],
       bullets: [
-        { label: '2 clears the pile', text: 'on by default — off, a 2 is just another unbeatable card' },
-        { label: 'Locked passes', text: 'once you pass, you sit out the whole trick (default off: you rejoin when the pile changes)' },
+        {
+          label: '2 clears the pile',
+          text: 'on by default — off, a 2 is just another unbeatable card',
+        },
+        {
+          label: 'Locked passes',
+          text: 'once you pass, you sit out the whole trick (default off: you rejoin when the pile changes)',
+        },
         { label: 'Trading', text: 'the role-based card exchange between deals' },
-        { label: 'Target points', text: 'how big the match is — 7 for a sprint, 11 for a session, 21 for a marathon' },
+        {
+          label: 'Target points',
+          text: 'how big the match is — 7 for a sprint, 11 for a session, 21 for a marathon',
+        },
       ],
     },
     {

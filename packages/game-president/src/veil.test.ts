@@ -60,11 +60,18 @@ describe('president under Veil', () => {
     const leader = session.state.turn!;
     const plan = revealPlan(session, leader, ['S3', 'H3']);
     const [first, second] = plan;
-    const outcome = sessionApply(presidentGame, session, leader, 'playSet', {
-      cards: [second![1], first![1]],
-    }, {
-      reveals: plan,
-    });
+    const outcome = sessionApply(
+      presidentGame,
+      session,
+      leader,
+      'playSet',
+      {
+        cards: [second![1], first![1]],
+      },
+      {
+        reveals: plan,
+      },
+    );
     expect(outcome.rejected).toBeUndefined();
     const next = outcome.session!;
     // the pile holds the real faces; the rest of the hand stays veiled
@@ -172,9 +179,16 @@ describe('president under Veil', () => {
         session = passOutcome.session!;
         continue;
       }
-      const outcome = sessionApply(presidentGame, session, actor, 'playSet', { cards: picks }, {
-        reveals,
-      });
+      const outcome = sessionApply(
+        presidentGame,
+        session,
+        actor,
+        'playSet',
+        { cards: picks },
+        {
+          reveals,
+        },
+      );
       if (outcome.rejected) throw new Error(`playSet: ${outcome.rejected.message}`);
       session = outcome.session!;
     }
@@ -195,9 +209,16 @@ describe('president under Veil', () => {
     const leader = session.state.turn!;
     const plan = revealPlan(session, leader, ['S7']);
     const [, face] = plan[0]!;
-    const host = sessionApply(presidentGame, session, leader, 'playSet', { cards: [face!] }, {
-      reveals: plan,
-    }).session!;
+    const host = sessionApply(
+      presidentGame,
+      session,
+      leader,
+      'playSet',
+      { cards: [face!] },
+      {
+        reveals: plan,
+      },
+    ).session!;
     const guest = createSession(presidentGame, {
       seed: 21,
       config: DEFAULTS,
@@ -205,9 +226,16 @@ describe('president under Veil', () => {
       veiled: true,
       deckOrder: veiledDeckOrder(presidentGame.veil!, MIN_SEATS, [], DEFAULTS),
     });
-    const guestApplied = sessionApply(presidentGame, guest, leader, 'playSet', { cards: [face!] }, {
-      reveals: plan,
-    }).session!;
+    const guestApplied = sessionApply(
+      presidentGame,
+      guest,
+      leader,
+      'playSet',
+      { cards: [face!] },
+      {
+        reveals: plan,
+      },
+    ).session!;
     expect(guestApplied.lastAppliedHash).toBe(host.log[host.log.length - 1]!.hash);
     expect(stateHash(guestApplied.state)).toBe(stateHash(host.state));
   });

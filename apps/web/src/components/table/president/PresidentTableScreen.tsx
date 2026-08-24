@@ -7,10 +7,7 @@ import { getAvatar } from '@/lib/avatars';
 import { PRESIDENT_SFX_PACK } from '@/lib/audio/sfx';
 import { useMatchTension } from '@/lib/audio/tension';
 import { PRESIDENT_MATCH_PACE_MS } from '@/lib/president/modes';
-import {
-  isValidLocalSet,
-  type PresidentTableView,
-} from '@/lib/president/view';
+import { isValidLocalSet, type PresidentTableView } from '@/lib/president/view';
 import { useMusicMood } from '@/stores/audio';
 import { type DealPresentation, useDealPresentation } from '@/lib/table/deal-presentation';
 import { buildFxTimeline, type FxCue } from '@/lib/table/fx-motion';
@@ -29,6 +26,8 @@ const ROLE_LABELS: Record<string, string> = {
   scum: 'Scum',
   neutral: '',
 };
+
+const EMPTY_SELECTION: readonly string[] = [];
 
 export type PresidentTableScreenProps = {
   view: PresidentTableView | null;
@@ -52,7 +51,13 @@ export function PresidentTableScreen(props: PresidentTableScreenProps) {
   const { view, error } = props;
   const rootRef = useRef<HTMLElement>(null);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [selected, setSelected] = useState<readonly string[]>([]);
+  // Selection rides with the fx batch it was made in: a new batch voids it
+  // without an effect-driven reset.
+  const [selection, setSelection] = useState<{ key: string | number; cards: readonly string[] }>({
+    key: props.fxKey,
+    cards: [],
+  });
+  const selected = selection.key === props.fxKey ? selection.cards : EMPTY_SELECTION;
   const deal = useDealPresentation(props.fx, props.fxKey);
   useTableAudio(props.fx, props.fxKey, PRESIDENT_SFX_PACK.id);
 
@@ -63,10 +68,6 @@ export function PresidentTableScreen(props: PresidentTableScreenProps) {
     running: Boolean(view) && view?.activeSeat !== null,
   });
   useMusicMood(tense ? 'tense' : null);
-
-  useEffect(() => {
-    setSelected([]);
-  }, [props.fxKey]);
 
   const moments = useRoleMoments(props.fx, props.fxKey);
 
@@ -119,11 +120,14 @@ export function PresidentTableScreen(props: PresidentTableScreenProps) {
   }, [deal, error, view]);
 
   const toggleCard = (card: string) => {
-    setSelected((current) => {
-      if (current.includes(card)) return current.filter((entry) => entry !== card);
+    setSelection((current) => {
+      const cards = current.key === props.fxKey ? current.cards : EMPTY_SELECTION;
+      if (cards.includes(card)) {
+        return { key: props.fxKey, cards: cards.filter((entry) => entry !== card) };
+      }
       const cap = Math.max(requiredCount, 1);
-      if (current.length >= cap) return current;
-      return [...current, card];
+      if (cards.length >= cap) return { key: props.fxKey, cards };
+      return { key: props.fxKey, cards: [...cards, card] };
     });
   };
 
@@ -227,7 +231,12 @@ export function PresidentTableScreen(props: PresidentTableScreenProps) {
               animate={{ scale: [0.4, 1.15, 1], opacity: 1 }}
               transition={{ duration: 0.5, ease: [0.34, 1.56, 0.64, 1] }}
             >
-              <span className={moments.current.role === 'scum' ? styles.celebrationScum : styles.celebrationCrown} aria-hidden="true">
+              <span
+                className={
+                  moments.current.role === 'scum' ? styles.celebrationScum : styles.celebrationCrown
+                }
+                aria-hidden="true"
+              >
                 {moments.current.role === 'scum' ? '🪠' : '👑'}
               </span>
               <div className={styles.celebrationLabel}>
@@ -248,7 +257,7 @@ export function PresidentTableScreen(props: PresidentTableScreenProps) {
               onClick={() => {
                 if (selectionValid) {
                   props.onConfirm?.(selected);
-                  setSelected([]);
+                  setSelection({ key: props.fxKey, cards: [] });
                 }
               }}
             >
@@ -277,7 +286,7 @@ export function PresidentTableScreen(props: PresidentTableScreenProps) {
               onClick={() => {
                 if (selectionValid) {
                   props.onConfirm?.(selected);
-                  setSelected([]);
+                  setSelection({ key: props.fxKey, cards: [] });
                 }
               }}
             >
@@ -371,8 +380,7 @@ function Seat({
 
 function CenterPile({ view, deal }: { view: PresidentTableView; deal: DealPresentation }) {
   const sets = deal.discardReady ? view.pile : [];
-  const topSet = sets.at(-1);
-  const standingHere = view.standing;
+  const standing = view.standing;
   return (
     <div className={styles.pileArea} data-center-pile>
       <div className={styles.pileStack} data-zone="pile">
@@ -398,9 +406,9 @@ function CenterPile({ view, deal }: { view: PresidentTableView; deal: DealPresen
           </div>
         ))}
       </div>
-      {standingHere && (
+      {standing && (
         <span className={styles.rankChip} data-testid="standing-chip">
-          beat rank {standingHere.rank} · {standingHere.cards.length}
+          beat rank {standing.rank} · {standing.cards.length}
         </span>
       )}
     </div>
@@ -474,11 +482,16 @@ function useRoleMoments(fx: readonly FxEvent[], fxKey: string | number) {
         .filter((moment) => moment.role === 'president' || moment.role === 'scum'),
     [fx],
   );
-  const [index, setIndex] = useState(0);
+  // The shown moment is derived from the fx batch; only advancing past the
+  // first highlight needs state, and that happens in a timer, not an effect.
+  const [advanced, setAdvanced] = useState<{ key: string | number; value: boolean }>({
+    key: fxKey,
+    value: false,
+  });
+  const index = advanced.key === fxKey && advanced.value ? Math.min(1, moments.length - 1) : 0;
   useEffect(() => {
-    setIndex(0);
     if (moments.length <= 1) return;
-    const timer = window.setTimeout(() => setIndex(1), 1100);
+    const timer = window.setTimeout(() => setAdvanced({ key: fxKey, value: true }), 1100);
     return () => window.clearTimeout(timer);
   }, [fxKey, moments.length]);
   return { current: moments[index] ?? null };
@@ -524,7 +537,12 @@ function PresidentFxLayer({
             (cue.type === 'deal' && cue.to !== `hand:${localSeat}` && cue.to !== 'discard') ||
             (cue.type === 'draw' && cue.to !== `hand:${localSeat}`);
           return (
-            <div key={`${fxKey}:${cue.id}`} data-fx-cue={cue.id} data-card-flight className={tableStyles.flyingCard}>
+            <div
+              key={`${fxKey}:${cue.id}`}
+              data-fx-cue={cue.id}
+              data-card-flight
+              className={tableStyles.flyingCard}
+            >
               <i className={tableStyles.cardTrail} />
               <span data-flight-card className={tableStyles.flightCardVisual}>
                 <PlayingCard card={cue.card} faceDown={faceDown} />

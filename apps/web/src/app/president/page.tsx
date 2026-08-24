@@ -3,17 +3,18 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { presidentConfig, presidentHowToPlay } from '@parlour/game-president';
+import { GameArt } from '@/components/GameArt';
+import { HowToPlayButton } from '@/components/HowToPlay';
+import { RuleSettings } from '@/components/settings/RuleSettings';
 import { useCenteredCarousel } from '@/hooks/useCenteredCarousel';
-import {
-  PRESIDENT_MODES,
-  type PresidentModeDef,
-} from '@/lib/president/modes';
-import {
-  PRESIDENT_SEAT_OPTIONS,
-  usePresidentSetupStore,
-} from '@/stores/presidentSetup';
+import { getGame } from '@/lib/games';
+import { PRESIDENT_MODES, type PresidentModeDef } from '@/lib/president/modes';
+import { presidentRulesFor, usePresidentSetupStore } from '@/stores/presidentSetup';
 import styles from '@/styles/modes.module.css';
 import gameStyles from '@/styles/games.module.css';
+
+const SEAT_OPTIONS = getGame('president').seats;
 
 export default function PresidentSetupPage() {
   const router = useRouter();
@@ -21,6 +22,9 @@ export default function PresidentSetupPage() {
   const seats = usePresidentSetupStore((s) => s.seats);
   const setMode = usePresidentSetupStore((s) => s.setMode);
   const setSeats = usePresidentSetupStore((s) => s.setSeats);
+  const overrides = usePresidentSetupStore((s) => s.overrides);
+  const setRule = usePresidentSetupStore((s) => s.setRule);
+  const resetRules = usePresidentSetupStore((s) => s.resetRules);
   const [starting, setStarting] = useState(false);
   const carouselRef = useCenteredCarousel(mode);
 
@@ -42,7 +46,7 @@ export default function PresidentSetupPage() {
         <h1 className="font-display text-xl font-extrabold tracking-tight text-hearth-50">
           President <span className="text-dusk-100/80">· claim the crown</span>
         </h1>
-        <span className="w-16" aria-hidden="true" />
+        <HowToPlayButton doc={presidentHowToPlay} title="President" subtitle="the climbing game" />
       </header>
 
       <div
@@ -69,7 +73,7 @@ export default function PresidentSetupPage() {
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-dusk-200">Seats</p>
             <div className="mt-1.5 flex items-center gap-2" role="group" aria-label="Seats">
-              {PRESIDENT_SEAT_OPTIONS.map((option) => (
+              {SEAT_OPTIONS.map((option) => (
                 <button
                   key={option}
                   type="button"
@@ -86,10 +90,18 @@ export default function PresidentSetupPage() {
               ))}
             </div>
             <p className="mt-1 text-xs text-dusk-200/80">
-              you + {seats - 1} bot{seats > 2 ? 's' : ''} — the full ladder, crowns included
+              you + {seats - 1} rivals — the full ladder, crowns included
             </p>
           </div>
         </div>
+
+        <RuleSettings
+          schema={presidentConfig}
+          values={presidentRulesFor(mode, overrides)}
+          onChange={setRule as (key: string, value: string | number | boolean) => void}
+          onReset={resetRules}
+          label="Advanced options"
+        />
 
         <div className="mx-auto flex w-full max-w-xl flex-wrap justify-center gap-3">
           <button
@@ -134,34 +146,39 @@ function ModeTile({
   onSelect: () => void;
 }) {
   return (
-    <button
-      type="button"
-      role="radio"
-      aria-checked={selected}
-      data-selected={selected}
-      onClick={onSelect}
-      className={styles.tile}
-      style={{
-        ['--tile-accent' as string]: def.accent,
-        ['--tile-accent-soft' as string]: `${def.accent}44`,
-      }}
-    >
-      <span className={styles.tileGlow} />
-      <span className={styles.preview}>
-        <span className={gameStyles.presCard}>3</span>
-        <span className={gameStyles.presCard}>{def.id === 'rapid' ? '⚡' : def.id === 'marathon' ? '∞' : '♛'}</span>
-        <span className={gameStyles.presCard}>2</span>
-      </span>
-      <span className={styles.tagline}>{def.tagline}</span>
-      <h2 className={styles.modeName}>{def.name}</h2>
-      <span className={styles.facts}>
-        {def.facts.map((fact) => (
-          <span key={fact} className={styles.fact}>
-            {fact}
-          </span>
-        ))}
-      </span>
-      <p className={styles.description}>{def.description}</p>
-    </button>
+    <div className={gameStyles.tileWrap}>
+      <HowToPlayButton
+        doc={presidentHowToPlay}
+        title={def.name}
+        subtitle={`President · ${def.tagline}`}
+        variant="chip"
+        className={gameStyles.tileHelp}
+      />
+      <button
+        type="button"
+        role="radio"
+        aria-checked={selected}
+        data-selected={selected}
+        onClick={onSelect}
+        className={styles.tile}
+        style={{
+          ['--tile-accent' as string]: def.accent,
+          ['--tile-accent-soft' as string]: `${def.accent}44`,
+        }}
+      >
+        <span className={styles.tileGlow} />
+        <GameArt cards={def.art} motif={def.motif} />
+        <span className={styles.tagline}>{def.tagline}</span>
+        <h2 className={styles.modeName}>{def.name}</h2>
+        <span className={styles.facts}>
+          {def.facts.map((fact) => (
+            <span key={fact} className={styles.fact}>
+              {fact}
+            </span>
+          ))}
+        </span>
+        <p className={styles.description}>{def.description}</p>
+      </button>
+    </div>
   );
 }

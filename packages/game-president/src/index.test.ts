@@ -46,9 +46,15 @@ function driveMatch(seed: number, seats = 4) {
     if (legal.length === 0) throw new Error(`seat ${actor} stuck in ${session.phase.phase}`);
     const policy = presidentBots[actor % presidentBots.length]!;
     const rng = makeRng(seed).fork(`t:${session.log.length}`);
-    const choice = policy.chooseMove(session.def.playerView(session.state, actor), actor, legal, rng, {
-      thinkMs: () => 0,
-    });
+    const choice = policy.chooseMove(
+      session.def.playerView(session.state, actor),
+      actor,
+      legal,
+      rng,
+      {
+        thinkMs: () => 0,
+      },
+    );
     const pick = choice ?? legal[0]!;
     const outcome = sessionApply(presidentGame, session, actor, pick.id, pick.payload);
     if (outcome.rejected) throw new Error(`${pick.id}: ${outcome.rejected.message}`);
@@ -146,7 +152,9 @@ describe('playSet', () => {
     const nextHand = session.state.hands[nextSeat]!;
     const lowerOrEqual = nextHand.find((card) => orderOf(card) <= orderOf(lowest));
     if (lowerOrEqual) {
-      expect(play(session, nextSeat, [lowerOrEqual]).rejected?.code).toMatch(/size-mismatch|not-higher/);
+      expect(play(session, nextSeat, [lowerOrEqual]).rejected?.code).toMatch(
+        /size-mismatch|not-higher/,
+      );
     }
     const biggerSet = nextHand.filter((card) => orderOf(card) === orderOf(nextHand[0]!));
     if (biggerSet.length >= 2 && lowest) {
@@ -310,9 +318,15 @@ describe('finishing, roles & scoring', () => {
       const legal = legalFor(session, actor);
       const policy = presidentBots[actor % presidentBots.length]!;
       const rng = makeRng(seed).fork(`x:${session.log.length}`);
-      const choice = policy.chooseMove(session.def.playerView(session.state, actor), actor, legal, rng, {
-        thinkMs: () => 0,
-      });
+      const choice = policy.chooseMove(
+        session.def.playerView(session.state, actor),
+        actor,
+        legal,
+        rng,
+        {
+          thinkMs: () => 0,
+        },
+      );
       const pick = choice ?? legal[0]!;
       const outcome = sessionApply(presidentGame, session, actor, pick.id, pick.payload);
       if (outcome.rejected) throw new Error(`${pick.id}: ${outcome.rejected.message}`);
@@ -336,9 +350,15 @@ describe('finishing, roles & scoring', () => {
       const legal = legalFor(session, actor);
       const policy = presidentBots[actor % presidentBots.length]!;
       const rng = makeRng(seed).fork(`y:${session.log.length}`);
-      const choice = policy.chooseMove(session.def.playerView(session.state, actor), actor, legal, rng, {
-        thinkMs: () => 0,
-      });
+      const choice = policy.chooseMove(
+        session.def.playerView(session.state, actor),
+        actor,
+        legal,
+        rng,
+        {
+          thinkMs: () => 0,
+        },
+      );
       const pick = choice ?? legal[0]!;
       const outcome = sessionApply(presidentGame, session, actor, pick.id, pick.payload);
       if (outcome.rejected) throw new Error(`${pick.id}: ${outcome.rejected.message}`);

@@ -1,13 +1,11 @@
 'use client';
 
-import { applyPreset } from '@parlour/engine';
-import { presidentConfig, MIN_SEATS, MAX_SEATS } from '@parlour/game-president';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { RoomLobby } from '@/components/multiplayer/RoomLobby';
 import { useProfileStore } from '@/stores/profile';
-import { usePresidentSetupStore } from '@/stores/presidentSetup';
+import { presidentRulesFor, usePresidentSetupStore } from '@/stores/presidentSetup';
 import {
   activateMultiplayerSession,
   clearActiveMultiplayerSession,
@@ -21,6 +19,7 @@ export default function CreatePresidentRoomPage() {
   const avatarId = useProfileStore((state) => state.avatarId);
   const mode = usePresidentSetupStore((state) => state.mode);
   const seats = usePresidentSetupStore((state) => state.seats);
+  const overrides = usePresidentSetupStore((state) => state.overrides);
   const sessionRef = useRef<MultiplayerRoomSession | null>(null);
   const [session, setSession] = useState<MultiplayerRoomSession | null>(null);
 
@@ -32,12 +31,12 @@ export default function CreatePresidentRoomPage() {
     void next
       .create({
         gameId: 'president',
-        seats: Math.min(Math.max(seats, MIN_SEATS), MAX_SEATS),
-        config: applyPreset(presidentConfig, mode),
+        seats,
+        config: presidentRulesFor(mode, overrides),
       })
       .then(() => activateMultiplayerSession(next))
       .catch(() => undefined);
-  }, [avatarId, mode, name, seats]);
+  }, [avatarId, mode, name, overrides, seats]);
 
   if (!session) return <PresidentLobbyLoading />;
   return (

@@ -8,10 +8,7 @@ import {
   type PresidentState,
 } from '@parlour/game-president';
 import { getPresidentMode, type PresidentModeId } from '@/lib/president/modes';
-import type {
-  PresidentPlayer,
-  PresidentSnapshot,
-} from '@/lib/solo/PresidentTransport';
+import type { PresidentPlayer, PresidentSnapshot } from '@/lib/solo/PresidentTransport';
 
 export type PresidentDecision = 'lead-or-follow' | 'pass-only' | 'give' | 'return';
 
@@ -152,8 +149,7 @@ export function presidentTableView(
     returnCount,
     legal: {
       playableCards: [...playable],
-      pass:
-        offered.some((move) => move.id === 'pass'),
+      pass: offered.some((move) => move.id === 'pass'),
       give: hasGive,
       returnCards: hasReturn,
     },

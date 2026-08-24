@@ -1,5 +1,5 @@
 import { applyPreset, stateHash } from '@parlour/engine';
-import { presidentConfig, type PresidentRules } from '@parlour/game-president';
+import { presidentConfig } from '@parlour/game-president';
 import { wildpileConfig } from '@parlour/game-wildpile';
 import { afterEach, describe, expect, it } from 'vitest';
 import { NostrSignaling, type SignalPayload } from '@/lib/multiplayer/NostrSignaling';
@@ -215,7 +215,11 @@ describe('multiplayer route composition', () => {
 
     expect(host.getSnapshot()).toMatchObject({ gameId: 'wildpile' });
     expect(guest.getSnapshot()).toMatchObject({ gameId: 'wildpile' });
-    expect(guest.getSnapshot().settings?.config).toMatchObject({ stackDrawTwo: true, stackDrawFour: true, jumpIn: true });
+    expect(guest.getSnapshot().settings?.config).toMatchObject({
+      stackDrawTwo: true,
+      stackDrawFour: true,
+      jumpIn: true,
+    });
 
     const hostSession = wildMultiplayerSession(host.getSnapshot());
     expect(hostSession).not.toBeNull();
@@ -238,74 +242,86 @@ describe('president rooms on the shared stack', () => {
 
   afterEach(() => sessions.splice(0).forEach((session) => session.close()));
 
+  /** True once every joined peer knows its seat. */
+  function guestSeat(peers: readonly { session: MultiplayerRoomSession }[]): boolean {
+    return peers.every((peer, index) => peer.session.getSnapshot().localSeat === index);
+  }
+
   it('routes a five-seat president room and keeps host/guest hashes identical across moves', async () => {
     const broker = new MockSignalingBroker();
     const rtc = new MockRtcNetwork();
-    const host = new MultiplayerRoomSession(
+    const profiles = [
       { name: 'Host', avatarId: 'ember', profileId: 'president-host' },
-      {
-        signaling: broker.signaling('president-host-peer'),
-        peerConnection: rtc.factory('host'),
-        seed: 4242,
-      },
-    );
-    const guest = new MultiplayerRoomSession(
       { name: 'Guest', avatarId: 'juniper', profileId: 'president-guest' },
-      {
-        signaling: broker.signaling('president-guest-peer'),
-        peerConnection: rtc.factory('guest'),
-        seed: 7,
-      },
-    );
-    sessions.push(host, guest);
+      { name: 'Third', avatarId: 'cobalt', profileId: 'president-third' },
+      { name: 'Fourth', avatarId: 'plum', profileId: 'president-fourth' },
+      { name: 'Fifth', avatarId: 'mint', profileId: 'president-fifth' },
+    ];
+    const peers = profiles.map((profile, index) => {
+      const session = new MultiplayerRoomSession(profile, {
+        signaling: broker.signaling(`president-peer-${index}`),
+        peerConnection: rtc.factory(`peer-${index}`),
+        seed: index === 0 ? 4242 : 7,
+      });
+      sessions.push(session);
+      return { session, profile };
+    });
+    const host = peers[0]!;
 
-    const room = await host.create({
+    const room = await host.session.create({
       gameId: 'president',
       seats: 5,
-      config: applyPreset(presidentConfig, 'classic') as Partial<PresidentRules>,
+      config: applyPreset(presidentConfig, 'classic'),
     });
-    await guest.join(room.code);
-    await eventually(() => expect(guest.getSnapshot().localSeat).toBe(1));
+    for (const peer of peers.slice(1)) {
+      await peer.session.join(room.code);
+    }
+    await eventually(() => {
+      expect(guestSeat(peers)).toBe(true);
+    });
 
-    expect(host.getSnapshot()).toMatchObject({ gameId: 'president' });
-    expect(guest.getSnapshot()).toMatchObject({ gameId: 'president' });
-    expect(guest.getSnapshot().settings?.config).toMatchObject({ twoClears: true, trading: true });
+    expect(host.session.getSnapshot()).toMatchObject({ gameId: 'president' });
+    expect(presidentMultiplayerSession(host.session.getSnapshot())!.state.hands.flat().length).toBe(
+      52,
+    );
 
-    // Drive a dozen real turns through the mesh; after every event both peers
-    // must hold the same log length AND the same state hash.
-    for (let step = 0; step < 12; step++) {
-      const hostSession = presidentMultiplayerSession(host.getSnapshot());
+    // Drive real turns through the mesh; after every event every peer must
+    // hold the same log length AND the same state hash.
+    for (let step = 0; step < 14; step++) {
+      const hostSession = presidentMultiplayerSession(host.session.getSnapshot());
       expect(hostSession).not.toBeNull();
       if (hostSession!.status !== 'playing') break;
+      const baseline = hostSession!.log.length;
       const actor = hostSession!.phase.actor;
       expect(actor).not.toBeNull();
       const legal =
-        hostSession!.def.flow.legalMovesFor?.(hostSession!.state, hostSession!.phase, actor!) ??
-        [];
+        hostSession!.def.flow.legalMovesFor?.(hostSession!.state, hostSession!.phase, actor!) ?? [];
       expect(legal.length).toBeGreaterThan(0);
       const move = legal[0]!;
-      (actor === 0 ? host : guest).send(move.id, move.payload);
+      peers[actor!]!.session.send(move.id, move.payload);
 
       await eventually(() => {
-        expect(presidentMultiplayerSession(host.getSnapshot())!.log.length).toBe(
-          presidentMultiplayerSession(guest.getSnapshot())!.log.length + 0,
+        const lengths = peers.map(
+          (peer) => presidentMultiplayerSession(peer.session.getSnapshot())!.log.length,
         );
-        expect(
-          presidentMultiplayerSession(host.getSnapshot())!.log.length,
-        ).toBeGreaterThan(step);
+        expect(Math.min(...lengths)).toBeGreaterThan(baseline);
+        expect(new Set(lengths).size).toBe(1);
       });
-      expect(stateHash(presidentMultiplayerSession(guest.getSnapshot())!.state)).toBe(
-        stateHash(presidentMultiplayerSession(host.getSnapshot())!.state),
+      const hashes = peers.map((peer) =>
+        stateHash(presidentMultiplayerSession(peer.session.getSnapshot())!.state),
       );
+      expect(new Set(hashes).size).toBe(1);
     }
 
-    // The guest replays the authority log from the announced seed — the whole
+    // The guests replay the authority log from the announced seed — the whole
     // replayed log must hash-match the host's event for event.
-    const hostLog = presidentMultiplayerSession(host.getSnapshot())!.log;
-    const guestLog = presidentMultiplayerSession(guest.getSnapshot())!.log;
-    expect(guestLog.length).toBe(hostLog.length);
-    for (let i = 0; i < hostLog.length; i++) {
-      expect(guestLog[i]!.hash).toBe(hostLog[i]!.hash);
+    const hostLog = presidentMultiplayerSession(host.session.getSnapshot())!.log;
+    for (const peer of peers.slice(1)) {
+      const guestLog = presidentMultiplayerSession(peer.session.getSnapshot())!.log;
+      expect(guestLog.length).toBe(hostLog.length);
+      for (let i = 0; i < hostLog.length; i++) {
+        expect(guestLog[i]!.hash).toBe(hostLog[i]!.hash);
+      }
     }
   });
 

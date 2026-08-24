@@ -202,7 +202,11 @@ function dealHands(
     const seat = (startSeat + slot) % seats;
     const card = order[cursor++]!;
     hands[seat]!.push(card);
-    fx.emit(Fx.DealCard, { card, from: 'stock', to: `hand:${seat}`, dur: 170 }, cursor * DEAL_STAGGER_MS);
+    fx.emit(
+      Fx.DealCard,
+      { card, from: 'stock', to: `hand:${seat}`, dur: 170 },
+      cursor * DEAL_STAGGER_MS,
+    );
   }
   return hands.map(sortedHand);
 }
@@ -357,7 +361,8 @@ function undecidedRivals(state: PresidentState): SeatId[] {
   if (!state.standing) return [];
   const winner = state.standing.seat;
   return activeSeats(state).filter(
-    (seat) => seat !== winner && !state.passedCycle.includes(seat) && !state.lockedOut.includes(seat),
+    (seat) =>
+      seat !== winner && !state.passedCycle.includes(seat) && !state.lockedOut.includes(seat),
   );
 }
 
@@ -376,9 +381,7 @@ function addToHand(
   seat: SeatId,
   cards: readonly CardId[],
 ): CardId[][] {
-  return hands.map((hand, index) =>
-    index === seat ? sortedHand([...hand, ...cards]) : [...hand],
-  );
+  return hands.map((hand, index) => (index === seat ? sortedHand([...hand, ...cards]) : [...hand]));
 }
 
 /**
@@ -477,7 +480,8 @@ const pass: Move<PresidentState> = {
     if (phaseFor(state).phase !== 'play') return error('not-playing', 'nothing to pass on');
     if (state.turn !== seat) return error('not-your-turn', 'it is another seat’s turn');
     if (!state.standing) return error('lead-required', 'the leader must open the trick');
-    if (state.passedCycle.includes(seat)) return error('already-passed', 'this seat already passed');
+    if (state.passedCycle.includes(seat))
+      return error('already-passed', 'this seat already passed');
     if (state.lockedOut.includes(seat)) return error('locked-out', 'this seat is out of the trick');
     return true;
   },
@@ -501,7 +505,11 @@ const pass: Move<PresidentState> = {
 
 function exchangeFlight(ctx: MoveCtx, from: SeatId, to: SeatId, cards: readonly CardId[]): void {
   cards.forEach((card, index) => {
-    ctx.fx.emit(Fx.DealCard, { card, from: `seat:${from}`, to: `hand:${to}`, dur: 200 }, index * 60);
+    ctx.fx.emit(
+      Fx.DealCard,
+      { card, from: `seat:${from}`, to: `hand:${to}`, dur: 200 },
+      index * 60,
+    );
   });
   ctx.fx.emit(PresidentFx.Exchange, { fromSeat: from, toSeat: to, count: cards.length });
 }
@@ -687,10 +695,9 @@ function setup(ctx: SetupCtx<PresidentRules>): PresidentState {
   });
 }
 
-export function createPresidentDef(options: { bots?: readonly BotPolicy<PresidentState>[] } = {}): GameDef<
-  PresidentState,
-  PresidentRules
-> {
+export function createPresidentDef(
+  options: { bots?: readonly BotPolicy<PresidentState>[] } = {},
+): GameDef<PresidentState, PresidentRules> {
   return {
     id: GAME_ID,
     howToPlay: presidentHowToPlay,
@@ -715,6 +722,3 @@ export function createPresidentDef(options: { bots?: readonly BotPolicy<Presiden
 }
 
 export const presidentGame = createPresidentDef();
-
-
-

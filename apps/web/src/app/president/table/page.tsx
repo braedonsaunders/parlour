@@ -15,7 +15,7 @@ import { presidentTableView } from '@/lib/president/view';
 import { botKey, buildMatchRecord, friendKey, useHistoryStore } from '@/stores/history';
 import { useMatchFlowStore } from '@/stores/matchFlow';
 import { useProfileStore } from '@/stores/profile';
-import { usePresidentSetupStore } from '@/stores/presidentSetup';
+import { presidentRulesFor, usePresidentSetupStore } from '@/stores/presidentSetup';
 import {
   clearActiveMultiplayerSession,
   getActiveMultiplayerSession,
@@ -39,6 +39,7 @@ export default function PresidentTablePage() {
 function SoloPresidentTablePage() {
   const mode = usePresidentSetupStore((state) => state.mode);
   const seats = usePresidentSetupStore((state) => state.seats);
+  const overrides = usePresidentSetupStore((state) => state.overrides);
   const name = useProfileStore((state) => state.name);
   const avatarId = useProfileStore((state) => state.avatarId);
   const [transport, setTransport] = useState<PresidentTransport | null>(null);
@@ -48,6 +49,7 @@ function SoloPresidentTablePage() {
       setTransport(
         new PresidentTransport({
           mode,
+          rules: presidentRulesFor(mode, overrides),
           seats,
           seed: Date.now() | 0,
           player: { name, avatarId },
@@ -55,7 +57,7 @@ function SoloPresidentTablePage() {
       );
     }, 0);
     return () => window.clearTimeout(timer);
-  }, [avatarId, mode, name, seats]);
+  }, [avatarId, mode, name, overrides, seats]);
 
   if (!transport) return <PresidentTableScreen view={null} fx={[]} fxKey="loading" />;
   return <ActivePresidentTable transport={transport} />;
@@ -178,7 +180,9 @@ function ActiveMultiplayerPresidentTable({ room }: { room: MultiplayerRoomSessio
       error={localError ?? snapshot.error}
       onConfirm={(cards) =>
         dispatch(
-          session.phase.phase.startsWith('exchange') ? pickExchangeMove(session, localSeat) : 'playSet',
+          session.phase.phase.startsWith('exchange')
+            ? pickExchangeMove(session, localSeat)
+            : 'playSet',
           { cards },
         )
       }
@@ -235,8 +239,7 @@ function ActivePresidentTable({ transport }: { transport: PresidentTransport }) 
     const botSeat = snapshot.session.phase.actor;
     if (botSeat === null) return;
     // Exchange decisions read as deliberation; regular turns keep the human pace.
-    const delay =
-      snapshot.session.phase.phase === 'play' ? 520 + botSeat * 80 : 420;
+    const delay = snapshot.session.phase.phase === 'play' ? 520 + botSeat * 80 : 420;
     const timer = window.setTimeout(() => {
       try {
         accept(transport.playBotTurn());
@@ -292,13 +295,9 @@ function ActivePresidentTable({ transport }: { transport: PresidentTransport }) 
 
   const actingLocally =
     snapshot.session.status === 'playing' &&
-    ((snapshot.session.phase.actors ?? []).includes(0) ||
-      snapshot.session.phase.actor === 0);
+    ((snapshot.session.phase.actors ?? []).includes(0) || snapshot.session.phase.actor === 0);
 
-  const view = presidentTableView(
-    snapshot,
-    actingLocally ? localLegalMoves(snapshot) : [],
-  );
+  const view = presidentTableView(snapshot, actingLocally ? localLegalMoves(snapshot) : []);
 
   return (
     <PresidentTableScreen

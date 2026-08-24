@@ -26,7 +26,12 @@ export const MAX_TARGET_POINTS = 21;
 export const presidentConfig = defineConfig<PresidentRules>(
   [
     { key: 'twoClears', kind: 'toggle', label: 'A 2 clears the pile', default: true },
-    { key: 'passLocks', kind: 'toggle', label: 'Passing locks you out of the trick', default: false },
+    {
+      key: 'passLocks',
+      kind: 'toggle',
+      label: 'Passing locks you out of the trick',
+      default: false,
+    },
     { key: 'trading', kind: 'toggle', label: 'Role card exchange between deals', default: true },
     {
       key: 'targetPoints',

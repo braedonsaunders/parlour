@@ -46,8 +46,7 @@ const args = parseArgs(process.argv.slice(2));
 console.log(`parlour ${GAME_ID} bot simulation — ${args.games} games per gate`);
 console.log(
   `gates: Sharp above Rookie ≥ ${(DEFAULT_THRESHOLDS.ladderMin * 100).toFixed(0)}% · ` +
-    `social band ${(DEFAULT_THRESHOLDS.socialBandMin * 100).toFixed(0)}–${(DEFAULT_THRESHOLDS.socialBandMax * 100).toFixed(0)}% · ` +
-    `Sharp wins ${(DEFAULT_THRESHOLDS.sharpWinMin * 100).toFixed(0)}–${(DEFAULT_THRESHOLDS.sharpWinMax * 100).toFixed(0)}% · ` +
+    `win bands ${(DEFAULT_THRESHOLDS.socialBandMin * 100).toFixed(0)}–${(DEFAULT_THRESHOLDS.sharpWinMax * 100).toFixed(0)}% · ` +
     `≤${DEFAULT_THRESHOLDS.maxAverageDeals} deals/match`,
 );
 
@@ -59,20 +58,14 @@ console.log('');
 console.log('gate 1 — skill ladder (Sharp vs Rookie, seating rotated)');
 console.log(
   `  Sharp above Rookie ${(report.ladder.sharpAboveRookieRate * 100).toFixed(1)}% · ` +
-    `wins ${((report.ladder.sharpWinRate * 100) || 0).toFixed(1)}% vs Rookie ${((report.ladder.rookieWinRate * 100) || 0).toFixed(1)}%` +
+    `wins ${(report.ladder.sharpWinRate * 100 || 0).toFixed(1)}% vs Rookie ${(report.ladder.rookieWinRate * 100 || 0).toFixed(1)}%` +
     ` over ${report.ladder.games} games — ${report.ladder.passes ? 'PASS' : 'FAIL'}`,
 );
 
 console.log('');
 console.log('gate 2 — persona win-rate band in mixed tables');
 for (const row of report.personas.rows) {
-  const flag =
-    row.winRate < report.thresholds.socialBandMin && row.key !== 'president-hard'
-      ? ' ✗'
-      : row.key === 'president-hard' &&
-          (row.winRate < report.thresholds.sharpWinMin || row.winRate > report.thresholds.sharpWinMax)
-        ? ' ✗'
-        : '';
+  const flag = row.winRate > report.thresholds.sharpWinMax ? ' ✗' : '';
   console.log(
     `  ${row.label.padEnd(10)} ${(row.winRate * 100).toFixed(1)}% (${row.games} games)${flag}`,
   );

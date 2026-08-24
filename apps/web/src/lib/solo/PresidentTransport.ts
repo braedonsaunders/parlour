@@ -39,6 +39,8 @@ export interface PresidentPlayer {
 
 export interface PresidentTransportOptions {
   mode: PresidentModeId;
+  /** Fully resolved table rules. Defaults to the mode's preset when omitted. */
+  rules?: PresidentRules;
   seats: number;
   seed: number;
   player: { name: string; avatarId: string };
@@ -79,7 +81,7 @@ export class PresidentTransport {
     this.options = options;
     this.session = createSession(this.def, {
       seed: options.seed | 0,
-      config: applyPreset(this.def.configSchema, options.mode),
+      config: options.rules ?? applyPreset(this.def.configSchema, options.mode),
       seats: options.seats,
     });
   }
