@@ -31,3 +31,4 @@ export * from './audit';
 export * from './session';
 export * from './room';
 export * from './wire';
+export * from './material';

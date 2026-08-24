@@ -78,6 +78,8 @@ import {
 import { resolveVeiledState, stateContainsCardId } from '@parlour/engine';
 import {
   auditSummary,
+  layerStream,
+  loadRoundMaterial,
   recoveryPolicyFor,
   VeilRoom,
   VeilSession,
@@ -86,11 +88,7 @@ import {
 } from '@/lib/multiplayer/veil';
 import { botTurnKey, botTurns } from './botSeats';
 import { NostrSignaling, type RoomAnnouncement } from '@/lib/multiplayer/NostrSignaling';
-import {
-  createDealNonce,
-  dealCommitment,
-  DealSeedRound,
-} from '@/lib/multiplayer/dealSeed';
+import { createDealNonce, dealCommitment, DealSeedRound } from '@/lib/multiplayer/dealSeed';
 import { validateRoomCode } from '@/lib/rooms/code';
 import { hasValidSeatCount, seatRangeFor } from '@/lib/rooms/seatRange';
 
@@ -181,6 +179,15 @@ type Listener = () => void;
  */
 const DEAL_ROUND_TIMEOUT_MS = 10_000;
 
+/**
+ * How long a veiled round holds a seat open for a player who dropped.
+ *
+ * Long enough to cover a phone changing networks, a locked screen or a reload,
+ * because the alternative to waiting is opening their hand to the rest of the
+ * table. Finite, because a round cannot wait forever on somebody who has gone.
+ */
+const RECONNECT_GRACE_MS = 45_000;
+
 type SessionAuthority = AuthorityAdapter & {
   getSession(): MultiplayerGameSession;
 };
@@ -222,6 +229,14 @@ export class MultiplayerRoomSession {
   private veil: { session: VeilSession; room: VeilRoom } | null = null;
   /** Ordered DataChannel delivery still needs ordered async crypto completion. */
   private veilInbox: Promise<void> = Promise.resolve();
+  /**
+   * The in-flight veil attachment.
+   *
+   * Attaching became asynchronous when a seat started restoring its material
+   * instead of minting it, so dealing has to wait for it: `start` can otherwise
+   * be pressed while the room's own key is still being read back.
+   */
+  private veilAttach: Promise<void> | null = null;
   private seed = 0;
   /** This seat's shuffle share, minted once per room and revealed at the deal. */
   private dealNonce: string | null = null;
@@ -230,6 +245,8 @@ export class MultiplayerRoomSession {
   private recycleActionPending = false;
   /** bot turns already scheduled, keyed by log position, so none fires twice */
   private readonly scheduledBotTurns = new Set<string>();
+  /** seats being held open for a player who dropped, keyed by seat */
+  private readonly pendingReturns = new Map<number, ReturnType<typeof setTimeout>>();
   private snapshot: MultiplayerRoomSnapshot = {
     room: null,
     gameId: null,
@@ -280,7 +297,8 @@ export class MultiplayerRoomSession {
         connection: 'connected',
         isHost: true,
       });
-      if (settings.security === 'veil') this.attachVeil(settings, this.seed);
+      if (settings.security === 'veil')
+        this.veilAttach = this.attachVeil(settings, this.seed).catch(() => undefined);
       this.commitDealShare();
       return room;
     } catch (error) {
@@ -335,7 +353,10 @@ export class MultiplayerRoomSession {
         seats: joinedSeats.sort((a, b) => a.seat - b.seat),
       });
       if (settings.security === 'veil' && assignedSeat !== null && !this.veil) {
-        this.attachVeil(settings, this.authority?.getSession().seed ?? this.seed);
+        this.veilAttach = this.attachVeil(
+          settings,
+          this.authority?.getSession().seed ?? this.seed,
+        ).catch(() => undefined);
       }
       return room;
     } catch (error) {
@@ -467,7 +488,9 @@ export class MultiplayerRoomSession {
         });
       })
       .catch((error: unknown) => {
-        this.update({ error: error instanceof Error ? error.message : 'the deal could not be checked' });
+        this.update({
+          error: error instanceof Error ? error.message : 'the deal could not be checked',
+        });
       });
   }
 
@@ -478,6 +501,8 @@ export class MultiplayerRoomSession {
    * happen at room creation: the table has to be full first.
    */
   private async dealVeiled(): Promise<void> {
+    // The room may still be reading its own material back off the shelf.
+    await this.veilAttach;
     const veil = this.veil;
     const settings = this.snapshot.settings;
     if (!veil || !settings || !this.transport) throw new Error('the veiled room is not ready');
@@ -518,17 +543,24 @@ export class MultiplayerRoomSession {
   }
 
   /** Builds this seat's Veil state and points it at the mesh. */
-  private attachVeil(settings: RoomSettings, seed: number): void {
+  private async attachVeil(settings: RoomSettings, seed: number): Promise<void> {
     const transport = this.transport;
     if (!transport) return;
     this.seed = seed;
+    const roomCode = this.snapshot.room?.code ?? 'ROOM';
+    // Restored if this seat has been in this room before, minted if not. This
+    // one line is what turns a disconnect into something a player can walk back
+    // from: the same key signs, and the same layers derive.
+    const material = await loadRoundMaterial(roomCode, this.profile.profileId);
     const session = new VeilSession({
-      roomCode: this.snapshot.room?.code ?? 'ROOM',
+      roomCode,
       seed,
       seat: this.snapshot.localSeat ?? 0,
       seats: settings.seats,
       gameId: settings.gameId,
       config: settings.config,
+      identity: material.identity,
+      layerRandom: (epoch) => layerStream(material.masterSeed, roomCode, epoch),
     });
     const room = new VeilRoom(
       session,
@@ -538,6 +570,7 @@ export class MultiplayerRoomSession {
         seatForPeer: (peerId) => transport.seatForPeerId(peerId),
       },
       settings.seats,
+      (restored) => this.onVeilResume(restored),
     );
     transport.onVeil((peerId, message) => {
       this.veilInbox = this.veilInbox
@@ -554,8 +587,17 @@ export class MultiplayerRoomSession {
           });
         });
     });
+    // Loading the material was the first await in this method, so the room may
+    // have been left or replaced while it ran. Announcing into a closed
+    // transport would throw where nobody is waiting to catch it.
+    if (this.transport !== transport) return;
     this.veil = { session, room };
-    void room.announce();
+    await room.announce();
+    if (this.transport !== transport) return;
+    // Ask the table to replay the round. A room that has not dealt yet has
+    // nothing to send and simply does not answer, so this costs a lobby
+    // nothing and is the whole story for a seat that is coming back.
+    room.requestCatchUp();
   }
 
   private publishCeremonyProgress(): void {
@@ -746,6 +788,71 @@ export class MultiplayerRoomSession {
    * has no honest threshold — two seats — the round pauses instead, and the
    * message says exactly why rather than blaming the network.
    */
+  /**
+   * Holds a seat open for a player who dropped, and only recovers it if they
+   * stay gone.
+   *
+   * The order matters more than the delay. Recovery rebuilds a seat's layer out
+   * of other people's shares, which means whoever holds them can read every
+   * card that seat was dealt — the protocol reports it as the privacy loss it
+   * is. A player who simply reconnects rebuilds that same layer themselves, out
+   * of material nobody else ever had. So waiting is not politeness, it is the
+   * difference between a round that stays private and one that does not.
+   */
+  private awaitReturnThenRecover(seat: number): void {
+    if (this.pendingReturns.has(seat)) return;
+    this.update({
+      security: {
+        ...this.snapshot.security,
+        paused: `Seat ${seat + 1} dropped. Waiting for them to come back…`,
+      },
+    });
+    const timer = setTimeout(() => {
+      this.pendingReturns.delete(seat);
+      void this.recoverLostSeat(seat);
+    }, RECONNECT_GRACE_MS);
+    this.pendingReturns.set(seat, timer);
+  }
+
+  /** A seat came back before the room gave up on it. */
+  private cancelPendingReturn(seat: number): void {
+    const timer = this.pendingReturns.get(seat);
+    if (timer === undefined) return;
+    clearTimeout(timer);
+    this.pendingReturns.delete(seat);
+    this.veil?.room.markSeatPresent(seat);
+    // Their layer came back with them, so nothing was opened and the round
+    // simply continues.
+    if (this.snapshot.security.paused?.includes(`Seat ${seat + 1}`)) {
+      this.update({ security: { ...this.snapshot.security, paused: null } });
+      this.driveBotSeats();
+    }
+  }
+
+  /**
+   * What this seat does when the table replays the round to it.
+   *
+   * `restored` false means the material this browser needed is gone — cleared
+   * storage, a different device — so it cannot rebuild the layers it laid. It
+   * says so instead of playing on with a layer that is not the one the
+   * transcript accepted, and the table recovers the seat the older way.
+   */
+  private onVeilResume(restored: boolean): void {
+    if (!restored) {
+      this.update({
+        error:
+          'Your shuffle layers could not be rebuilt on this device, so the table has to reopen ' +
+          'your cards to continue. The round is no longer private for this seat.',
+      });
+      return;
+    }
+    this.update({
+      error: null,
+      security: { ...this.snapshot.security, paused: null },
+    });
+    void this.openMyHandles();
+  }
+
   private async recoverLostSeat(seat: number): Promise<void> {
     const veil = this.veil;
     if (!veil || seat === this.snapshot.localSeat) return;
@@ -1009,6 +1116,7 @@ export class MultiplayerRoomSession {
     if (presence.kind === 'peer.joined' || presence.kind === 'seat.reclaimed') {
       const isLocal = presence.peerId === this.snapshot.room?.peerId;
       this.veil?.room.markSeatPresent(presence.seat);
+      this.cancelPendingReturn(presence.seat);
       const existing = this.snapshot.seats.filter((seat) => seat.seat !== presence.seat);
       const joined: MultiplayerSeat = isLocal
         ? { ...this.profile, seat: presence.seat, connected: true, bot: false }
@@ -1047,7 +1155,10 @@ export class MultiplayerRoomSession {
         this.snapshot.localSeat !== null &&
         this.snapshot.room
       ) {
-        this.attachVeil(this.snapshot.settings, this.authority?.getSession().seed ?? this.seed);
+        this.veilAttach = this.attachVeil(
+          this.snapshot.settings,
+          this.authority?.getSession().seed ?? this.seed,
+        ).catch(() => undefined);
       }
       return;
     }
@@ -1058,8 +1169,10 @@ export class MultiplayerRoomSession {
         ),
       });
       // A veiled room cannot keep dealing while a departed seat's layer is
-      // missing, so ask the room to rebuild it — or say plainly that it cannot.
-      if (this.veil) void this.recoverLostSeat(presence.seat);
+      // missing. Wait for them first: a player who comes back rebuilds their
+      // own layer and nobody's hand is opened, which recovery cannot say.
+      // Recovery is what happens when they do not come back.
+      if (this.veil) this.awaitReturnThenRecover(presence.seat);
       else this.driveBotSeats();
     }
   }

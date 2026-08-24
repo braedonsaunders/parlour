@@ -129,6 +129,25 @@ export interface LayerResult {
 }
 
 /**
+ * Draws a layer from a byte stream: the exponent, the permutation, the salt.
+ *
+ * Split out so that laying a layer and *rebuilding* one after a disconnect draw
+ * in exactly the same order from exactly the same places. A seat that returns
+ * derives this again from its own stream and checks the result against the
+ * commitment already in the transcript — which only matches if every draw here
+ * happened identically, so the two must never be allowed to drift apart.
+ */
+export function deriveLayerSecret(
+  epoch: VeilEpoch,
+  random: (length: number) => Uint8Array,
+): VeilLayerSecret {
+  const key = generateLayerKey(random);
+  const order = randomPermutation(epoch.cards.length, random);
+  const salt = toHexString(random(16));
+  return { epoch: epoch.epoch, key, order, salt };
+}
+
+/**
  * Lays this seat's layer on the deck as it stands. `input` is the base deck for
  * the first seat, and the previous seat's published deck after that.
  */
@@ -139,11 +158,8 @@ export async function layShuffleLayer(
   random: (length: number) => Uint8Array,
 ): Promise<LayerResult> {
   if (input.length !== epoch.cards.length) throw new Error('shuffle input is the wrong size');
-  const key = generateLayerKey(random);
-  const order = randomPermutation(input.length, random);
-  const salt = toHexString(random(16));
-  const deck = shuffleLayer(input.map(elementFromHex), key, order).map(elementToHex);
-  const secret: VeilLayerSecret = { epoch: epoch.epoch, key, order, salt };
+  const secret = deriveLayerSecret(epoch, random);
+  const deck = shuffleLayer(input.map(elementFromHex), secret.key, secret.order).map(elementToHex);
   return {
     entry: { epoch: epoch.epoch, seat, deck, commitment: await commitLayer(secret) },
     secret,

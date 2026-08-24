@@ -20,6 +20,8 @@ import {
   acceptLayer,
   baseDeck,
   checkLayer,
+  commitLayer,
+  deriveLayerSecret,
   finishOpen,
   handleForPosition,
   layShuffleLayer,
@@ -56,6 +58,17 @@ export interface VeilSessionOptions {
   gameId: string;
   config: RuleValues;
   random?: (length: number) => Uint8Array;
+  /**
+   * The byte stream this seat's layer for an epoch is built from.
+   *
+   * Scoped per epoch on purpose: one shared stream would make a layer depend on
+   * how many bytes earlier epochs happened to consume, and a resumed session
+   * replays epochs it did not draw in the same order. Keyed by epoch, each
+   * layer is reproducible on its own.
+   */
+  layerRandom?: (epoch: number) => Promise<(length: number) => Uint8Array>;
+  /** This seat's round key, kept across a disconnect so it returns as itself. */
+  identity?: VeilIdentity;
 }
 
 export interface VeilCeremonyProgress {
@@ -131,9 +144,16 @@ export class VeilSession {
     return this.auditState;
   }
 
-  /** Mints this seat's round identity. Call once, before the header is built. */
+  /**
+   * Takes up this seat's round identity. Call once, before the header is built.
+   *
+   * Prefers the identity the room hands it, because a seat that comes back
+   * after a disconnect has to sign as the key the round header registered — a
+   * freshly minted one is a stranger to the transcript, and every entry it
+   * wrote would be refused.
+   */
   async start(): Promise<string> {
-    this.identity = await createIdentity();
+    this.identity = this.options.identity ?? (await createIdentity());
     return this.identity.publicKey;
   }
 
@@ -274,6 +294,45 @@ export class VeilSession {
   }
 
   /**
+   * Rebuilds this seat's layer secret for an epoch it already laid.
+   *
+   * The transcript records what a layer *did* — its deck and its commitment —
+   * never the secret behind it, so a returning seat cannot read its layer back
+   * off the wire. It re-derives it from its own stream and then proves the
+   * result: the rebuilt secret must hash to the commitment the round already
+   * accepted. If it does not, this seat cannot peel and must say so rather than
+   * carry on with a layer that is not the one it laid, so the room can fall
+   * back to recovering the seat properly.
+   */
+  async restoreLayerSecret(epoch: number): Promise<boolean> {
+    if (this.secrets.has(epoch)) return true;
+    const current = this.epochs.get(epoch);
+    if (!current) return false;
+    const mine = current.layers.find((layer) => layer.seat === this.options.seat);
+    // Nothing laid on this epoch by this seat is nothing to restore.
+    if (!mine) return true;
+    const random = await this.options.layerRandom?.(epoch);
+    if (!random) return false;
+    try {
+      const secret = deriveLayerSecret(current, random);
+      if ((await commitLayer(secret)) !== mine.commitment) return false;
+      this.secrets.set(epoch, secret);
+      return true;
+    } catch {
+      // An exhausted or absent stream means the material is gone.
+      return false;
+    }
+  }
+
+  /** Epochs this seat has laid a layer on, for a returning peer to restore. */
+  laidEpochs(): number[] {
+    return [...this.epochs.entries()]
+      .filter(([, epoch]) => epoch.layers.some((layer) => layer.seat === this.options.seat))
+      .map(([index]) => index)
+      .sort((left, right) => left - right);
+  }
+
+  /**
    * Lays this seat's layer on the epoch as it currently stands and records it
    * in the transcript. `null` means it is not this seat's turn yet.
    */
@@ -290,7 +349,10 @@ export class VeilSession {
       current,
       this.options.seat,
       input,
-      this.options.random ?? randomBytes,
+      // A derived stream makes this layer reproducible by this seat and nobody
+      // else, which is what lets a dropped player resume its own round instead
+      // of the table recovering it on their behalf. See veil/material.ts.
+      (await this.options.layerRandom?.(epoch)) ?? this.options.random ?? randomBytes,
     );
     this.secrets.set(epoch, secret);
     await this.transcript.append(this.identity, this.options.seat, 'ceremony.layer', entry);

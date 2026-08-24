@@ -25,6 +25,34 @@ export async function createIdentity(): Promise<VeilIdentity> {
   return { publicKey: toBase64Url(new Uint8Array(spki)), privateKey: pair.privateKey };
 }
 
+/**
+ * Carries a seat's identity across a disconnect.
+ *
+ * The transcript only accepts entries from signers registered in the round
+ * header, so a returning player that minted a fresh key would be a stranger to
+ * the round it is trying to rejoin. Keeping the key is what lets it come back
+ * as itself. The key is generated extractable, so this needs no change to how
+ * it is made — see veil/material.ts for where it is kept and what that costs.
+ */
+export async function exportIdentity(identity: VeilIdentity): Promise<string> {
+  const pkcs8 = await crypto.subtle.exportKey('pkcs8', identity.privateKey);
+  return toBase64Url(new Uint8Array(pkcs8));
+}
+
+export async function restoreIdentity(
+  privateKey: string,
+  publicKey: string,
+): Promise<VeilIdentity> {
+  const key = await crypto.subtle.importKey(
+    'pkcs8',
+    fromBase64Url(privateKey) as BufferSource,
+    ALGORITHM,
+    true,
+    ['sign'],
+  );
+  return { publicKey, privateKey: key };
+}
+
 const verifyKeyCache = new Map<string, Promise<CryptoKey | null>>();
 
 async function importVerifyKey(publicKey: string): Promise<CryptoKey | null> {

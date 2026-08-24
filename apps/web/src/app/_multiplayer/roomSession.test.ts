@@ -456,6 +456,109 @@ describe('multiplayer route composition', () => {
     );
   }, 120_000);
 
+  /**
+   * The two-seat disconnect used to be the end of a veiled round: recovery
+   * needs somebody else to hold key material, and at two seats the only
+   * somebody is your opponent. A player who comes back rebuilds their own layer
+   * from their own material, so the round continues and nobody's hand is
+   * opened — which is what these assertions are really checking.
+   */
+  it('resumes a two-seat veiled round when the dropped player comes back', async () => {
+    const broker = new MockSignalingBroker();
+    const rtc = new MockRtcNetwork();
+    const host = new MultiplayerRoomSession(
+      { name: 'Host', avatarId: 'ember', profileId: 'resume-host' },
+      {
+        signaling: broker.signaling('resume-host-peer'),
+        peerConnection: rtc.factory('resume-host'),
+        seed: 77,
+        // Fast enough to notice a real drop inside a test, slow enough that a
+        // ceremony hogging the event loop is not mistaken for one.
+        heartbeatIntervalMs: 20,
+        heartbeatTimeoutMs: 2_000,
+      },
+    );
+    const guest = new MultiplayerRoomSession(
+      { name: 'Guest', avatarId: 'mint', profileId: 'resume-guest' },
+      {
+        signaling: broker.signaling('resume-guest-peer'),
+        peerConnection: rtc.factory('resume-guest'),
+        seed: 5,
+        heartbeatIntervalMs: 20,
+        heartbeatTimeoutMs: 2_000,
+      },
+    );
+    sessions.push(host, guest);
+
+    const room = await host.create({ seats: 2, security: 'veil' });
+    await guest.join(room.code);
+    await eventually(() => expect(guest.getSnapshot().localSeat).toBe(1));
+    await host.start();
+    await eventually(
+      () => {
+        expect(host.getSnapshot().security.ceremony.ready).toBe(true);
+        expect(guest.getSnapshot().security.ceremony.ready).toBe(true);
+      },
+      1_000,
+      10,
+    );
+
+    // The guest's browser goes away mid-round.
+    guest.close();
+    await eventually(
+      () => {
+        expect(host.getSnapshot().seats.find((seat) => seat.seat === 1)?.connected).toBe(false);
+        // Held open, not recovered: the round is waiting for them, and no
+        // hand has been reopened to keep it moving.
+        expect(host.getSnapshot().security.paused).toMatch(/come back/i);
+        expect(host.getSnapshot().security.recoveredSeats).toEqual([]);
+      },
+      500,
+      10,
+    );
+
+    // Same profile, new browser session — a reload, or a phone that dropped.
+    const rejoined = new MultiplayerRoomSession(
+      { name: 'Guest', avatarId: 'mint', profileId: 'resume-guest' },
+      {
+        signaling: broker.signaling('resume-guest-back'),
+        peerConnection: rtc.factory('resume-back'),
+        seed: 6,
+        heartbeatIntervalMs: 20,
+        heartbeatTimeoutMs: 2_000,
+      },
+    );
+    sessions.push(rejoined);
+    await rejoined.join(room.code);
+
+    await eventually(
+      () => {
+        expect(rejoined.getSnapshot().localSeat).toBe(1);
+        // The round is live again on both sides, and nothing was recovered.
+        expect(host.getSnapshot().security.paused).toBeNull();
+        expect(host.getSnapshot().security.recoveredSeats).toEqual([]);
+        expect(rejoined.getSnapshot().security.recoveredSeats).toEqual([]);
+      },
+      500,
+      10,
+    );
+
+    // And the seat can still read its own cards and nobody else's, which is
+    // only true if it rebuilt the very layer it laid before it dropped.
+    await eventually(
+      () => {
+        const state = multiplayerSession<BlitzState, BlitzConfig>(
+          rejoined.getSnapshot(),
+          'blitz',
+        )!.state;
+        expect(state.hands[1]!.some(isVeilHandle)).toBe(false);
+        expect(state.hands[0]!.every(isVeilHandle)).toBe(true);
+      },
+      1_000,
+      10,
+    );
+  }, 120_000);
+
   it('discovers a Wild room and keeps its action-card state synchronized', async () => {
     const broker = new MockSignalingBroker();
     const rtc = new MockRtcNetwork();
