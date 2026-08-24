@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
-import { ROOM_CODE_LENGTH, normalizeRoomCode } from '@/lib/rooms/code';
+import { ROOM_CODE_ALPHABET, ROOM_CODE_LENGTH, normalizeRoomCode } from '@/lib/rooms/code';
 import { useProfileStore } from '@/stores/profile';
 import styles from '@/styles/join.module.css';
 import {
@@ -13,7 +13,6 @@ import {
   MultiplayerRoomSession,
 } from '../_multiplayer/roomSession';
 
-const KEYS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'.split('');
 const subscribeNoop = () => () => {};
 
 function readLinkCode(): string {
@@ -29,12 +28,12 @@ export default function JoinPage() {
   const name = useProfileStore((state) => state.name);
   const avatarId = useProfileStore((state) => state.avatarId);
   const linkCode = useSyncExternalStore(subscribeNoop, readLinkCode, () => '');
-  const [typed, setTyped] = useState<string[]>([]);
+  const [typed, setTyped] = useState<string | null>(null);
   const [roomSession, setRoomSession] = useState<MultiplayerRoomSession | null>(null);
   const [checking, setChecking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const autoTried = useRef(false);
-  const chars = typed.length > 0 || !linkCode ? typed : linkCode.split('');
+  const code = typed ?? linkCode;
 
   const submit = useCallback(
     async (code: string) => {
@@ -66,29 +65,17 @@ export default function JoinPage() {
     void submit(linkCode);
   }, [linkCode, submit]);
 
-  const press = useCallback((key: string) => {
+  const updateCode = useCallback((raw: string) => {
     setError(null);
-    setTyped((previous) => (previous.length >= ROOM_CODE_LENGTH ? previous : [...previous, key]));
-  }, []);
-  const backspace = useCallback(() => {
-    setError(null);
-    setTyped((previous) =>
-      previous.length > 0 ? previous.slice(0, -1) : linkCode ? linkCode.split('').slice(0, -1) : [],
+    setTyped(
+      normalizeRoomCode(raw)
+        .split('')
+        .filter((character) => ROOM_CODE_ALPHABET.includes(character))
+        .join('')
+        .slice(0, ROOM_CODE_LENGTH),
     );
-  }, [linkCode]);
+  }, []);
 
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      const key = event.key.toUpperCase();
-      if (key === 'BACKSPACE' || key === 'DELETE') backspace();
-      else if (key === 'ENTER' && chars.length === ROOM_CODE_LENGTH) void submit(chars.join(''));
-      else if (/^[A-Z0-9]$/.test(key)) press(key);
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [backspace, chars, press, submit]);
-
-  const code = chars.join('');
   return (
     <main className="flex min-h-dvh flex-col items-center justify-center gap-6 px-6 py-8 text-center">
       <Link
@@ -105,39 +92,28 @@ export default function JoinPage() {
           Type the four characters your friend shared.
         </p>
       </div>
-      <div
-        className={styles.slots}
-        role="textbox"
-        aria-label={`Room code, ${chars.length} of ${ROOM_CODE_LENGTH} entered`}
-        aria-live="polite"
-      >
-        {Array.from({ length: ROOM_CODE_LENGTH }, (_, index) => (
-          <span key={index} data-filled={index < chars.length} className={styles.slot}>
-            {chars[index] ?? ''}
-          </span>
-        ))}
-      </div>
-      <div className={styles.keypad} aria-label="Room code keypad">
-        {KEYS.map((key) => (
-          <button
-            key={key}
-            type="button"
-            onClick={() => press(key)}
-            disabled={chars.length === ROOM_CODE_LENGTH || checking}
-            className={styles.key}
-          >
-            {key}
-          </button>
-        ))}
-        <button
-          type="button"
-          onClick={backspace}
-          className={styles.key}
-          aria-label="Delete last character"
-        >
-          ⌫
-        </button>
-      </div>
+      <input
+        type="text"
+        value={code}
+        onChange={(event) => updateCode(event.currentTarget.value)}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' && code.length === ROOM_CODE_LENGTH && !checking) {
+            void submit(code);
+          }
+        }}
+        maxLength={ROOM_CODE_LENGTH}
+        inputMode="text"
+        enterKeyHint="go"
+        autoCapitalize="characters"
+        autoComplete="off"
+        autoCorrect="off"
+        spellCheck={false}
+        autoFocus={!linkCode}
+        disabled={checking}
+        data-filled={code.length > 0}
+        aria-label={`Room code, ${code.length} of ${ROOM_CODE_LENGTH} entered`}
+        className={styles.codeInput}
+      />
       <JoinStatus
         session={roomSession}
         fallbackError={error}
@@ -146,7 +122,7 @@ export default function JoinPage() {
       <button
         type="button"
         onClick={() => void submit(code)}
-        disabled={chars.length !== ROOM_CODE_LENGTH || checking}
+        disabled={code.length !== ROOM_CODE_LENGTH || checking}
         className="btn-fat w-64 text-lg"
       >
         {checking ? 'Knocking…' : 'Pull up a chair'}
