@@ -3,8 +3,10 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { GameArt } from '@/components/GameArt';
 import { useCenteredCarousel } from '@/hooks/useCenteredCarousel';
 import { EUCHRE_MODES, type EuchreModeDef } from '@/lib/euchre/modes';
+import { getGameMode } from '@/lib/games';
 import { useEuchreSetupStore } from '@/stores/euchreSetup';
 import styles from '@/styles/modes.module.css';
 
@@ -128,10 +130,7 @@ function ModeTile({
       }}
     >
       <span className={styles.tileGlow} />
-      <span className={styles.preview}>
-        <span className="font-display text-2xl font-black">J♠</span>
-        <span className="font-display text-2xl font-black opacity-80">J♣</span>
-      </span>
+      <GameArt cards={getGameMode('euchre', def.id).art} />
       <span className={styles.tagline}>{def.tagline}</span>
       <h2 className={styles.modeName}>{def.name}</h2>
       <span className={styles.facts}>

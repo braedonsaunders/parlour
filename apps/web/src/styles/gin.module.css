@@ -1,5 +1,11 @@
 /* Gin-specific table furniture: deadwood meter, meld glow, hand-end sheet. */
 
+.handCardShell {
+  position: relative;
+  display: flex;
+  width: 100%;
+}
+
 .meldMark {
   position: absolute;
   inset: -3px;
@@ -60,10 +66,18 @@
   color: var(--hearth-100);
 }
 
+@media (orientation: landscape) and (max-height: 560px) {
+  .optionBanner {
+    left: calc(100% + 1.1rem);
+    top: 50%;
+    transform: translateY(-50%);
+  }
+}
+
 .handEnd {
   position: absolute;
   inset: 0;
-  z-index: 20;
+  z-index: 40;
   display: grid;
   place-items: center;
   background: rgb(8 10 16 / 0.62);

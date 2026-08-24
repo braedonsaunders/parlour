@@ -1,29 +1,92 @@
 /* Rat Screw table chrome — sits on top of the shared table.module.css stage. */
 
-/*
- * The shared stage hides seat 0 because Wild/Blitz players see themselves as
- * the hand rail. Rat Screw has no visible hand — your stack is face-down like
- * everyone else's — so the local plaque shows, parked clear of the buttons.
- */
-.seatLocal {
+/* Rat Screw seats rotate around the viewer: authority seat ids never dictate
+ * screen position, so every multiplayer client sees their own stack below. */
+.ratscrewSeat {
+  inset: auto;
   visibility: visible;
-  left: 4.5%;
-  bottom: 1.6rem;
   translate: none;
 }
 
+.ratscrewSeat[data-table-position='0'] {
+  left: 50%;
+  bottom: 1.35rem;
+  translate: -50% 0;
+}
+
+.ratscrewSeat[data-table-size='2'][data-table-position='1'] {
+  left: 50%;
+  top: 2.2rem;
+  translate: -50% 0;
+}
+
+.ratscrewSeat[data-table-size='3'][data-table-position='1'] {
+  left: 8%;
+  top: 31%;
+  translate: 0 -50%;
+}
+
+.ratscrewSeat[data-table-size='3'][data-table-position='2'] {
+  right: 8%;
+  top: 31%;
+  translate: 0 -50%;
+}
+
+.ratscrewSeat[data-table-size='4'][data-table-position='1'] {
+  left: 2.5%;
+  top: 47%;
+  translate: 0 -50%;
+}
+
+.ratscrewSeat[data-table-size='4'][data-table-position='2'] {
+  left: 50%;
+  top: 2.2rem;
+  translate: -50% 0;
+}
+
+.ratscrewSeat[data-table-size='4'][data-table-position='3'] {
+  right: 2.5%;
+  top: 47%;
+  translate: 0 -50%;
+}
+
+.playerStack {
+  position: absolute;
+  top: -1.2rem;
+  z-index: -1;
+  display: grid;
+  place-items: center;
+  width: 4rem;
+  height: 5.6rem;
+  transform-origin: 50% 115%;
+}
+
+.stackLayer {
+  grid-area: 1 / 1;
+  line-height: 0;
+  transform: translate(var(--stack-x), var(--stack-y)) rotate(var(--stack-rotation));
+  transform-origin: 50% 135%;
+}
+
 .centerPile {
-  position: relative;
+  position: absolute;
+  left: 50%;
+  top: 47%;
+  z-index: 5;
   display: grid;
   place-items: center;
   min-width: 9.5rem;
   min-height: 8.4rem;
+  translate: -50% -50%;
+  perspective: 600px;
 }
 
 .pileFan {
   position: relative;
   display: grid;
   place-items: center;
+  width: clamp(3rem, 4.2vw, 4rem);
+  aspect-ratio: 5 / 7;
 }
 
 .pileFan > * {
@@ -46,9 +109,23 @@
   white-space: nowrap;
 }
 
+.emptyPile {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  place-items: center;
+  border: 2px dashed rgb(255 218 160 / 30%);
+  border-radius: 0.6rem;
+  color: rgb(255 235 201 / 58%);
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .challengeBanner {
   position: absolute;
-  top: clamp(5.4rem, 12vh, 7rem);
+  top: clamp(8.5rem, 20vh, 10rem);
   left: 50%;
   translate: -50% 0;
   display: flex;
@@ -62,7 +139,7 @@
   font-weight: 700;
   font-size: 0.85rem;
   color: rgb(255 244 224 / 92%);
-  z-index: 3;
+  z-index: 24;
 }
 
 .challengePips {
@@ -89,7 +166,7 @@
   display: grid;
   place-items: center;
   pointer-events: none;
-  z-index: 4;
+  z-index: 31;
 }
 
 .slapCard {
@@ -213,6 +290,58 @@
   font-weight: 800;
   color: rgb(255 244 224 / 90%);
   white-space: nowrap;
+}
+
+@media (orientation: portrait) {
+  .ratscrewSeat[data-table-size='3'][data-table-position='1'],
+  .ratscrewSeat[data-table-size='4'][data-table-position='1'] {
+    left: 3%;
+    top: 8.2rem;
+    translate: 0 0;
+  }
+
+  .ratscrewSeat[data-table-size='3'][data-table-position='2'],
+  .ratscrewSeat[data-table-size='4'][data-table-position='3'] {
+    right: 3%;
+    top: 8.2rem;
+    translate: 0 0;
+  }
+
+  .ratscrewSeat[data-table-size='2'][data-table-position='1'],
+  .ratscrewSeat[data-table-size='4'][data-table-position='2'] {
+    top: 3.4rem;
+  }
+
+  .centerPile {
+    top: 48%;
+  }
+}
+
+@media (orientation: landscape) and (max-height: 560px) {
+  .challengeBanner {
+    top: 6.25rem;
+  }
+
+  .ratscrewSeat[data-table-position='0'] {
+    bottom: 0.65rem;
+  }
+
+  .ratscrewSeat[data-table-size='2'][data-table-position='1'],
+  .ratscrewSeat[data-table-size='4'][data-table-position='2'] {
+    top: 1.25rem;
+  }
+
+  .ratscrewSeat[data-table-size='3'][data-table-position='1'],
+  .ratscrewSeat[data-table-size='3'][data-table-position='2'],
+  .ratscrewSeat[data-table-size='4'][data-table-position='1'],
+  .ratscrewSeat[data-table-size='4'][data-table-position='3'] {
+    top: 44%;
+  }
+
+  .centerPile {
+    top: 50.5%;
+    scale: 0.82;
+  }
 }
 
 /* burst layer ---------------------------------------------------------- */

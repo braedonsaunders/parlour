@@ -200,16 +200,18 @@ export function GinTableScreen(props: GinTableScreenProps) {
         />
       </section>
 
-      <div className={styles.actionRail}>
-        <button
-          type="button"
-          className="btn-fat"
-          disabled={!view.canKnock || busy || view.decision !== 'act'}
-          onClick={props.onKnock}
-        >
-          Knock
-        </button>
-      </div>
+      {!view.handEnd && (
+        <div className={styles.actionRail}>
+          <button
+            type="button"
+            className="btn-fat"
+            disabled={!view.canKnock || busy || view.decision !== 'act'}
+            onClick={props.onKnock}
+          >
+            Knock
+          </button>
+        </div>
+      )}
 
       {view.handEnd && !view.matchOver && (
         <HandEndSheet
@@ -400,7 +402,7 @@ function LocalHand({
               count={view.hand.length}
               playable={canChoose ? playable : undefined}
             >
-              <span className="relative inline-flex">
+              <span className={ginStyles.handCardShell}>
                 <PlayingCard card={card} disabled={!playable} onClick={() => onDiscard?.(card)} />
                 {melded && !deal.dealing && <i className={ginStyles.meldMark} aria-hidden="true" />}
               </span>

@@ -1,16 +1,31 @@
 /* Euchre-specific table furniture: trick zone, kitty, bid rail, team scores. */
 
+.hudCluster {
+  display: grid;
+  justify-items: start;
+  gap: 0.45rem;
+}
+
 .teamScores {
   display: flex;
-  gap: 0.5rem;
+  gap: 0.4rem;
   align-items: center;
+}
+
+.scoreTarget {
+  color: rgba(253, 246, 234, 0.58);
+  font-size: 0.58rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .teamChip {
   display: inline-flex;
   align-items: baseline;
-  gap: 0.4rem;
-  padding: 0.3rem 0.7rem;
+  gap: 0.3rem;
+  padding: 0.28rem 0.56rem;
   border-radius: 999px;
   background: rgba(16, 24, 32, 0.72);
   border: 2px solid rgba(255, 255, 255, 0.08);
@@ -31,10 +46,11 @@
 }
 
 .teamChip small {
-  font-size: 0.62rem;
-  letter-spacing: 0.14em;
+  font-size: 0.6rem;
+  letter-spacing: 0.055em;
   text-transform: uppercase;
   color: rgba(253, 246, 234, 0.66);
+  white-space: nowrap;
 }
 
 .trickZone {
@@ -121,7 +137,8 @@
 .trumpBadge {
   position: absolute;
   left: 50%;
-  top: 12%;
+  top: clamp(6.4rem, 17vh, 7.8rem);
+  z-index: 5;
   transform: translateX(-50%);
   display: inline-flex;
   align-items: center;
@@ -234,6 +251,19 @@
 .aloneToggle[data-on='true'] {
   background: #f0c04e;
   color: #3b2707;
+}
+
+.bidAction {
+  display: inline-flex;
+  width: 8rem;
+  min-height: 3.25rem;
+  box-sizing: border-box;
+  align-items: center;
+  justify-content: center;
+  padding: 0.65rem 0.85rem;
+  border-radius: var(--radius-fat);
+  font-size: 0.82rem;
+  line-height: 1;
 }
 
 .partnerNote {

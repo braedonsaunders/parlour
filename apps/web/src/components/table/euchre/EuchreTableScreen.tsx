@@ -120,11 +120,13 @@ export function EuchreTableScreen(props: EuchreTableScreenProps) {
       data-deal-state={deal.sequence ? (deal.complete ? 'complete' : 'dealing') : undefined}
     >
       <header className={tableStyles.hud}>
-        <div className="pill-soft">
-          <span className={tableStyles.eyebrow}>Euchre</span>
-          <strong>{view.stageLabel}</strong>
-        </div>
-        <TeamScores view={view} />
+        <section className={styles.hudCluster}>
+          <div className="pill-soft">
+            <span className={tableStyles.eyebrow}>Euchre</span>
+            <strong>{view.stageLabel}</strong>
+          </div>
+          <TeamScores view={view} />
+        </section>
         <button
           type="button"
           className={`${tableStyles.menuButton} btn-fat btn-fat--ghost`}
@@ -174,14 +176,14 @@ export function EuchreTableScreen(props: EuchreTableScreenProps) {
           onDiscard={props.onDiscard}
           deal={deal}
         />
-        <EuchreFxLayer
+        {/* Shared flights paint first; named Euchre moments stay readable above them. */}
+        <SharedCueLayer
           fx={props.fx}
           fxKey={props.fxKey}
           localSeat={view.localSeat}
           rootRef={rootRef}
         />
-        {/* shared cues: deal flights, kitty flip, turn rings */}
-        <SharedCueLayer
+        <EuchreFxLayer
           fx={props.fx}
           fxKey={props.fxKey}
           localSeat={view.localSeat}
@@ -222,22 +224,31 @@ export function EuchreTableScreen(props: EuchreTableScreenProps) {
 
 function TeamScores({ view }: { view: EuchreTableView }) {
   return (
-    <div className={styles.teamScores} data-team-scores>
+    <section
+      className={styles.teamScores}
+      data-team-scores
+      aria-label={`Team scores, first to ${view.targetScore}`}
+    >
+      <span className={styles.scoreTarget}>First to {view.targetScore}</span>
       {view.teams.map((team) => (
         <span
           key={team.team}
           className={styles.teamChip}
           data-maker={team.isMaker || undefined}
           style={{ '--team-accent': TEAM_ACCENTS[team.team] } as CSSProperties}
+          aria-label={`${team.label}: ${team.score} points and ${team.tricks} trick${team.tricks === 1 ? '' : 's'}`}
         >
           <strong>{team.score}</strong>
-          <small>
-            {team.label.split('–')[0]}/{team.label.split('–')[1]?.slice(0, 1)} · to{' '}
-            {view.targetScore} · {team.tricks} trick{team.tricks === 1 ? '' : 's'}
+          <small aria-hidden="true">
+            {team.label
+              .split('–')
+              .map((side) => side.slice(0, 1))
+              .join('/')}{' '}
+            · {team.tricks} trick{team.tricks === 1 ? '' : 's'}
           </small>
         </span>
       ))}
-    </div>
+    </section>
   );
 }
 
@@ -251,7 +262,7 @@ function Seat({
   displayCount: number;
 }) {
   const avatar = getAvatar(player.avatarId);
-  const visibleCards = Math.min(displayCount, 5);
+  const visibleCards = Math.min(displayCount, 6);
   const fanStep = visibleCards > 1 ? 22 / (visibleCards - 1) : 0;
   const style = {
     '--seat-accent': avatar.accent,
@@ -270,7 +281,7 @@ function Seat({
     >
       {!player.isLocal && (
         <div className={tableStyles.opponentCards} aria-label={`${displayCount} hidden cards`}>
-          {Array.from({ length: Math.max(visibleCards, player.isDealer ? 6 : 5) }, (_, index) => (
+          {Array.from({ length: visibleCards }, (_, index) => (
             <PlayingCard
               key={index}
               faceDown
@@ -412,13 +423,17 @@ function BidRail({
     return (
       <div className={styles.bidRail} role="group" aria-label="Bidding decision">
         <p className={styles.bidPrompt}>The dealer turned up a card — order it up?</p>
-        <button type="button" className="btn-fat" onClick={() => onOrderUp?.(false)}>
+        <button
+          type="button"
+          className={`btn-fat ${styles.bidAction}`}
+          onClick={() => onOrderUp?.(false)}
+        >
           Order it up
         </button>
         {allowAlone && (
           <button
             type="button"
-            className={styles.aloneToggle}
+            className={`${styles.aloneToggle} ${styles.bidAction}`}
             data-on={alonePending || undefined}
             onClick={onAloneToggle}
             aria-pressed={alonePending}
@@ -426,7 +441,11 @@ function BidRail({
             Go alone?
           </button>
         )}
-        <button type="button" className="btn-fat btn-fat--ghost" onClick={onPass}>
+        <button
+          type="button"
+          className={`btn-fat btn-fat--ghost ${styles.bidAction}`}
+          onClick={onPass}
+        >
           Pass
         </button>
       </div>
@@ -454,7 +473,7 @@ function BidRail({
         {allowAlone && (
           <button
             type="button"
-            className={styles.aloneToggle}
+            className={`${styles.aloneToggle} ${styles.bidAction}`}
             data-on={alonePending || undefined}
             onClick={onAloneToggle}
             aria-pressed={alonePending}
@@ -464,7 +483,11 @@ function BidRail({
         )}
         {!view.canPass && <p className={styles.bidPrompt}>Stick the dealer — you must call!</p>}
         {view.canPass && (
-          <button type="button" className="btn-fat btn-fat--ghost" onClick={onPass}>
+          <button
+            type="button"
+            className={`btn-fat btn-fat--ghost ${styles.bidAction}`}
+            onClick={onPass}
+          >
             Pass
           </button>
         )}

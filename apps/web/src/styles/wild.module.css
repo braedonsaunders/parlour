@@ -315,7 +315,7 @@
   position: absolute;
   left: 50%;
   bottom: 30%;
-  z-index: 24;
+  z-index: 31;
   display: flex;
   gap: 0.8rem;
   align-items: center;
@@ -665,7 +665,9 @@
 
 @media (max-height: 560px) {
   .tableBadges {
-    top: 30%;
+    left: 19%;
+    top: 31%;
+    transform: none;
   }
   .announcer {
     top: 8%;
