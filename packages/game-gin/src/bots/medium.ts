@@ -27,6 +27,17 @@ export function makeMediumBot(
       const current = bestPartition(view.hands[seat] ?? []).deadwood;
       const knock = legal.find((move) => move.id === 'knock');
 
+      // opening upcard decision
+      const take = legal.find((move) => move.id === 'option.take');
+      const pass = legal.find((move) => move.id === 'option.pass');
+      if (take && pass) {
+        const probe = drawOptions(ctx);
+        if (probe.discard && probe.stock && probe.discard.gain >= Math.max(1, probe.stock.gain)) {
+          return take;
+        }
+        return pass;
+      }
+
       const discards = discardMoves(legal);
       if (discards.length > 0) {
         if (knock && current <= params.knockAt) return knock;

@@ -47,6 +47,8 @@ export interface GinState {
   drawnFromStock: CardId | null;
   drawnFromDiscard: CardId | null;
   knocker: SeatId | null;
+  /** completed turns since the last stock draw — the pile-trade stall guard */
+  quietTurns: number;
   pickups: readonly Pickup[];
   outcome: HandOutcome | null;
 }

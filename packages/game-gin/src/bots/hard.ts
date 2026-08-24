@@ -31,6 +31,25 @@ export function makeHardBot(
       const current = bestPartition(hand).deadwood;
       const knock = legal.find((move) => move.id === 'knock');
 
+      // opening upcard decision
+      const take = legal.find((move) => move.id === 'option.take');
+      const pass = legal.find((move) => move.id === 'option.pass');
+      if (take && pass) {
+        const probe = drawOptions(ctx);
+        const probeTake = probe.discard;
+        const upcard = probeTake?.card;
+        if (probeTake && upcard !== undefined && upcard !== null) {
+          const appetite = discardDanger(ctx, upcard);
+          if (
+            probeTake.gain + appetite * 0.15 >= Math.max(0.75, probe.stock.gain) ||
+            (appetite >= 2.4 && probeTake.gain >= -1)
+          ) {
+            return take;
+          }
+        }
+        return pass;
+      }
+
       const discards = discardMoves(legal);
       if (discards.length > 0) {
         if (knock && current <= params.knockAt && params.knockProb !== null) {

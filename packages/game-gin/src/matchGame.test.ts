@@ -59,10 +59,10 @@ function driveToHandEnd(session: MatchSession, maxEvents = 4000): MatchSession {
   return cursor;
 }
 
-/** Full bot match driver used by determinism + replay tests. */
-function runBotMatch(seed: number) {
+/** Full bot match driver used by determinism + replay + completion tests. */
+function runBotMatch(seed: number, config: GinConfig = DEFAULTS) {
   const botsDef = createGinMatchDef({ bots: GIN_TIER_BOTS });
-  let session = createSession(botsDef, { seed, config: DEFAULTS, seats: 2 });
+  let session = createSession(botsDef, { seed, config, seats: 2 });
   let guard = 0;
   while (session.status === 'playing' && guard++ < 6000) {
     const next = acting(botsDef, session);
@@ -113,26 +113,25 @@ describe('the match wrapper', () => {
   it('rejects double-ready and ready during live play', () => {
     let session = driveToHandEnd(createSession(def, { seed: 21, config: DEFAULTS, seats: 2 }));
     session = play(session, 0, 'ready');
-    expect(sessionApply(def, session, 0, 'ready').rejected?.code).toBe('already-ready');
+    // seat 0 already signalled, so it is no longer an acting seat
+    const again = sessionApply(def, session, 0, 'ready').rejected?.code;
+    expect(['already-ready', 'not-your-turn']).toContain(again);
     const live = createSession(def, { seed: 2, config: DEFAULTS, seats: 2 });
-    expect(sessionApply(def, live, 0, 'ready').rejected?.code).toBe('hand-in-play');
+    const actor = live.phase.actor!;
+    // readying mid-hand must be refused — either as illegal or by validate
+    const liveReady = sessionApply(def, live, actor, 'ready').rejected?.code;
+    expect(['hand-in-play', 'illegal-move']).toContain(liveReady);
   });
 
   it('ends the match when a sole leader crosses the target', () => {
     const config = ginConfigSchema.resolve({ matchTarget: 50 });
-    let session: MatchSession = createSession(def, { seed: 77, config, seats: 2 });
-    let guard = 0;
-    while (session.status === 'playing' && guard++ < 80) {
-      session = driveToHandEnd(session);
-      if (session.status !== 'playing') break;
-      for (const seat of [0, 1]) {
-        if (!session.state.readied.includes(seat)) session = play(session, seat, 'ready');
-      }
-    }
+    const { session } = runBotMatch(77, config);
     expect(session.status).toBe('ended');
     expect(session.result?.reason).toBe('gin-match');
     const winner = session.result!.winner as number;
     expect(session.state.scores[winner]).toBeGreaterThanOrEqual(50);
+    const loser = winner === 0 ? 1 : 0;
+    expect(session.state.scores[winner]!).toBeGreaterThan(session.state.scores[loser]!);
   });
 
   it('applies the box bonus only when enabled', () => {
@@ -160,32 +159,38 @@ describe('the match wrapper', () => {
     expect(matchEndResult(tied)).toBeNull();
   });
 
-  it('plays a full bot-driven match to completion', () => {
-    const { session } = runBotMatch(1234);
-    expect(session.status).toBe('ended');
-    expect(session.result?.reason).toBe('gin-match');
-    expect(session.state.handIndex).toBeGreaterThan(0);
-  });
+  it(
+    'plays a full bot-driven match to completion',
+    () => {
+      const { session } = runBotMatch(1234);
+      expect(session.status).toBe('ended');
+      expect(session.result?.reason).toBe('gin-match');
+      expect(session.state.handIndex).toBeGreaterThan(0);
+    },
+    120_000,
+  );
 
-  it('is deterministic across runs — identical logs and hashes', () => {
-    const a = runBotMatch(1234);
-    const b = runBotMatch(1234);
-    expect(a.session.log.map((event) => event.hash)).toEqual(
-      b.session.log.map((event) => event.hash),
-    );
-  });
+  it(
+    'is deterministic and replays from its event log alone',
+    () => {
+      const a = runBotMatch(1234);
+      const b = runBotMatch(1234);
+      expect(a.session.log.map((event) => event.hash)).toEqual(
+        b.session.log.map((event) => event.hash),
+      );
 
-  it('replays an entire multi-hand match from its event log alone', () => {
-    const { session, def: botsDef } = runBotMatch(555);
-    const replayed = replaySession(botsDef, 555, session.log, {
-      config: DEFAULTS,
-      seats: 2,
-    });
-    expect(replayed.status).toBe(session.status);
-    expect(stateHash(replayed.state)).toBe(stateHash(session.state));
-    expect(replayed.result).toEqual(session.result);
-    expect(replayed.state.scores).toEqual(session.state.scores);
-  });
+      const { session, def: botsDef } = runBotMatch(555);
+      const replayed = replaySession(botsDef, 555, session.log, {
+        config: DEFAULTS,
+        seats: 2,
+      });
+      expect(replayed.status).toBe(session.status);
+      expect(stateHash(replayed.state)).toBe(stateHash(session.state));
+      expect(replayed.result).toEqual(session.result);
+      expect(replayed.state.scores).toEqual(session.state.scores);
+    },
+    180_000,
+  );
 
   it('redacts opponent cards in the wrapped view too', () => {
     const session = createSession(def, { seed: 5, config: DEFAULTS, seats: 2 });

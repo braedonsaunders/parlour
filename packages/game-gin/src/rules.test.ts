@@ -34,6 +34,7 @@ function freshState(partial: Partial<GinState> = {}): GinState {
     drawnFromStock: null,
     drawnFromDiscard: null,
     knocker: null,
+    quietTurns: 0,
     pickups: [],
     outcome: null,
     ...partial,

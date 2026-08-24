@@ -33,7 +33,7 @@ export const GIN_PERSONAS: readonly PersonaDef[] = [
     blurb: 'Only knocks when the kettle is on and the hand is lovely.',
     emotes: ['oh dear', 'beg pardon', 'lovely cards'],
     tier: 1,
-    params: EASY_BASE,
+    params: { ...EASY_BASE, knockAt: 6 },
   },
   {
     id: 'rookie-rex',
@@ -42,7 +42,7 @@ export const GIN_PERSONAS: readonly PersonaDef[] = [
     blurb: 'Learned gin from a biscuit tin. Enthusiastic about it.',
     emotes: ['which suit?', 'oops', 'gin?? no'],
     tier: 1,
-    params: { ...EASY_BASE, knockAt: 7 },
+    params: EASY_BASE,
   },
   {
     id: 'steady-marge',

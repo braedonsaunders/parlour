@@ -26,6 +26,8 @@ const DECK = stdDeck();
 export const GIN_HAND_SIZE = HAND_SIZE;
 /** A hand goes dead once only this many stock cards remain. */
 export const DEAD_STOCK_SIZE = 2;
+/** Consecutive pile-only turns before the hand is declared dead. */
+export const MAX_QUIET_TURNS = 15;
 export const DEAL_STAGGER_MS = 60;
 
 /**
@@ -57,7 +59,10 @@ function nonDealer(state: GinState): SeatId {
  */
 function knockLegality(state: GinState, seat: SeatId): boolean {
   if (state.knocker !== null || state.outcome) return false;
-  if (state.veiled && hasVeiledCard(state.hands[seat] ?? [])) return true;
+  // Veil: the runtime substitutes a claim's openings BEFORE legality runs, so
+  // an honest-looking hand here proves nothing — offer the knock on counts
+  // alone and let `validate` settle the claim against the opened cards.
+  if (state.veiled) return true;
   return deadwoodOf(state.hands[seat] ?? []) <= state.rules.knockCap;
 }
 
@@ -124,6 +129,7 @@ export function dealHand(
     drawnFromStock: null,
     drawnFromDiscard: null,
     knocker: null,
+    quietTurns: 0,
     pickups: [],
     outcome: null,
   };
@@ -154,6 +160,7 @@ const optionTake: Move<GinState> = {
       optionSeat: null,
       turn: seat,
       drawnFromDiscard: card,
+      quietTurns: state.quietTurns + 1,
       pickups: [...state.pickups, { seat, card } satisfies Pickup],
     };
   },
@@ -197,6 +204,7 @@ const drawStock: Move<GinState> = {
       turn: seat,
       drawnFromStock: card,
       forceStockDraw: false,
+      quietTurns: 0,
     };
   },
 };
@@ -217,6 +225,7 @@ const drawDiscard: Move<GinState> = {
       discard: state.discard.slice(1),
       turn: seat,
       drawnFromDiscard: card,
+      quietTurns: state.quietTurns + 1,
       pickups: [...state.pickups, { seat, card } satisfies Pickup],
     };
   },
@@ -450,7 +459,7 @@ const flow: HandFlow = {
 
 function stockStarved(state: GinState): boolean {
   return (
-    state.stock.length <= DEAD_STOCK_SIZE &&
+    (state.stock.length <= DEAD_STOCK_SIZE || state.quietTurns >= MAX_QUIET_TURNS) &&
     !state.forceStockDraw &&
     state.optionSeat === null &&
     state.knocker === null

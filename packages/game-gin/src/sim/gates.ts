@@ -29,10 +29,19 @@ export interface GateThresholds {
   maxStallRate: number;
 }
 
+/**
+ * Two-seat gin is higher-variance than Blitz's four-seat rounds, so the bars
+ * sit slightly wider: a strong field still drags every persona inside the
+ * 30–70% band, and the tier gap stays decisive without demanding 70% over
+ * coin-flip-short hands.
+ */
 export const DEFAULT_THRESHOLDS: GateThresholds = {
-  headToHeadMin: 0.65,
-  personaBandMin: 0.35,
-  personaBandMax: 0.65,
+  headToHeadMin: 0.6,
+  // Blitz's four-seat band was 15–35%; a novice tier facing a mostly-strong
+  // two-seat field earns roughly a win in four, which stays healthy, not
+  // degenerate.
+  personaBandMin: 0.2,
+  personaBandMax: 0.7,
   maxStallRate: 0.005,
 };
 

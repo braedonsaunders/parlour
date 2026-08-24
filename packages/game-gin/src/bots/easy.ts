@@ -6,6 +6,7 @@ import {
   payloadCard,
   type GinBotParams,
 } from './shared';
+import { drawOptions } from './view';
 
 /**
  * Tier 1 "Easy" — myopic: takes obvious improvements, throws the biggest
@@ -25,6 +26,15 @@ export function makeEasyBot(
       const hand = view.hands[seat] ?? [];
       const current = bestPartition(hand).deadwood;
 
+      const options = drawOptions({ view, seat, params, rng: _rng });
+
+      // opening upcard decision
+      const take = legal.find((move) => move.id === 'option.take');
+      const pass = legal.find((move) => move.id === 'option.pass');
+      if (take && pass) {
+        return options.discard && options.discard.gain >= 2 ? take : pass;
+      }
+
       const discards = discardMoves(legal);
       if (discards.length > 0) {
         const knock = legal.find((move) => move.id === 'knock');
@@ -32,12 +42,10 @@ export function makeEasyBot(
         return worstThrow(discards);
       }
 
-      const knock = legal.find((move) => move.id === 'knock');
-      void knock;
-
-      const upcard = view.discard[0];
+      void cardPoints;
       const drawDiscard = legal.find((move) => move.id === 'draw.discard');
-      if (drawDiscard && upcard !== undefined && cardPoints(upcard) >= 8 && improves(hand, upcard)) {
+      // takes must clearly pay — no polite trading of the same ten points
+      if (drawDiscard && options.discard && options.discard.gain >= 2) {
         return drawDiscard;
       }
       return legal.find((move) => move.id === 'draw.stock') ?? null;
