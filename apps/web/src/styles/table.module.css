@@ -1123,6 +1123,8 @@ button.card:not(:disabled):hover {
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: max(0.75rem, env(safe-area-inset-top)) max(0.75rem, env(safe-area-inset-right))
+    max(0.75rem, env(safe-area-inset-bottom)) max(0.75rem, env(safe-area-inset-left));
 }
 
 .menuScrim {
@@ -1142,10 +1144,13 @@ button.card:not(:disabled):hover {
 .menuPanel {
   position: relative;
   display: flex;
+  max-height: 100%;
   flex-direction: column;
   gap: 1.1rem;
   width: min(24rem, calc(100% - 2.5rem));
   padding: 1.75rem 1.6rem 1.6rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   text-align: center;
 }
 
@@ -1180,4 +1185,52 @@ button.card:not(:disabled):hover {
   background: linear-gradient(180deg, #ef8f7c 0%, #d05438 48%, #a2321d 100%);
   color: #3c0d05;
   text-shadow: 0 1px 0 rgba(255, 226, 214, 0.55);
+}
+
+/* A phone held sideways has about 390px of height, and the menu — sound, calm
+   motion, background, card effects, music, and the three ways out — is taller
+   than that as a single column. It used to run off both ends of the screen with
+   Quit somewhere below the glass. Landscape gets two columns instead, with the
+   music transport and the actions spanning the full width. */
+@media (orientation: landscape) and (max-height: 560px) {
+  .menuPanel {
+    display: grid;
+    width: min(46rem, 100%);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+    gap: 0.5rem 1.25rem;
+    padding: 0.85rem 1.1rem 0.95rem;
+  }
+
+  .menuTitle {
+    grid-column: 1 / -1;
+    font-size: 1.15rem;
+  }
+
+  .menuHint {
+    grid-column: 1 / -1;
+    margin-top: 0;
+    font-size: 0.82rem;
+  }
+
+  .menuToggles,
+  .menuSectionWide,
+  .menuActions {
+    grid-column: 1 / -1;
+  }
+
+  .menuActions {
+    flex-direction: row;
+    justify-content: center;
+  }
+
+  .menuActions > :global(.btn-fat) {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .menuPanel :global(.btn-fat) {
+    padding-block: 0.45rem;
+    font-size: 0.85rem;
+  }
 }

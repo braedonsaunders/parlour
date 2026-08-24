@@ -109,3 +109,32 @@ describe('table overlay stacking', () => {
     expect(declarationsFor(wipe, '.overlay')).toMatch(/height:\s*var\(--app-height\);/);
   });
 });
+
+describe('table menu on a phone', () => {
+  it('keeps the whole menu reachable however short the window is', () => {
+    // The panel used to be a single column with no ceiling: on a handset in
+    // landscape it ran off both ends of the screen, taking Quit with it.
+    const panel = declarationsFor(table, '.menuPanel');
+    expect(panel).toMatch(/max-height:\s*100%;/);
+    expect(panel).toMatch(/overflow-y:\s*auto;/);
+
+    const overlay = declarationsFor(table, '.menuOverlay');
+    expect(overlay).toMatch(/env\(safe-area-inset-top\)/);
+    expect(overlay).toMatch(/env\(safe-area-inset-bottom\)/);
+  });
+
+  it('lays the settings out in two columns when the window is short and wide', () => {
+    const landscapeBlocks = [
+      ...table.matchAll(
+        /@media \(orientation: landscape\) and \(max-height: 560px\)\s*\{([\s\S]*?)\n\}/g,
+      ),
+    ].map((block) => block[1]!);
+    const rules = landscapeBlocks.find((block) => block.includes('.menuPanel'));
+    expect(rules, 'the menu declares a landscape layout').toBeDefined();
+    expect(rules).toMatch(/grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\);/);
+    // The transport and the ways out read across the whole panel; the pickers
+    // pair up beside each other.
+    expect(rules).toMatch(/\.menuSectionWide[\s\S]*?grid-column:\s*1 \/ -1;/);
+    expect(rules).toMatch(/\.menuActions\s*\{[^}]*flex-direction:\s*row;/);
+  });
+});

@@ -168,7 +168,13 @@ export function TableMenu({ open, onClose, onQuit, howToPlay }: TableMenuProps) 
                 })}
               </div>
             </section>
-            <section aria-label="Music" data-testid="music-section">
+            {/* The transport is a row of controls, so it takes the full width
+                of the landscape grid rather than half of it. */}
+            <section
+              aria-label="Music"
+              data-testid="music-section"
+              className={styles.menuSectionWide}
+            >
               <p className="mb-1 text-center text-xs font-semibold uppercase tracking-[0.25em] text-dusk-200">
                 Music
               </p>
