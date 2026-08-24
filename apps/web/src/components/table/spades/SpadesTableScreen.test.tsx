@@ -1,6 +1,8 @@
 import { createElement } from 'react';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { spadesConfig } from '@parlour/game-spades';
 import { useProfileStore } from '@/stores/profile';
@@ -8,6 +10,7 @@ import { SpadesTableScreen } from './SpadesTableScreen';
 import type { SpadesTableView } from '@/lib/spades/view';
 
 const RULES = spadesConfig.resolve({});
+const SPADES_STYLES = readFileSync(join(process.cwd(), 'src/styles/spades.module.css'), 'utf8');
 
 const HAND = ['C2', 'C7', 'C13', 'D3', 'D9', 'D12', 'H4', 'H8', 'H11', 'S1', 'S5', 'S10', 'S13'];
 
@@ -288,6 +291,13 @@ describe('SpadesTableScreen', () => {
     const cards = container.querySelectorAll('[data-card]');
     expect(cards).toHaveLength(13);
     expect(container.querySelector('[data-card="S13"]')).not.toBeNull();
+  });
+
+  it('keeps the data-card wrapper full width so card faces cannot collapse', () => {
+    const match = SPADES_STYLES.match(/\.handCardSlot\s*\{([^}]*)\}/);
+    expect(match, '.handCardSlot exists').not.toBeNull();
+    expect(match![1]).toMatch(/display:\s*block;/);
+    expect(match![1]).toMatch(/width:\s*100%;/);
   });
 
   it('plays only legal cards and marks the rest unplayable', () => {
