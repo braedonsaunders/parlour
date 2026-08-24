@@ -9,6 +9,14 @@ import SpadesSetupPage from './page';
 const pushed: string[] = [];
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: (href: string) => pushed.push(href) }),
+  usePathname: () => '/spades',
+}));
+
+// The table wipe is presentational and holds the navigation for its own beat;
+// these tests are about where the buttons go. `runTableWipe.test.ts` owns the
+// timing.
+vi.mock('@/lib/transitions/runTableWipe', () => ({
+  runTableWipe: (nav: () => void) => nav(),
 }));
 
 describe('Spades setup page', () => {

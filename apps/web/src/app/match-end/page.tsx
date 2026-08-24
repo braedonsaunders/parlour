@@ -3,8 +3,10 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useMemo } from 'react';
+import { useHydrated } from '@/components/backgrounds/SceneStage';
 import { MatchPodium } from '@/components/celebration/MatchPodium';
 import { MatchRivalry } from '@/components/celebration/MatchRivalry';
+import { getGame } from '@/lib/games';
 import { deriveRivalry, hasRivalryToShow } from '@/lib/match/rivalry';
 import { useHistoryStore } from '@/stores/history';
 import { useMatchFlowStore } from '@/stores/matchFlow';
@@ -12,7 +14,11 @@ import { useProfileStore } from '@/stores/profile';
 
 export default function MatchEndPage() {
   const router = useRouter();
-  const snapshot = useMatchFlowStore((s) => s.lastMatch);
+  // The snapshot is restored from session storage on a reload, so it must not
+  // be read during hydration — the prerendered markup has no match in it.
+  const hydrated = useHydrated();
+  const stored = useMatchFlowStore((s) => s.lastMatch);
+  const snapshot = hydrated ? stored : null;
   const playAgainHandler = useMatchFlowStore((s) => s.playAgain);
   const records = useHistoryStore((s) => s.records);
   const profileAvatarId = useProfileStore((s) => s.avatarId);
@@ -22,13 +28,21 @@ export default function MatchEndPage() {
   // the seat you actually sat in wins over the profile, which may have moved on
   const you = snapshot?.seats.find((seat) => seat.seat === snapshot.localSeat);
 
+  const fallbackRoute = snapshot?.game ? (getGame(snapshot.game).href ?? '/play') : '/play';
+
   const playAgain = useCallback(() => {
+    // The handler is a closure the table registered; a reload leaves the
+    // snapshot but not the closure, so fall back to that game's own setup.
     if (playAgainHandler) {
       playAgainHandler();
       return;
     }
-    router.push('/play');
-  }, [playAgainHandler, router]);
+    router.push(fallbackRoute);
+    // `fallbackRoute` is read out of the snapshot above rather than inside the
+    // closure: depending on `snapshot?.game` while the body reads `snapshot`
+    // makes the compiler infer a broader dependency than the one declared, and
+    // it then declines to memoize the component at all.
+  }, [fallbackRoute, playAgainHandler, router]);
 
   return (
     <main className="flex min-h-dvh flex-col items-center justify-center">

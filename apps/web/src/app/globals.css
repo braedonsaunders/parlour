@@ -3,7 +3,13 @@
 @tailwind utilities;
 
 :root {
-  --app-height: 100dvh;
+  /* Standalone iOS disagrees with itself about how tall the window is: the
+     viewport units can stop above the home indicator while `window.innerHeight`
+     reports the whole screen, and which one is short varies by version. JS
+     publishes its measurement here and every consumer takes the taller of the
+     two, so a full-bleed layer can never end up shorter than the real window. */
+  --app-window-height: 0px;
+  --app-height: max(100dvh, var(--app-window-height));
   --parlour-bg: #152833;
   --parlour-amber: #e29349;
   --parlour-teal: #2f86a1;
@@ -30,6 +36,19 @@
   --shadow-lift: 0 26px 60px -22px rgba(6, 16, 22, 0.9);
   --shadow-glow: 0 0 48px -6px rgba(242, 176, 106, 0.45);
 
+  /*
+   * "This card cannot be played / cannot go here."
+   *
+   * The hand rail has used this recipe since Wild shipped, and it is the single
+   * clearest thing the table does: legal cards keep their colour and lift,
+   * everything else falls back. Solitaire needs the same language for its
+   * destinations, so it is a token rather than a number copied into a second
+   * stylesheet where the two could drift.
+   */
+  --unplayable-filter: grayscale(0.58) saturate(0.22) brightness(0.62);
+  --unplayable-opacity: 0.68;
+  --playable-filter: saturate(1.12) brightness(1.07);
+
   --ease-pop: cubic-bezier(0.34, 1.56, 0.64, 1);
   --ease-settle: cubic-bezier(0.2, 0.8, 0.3, 1);
   --dur-tap: 140ms;
@@ -39,15 +58,9 @@
 
 @media (display-mode: standalone), (display-mode: fullscreen) {
   :root {
-    --app-height: 100lvh;
-  }
-}
-
-@supports (-webkit-touch-callout: none) {
-  @media (display-mode: standalone), (display-mode: fullscreen) {
-    :root {
-      --app-height: -webkit-fill-available;
-    }
+    /* Installed apps have no collapsing browser chrome, so the large viewport is
+       the honest floor; `dvh` is the one that shrinks under iOS's status bar. */
+    --app-height: max(100lvh, var(--app-window-height));
   }
 }
 

@@ -242,3 +242,34 @@ function payloadRecord(event: FxEvent): Record<string, unknown> | null {
   }
   return event.payload as Record<string, unknown>;
 }
+
+/**
+ * Oh Hell cues.
+ *
+ * Deliberately reuses the Euchre/Spades trick-taking sounds rather than
+ * shipping a fourth near-identical set: a trick collecting sounds like a trick
+ * collecting whichever game is on the table, and the bid/score beats are the
+ * only moments that need their own character.
+ */
+export function ohhellCuesForFx(fx: readonly FxEvent[]): SoundCue[] {
+  return fx.flatMap((event) => {
+    const atMs = Math.max(0, event.at ?? 0);
+    switch (event.kind) {
+      case 'ohhell.trump-turned':
+      case 'ohhell.trump-chosen':
+        return [{ id: 'ohhell.trump', atMs }];
+      case 'ohhell.bid':
+        return [{ id: 'ohhell.bid', atMs }];
+      case 'ohhell.bids-complete':
+        return [{ id: 'ohhell.bids-complete', atMs }];
+      case 'tricks.collect':
+        return [{ id: 'ohhell.trick-collect', atMs: atMs + 120 }];
+      case 'ohhell.round-score':
+        return [{ id: 'ohhell.score', atMs }];
+      case 'ohhell.match-score':
+        return [{ id: 'ohhell.match-score', atMs }];
+      default:
+        return [];
+    }
+  });
+}

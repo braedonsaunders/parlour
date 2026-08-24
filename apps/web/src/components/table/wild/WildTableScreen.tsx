@@ -88,7 +88,6 @@ export function WildTableScreen(props: WildTableScreenProps) {
   const { view, error } = props;
   const rootRef = useRef<HTMLElement>(null);
   const menu = useTableMenu(props.onQuit);
-  const [clockNow, setClockNow] = useState(() => Date.now());
   const deal = useDealPresentation(props.fx, props.fxKey);
   useTableAudio(props.fx, props.fxKey, WILDPILE_SFX_PACK.id);
 
@@ -106,22 +105,22 @@ export function WildTableScreen(props: WildTableScreenProps) {
     expectedMs: 300_000,
     running: Boolean(view) && view?.activeSeat !== null,
   });
-  const remainingMs =
-    props.matchEndsAt === undefined ? null : Math.max(0, props.matchEndsAt - clockNow);
-  const finalMinute = remainingMs !== null && remainingMs <= 60_000;
+  // The clock used to tick a state field on this component once a second,
+  // which re-rendered the entire table — every seat, the whole fan and every
+  // motion subtree — purely to redraw two digits. Only the boolean the table
+  // itself reacts to lives up here now, and it flips once; the digits are
+  // owned by the leaves that show them.
+  const finalMinute = useFinalMinute(props.matchEndsAt);
   const tense =
-    remainingMs === null ? fallbackTense : Boolean(view?.activeSeat !== null && finalMinute);
+    props.matchEndsAt === undefined
+      ? fallbackTense
+      : Boolean(view?.activeSeat !== null && finalMinute);
   useMusicMood(tense ? 'tense' : null);
 
-  useEffect(() => {
-    if (props.matchEndsAt === undefined || !view || view.activeSeat === null) {
-      return;
-    }
-    const sync = () => setClockNow(Date.now());
-    sync();
-    const timer = window.setInterval(sync, 1_000);
-    return () => window.clearInterval(timer);
-  }, [props.matchEndsAt, view, view?.activeSeat]);
+  const calls = useMemo(
+    () => (!view || deal.dealing ? [] : wildAnnouncements(props.fx, view.players)),
+    [deal.dealing, props.fx, view],
+  );
 
   useGameTextSurface(() => ({
     game: 'wild',
@@ -130,7 +129,11 @@ export function WildTableScreen(props: WildTableScreenProps) {
     localSeat: view?.localSeat ?? null,
     activeSeat: view?.activeSeat ?? null,
     decision: view?.decision ?? null,
-    matchRemainingSeconds: remainingMs === null ? null : Math.ceil(remainingMs / 1_000),
+    // Read when the surface is asked for, not kept in state.
+    matchRemainingSeconds:
+      props.matchEndsAt === undefined
+        ? null
+        : Math.ceil(Math.max(0, props.matchEndsAt - Date.now()) / 1_000),
     turnDurationSeconds: props.turnDurationMs === undefined ? null : props.turnDurationMs / 1_000,
     stockCount: view ? view.stockCount + deal.pendingStockCards : null,
     discardTop: view && deal.discardReady ? view.discard.at(-1) : null,
@@ -149,14 +152,13 @@ export function WildTableScreen(props: WildTableScreenProps) {
   }
 
   const localBusy = (props.busy ?? false) || deal.dealing;
-  const calls = deal.dealing ? [] : wildAnnouncements(props.fx, view.players);
 
   return (
     <ArrivalProvider fx={props.fx} fxKey={props.fxKey} localSeat={view.localSeat}>
       <TableShell rootRef={rootRef} dealState={dealStateAttr(deal)}>
         <TableHud onOpenMenu={menu.open}>
           <TableTitlePill eyebrow="Wild" status={view.phaseLabel} />
-          {remainingMs !== null && <MatchClock remainingMs={remainingMs} />}
+          {props.matchEndsAt !== undefined && <MatchClock endsAt={props.matchEndsAt} />}
         </TableHud>
 
         <TablePlayfield label="Wild table" feltMark="W">
@@ -171,8 +173,8 @@ export function WildTableScreen(props: WildTableScreenProps) {
             />
           ))}
           <TableBadges view={view} />
-          {finalMinute && remainingMs !== null && (
-            <LiveStandings players={view.players} remainingMs={remainingMs} />
+          {finalMinute && props.matchEndsAt !== undefined && (
+            <LiveStandings players={view.players} endsAt={props.matchEndsAt} />
           )}
           <Piles view={view} busy={localBusy} onDraw={props.onDraw} deal={deal} />
           {props.turnDurationMs !== undefined && view.activeSeat !== null && (
@@ -221,7 +223,7 @@ export function WildTableScreen(props: WildTableScreenProps) {
 
         {/* No draw button: the stock pile is the draw, and forced pickups resolve
           themselves. The only rail action left is protecting your last card. */}
-        <TableActionRail>
+        <TableActionRail className={wildStyles.actionRail}>
           <AnimatePresence initial={false}>
             {view.legal.pass && !localBusy && (
               <motion.button
@@ -279,17 +281,60 @@ export function WildTableScreen(props: WildTableScreenProps) {
   );
 }
 
-function LiveStandings({
-  players,
-  remainingMs,
-}: {
-  players: readonly WildSeatView[];
-  remainingMs: number;
-}) {
+/**
+ * One second of the match clock, without a re-render of anything above it.
+ * Returns whole seconds, so it settles on the value it will actually show.
+ */
+function useSecondsLeft(endsAt: number | undefined): number {
+  const [seconds, setSeconds] = useState(() =>
+    endsAt === undefined ? 0 : Math.ceil(Math.max(0, endsAt - Date.now()) / 1_000),
+  );
+
+  useEffect(() => {
+    if (endsAt === undefined) return;
+    const sync = () => setSeconds(Math.ceil(Math.max(0, endsAt - Date.now()) / 1_000));
+    sync();
+    const timer = window.setInterval(sync, 1_000);
+    return () => window.clearInterval(timer);
+  }, [endsAt]);
+
+  return seconds;
+}
+
+/**
+ * The final-minute flip. A boolean that changes once does not need polling, so
+ * it is scheduled for the moment it becomes true instead.
+ */
+function useFinalMinute(endsAt: number | undefined): boolean {
+  /*
+   * Whether the table was ALREADY inside the final minute is sampled once, in
+   * the lazy initializer; every later arrival comes off a timer.
+   *
+   * Neither half is incidental. Reading the clock during render is impure, and
+   * setting state synchronously inside the effect cascades a render — the two
+   * lint rules pull in opposite directions, and scheduling at `max(0,
+   * remaining)` satisfies both: an already-expired clock simply fires on the
+   * next tick instead of during the effect.
+   */
+  const [firedFor, setFiredFor] = useState<number | null>(() =>
+    endsAt !== undefined && endsAt - Date.now() <= 60_000 ? endsAt : null,
+  );
+
+  useEffect(() => {
+    if (endsAt === undefined) return;
+    const remaining = endsAt - 60_000 - Date.now();
+    const timer = window.setTimeout(() => setFiredFor(endsAt), Math.max(0, remaining));
+    return () => window.clearTimeout(timer);
+  }, [endsAt]);
+
+  return endsAt !== undefined && firedFor === endsAt;
+}
+
+function LiveStandings({ players, endsAt }: { players: readonly WildSeatView[]; endsAt: number }) {
   const ordered = [...players].sort(
     (left, right) => left.handCount - right.handCount || left.seat - right.seat,
   );
-  const seconds = Math.ceil(remainingMs / 1_000);
+  const seconds = useSecondsLeft(endsAt);
   return (
     <aside className={`${wildStyles.liveStandings} panel-soft`} aria-label="Live standings">
       <strong>{seconds}s left</strong>
@@ -306,8 +351,8 @@ function LiveStandings({
   );
 }
 
-function MatchClock({ remainingMs }: { remainingMs: number }) {
-  const totalSeconds = Math.ceil(remainingMs / 1_000);
+function MatchClock({ endsAt }: { endsAt: number }) {
+  const totalSeconds = useSecondsLeft(endsAt);
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
   return (
@@ -320,26 +365,34 @@ function MatchClock({ remainingMs }: { remainingMs: number }) {
   );
 }
 
+/**
+ * The turn clock ran a 100ms interval and re-rendered ten times a second for
+ * the whole of every turn — the single largest source of render churn on an
+ * otherwise idle table. The ring is a linear sweep over a known duration, so
+ * CSS animates it with no JavaScript at all, and the digit only changes once a
+ * second, so that is how often it now ticks.
+ */
 function TurnClock({ durationMs, mine }: { durationMs: number; mine: boolean }) {
-  const [remainingMs, setRemainingMs] = useState(durationMs);
+  const [remainingSeconds, setRemainingSeconds] = useState(() =>
+    Math.max(0, Math.ceil(durationMs / 1_000)),
+  );
 
   useEffect(() => {
-    const startedAt = Date.now();
-    const sync = () => setRemainingMs(Math.max(0, durationMs - (Date.now() - startedAt)));
+    const endsAt = Date.now() + durationMs;
+    const sync = () => setRemainingSeconds(Math.max(0, Math.ceil((endsAt - Date.now()) / 1_000)));
     sync();
-    const timer = window.setInterval(sync, 100);
+    const timer = window.setInterval(sync, 1_000);
     return () => window.clearInterval(timer);
   }, [durationMs]);
 
-  const seconds = Math.ceil(remainingMs / 1_000);
-  const progress = durationMs <= 0 ? 0 : remainingMs / durationMs;
   return (
     <div
       className={wildStyles.turnClock}
       aria-label="Turn clock"
       data-testid="turn-clock"
       data-mine={mine || undefined}
-      data-warning={seconds <= 5 || undefined}
+      data-warning={remainingSeconds <= 5 || undefined}
+      style={{ '--turn-duration': `${durationMs}ms` } as CSSProperties}
     >
       <svg viewBox="0 0 48 48" aria-hidden="true">
         <circle className={wildStyles.turnClockTrack} cx="24" cy="24" r="20" pathLength="1" />
@@ -350,11 +403,10 @@ function TurnClock({ durationMs, mine }: { durationMs: number; mine: boolean }) 
           cy="24"
           r="20"
           pathLength="1"
-          style={{ strokeDashoffset: 1 - progress }}
         />
       </svg>
       <span>{mine ? 'You' : 'Turn'}</span>
-      <strong>{seconds}</strong>
+      <strong>{remainingSeconds}</strong>
     </div>
   );
 }

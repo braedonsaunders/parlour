@@ -1,5 +1,6 @@
 import { applyPreset } from '@parlour/engine';
 import { dailySeed, klondikeConfig, type KlondikeRules } from '@parlour/game-klondike';
+import { resolveWinnableSeed } from './winnableSeed';
 
 export type KlondikeModeId = 'daily' | 'classic' | 'relaxed';
 
@@ -70,6 +71,11 @@ export interface KlondikeRun {
   mode: KlondikeModeId;
   seed: number;
   dailyKey: string | null;
+  /**
+   * `true` when the solver proved this deal winnable, `false` when it was asked
+   * to and could not, `null` when nobody asked.
+   */
+  winnable: boolean | null;
 }
 
 export function makeKlondikeRun(
@@ -83,7 +89,26 @@ export function makeKlondikeRun(
     mode,
     seed: dailyKey ? dailySeed(dailyKey) : randomSeed | 0,
     dailyKey,
+    winnable: null,
   };
+}
+
+/**
+ * Builds the run a player is about to sit down to, searching for a winnable deal
+ * first when they have asked for one.
+ *
+ * The search starts from the run's own seed and is pure, so a given date still
+ * lands everyone on the same daily table — it is just a later candidate than the
+ * raw shuffle when that one turned out to be dead.
+ */
+export async function dealKlondikeRun(
+  mode: KlondikeModeId,
+  options: Parameters<typeof makeKlondikeRun>[1] & { winnableOnly?: boolean } = {},
+): Promise<KlondikeRun> {
+  const run = makeKlondikeRun(mode, options);
+  if (!options.winnableOnly) return run;
+  const found = await resolveWinnableSeed(run.seed, rulesForKlondikeMode(mode).drawCount);
+  return { ...run, seed: found.seed, winnable: found.winnable };
 }
 
 function randomInt32(): number {

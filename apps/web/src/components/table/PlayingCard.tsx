@@ -41,12 +41,24 @@ export function PlayingCard({
     .join(' ');
   const style = { '--card-rotation': `${rotation}deg` } as CSSProperties;
 
+  /*
+   * A stable hook for stylesheets outside this component.
+   *
+   * `styles.card` is a CSS-module class, so its real name is hashed at build
+   * time. Any other module writing `:global(.card)` to reach the card chassis
+   * matches nothing and fails silently — which is exactly what had happened to
+   * three rules in klondike.module.css, including the one that was supposed to
+   * highlight a selected card.
+   */
+  const chassis = { 'data-card-chassis': '' };
+
   if (onClick) {
     return (
       <button
         type="button"
         className={className}
         style={style}
+        {...chassis}
         onClick={onClick}
         disabled={disabled}
         aria-label={
@@ -62,6 +74,7 @@ export function PlayingCard({
     <span
       className={className}
       style={style}
+      {...chassis}
       aria-label={faceDown ? 'Face-down card' : parsed?.label}
     >
       <CardContents parsed={parsed} faceDown={faceDown} />

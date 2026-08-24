@@ -9,6 +9,7 @@ import {
   klondikeCuesForFx,
   presidentCuesForFx,
   ratscrewCuesForFx,
+  ohhellCuesForFx,
   spadesCuesForFx,
 } from './game-cues';
 
@@ -256,6 +257,29 @@ export const SPADES_SFX_PACK: SfxPack = {
   cuesForFx: spadesCuesForFx,
 };
 
+export const OHHELL_SFX = {
+  trump: 'ohhell.trump',
+  bid: 'ohhell.bid',
+  bidsComplete: 'ohhell.bids-complete',
+  trickCollect: 'ohhell.trick-collect',
+  score: 'ohhell.score',
+  matchScore: 'ohhell.match-score',
+} as const;
+
+export const OHHELL_SFX_PACK: SfxPack = {
+  id: 'ohhell',
+  label: 'Oh Hell!',
+  sounds: [
+    sound(OHHELL_SFX.trump, '/audio/sfx/euchre-trump-called.mp3', 0.74, 1, 250),
+    sound(OHHELL_SFX.bid, '/audio/sfx/euchre-order-up.mp3', 0.7, 6, 60),
+    sound(OHHELL_SFX.bidsComplete, '/audio/sfx/gin-knock-rap.mp3', 0.8, 1, 250),
+    sound(OHHELL_SFX.trickCollect, '/audio/sfx/euchre-trick-collect.mp3', 0.76, 2, 100),
+    sound(OHHELL_SFX.score, '/audio/sfx/euchre-score-chime.mp3', 0.68, 8, 50),
+    sound(OHHELL_SFX.matchScore, '/audio/sfx/euchre-march-fanfare.mp3', 0.88, 1, 500),
+  ],
+  cuesForFx: ohhellCuesForFx,
+};
+
 export const KLONDIKE_SFX_PACK: SfxPack = {
   id: 'klondike',
   label: 'Klondike',
@@ -338,6 +362,7 @@ for (const pack of [
   HEARTS_SFX_PACK,
   EUCHRE_SFX_PACK,
   SPADES_SFX_PACK,
+  OHHELL_SFX_PACK,
   KLONDIKE_SFX_PACK,
   GIN_SFX_PACK,
   CRIBBAGE_SFX_PACK,

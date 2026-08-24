@@ -1,4 +1,5 @@
 import { act } from 'react';
+import { GAMES } from '@/lib/games';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import GameSelectPage from './page';
@@ -45,8 +46,8 @@ describe('game library', () => {
 
     expect(input?.type).toBe('search');
     expect(container.querySelector('label[for="game-search"]')?.textContent).toBe('Search games');
-    expect(gameTiles()).toHaveLength(10);
-    expect(container.textContent).toContain('10 games ready to play');
+    expect(gameTiles()).toHaveLength(GAMES.length);
+    expect(container.textContent).toContain(`${GAMES.length} games ready to play`);
   });
 
   it('filters instantly across catalog metadata and keeps selection working', () => {
@@ -66,8 +67,8 @@ describe('game library', () => {
     const clear = container.querySelector<HTMLButtonElement>('[aria-label="Clear game search"]');
     act(() => clear?.click());
 
-    expect(gameTiles()).toHaveLength(10);
-    expect(container.textContent).toContain('10 games ready to play');
+    expect(gameTiles()).toHaveLength(GAMES.length);
+    expect(container.textContent).toContain(`${GAMES.length} games ready to play`);
   });
 
   it('offers a friendly recovery when no game matches', () => {

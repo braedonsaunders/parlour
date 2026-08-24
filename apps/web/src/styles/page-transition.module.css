@@ -1,0 +1,23 @@
+/* The quiet counterpart to the table wipe: every other screen settles in with a
+   short rise and fade so a tap on "Play" reads as travel rather than a cut. */
+
+.enter {
+  animation: pageIn 300ms var(--ease-settle) both;
+}
+
+@keyframes pageIn {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 12px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+/* Reduced motion is deliberately left to the global `animation-duration: 0.001ms
+   !important` rules in `globals.css`, which cover both the OS setting and the
+   profile toggle. Overriding to `animation: none` here would look the same but
+   never fire `animationend`, so the wrapper would keep an animating class — and
+   its transform — for the rest of the session. */

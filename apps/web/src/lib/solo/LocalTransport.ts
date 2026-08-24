@@ -12,6 +12,7 @@ import {
 import type { ModeId } from '@/lib/modes';
 import type { BotTier, SeatCount } from '@/stores/setup';
 import { adaptSessionApply, SoloAuthority, type SoloDispatch } from './SoloAuthority';
+import { localSeat } from './seating';
 
 const STARTING_LIVES = 3;
 const FIRST_TO_WINS = 3;
@@ -202,15 +203,7 @@ export class LocalTransport {
       isBot: true,
       personaId: policy.persona.id,
     }));
-    return [
-      {
-        seat: 0,
-        name: this.options.player.name.trim() || 'You',
-        avatarId: this.options.player.avatarId,
-        isBot: false,
-      },
-      ...bots,
-    ];
+    return [localSeat(this.options.player), ...bots];
   }
 
   private scoreRound(session: BlitzSession, fx: FxEvent[]): void {

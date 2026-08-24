@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useWipeRouter } from '@/hooks/useWipeRouter';
 import { useState } from 'react';
 import { GameArt } from '@/components/GameArt';
 import { BotDifficultyPicker } from '@/components/setup/BotDifficultyPicker';
@@ -12,7 +12,7 @@ import { useEuchreSetupStore } from '@/stores/euchreSetup';
 import styles from '@/styles/modes.module.css';
 
 export default function EuchreSetupPage() {
-  const router = useRouter();
+  const router = useWipeRouter();
   const mode = useEuchreSetupStore((s) => s.mode);
   const botTier = useEuchreSetupStore((s) => s.botTier);
   const setMode = useEuchreSetupStore((s) => s.setMode);

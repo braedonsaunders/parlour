@@ -2,7 +2,7 @@
 
 import { heartsHowToPlay } from '@parlour/game-hearts';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useWipeRouter } from '@/hooks/useWipeRouter';
 import { useState } from 'react';
 import { GameArt } from '@/components/GameArt';
 import { getGame } from '@/lib/games';
@@ -17,7 +17,7 @@ import styles from '@/styles/modes.module.css';
 import gameStyles from '@/styles/games.module.css';
 
 export default function HeartsSetupPage() {
-  const router = useRouter();
+  const router = useWipeRouter();
   const mode = useHeartsSetupStore((s) => s.mode);
   const overrides = useHeartsSetupStore((s) => s.overrides);
   const botTier = useHeartsSetupStore((s) => s.botTier);

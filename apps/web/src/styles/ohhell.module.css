@@ -1,0 +1,290 @@
+.screen {
+  --oh-accent: #6b3d55;
+  --oh-shade: #381c2c;
+  --oh-under: #e2b049;
+  --oh-exact: #75e1cc;
+  --oh-over: #e2705a;
+}
+
+.playfield {
+  background:
+    radial-gradient(ellipse at 50% 42%, rgba(140, 78, 112, 0.18), transparent 58%),
+    linear-gradient(180deg, rgba(28, 12, 22, 0.1), rgba(20, 8, 16, 0.22));
+}
+
+.board {
+  display: grid;
+  gap: clamp(0.6rem, 1.6vh, 1.2rem);
+  grid-template-rows: auto 1fr;
+  height: 100%;
+  min-height: 0;
+}
+
+/*
+ * Seats wrap rather than sitting at fixed compass points.
+ *
+ * Every other table on the shelf seats exactly two or four, so each one places
+ * its opponents absolutely. Oh Hell runs three to seven, and a layout with a
+ * hard-coded north/east/west has nowhere to put seats five and six — so this is
+ * a flow layout that simply grows.
+ */
+.seats {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: center;
+  gap: clamp(0.5rem, 1.6vw, 1.3rem);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.seat {
+  display: grid;
+  justify-items: center;
+  gap: 0.2rem;
+  padding: 0.35rem 0.5rem;
+  border-radius: var(--radius-chunky);
+  transition: background var(--dur-feedback) var(--ease-settle);
+}
+
+.seat[data-active] {
+  background: rgba(255, 224, 173, 0.14);
+  box-shadow: inset 0 0 0 1px rgba(255, 224, 173, 0.4);
+}
+
+.centre {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(1rem, 4vw, 3rem);
+  min-height: 0;
+}
+
+.trump {
+  display: grid;
+  justify-items: center;
+  gap: 0.3rem;
+}
+
+.noTrump {
+  display: grid;
+  place-items: center;
+  width: clamp(3rem, 5vw, 4.2rem);
+  aspect-ratio: 5 / 7;
+  border: 2px dashed rgba(253, 246, 236, 0.4);
+  border-radius: 0.6rem;
+  color: var(--ink-dim);
+  font-size: 0.7rem;
+  line-height: 1.05;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.trumpLabel {
+  color: var(--ink-dim);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.trick {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.trick li[data-local] {
+  translate: 0 -0.35rem;
+}
+
+.localRow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+}
+
+/*
+ * Bid, tricks, score — and the colour is the whole point.
+ *
+ * In Oh Hell, being over your bid is exactly as bad as being under it. A row
+ * that only counts tricks taken makes the player do that subtraction on every
+ * trick, so the standing is stated instead.
+ */
+.pips {
+  display: flex;
+  gap: 0.45rem;
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.pips span {
+  display: grid;
+  justify-items: center;
+  min-width: 2rem;
+  padding: 0.12rem 0.3rem;
+  border-radius: 0.45rem;
+  background: rgba(8, 20, 26, 0.42);
+  font-size: 0.92rem;
+  font-weight: 700;
+  line-height: 1.05;
+}
+
+.pips small {
+  color: var(--ink-dim);
+  font-size: 0.58rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.pips[data-standing='exact'] .tricks {
+  background: color-mix(in srgb, var(--oh-exact) 30%, rgba(8, 20, 26, 0.42));
+  box-shadow: inset 0 0 0 1px var(--oh-exact);
+}
+
+.pips[data-standing='under'] .tricks {
+  box-shadow: inset 0 0 0 1px var(--oh-under);
+}
+
+.pips[data-standing='over'] .tricks {
+  background: color-mix(in srgb, var(--oh-over) 26%, rgba(8, 20, 26, 0.42));
+  box-shadow: inset 0 0 0 1px var(--oh-over);
+}
+
+.contract {
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Bids totalling exactly the tricks available means the hook rule bit. */
+.evenWarning {
+  color: var(--oh-under);
+  font-style: normal;
+  font-weight: 700;
+}
+
+.actionRail {
+  display: grid;
+  justify-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem clamp(0.6rem, 3vw, 1.4rem) 0.8rem;
+}
+
+.railPrompt {
+  margin: 0;
+  color: var(--ink-dim);
+  font-size: 0.86rem;
+  text-align: center;
+}
+
+.hooked {
+  color: var(--oh-under);
+  font-style: normal;
+  font-weight: 700;
+}
+
+.railButtons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.35rem;
+}
+
+.bidButton,
+.trumpButton {
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  padding: 0.3rem 0.6rem;
+  border: 0;
+  border-radius: 0.7rem;
+  background: linear-gradient(180deg, var(--oh-accent), var(--oh-shade));
+  color: var(--ink);
+  font-size: 1.05rem;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: var(--shadow-ambient);
+}
+
+.trumpButton {
+  display: grid;
+  justify-items: center;
+  gap: 0.1rem;
+  line-height: 1;
+}
+
+.trumpButton small {
+  font-size: 0.55rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.bidButton:disabled,
+.trumpButton:disabled {
+  filter: var(--unplayable-filter);
+  opacity: var(--unplayable-opacity);
+  cursor: default;
+}
+
+.roundEnd {
+  position: absolute;
+  inset: auto 0 4.5rem;
+  display: grid;
+  justify-items: center;
+  gap: 0.5rem;
+  margin: 0 auto;
+  padding: 1rem 1.2rem;
+  width: min(28rem, 92vw);
+  border-radius: var(--radius-chunky);
+  background: rgba(12, 26, 32, 0.94);
+  box-shadow: var(--shadow-lift);
+  z-index: 30;
+}
+
+.roundEnd h2 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.roundEnd ul {
+  display: grid;
+  gap: 0.2rem;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  list-style: none;
+  font-size: 0.86rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.roundEnd li[data-standing='exact'] {
+  color: var(--oh-exact);
+}
+
+.roundEnd li span {
+  float: right;
+  font-weight: 800;
+}
+
+.nextRound {
+  min-height: 2.75rem;
+  padding: 0.4rem 1.2rem;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(180deg, var(--parlour-amber), #96471c);
+  color: var(--ink);
+  font-weight: 800;
+  cursor: pointer;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .seat {
+    transition: none;
+  }
+}

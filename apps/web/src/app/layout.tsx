@@ -5,6 +5,8 @@ import { ComfortSync } from '@/components/ComfortSync';
 import { AudioDirector } from '@/components/AudioDirector';
 import { SceneStage } from '@/components/backgrounds/SceneStage';
 import { SplashScreen } from '@/components/SplashScreen';
+import { PageTransition } from '@/components/transitions/PageTransition';
+import { WipeOverlay } from '@/components/transitions/WipeOverlay';
 import { PwaRegister } from '@/components/PwaRegister';
 import { Analytics } from '@vercel/analytics/next';
 import './globals.css';
@@ -103,7 +105,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           />
         ) : null}
         <SceneStage />
-        <div className="relative z-10 min-h-dvh">{children}</div>
+        <PageTransition>{children}</PageTransition>
+        <WipeOverlay />
         <SplashScreen />
         <ComfortSync />
         <AudioDirector />

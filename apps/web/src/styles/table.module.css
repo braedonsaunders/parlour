@@ -498,7 +498,7 @@
 }
 
 .handCard[data-playable='true'] .card {
-  filter: saturate(1.12) brightness(1.07);
+  filter: var(--playable-filter);
   box-shadow:
     0 13px 24px -8px rgba(3, 11, 15, 0.82),
     0 0 0 2px rgba(255, 224, 173, 0.46),
@@ -507,8 +507,8 @@
 }
 
 .handCard[data-playable='false'] .card {
-  filter: grayscale(0.58) saturate(0.22) brightness(0.62);
-  opacity: 0.68;
+  filter: var(--unplayable-filter);
+  opacity: var(--unplayable-opacity);
 }
 
 /* The card you just drew: lifted clear of the fan so the decision is obvious. */

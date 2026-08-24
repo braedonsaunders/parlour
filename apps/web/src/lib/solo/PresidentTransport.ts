@@ -15,6 +15,7 @@ import {
   SoloAuthority,
   type SoloDispatch,
 } from './SoloAuthority';
+import { localSeat } from './seating';
 
 /** House opponents — names match the avatar cast so the table reads cohesively. */
 const PRESIDENT_BOTS = [
@@ -130,12 +131,7 @@ export class PresidentTransport {
 
   private players(): PresidentPlayer[] {
     return [
-      {
-        seat: 0,
-        name: this.options.player.name.trim() || 'You',
-        avatarId: this.options.player.avatarId,
-        isBot: false,
-      },
+      localSeat(this.options.player),
       ...Array.from({ length: this.options.seats - 1 }, (_, index) => ({
         seat: index + 1,
         ...PRESIDENT_BOTS[index % PRESIDENT_BOTS.length]!,

@@ -14,6 +14,7 @@ import {
   SoloAuthority,
   type SoloDispatch,
 } from './SoloAuthority';
+import { localSeat } from './seating';
 
 /** House opponents — names match the avatar cast so the table reads cohesively. */
 const WILD_BOTS = [
@@ -138,12 +139,7 @@ export class WildTransport {
 
   private players(): WildPlayer[] {
     return [
-      {
-        seat: 0,
-        name: this.options.player.name.trim() || 'You',
-        avatarId: this.options.player.avatarId,
-        isBot: false,
-      },
+      localSeat(this.options.player),
       ...Array.from({ length: this.options.seats - 1 }, (_, index) => ({
         seat: index + 1,
         ...WILD_BOTS[index % WILD_BOTS.length]!,

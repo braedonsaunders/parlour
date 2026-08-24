@@ -1,39 +1,35 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
-import { useRouter } from 'next/navigation';
+import { useCallback, useSyncExternalStore } from 'react';
+import { useWipeRouter } from '@/hooks/useWipeRouter';
 import { isActingSeat } from '@parlour/engine';
 import type { HeartsModeId } from '@/lib/hearts/modes';
 import { heartsModeForRules } from '@/lib/hearts/modes';
 import { heartsTableView } from '@/lib/hearts/view';
 import { useSoloTable } from '@/lib/table/useSoloTable';
 import { HeartsTransport, type HeartsSnapshot } from '@/lib/solo/HeartsTransport';
-import { botKey, buildMatchRecord, friendKey, useHistoryStore } from '@/stores/history';
-import { useMatchFlowStore } from '@/stores/matchFlow';
+import {
+  leaveRoom,
+  roomMatchId,
+  roomSeats,
+  soloSeats,
+  useMatchReport,
+  useMultiplayerRoom,
+  useRoomDispatch,
+  useSoloTransport,
+} from '@/lib/table/useGameTable';
 import { useProfileStore } from '@/stores/profile';
 import { heartsRulesFor, useHeartsSetupStore } from '@/stores/heartsSetup';
 import {
   HeartsTableScreen,
   type HeartsHandEndInfo,
 } from '@/components/table/hearts/HeartsTableScreen';
-import {
-  clearActiveMultiplayerSession,
-  getActiveMultiplayerSession,
-  multiplayerSession,
-  subscribeActiveMultiplayerSession,
-  type MultiplayerRoomSession,
-} from '../../_multiplayer/roomSession';
+import { multiplayerSession, type MultiplayerRoomSession } from '../../_multiplayer/roomSession';
 import type { HeartsRules, HeartsState } from '@parlour/game-hearts';
 
 export default function HeartsTablePage() {
-  const multiplayer = useSyncExternalStore(
-    subscribeActiveMultiplayerSession,
-    getActiveMultiplayerSession,
-    () => null,
-  );
-  if (multiplayer?.getSnapshot().gameId === 'hearts') {
-    return <ActiveMultiplayerHeartsTable room={multiplayer} />;
-  }
+  const room = useMultiplayerRoom('hearts');
+  if (room) return <ActiveMultiplayerHeartsTable room={room} />;
   return <SoloHeartsTablePage />;
 }
 
@@ -43,22 +39,17 @@ function SoloHeartsTablePage() {
   const botTier = useHeartsSetupStore((state) => state.botTier);
   const name = useProfileStore((state) => state.name);
   const avatarId = useProfileStore((state) => state.avatarId);
-  const [transport, setTransport] = useState<HeartsTransport | null>(null);
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      setTransport(
-        new HeartsTransport({
-          config: heartsRulesFor(mode, overrides),
-          mode,
-          seed: Date.now() | 0,
-          player: { name, avatarId },
-          botTier,
-        }),
-      );
-    }, 0);
-    return () => window.clearTimeout(timer);
-  }, [avatarId, botTier, mode, name, overrides]);
+  const transport = useSoloTransport(
+    () =>
+      new HeartsTransport({
+        config: heartsRulesFor(mode, overrides),
+        mode,
+        seed: Date.now() | 0,
+        player: { name, avatarId },
+        botTier,
+      }),
+    [avatarId, botTier, mode, name, overrides],
+  );
 
   if (!transport) return <HeartsTableScreen view={null} fx={[]} fxKey="loading" />;
   return <ActiveSoloHeartsTable transport={transport} />;
@@ -67,12 +58,7 @@ function SoloHeartsTablePage() {
 const BOT_THINK_MS = 520;
 
 function ActiveSoloHeartsTable({ transport }: { transport: HeartsTransport }) {
-  const router = useRouter();
-  const setLastMatch = useMatchFlowStore((state) => state.setLastMatch);
-  const registerPlayAgain = useMatchFlowStore((state) => state.registerPlayAgain);
-  const recordResult = useProfileStore((state) => state.recordResult);
-  const recordMatch = useHistoryStore((state) => state.recordMatch);
-  const reportedMatch = useRef<HeartsTransport | null>(null);
+  const router = useWipeRouter();
   const botPaceMs = useCallback((_current: HeartsSnapshot) => BOT_THINK_MS, []);
   const { snapshot, fx, fxKey, error, dispatch, accept } = useSoloTable(transport, {
     round: (current) => current.hand,
@@ -81,46 +67,16 @@ function ActiveSoloHeartsTable({ transport }: { transport: HeartsTransport }) {
       outcome.fx.length > 0 ? outcome.fx : (outcome.snapshot.hand.setupFx ?? []),
   });
 
-  useEffect(() => {
-    if (
-      snapshot.matchWinner === null ||
-      reportedMatch.current === transport ||
-      !snapshot.matchResult
-    ) {
-      return;
-    }
-    reportedMatch.current = transport;
-    recordResult({ won: snapshot.matchWinner === 0, blitzes: 0, knocks: 0, knockWins: 0 });
-    const id = crypto.randomUUID();
-    const seats = snapshot.players.map((player) => ({
-      seat: player.seat,
-      name: player.name,
-      avatarId: player.avatarId,
-      kind: player.isBot ? ('bot' as const) : ('friend' as const),
-      key: player.isBot ? botKey(player.avatarId) : friendKey(`seat-${player.seat}`),
-    }));
-    const record = buildMatchRecord({
-      id,
-      at: Date.now(),
-      game: 'hearts',
-      mode: snapshot.mode,
-      result: matchResultFrom(snapshot),
-      localSeat: 0,
-      seats,
-    });
-    if (record) recordMatch(record);
-    setLastMatch({
-      id,
-      result: matchResultFrom(snapshot),
-      seats,
-      game: 'hearts',
-      mode: snapshot.mode,
-      localSeat: 0,
-    });
-    registerPlayAgain(() => router.push('/hearts/table'));
-    const timer = window.setTimeout(() => router.push('/match-end'), 900);
-    return () => window.clearTimeout(timer);
-  }, [recordMatch, recordResult, registerPlayAgain, router, setLastMatch, snapshot, transport]);
+  useMatchReport({
+    result: snapshot.matchWinner === null ? null : (snapshot.matchResult ?? null),
+    game: 'hearts',
+    mode: snapshot.mode,
+    localSeat: 0,
+    seats: soloSeats(snapshot.players),
+    id: `solo:hearts:${snapshot.hand.seed}`,
+    won: snapshot.matchWinner === 0,
+    playAgain: () => router.push('/hearts/table'),
+  });
 
   const legal =
     snapshot.status === 'playing' && isActingSeat(snapshot.hand.phase, 0)
@@ -156,90 +112,27 @@ function ActiveSoloHeartsTable({ transport }: { transport: HeartsTransport }) {
   );
 }
 
-/** The podium wants the whole match, not just the last hand. */
-function matchResultFrom(snapshot: HeartsSnapshot) {
-  if (snapshot.matchResult) return snapshot.matchResult;
-  return snapshot.handResult ?? { winner: null, rankings: [], reason: 'hand-complete' };
-}
-
 function ActiveMultiplayerHeartsTable({ room }: { room: MultiplayerRoomSession }) {
-  const router = useRouter();
-  const setLastMatch = useMatchFlowStore((state) => state.setLastMatch);
-  const registerPlayAgain = useMatchFlowStore((state) => state.registerPlayAgain);
-  const recordResult = useProfileStore((state) => state.recordResult);
-  const recordMatch = useHistoryStore((state) => state.recordMatch);
-  const reportedMatch = useRef(false);
-  const [localError, setLocalError] = useState<string | null>(null);
+  const router = useWipeRouter();
   const snapshot = useSyncExternalStore(room.subscribe, room.getSnapshot, room.getSnapshot);
+  const { dispatch, error: localError } = useRoomDispatch(room);
   const session = multiplayerSession<HeartsState, HeartsRules>(snapshot, 'hearts');
   const localSeat = snapshot.localSeat;
+  const roomMode = session ? heartsModeForRules(session.config) : 'classic';
 
-  const dispatch = useCallback(
-    (move: string, payload?: unknown) => {
-      try {
-        room.send(move, payload);
-        setLocalError(null);
-      } catch (caught) {
-        setLocalError(caught instanceof Error ? caught.message : 'The move could not be sent.');
-      }
-    },
-    [room],
-  );
-
-  useEffect(() => {
-    if (!session?.result || localSeat === null || reportedMatch.current) return;
-    reportedMatch.current = true;
-    const mode = heartsModeForRules(session.config);
-    const id = `multiplayer:${snapshot.room?.code ?? 'room'}:${session.seed}:${
-      session.lastAppliedHash ?? session.log.length
-    }`;
-    recordResult({ won: session.result.winner === localSeat, blitzes: 0, knocks: 0, knockWins: 0 });
-    const seats = snapshot.seats.map((seat) => ({
-      seat: seat.seat,
-      name: seat.name,
-      avatarId: seat.avatarId,
-      kind: 'friend' as const,
-      key: friendKey(seat.profileId),
-    }));
-    const record = buildMatchRecord({
-      id,
-      at: Date.now(),
-      game: 'hearts',
-      mode,
-      result: session.result,
-      localSeat,
-      seats,
-    });
-    if (record) recordMatch(record);
-    setLastMatch({
-      id,
-      result: session.result,
-      seats,
-      game: 'hearts',
-      mode,
-      localSeat,
-    });
-    registerPlayAgain(() => {
-      router.push('/hearts/create');
-    });
-    const timer = window.setTimeout(() => {
-      room.close();
-      clearActiveMultiplayerSession();
-      router.push('/match-end');
-    }, 900);
-    return () => window.clearTimeout(timer);
-  }, [
+  useMatchReport({
+    result: session?.result ?? null,
+    game: 'hearts',
+    mode: roomMode,
     localSeat,
-    recordMatch,
-    recordResult,
-    registerPlayAgain,
-    room,
-    router,
-    session,
-    setLastMatch,
-    snapshot.room?.code,
-    snapshot.seats,
-  ]);
+    seats: roomSeats(snapshot.seats),
+    id: session ? roomMatchId(snapshot.room?.code, session) : '',
+    // Hearts has a single winner, so "the winning seat is mine" and "I ranked
+    // first" agree; the default predicate is the one that keeps agreeing if a
+    // future rule ever ties the lowest score.
+    playAgain: () => router.push('/hearts/create'),
+    onLeave: () => leaveRoom(room),
+  });
 
   if (!session || localSeat === null) {
     return (
@@ -261,12 +154,10 @@ function ActiveMultiplayerHeartsTable({ room }: { room: MultiplayerRoomSession }
   const legal = myTurn
     ? (session.def.flow.legalMovesFor?.(session.state, session.phase, localSeat) ?? [])
     : [];
-  const mode = heartsModeForRules(session.config);
-
   return (
     <HeartsTableScreen
       view={heartsTableView({
-        mode,
+        mode: roomMode,
         localSeat,
         players: snapshot.seats.map((player) => ({
           seat: player.seat,
@@ -285,8 +176,7 @@ function ActiveMultiplayerHeartsTable({ room }: { room: MultiplayerRoomSession }
       onPass={(cards) => dispatch('passCards', { cards })}
       onPlayCard={(card) => dispatch('playCard', { card })}
       onQuit={() => {
-        room.close();
-        clearActiveMultiplayerSession();
+        leaveRoom(room);
         router.push('/hearts');
       }}
     />

@@ -1,7 +1,6 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import {
   ROOM_CODE_ALPHABET,
@@ -9,6 +8,7 @@ import {
   normalizeRoomCode,
   validateRoomHostPubkey,
 } from '@/lib/rooms/code';
+import { useWipeRouter } from '@/hooks/useWipeRouter';
 import { RoomLobby } from '@/components/multiplayer/RoomLobby';
 import { tableRouteFor } from '@/lib/rooms/tableRoute';
 import { useProfileStore } from '@/stores/profile';
@@ -42,7 +42,7 @@ function useRoomSnapshot(session: MultiplayerRoomSession | null) {
 }
 
 export default function JoinPage() {
-  const router = useRouter();
+  const router = useWipeRouter();
   const name = useProfileStore((state) => state.name);
   const avatarId = useProfileStore((state) => state.avatarId);
   const linkCode = useSyncExternalStore(subscribeNoop, readLinkCode, () => '');

@@ -61,6 +61,15 @@ const REQUIRED_SOUNDS = [
   'spades.contract-made',
   'spades.bag-penalty',
   'spades.score-chime',
+  // Oh Hell reuses the trick-taking samples rather than shipping a fourth
+  // near-identical set; the ids are still declared so each one is checked to
+  // point at a real, non-empty MP3.
+  'ohhell.trump',
+  'ohhell.bid',
+  'ohhell.bids-complete',
+  'ohhell.trick-collect',
+  'ohhell.score',
+  'ohhell.match-score',
   'klondike.draw',
   'klondike.recycle',
   'klondike.move',

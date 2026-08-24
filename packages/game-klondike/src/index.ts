@@ -29,6 +29,20 @@ export {
   type KlondikeHint,
 } from './game';
 export { klondikeHowToPlay } from './howto';
+export {
+  isWinnableDeal,
+  solveKlondike,
+  type SolveOptions,
+  type SolveOutcome,
+  type SolveResult,
+  type SolveWeights,
+} from './solver';
+export {
+  findWinnableSeed,
+  klondikeDealFor,
+  type WinnableSearchOptions,
+  type WinnableSeed,
+} from './winnable';
 export type {
   FoundationToTableauPayload,
   HiddenKlondikeCard,

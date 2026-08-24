@@ -1,0 +1,440 @@
+/* Full-screen table-entry wipe: three felt panels sweep across, a hearth-light
+   blade leads the edge, suit sparks tumble in its wake, and the game emblem
+   holds the beat before the panels carry on out the far side. */
+
+.overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: var(--app-height);
+  z-index: 70;
+  overflow: hidden;
+  pointer-events: all;
+}
+
+/* ------------------------------------------------------------------ panels */
+
+.panel {
+  position: absolute;
+  top: -30%;
+  left: -25%;
+  width: 150%;
+  height: 160%;
+  will-change: transform;
+  transform: translateX(-8%) skewX(-14deg);
+}
+
+.panelA {
+  background:
+    radial-gradient(120% 90% at 88% 110%, rgba(226, 147, 73, 0.16) 0%, transparent 55%),
+    linear-gradient(100deg, #0a141c 0%, #12242f 58%, #16303e 100%);
+}
+
+.panelB {
+  background:
+    radial-gradient(100% 80% at 90% 0%, rgba(127, 192, 209, 0.14) 0%, transparent 52%),
+    linear-gradient(100deg, #123640 0%, #1d4c52 62%, #2a6b6b 100%);
+  animation-delay: 70ms;
+}
+
+.panelC {
+  background:
+    radial-gradient(130% 100% at 86% 112%, rgba(242, 176, 106, 0.2) 0%, transparent 56%),
+    linear-gradient(
+      100deg,
+      #152833 0%,
+      #1f3f50 56%,
+      #35596b 84%,
+      rgba(255, 220, 170, 0.4) 93%,
+      #35596b 97%
+    );
+  animation-delay: 140ms;
+}
+
+[data-status='cover'] .panel {
+  animation-name: panelIn;
+  animation-duration: 420ms;
+  animation-timing-function: cubic-bezier(0.76, 0, 0.24, 1);
+  animation-fill-mode: both;
+}
+
+[data-status='reveal'] .panel {
+  animation-name: panelOut;
+  animation-duration: 520ms;
+  animation-timing-function: cubic-bezier(0.65, 0.05, 0.36, 1);
+  animation-fill-mode: both;
+}
+
+/* Longhand delays so the shorthand above cannot flatten the stagger. */
+[data-status='cover'] .panelB,
+[data-status='reveal'] .panelB {
+  animation-delay: 70ms;
+}
+
+[data-status='cover'] .panelC,
+[data-status='reveal'] .panelC {
+  animation-delay: 140ms;
+}
+
+@keyframes panelIn {
+  from {
+    transform: translateX(-118%) skewX(-14deg);
+  }
+  to {
+    transform: translateX(-8%) skewX(-14deg);
+  }
+}
+
+@keyframes panelOut {
+  from {
+    transform: translateX(-8%) skewX(-14deg);
+  }
+  to {
+    transform: translateX(118%) skewX(-14deg);
+  }
+}
+
+/* ------------------------------------------------------------------- blade */
+
+.blade {
+  position: absolute;
+  top: -20%;
+  left: 0;
+  width: 16vmin;
+  height: 140%;
+  z-index: 2;
+  opacity: 0;
+  will-change: transform, opacity;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(242, 176, 106, 0.5) 34%,
+    rgba(255, 236, 200, 0.95) 52%,
+    rgba(242, 176, 106, 0.5) 70%,
+    transparent 100%
+  );
+  box-shadow: 0 0 9vmin 2vmin rgba(242, 176, 106, 0.28);
+}
+
+[data-status='cover'] .blade {
+  animation: bladeRun 640ms cubic-bezier(0.55, 0.06, 0.35, 1) 60ms both;
+}
+
+[data-status='reveal'] .blade {
+  animation: bladeRun 600ms cubic-bezier(0.55, 0.06, 0.45, 0.95) 140ms both;
+}
+
+@keyframes bladeRun {
+  0% {
+    transform: translateX(-24vmin) skewX(-14deg);
+    opacity: 0;
+  }
+  12% {
+    opacity: 1;
+  }
+  82% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(118vw) skewX(-14deg);
+    opacity: 0;
+  }
+}
+
+/* ------------------------------------------------------------------ sparks */
+
+.spark {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 2;
+  font-weight: 700;
+  line-height: 1;
+  opacity: 0;
+  will-change: transform, opacity;
+}
+
+[data-status='cover'] .spark {
+  animation: sparkRun 760ms cubic-bezier(0.5, 0.05, 0.4, 1) var(--spark-delay) both;
+}
+
+[data-status='reveal'] .spark {
+  animation: sparkRun 640ms cubic-bezier(0.5, 0.05, 0.45, 1) calc(var(--spark-delay) + 180ms) both;
+}
+
+@keyframes sparkRun {
+  0% {
+    transform: translate(var(--spark-x), var(--spark-y)) rotate(0deg) scale(0.5);
+    opacity: 0;
+  }
+  18% {
+    opacity: var(--spark-peak);
+  }
+  100% {
+    transform: translate(calc(var(--spark-x) + 116vw), calc(var(--spark-y) + var(--spark-drift)))
+      rotate(var(--spark-rot)) scale(1.15);
+    opacity: 0;
+  }
+}
+
+/* ------------------------------------------------------------------ emblem */
+
+.emblem {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+
+.emblemInner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.65rem;
+  padding-top: 4vmin;
+}
+
+/* The emblem's parts rest in their *settled* pose and animate on the way in.
+   Parking them at their starting pose instead would work for the entrance and
+   then betray the exit: the moment the status leaves `covered` the entrance
+   rules stop applying, every part snaps back to invisible, and `emblemOut`
+   sweeps an empty box off the screen. */
+
+[data-status='cover'] .emblemInner {
+  opacity: 0;
+}
+
+[data-status='reveal'] .emblemInner {
+  animation: emblemOut 260ms ease-in both;
+}
+
+@keyframes emblemOut {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(12%);
+  }
+}
+
+.fan {
+  position: relative;
+  width: 11rem;
+  height: 6.4rem;
+  margin-bottom: 0.4rem;
+}
+
+.fanCard {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  display: grid;
+  place-items: center;
+  width: 4.4rem;
+  height: 6.2rem;
+  border-radius: 0.85rem;
+  border: 2px solid var(--bevel-light);
+  font-size: 2rem;
+  font-weight: 700;
+  box-shadow: var(--shadow-lift);
+  will-change: transform, opacity;
+  transform-origin: 50% 115%;
+}
+
+.fanCardSpade {
+  color: #25404e;
+  background: linear-gradient(168deg, #fffaf0 0%, #f4e7d2 58%, #e8d4b4 100%);
+  transform: translate(-50%, 0) rotate(-13deg);
+}
+
+.fanCardHeart {
+  color: #fff6ea;
+  text-shadow: 0 1px 0 rgba(120, 57, 29, 0.5);
+  background: linear-gradient(168deg, #f6bd7a 0%, #e29349 48%, #c76a26 100%);
+  transform: translate(-50%, -10px) rotate(0deg);
+}
+
+.fanCardDiamond {
+  color: var(--ink-dim);
+  background: linear-gradient(168deg, #4ba1ba 0%, #2f86a1 46%, #25586e 100%);
+  transform: translate(-50%, 0) rotate(13deg);
+}
+
+[data-status='covered'] .fanCardSpade {
+  animation: fanLeft 360ms var(--ease-pop) 40ms both;
+}
+
+[data-status='covered'] .fanCardHeart {
+  animation: fanCenter 340ms var(--ease-pop) 110ms both;
+}
+
+[data-status='covered'] .fanCardDiamond {
+  animation: fanRight 360ms var(--ease-pop) 180ms both;
+}
+
+@keyframes fanLeft {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 26px) rotate(0deg);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0) rotate(-13deg);
+  }
+}
+
+@keyframes fanCenter {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 30px) rotate(0deg);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -10px) rotate(0deg);
+  }
+}
+
+@keyframes fanRight {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 26px) rotate(0deg);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0) rotate(13deg);
+  }
+}
+
+.kicker {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.34em;
+  text-transform: uppercase;
+  color: rgba(175, 218, 228, 0.78);
+}
+
+[data-status='covered'] .kicker {
+  animation: riseIn 300ms var(--ease-settle) 140ms both;
+}
+
+.title {
+  margin: 0;
+  font-family: var(--font-display), ui-rounded, system-ui, sans-serif;
+  font-size: clamp(2.5rem, 10vw, 4.5rem);
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  line-height: 1.05;
+  background: linear-gradient(180deg, #ffeecb 0%, #f2cfa4 38%, #d97a2b 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 5px 22px rgba(242, 176, 106, 0.38));
+}
+
+[data-status='covered'] .title {
+  animation: titlePop 340ms var(--ease-pop) 80ms both;
+}
+
+@keyframes titlePop {
+  from {
+    opacity: 0;
+    transform: scale(0.86);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.rule {
+  width: min(230px, 44vw);
+  height: 3px;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(90deg, transparent 0%, #e29349 50%, transparent 100%);
+}
+
+[data-status='covered'] .rule {
+  animation: drawRule 400ms var(--ease-settle) 220ms both;
+}
+
+@keyframes drawRule {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+.sub {
+  margin: 0.15rem 0 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: rgba(215, 237, 242, 0.72);
+}
+
+[data-status='covered'] .sub {
+  animation: riseIn 320ms var(--ease-settle) 260ms both;
+}
+
+.subDot {
+  display: inline-block;
+  animation: dotPulse 1.2s ease-in-out infinite;
+}
+
+.subDot:nth-child(2) {
+  animation-delay: 200ms;
+}
+
+.subDot:nth-child(3) {
+  animation-delay: 400ms;
+}
+
+@keyframes dotPulse {
+  0%,
+  100% {
+    opacity: 0.25;
+  }
+  40% {
+    opacity: 1;
+  }
+}
+
+@keyframes riseIn {
+  from {
+    opacity: 0;
+    transform: translateY(9px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ---------------------------------------------------------------- vignette */
+
+.vignette {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+  background: radial-gradient(82% 70% at 50% 46%, transparent 48%, rgba(4, 10, 15, 0.66) 100%);
+}
+
+/* ------------------------------------------------------- reduced motion */
+
+@media (prefers-reduced-motion: reduce) {
+  .overlay {
+    display: none;
+  }
+}
+
+html.reduce-motion .overlay {
+  display: none;
+}

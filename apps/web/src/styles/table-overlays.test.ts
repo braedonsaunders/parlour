@@ -11,6 +11,8 @@ const gin = readStyles('gin');
 const hearts = readStyles('hearts');
 const president = readStyles('president');
 const wild = readStyles('wild');
+const wipe = readStyles('wipe');
+const splash = readStyles('splash');
 
 function declarationsFor(source: string, selector: string): string {
   const escapedSelector = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -50,9 +52,60 @@ describe('table overlay stacking', () => {
     );
   });
 
+  it('lifts the Wild last-card call off the hand rail on a portrait phone', () => {
+    // The shared rail is pinned bottom-right, which on a phone is on top of the
+    // fanned hand and inside the home indicator's reach. Wild's one-turn
+    // last-card window has to be somewhere a thumb can find it, so on portrait
+    // it centres above the felt with the table's other decision prompts.
+    const portraitRail = wild.match(
+      /@media \(orientation:\s*portrait\)\s*\{[\s\S]*?\.actionRail\.actionRail\s*\{([^}]*)\}/,
+    );
+    expect(portraitRail, 'wild overrides the action rail on portrait').not.toBeNull();
+    expect(portraitRail![1]).toMatch(/right:\s*auto;/);
+    expect(portraitRail![1]).toMatch(/left:\s*50%;/);
+    expect(portraitRail![1]).toMatch(/bottom:\s*27%;/);
+    expect(zIndexFor(wild, '.actionRail.actionRail')).toBeGreaterThan(
+      zIndexFor(table, '.localHand'),
+    );
+  });
+
+  it('sweeps the Wild turn clock from CSS rather than a render loop', () => {
+    // Driving the ring from React meant a re-render ten times a second for the
+    // whole of every turn; the sweep is linear over a known duration, so the
+    // stylesheet owns it and the component only ticks the digit.
+    expect(wild).toMatch(
+      /\.turnClockProgress\s*\{[^}]*animation:\s*turnClockSweep var\(--turn-duration[^}]*\}/,
+    );
+    expect(wild).toMatch(/@keyframes turnClockSweep/);
+    expect(wild).not.toMatch(/transition:\s*stroke-dashoffset/);
+  });
+
   it('parks the Euchre trump badge below the north player', () => {
     expect(declarationsFor(euchre, '.trumpBadge')).toMatch(
       /top:\s*clamp\(6\.4rem,\s*17vh,\s*7\.8rem\);/,
     );
+  });
+
+  it('keeps the table wipe over the only other layer it shares the body with', () => {
+    // Everything a page draws — including its own fixed sheets — is boxed
+    // inside the `z-10` app shell, so the wipe only has to clear the splash.
+    // If it did not, the logo would sit on top of the panels on a cold start.
+    expect(zIndexFor(wipe, '.overlay')).toBeGreaterThan(zIndexFor(splash, '.overlay'));
+  });
+
+  it('rests the wipe emblem in its settled pose so it can be swept back out', () => {
+    // Each part animates in on `covered` and is carried out by `emblemOut` on
+    // `reveal`. If a part were parked at `opacity: 0`, the entrance rule would
+    // stop applying the instant the status changed and it would vanish before
+    // the exit had a frame to play.
+    for (const part of ['.kicker', '.title', '.rule', '.sub', '.fanCard']) {
+      expect(declarationsFor(wipe, part), `${part} rests visible`).not.toMatch(/opacity:\s*0\s*;/);
+    }
+  });
+
+  it('covers the window rather than the viewport the browser admits to', () => {
+    // `100dvh` stops short of the iOS home indicator in a standalone PWA, which
+    // would leave a strip of the outgoing table showing under the panels.
+    expect(declarationsFor(wipe, '.overlay')).toMatch(/height:\s*var\(--app-height\);/);
   });
 });

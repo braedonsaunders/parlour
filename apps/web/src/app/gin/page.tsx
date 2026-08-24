@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useWipeRouter } from '@/hooks/useWipeRouter';
 import { useState } from 'react';
 import { ginHowToPlay } from '@parlour/game-gin';
 import { HowToPlayButton } from '@/components/HowToPlay';
@@ -15,7 +15,7 @@ import styles from '@/styles/modes.module.css';
 import gameStyles from '@/styles/games.module.css';
 
 export default function GinSetupPage() {
-  const router = useRouter();
+  const router = useWipeRouter();
   const mode = useGinSetupStore((s) => s.mode);
   const botTier = useGinSetupStore((s) => s.botTier);
   const overrides = useGinSetupStore((s) => s.overrides);

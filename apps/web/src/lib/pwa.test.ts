@@ -113,14 +113,19 @@ describe('installable offline shell', () => {
     const globals = readFileSync(join(process.cwd(), 'src/app/globals.css'), 'utf8');
     const scenes = readFileSync(join(process.cwd(), 'src/styles/scenes.module.css'), 'utf8');
 
-    expect(globals).toContain('--app-height: 100dvh');
-    expect(globals).toContain('--app-height: 100lvh');
-    expect(globals).toContain('--app-height: -webkit-fill-available');
+    expect(globals).toContain('--app-height: max(100dvh, var(--app-window-height))');
+    expect(globals).toContain('--app-height: max(100lvh, var(--app-window-height))');
     expect(globals).toContain('env(safe-area-inset-top)');
     expect(globals).toMatch(/\.chrome-nw\s*\{[^}]*safe-area-inset-top/s);
     expect(globals).toMatch(/\.chrome-ne\s*\{[^}]*safe-area-inset-top/s);
     expect(globals).toMatch(/\.safe-page\s*\{[^}]*safe-area-inset-top/s);
-    expect(scenes).toMatch(/height:\s*var\(--app-height\)/);
+    // The scene backdrop spans the viewport insets *and* the measured window, so
+    // neither reading coming up short can leave a bare strip under the fold.
+    expect(scenes).toMatch(/\.stage\s*\{[^}]*inset:\s*0;/s);
+    expect(scenes).toMatch(/\.stage\s*\{[^}]*min-height:\s*var\(--app-height\);/s);
+    const splash = readFileSync(join(process.cwd(), 'src/styles/splash.module.css'), 'utf8');
+    expect(splash).toMatch(/\.overlay\s*\{[^}]*inset:\s*0;/s);
+    expect(splash).toMatch(/\.overlay\s*\{[^}]*min-height:\s*var\(--app-height\);/s);
     expect(readFileSync(join(process.cwd(), 'src/app/profile/page.tsx'), 'utf8')).toContain(
       'safe-page',
     );
@@ -171,7 +176,7 @@ describe('PWA runtime detection', () => {
     expect(isTauriRuntime(tauriWindow)).toBe(true);
   });
 
-  it('pins --app-height to the real window in standalone and clears it in the browser', () => {
+  it('publishes the real window height in standalone and clears it in the browser', () => {
     const styles = new Map<string, string>();
     const standaloneWindow = {
       innerHeight: 390,
@@ -197,15 +202,44 @@ describe('PWA runtime detection', () => {
     } as unknown as Window;
 
     const stopStandalone = syncAppViewportHeight(standaloneWindow, {} as Navigator);
-    expect(styles.get('--app-height')).toBe('390px');
+    expect(styles.get('--app-window-height')).toBe('390px');
     stopStandalone();
-    expect(styles.has('--app-height')).toBe(false);
+    expect(styles.has('--app-window-height')).toBe(false);
 
     const browserWindow = {
       ...standaloneWindow,
       matchMedia: () => ({ matches: false }),
     } as unknown as Window;
     syncAppViewportHeight(browserWindow, {} as Navigator);
-    expect(styles.has('--app-height')).toBe(false);
+    expect(styles.has('--app-window-height')).toBe(false);
+  });
+
+  it('takes the taller of the window and the visual viewport', () => {
+    const styles = new Map<string, string>();
+    const tallVisualViewport = {
+      innerHeight: 700,
+      document: {
+        documentElement: {
+          style: {
+            setProperty: (name: string, value: string) => styles.set(name, value),
+            removeProperty: (name: string) => styles.delete(name),
+          },
+        },
+      },
+      matchMedia: () => ({ matches: true }),
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+      requestAnimationFrame: (callback: FrameRequestCallback) => {
+        callback(0);
+        return 1;
+      },
+      cancelAnimationFrame: () => undefined,
+      setTimeout: () => 1,
+      clearTimeout: () => undefined,
+      visualViewport: { height: 744.5, addEventListener: () => undefined },
+    } as unknown as Window;
+
+    syncAppViewportHeight(tallVisualViewport, {} as Navigator);
+    expect(styles.get('--app-window-height')).toBe('745px');
   });
 });

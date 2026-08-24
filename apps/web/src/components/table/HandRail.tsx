@@ -60,8 +60,13 @@ export function HandRailCard({
   const fanIndex = index - (count - 1) / 2;
   return (
     <motion.div
+      // `layout` re-flows the fan when a card joins or leaves. A `layoutId` on
+      // top of it registered every card in motion's shared-layout map and had
+      // it measured on every commit — projection work that showed up as one of
+      // the hottest functions in a profile — to buy a shared transition
+      // between containers that no table performs. Cards leave the rail as
+      // engine fx flights, not as layout animations.
       layout={!receiving}
-      layoutId={`card:${cardId}`}
       className={styles.handCard}
       role="listitem"
       data-hand-card

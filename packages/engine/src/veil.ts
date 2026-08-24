@@ -391,8 +391,14 @@ export const MAX_PUBLIC_SETUP_OPENS = 16;
 export interface VeilPack {
   /** the deck this game deals from */
   deck: DeckDef | ((config: RuleValues) => DeckDef);
-  /** cards dealt to each seat before the public setup cards (default 0) */
-  handSize?: number | ((config: RuleValues) => number);
+  /**
+   * Cards dealt to each seat before the public setup cards (default 0).
+   *
+   * Takes the seat count as well as the config because a hand size can depend
+   * on how many seats are sharing the deck — Oh Hell deals as many as the deck
+   * allows, which is a different number at four seats than at seven.
+   */
+  handSize?: number | ((config: RuleValues, seats: number) => number);
   /**
    * Setup cards the room must open in public before `setup` can deal.
    * `'none'` (default) for games where everything starts face down, `'one'`
@@ -417,7 +423,7 @@ export function veilSupport(pack: VeilPack): VeilSupport {
     publicSetupFrom(seats, config) {
       if (mode === 'none') return resolveDeck(pack, config).cardIds.length;
       const size =
-        typeof pack.handSize === 'function' ? pack.handSize(config) : (pack.handSize ?? 0);
+        typeof pack.handSize === 'function' ? pack.handSize(config, seats) : (pack.handSize ?? 0);
       return seats * size;
     },
     publicSetupReady(opened, _seats, config) {

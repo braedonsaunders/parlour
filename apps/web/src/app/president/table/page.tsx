@@ -1,35 +1,31 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
-import { useRouter } from 'next/navigation';
+import { useCallback, useSyncExternalStore } from 'react';
+import { useWipeRouter } from '@/hooks/useWipeRouter';
 import type { GameSession } from '@parlour/engine';
 import { PresidentTableScreen } from '@/components/table/president/PresidentTableScreen';
 import { PresidentTransport, type PresidentSnapshot } from '@/lib/solo/PresidentTransport';
 import { presidentModeForRules } from '@/lib/president/modes';
 import { presidentTableView } from '@/lib/president/view';
 import { useSoloTable } from '@/lib/table/useSoloTable';
-import { botKey, buildMatchRecord, friendKey, useHistoryStore } from '@/stores/history';
-import { useMatchFlowStore } from '@/stores/matchFlow';
+import {
+  leaveRoom,
+  roomMatchId,
+  roomSeats,
+  soloSeats,
+  useMatchReport,
+  useMultiplayerRoom,
+  useRoomDispatch,
+  useSoloTransport,
+} from '@/lib/table/useGameTable';
 import { useProfileStore } from '@/stores/profile';
 import { presidentRulesFor, usePresidentSetupStore } from '@/stores/presidentSetup';
-import {
-  clearActiveMultiplayerSession,
-  getActiveMultiplayerSession,
-  subscribeActiveMultiplayerSession,
-  multiplayerSession,
-  type MultiplayerRoomSession,
-} from '../../_multiplayer/roomSession';
+import { multiplayerSession, type MultiplayerRoomSession } from '../../_multiplayer/roomSession';
 import type { PresidentRules, PresidentState } from '@parlour/game-president';
 
 export default function PresidentTablePage() {
-  const multiplayer = useSyncExternalStore(
-    subscribeActiveMultiplayerSession,
-    getActiveMultiplayerSession,
-    () => null,
-  );
-  if (multiplayer?.getSnapshot().gameId === 'president') {
-    return <ActiveMultiplayerPresidentTable room={multiplayer} />;
-  }
+  const room = useMultiplayerRoom('president');
+  if (room) return <ActiveMultiplayerPresidentTable room={room} />;
   return <SoloPresidentTablePage />;
 }
 
@@ -40,106 +36,43 @@ function SoloPresidentTablePage() {
   const botTier = usePresidentSetupStore((state) => state.botTier);
   const name = useProfileStore((state) => state.name);
   const avatarId = useProfileStore((state) => state.avatarId);
-  const [transport, setTransport] = useState<PresidentTransport | null>(null);
 
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      setTransport(
-        new PresidentTransport({
-          mode,
-          rules: presidentRulesFor(mode, overrides),
-          seats,
-          seed: Date.now() | 0,
-          player: { name, avatarId },
-          botTier,
-        }),
-      );
-    }, 0);
-    return () => window.clearTimeout(timer);
-  }, [avatarId, botTier, mode, name, overrides, seats]);
+  const transport = useSoloTransport(
+    () =>
+      new PresidentTransport({
+        mode,
+        rules: presidentRulesFor(mode, overrides),
+        seats,
+        seed: Date.now() | 0,
+        player: { name, avatarId },
+        botTier,
+      }),
+    [avatarId, botTier, mode, name, overrides, seats],
+  );
 
   if (!transport) return <PresidentTableScreen view={null} fx={[]} fxKey="loading" />;
   return <ActivePresidentTable transport={transport} />;
 }
 
 function ActiveMultiplayerPresidentTable({ room }: { room: MultiplayerRoomSession }) {
-  const router = useRouter();
-  const setLastMatch = useMatchFlowStore((state) => state.setLastMatch);
-  const registerPlayAgain = useMatchFlowStore((state) => state.registerPlayAgain);
-  const recordResult = useProfileStore((state) => state.recordResult);
-  const recordMatch = useHistoryStore((state) => state.recordMatch);
+  const router = useWipeRouter();
   const snapshot = useSyncExternalStore(room.subscribe, room.getSnapshot, room.getSnapshot);
-  const reportedMatch = useRef(false);
-  const [localError, setLocalError] = useState<string | null>(null);
   const session = multiplayerSession<PresidentState, PresidentRules>(snapshot, 'president');
   const localSeat = snapshot.localSeat;
+  const roomMode = session ? presidentModeForRules(session.config as PresidentRules) : 'classic';
 
-  const dispatch = useCallback(
-    (move: string, payload?: unknown) => {
-      try {
-        room.send(move, payload);
-        setLocalError(null);
-      } catch (error) {
-        setLocalError(error instanceof Error ? error.message : 'The move could not be sent.');
-      }
-    },
-    [room],
-  );
+  const { dispatch, error: localError } = useRoomDispatch(room);
 
-  useEffect(() => {
-    if (!session?.result || localSeat === null || reportedMatch.current) return;
-    reportedMatch.current = true;
-    const mode = presidentModeForRules(session.config as PresidentRules);
-    const id = `multiplayer:${snapshot.room?.code ?? 'room'}:${session.seed}:${
-      session.lastAppliedHash ?? session.log.length
-    }`;
-    recordResult({ won: session.result.winner === localSeat, blitzes: 0, knocks: 0, knockWins: 0 });
-    const seats = snapshot.seats.map((seat) => ({
-      seat: seat.seat,
-      name: seat.name,
-      avatarId: seat.avatarId,
-      kind: 'friend' as const,
-      key: friendKey(seat.profileId),
-    }));
-    const record = buildMatchRecord({
-      id,
-      at: Date.now(),
-      game: 'president',
-      mode,
-      result: session.result,
-      localSeat,
-      seats,
-    });
-    if (record) recordMatch(record);
-    setLastMatch({
-      id,
-      result: session.result,
-      seats,
-      game: 'president',
-      mode,
-      localSeat,
-    });
-    registerPlayAgain(() => {
-      router.push('/president/create');
-    });
-    const timer = window.setTimeout(() => {
-      room.close();
-      clearActiveMultiplayerSession();
-      router.push('/match-end');
-    }, 1400);
-    return () => window.clearTimeout(timer);
-  }, [
+  useMatchReport({
+    result: session?.result ?? null,
+    game: 'president',
+    mode: roomMode,
     localSeat,
-    recordMatch,
-    recordResult,
-    registerPlayAgain,
-    room,
-    router,
-    session,
-    setLastMatch,
-    snapshot.room?.code,
-    snapshot.seats,
-  ]);
+    seats: roomSeats(snapshot.seats),
+    id: session ? roomMatchId(snapshot.room?.code, session) : '',
+    playAgain: () => router.push('/president/create'),
+    onLeave: () => leaveRoom(room),
+  });
 
   if (!session || localSeat === null) {
     return (
@@ -187,8 +120,7 @@ function ActiveMultiplayerPresidentTable({ room }: { room: MultiplayerRoomSessio
       }
       onPass={() => dispatch('pass')}
       onQuit={() => {
-        room.close();
-        clearActiveMultiplayerSession();
+        leaveRoom(room);
         router.push('/president');
       }}
     />
@@ -206,12 +138,7 @@ function pickExchangeMove(
 }
 
 function ActivePresidentTable({ transport }: { transport: PresidentTransport }) {
-  const router = useRouter();
-  const setLastMatch = useMatchFlowStore((state) => state.setLastMatch);
-  const registerPlayAgain = useMatchFlowStore((state) => state.registerPlayAgain);
-  const recordResult = useProfileStore((state) => state.recordResult);
-  const recordMatch = useHistoryStore((state) => state.recordMatch);
-  const reportedMatch = useRef<PresidentTransport | null>(null);
+  const router = useWipeRouter();
 
   // Exchange decisions read as deliberation; regular turns keep the human pace.
   const botPaceMs = useCallback(
@@ -224,41 +151,16 @@ function ActivePresidentTable({ transport }: { transport: PresidentTransport }) 
     botPaceMs,
   });
 
-  useEffect(() => {
-    if (snapshot.matchWinner === null || reportedMatch.current === transport) return;
-    if (!snapshot.session.result) return;
-    reportedMatch.current = transport;
-    recordResult({ won: snapshot.matchWinner === 0, blitzes: 0, knocks: 0, knockWins: 0 });
-    const id = crypto.randomUUID();
-    const seats = snapshot.players.map((player) => ({
-      seat: player.seat,
-      name: player.name,
-      avatarId: player.avatarId,
-      kind: player.isBot ? ('bot' as const) : ('friend' as const),
-      key: player.isBot ? botKey(player.name.toLowerCase()) : friendKey('local-president-player'),
-    }));
-    const record = buildMatchRecord({
-      id,
-      at: Date.now(),
-      game: 'president',
-      mode: snapshot.mode,
-      result: snapshot.session.result,
-      localSeat: 0,
-      seats,
-    });
-    if (record) recordMatch(record);
-    setLastMatch({
-      id,
-      result: snapshot.session.result,
-      seats,
-      game: 'president',
-      mode: snapshot.mode,
-      localSeat: 0,
-    });
-    registerPlayAgain(() => router.push('/president/table'));
-    const timer = window.setTimeout(() => router.push('/match-end'), 1400);
-    return () => window.clearTimeout(timer);
-  }, [recordMatch, recordResult, registerPlayAgain, router, setLastMatch, snapshot, transport]);
+  useMatchReport({
+    result: snapshot.matchWinner === null ? null : (snapshot.session.result ?? null),
+    game: 'president',
+    mode: snapshot.mode,
+    localSeat: 0,
+    seats: soloSeats(snapshot.players),
+    id: `solo:president:${snapshot.session.seed}`,
+    won: snapshot.matchWinner === 0,
+    playAgain: () => router.push('/president/table'),
+  });
 
   const actingLocally =
     snapshot.session.status === 'playing' &&

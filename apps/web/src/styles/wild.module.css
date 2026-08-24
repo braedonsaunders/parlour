@@ -624,7 +624,9 @@
   gap: 0.5rem;
 }
 
-.challengeButton {
+/* Doubled for the same reason as .lastCardButton below: it overrides the
+   global `btn-fat` background at equal specificity. */
+.challengeButton.challengeButton {
   background: linear-gradient(180deg, #d67ba0, #8c2e64);
   border-color: rgba(255, 226, 240, 0.75);
 }
@@ -653,10 +655,51 @@
   pointer-events: none;
 }
 
-.lastCardButton {
+/* Doubled class on purpose: these sit on top of the global `btn-fat`, which
+   declares its own amber background at the same specificity, so which one wins
+   would otherwise come down to the order the style chunks happen to load in.
+   The call to protect your last card is green — that is the design, not a
+   coin toss. */
+.lastCardButton.lastCardButton {
   background: linear-gradient(180deg, #6fc98d, #357a54);
   border-color: rgba(220, 255, 232, 0.75);
   animation: lastCardPulse 0.9s ease-in-out infinite;
+}
+
+/**
+ * Calling your last card is a decision, not a corner control.
+ *
+ * The shared rail is pinned bottom-right, which on a desktop table is empty
+ * felt but on a phone is the worst square inch of the screen: the fanned hand
+ * spans the full width and reaches the bottom edge, so the call lands on top of
+ * your own cards, under your thumb, a few pixels above the home indicator. It
+ * is a one-turn window and missing it costs you the catch penalty, so on
+ * portrait it moves up beside the jump-in and challenge prompts — the place
+ * this table already asks its questions — and gets a hit target to match.
+ */
+.actionRail.actionRail {
+  z-index: 32;
+}
+
+@media (orientation: portrait) {
+  .actionRail.actionRail {
+    right: auto;
+    left: 50%;
+    bottom: 27%;
+    justify-content: center;
+    transform: translateX(-50%);
+    gap: 0.6rem;
+  }
+  .actionRail.actionRail button {
+    min-height: 3.15rem;
+    padding: 0.8rem 1.5rem;
+    border-radius: 1rem;
+    font-size: 1rem;
+  }
+  .actionRail.actionRail .lastCardArmed {
+    padding: 0.8rem 1.2rem;
+    font-size: 0.86rem;
+  }
 }
 
 .lastCardArmed {
@@ -789,12 +832,24 @@
   stroke: rgba(255, 246, 228, 0.16);
 }
 
+/* The sweep is a straight line from full to empty over a known duration, so it
+   is a CSS animation rather than a ten-times-a-second React render. */
 .turnClockProgress {
   stroke: var(--turn-clock-color);
   stroke-linecap: round;
   stroke-dasharray: 1;
-  transition: stroke-dashoffset 100ms linear;
+  stroke-dashoffset: 0;
+  animation: turnClockSweep var(--turn-duration, 15000ms) linear forwards;
   filter: drop-shadow(0 0 3px var(--turn-clock-color));
+}
+
+@keyframes turnClockSweep {
+  from {
+    stroke-dashoffset: 0;
+  }
+  to {
+    stroke-dashoffset: 1;
+  }
 }
 
 .turnClock span {
@@ -855,7 +910,7 @@
   }
 
   .turnClockProgress {
-    transition: none;
+    animation: none;
   }
 }
 

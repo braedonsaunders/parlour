@@ -6,7 +6,17 @@ import gameStyles from '@/styles/games.module.css';
 import modeStyles from '@/styles/modes.module.css';
 import EuchreSetupPage from './page';
 
-vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }));
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push: vi.fn() }),
+  usePathname: () => '/euchre',
+}));
+
+// The table wipe is presentational and holds the navigation for its own beat;
+// these tests are about where the buttons go. `runTableWipe.test.ts` owns the
+// timing.
+vi.mock('@/lib/transitions/runTableWipe', () => ({
+  runTableWipe: (nav: () => void) => nav(),
+}));
 
 describe('Euchre setup page', () => {
   let container: HTMLDivElement;

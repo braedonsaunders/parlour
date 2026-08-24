@@ -61,6 +61,13 @@ export function useFxAnimation(
     const bounds = root.getBoundingClientRect();
     const context = gsap.context(() => {
       const timeline = gsap.timeline();
+      // Planning a cue measures the table (bounding boxes, computed transforms,
+      // fan geometry). Writing a custom property back to an element in the same
+      // pass invalidates layout, so the next cue's measurement forces a fresh
+      // one — a stacked pickup or a discard-all sweep turned into a dozen
+      // synchronous layouts. The writes are collected and flushed once, after
+      // every cue has been measured.
+      const angleWrites: Array<[HTMLElement, string]> = [];
       for (const cue of cues) {
         const element = root.querySelector<HTMLElement>(`[data-fx-cue="${cue.id}"]`);
         if (!element) continue;
@@ -115,7 +122,7 @@ export function useFxAnimation(
                   ? discardRotation(cue.card, 0)
                   : direction * 2;
           const landingScale = to.scale ?? 1;
-          element.style.setProperty('--flight-angle', `${Math.atan2(dy, dx)}rad`);
+          angleWrites.push([element, `${Math.atan2(dy, dx)}rad`]);
           timeline
             .set(element, { x: from.x, y: from.y, autoAlpha: 1 }, start)
             .set(
@@ -286,6 +293,9 @@ export function useFxAnimation(
               start + cue.durationMs / 1000 - 0.2,
             );
         }
+      }
+      for (const [element, angle] of angleWrites) {
+        element.style.setProperty('--flight-angle', angle);
       }
     }, root);
     return () => context.revert();

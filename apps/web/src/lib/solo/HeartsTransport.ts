@@ -19,6 +19,7 @@ import {
 import type { HeartsModeId } from '@/lib/hearts/modes';
 import type { BotTier } from '@/stores/setup';
 import { adaptMatchApply, SoloAuthority, type SoloDispatch } from './SoloAuthority';
+import { localSeat } from './seating';
 
 /** House opponents — personas map onto the shared avatar cast. */
 const SEAT_PERSONAS = ['rose', 'flint', 'dove'] as const;
@@ -189,12 +190,7 @@ export class HeartsTransport {
 
   private players(): HeartsPlayer[] {
     return [
-      {
-        seat: 0,
-        name: this.options.player.name.trim() || 'You',
-        avatarId: this.options.player.avatarId,
-        isBot: false,
-      },
+      localSeat(this.options.player),
       ...SEAT_PERSONAS.map((personaId, index) => {
         const persona = heartsPersona(personaId);
         return {

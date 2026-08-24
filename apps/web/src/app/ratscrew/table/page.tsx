@@ -1,35 +1,31 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { useWipeRouter } from '@/hooks/useWipeRouter';
 import type { FxEvent } from '@parlour/engine';
 import { RatscrewTableScreen } from '@/components/table/ratscrew/RatscrewTableScreen';
 import { RatscrewTransport, type RatscrewSnapshot } from '@/lib/solo/RatscrewTransport';
 import { SLAP_GRACE_MS } from '@parlour/game-ratscrew';
 import { ratscrewModeForRules } from '@/lib/ratscrew/modes';
 import { ratscrewTableView } from '@/lib/ratscrew/view';
-import { botKey, buildMatchRecord, friendKey, useHistoryStore } from '@/stores/history';
-import { useMatchFlowStore } from '@/stores/matchFlow';
+import {
+  leaveRoom,
+  roomMatchId,
+  roomSeats,
+  soloSeats,
+  useMatchReport,
+  useMultiplayerRoom,
+  useRoomDispatch,
+  useSoloTransport,
+} from '@/lib/table/useGameTable';
 import { useProfileStore } from '@/stores/profile';
 import { useRatscrewSetupStore, ratscrewRulesFor } from '@/stores/ratscrewSetup';
-import {
-  clearActiveMultiplayerSession,
-  getActiveMultiplayerSession,
-  multiplayerSession,
-  subscribeActiveMultiplayerSession,
-  type MultiplayerRoomSession,
-} from '../../_multiplayer/roomSession';
+import { multiplayerSession, type MultiplayerRoomSession } from '../../_multiplayer/roomSession';
 import type { RatscrewConfig, RatscrewState } from '@parlour/game-ratscrew';
 
 export default function RatscrewTablePage() {
-  const multiplayer = useSyncExternalStore(
-    subscribeActiveMultiplayerSession,
-    getActiveMultiplayerSession,
-    () => null,
-  );
-  if (multiplayer?.getSnapshot().gameId === 'ratscrew') {
-    return <ActiveMultiplayerRatscrewTable room={multiplayer} />;
-  }
+  const room = useMultiplayerRoom('ratscrew');
+  if (room) return <ActiveMultiplayerRatscrewTable room={room} />;
   return <SoloRatscrewTablePage />;
 }
 
@@ -40,29 +36,23 @@ function SoloRatscrewTablePage() {
   const botTier = useRatscrewSetupStore((state) => state.botTier);
   const name = useProfileStore((state) => state.name);
   const avatarId = useProfileStore((state) => state.avatarId);
-  const [transport, setTransport] = useState<RatscrewTransport | null>(null);
   const rules = ratscrewRulesFor(mode, overrides);
   const rulesKey = JSON.stringify(rules);
 
-  useEffect(() => {
-    let active: RatscrewTransport | null = null;
-    const timer = window.setTimeout(() => {
-      active = new RatscrewTransport({
+  const transport = useSoloTransport(
+    () =>
+      new RatscrewTransport({
         seats,
         seed: Date.now() | 0,
         rules: JSON.parse(rulesKey) as typeof rules,
         player: { name, avatarId },
         botTier,
-      });
-      setTransport(active);
-    }, 0);
-    return () => {
-      window.clearTimeout(timer);
-      active?.dispose();
-    };
+      }),
     // rulesKey stands in for the rules object so a fresh identity per render
     // does not re-deal the table.
-  }, [avatarId, botTier, name, seats, rulesKey]);
+    [avatarId, botTier, name, rulesKey, seats],
+    (built) => built.dispose(),
+  );
 
   if (!transport) return <RatscrewTableScreen view={null} fx={[]} fxKey="loading" />;
   return <LiveRatscrewTable transport={transport} />;
@@ -70,17 +60,12 @@ function SoloRatscrewTablePage() {
 
 /** Drives the UI off the transport's real-time notifications. */
 function LiveRatscrewTable({ transport }: { transport: RatscrewTransport }) {
-  const router = useRouter();
-  const setLastMatch = useMatchFlowStore((state) => state.setLastMatch);
-  const registerPlayAgain = useMatchFlowStore((state) => state.registerPlayAgain);
-  const recordResult = useProfileStore((state) => state.recordResult);
-  const recordMatch = useHistoryStore((state) => state.recordMatch);
+  const router = useWipeRouter();
   const [, setTick] = useState(0);
   const [fx, setFx] = useState<readonly FxEvent[]>(
     () => transport.getSnapshot().session.setupFx ?? [],
   );
   const [fxKey, setFxKey] = useState(0);
-  const reportedRef = useRef(false);
 
   useEffect(() => {
     const unsubscribe = transport.subscribe(() => {
@@ -96,45 +81,16 @@ function LiveRatscrewTable({ transport }: { transport: RatscrewTransport }) {
 
   const snapshot = transport.getSnapshot();
 
-  const reportAndLeave = useCallback(() => {
-    if (reportedRef.current || !snapshot.session.result) return;
-    reportedRef.current = true;
-    recordResult({ won: snapshot.matchWinner === 0, blitzes: 0, knocks: 0, knockWins: 0 });
-    const id = crypto.randomUUID();
-    const seats = snapshot.players.map((player) => ({
-      seat: player.seat,
-      name: player.name,
-      avatarId: player.avatarId,
-      kind: player.isBot ? ('bot' as const) : ('friend' as const),
-      key: player.isBot ? botKey(player.avatarId) : friendKey('local-ratscrew-player'),
-    }));
-    const record = buildMatchRecord({
-      id,
-      at: Date.now(),
-      game: 'ratscrew',
-      mode: ratscrewModeForRules(snapshot.session.config),
-      result: snapshot.session.result,
-      localSeat: 0,
-      seats,
-    });
-    if (record) recordMatch(record);
-    setLastMatch({
-      id,
-      result: snapshot.session.result,
-      seats,
-      game: 'ratscrew',
-      mode: ratscrewModeForRules(snapshot.session.config),
-      localSeat: 0,
-    });
-    registerPlayAgain(() => router.push('/ratscrew/table'));
-    const timer = window.setTimeout(() => router.push('/match-end'), 900);
-    return () => window.clearTimeout(timer);
-  }, [recordMatch, recordResult, registerPlayAgain, router, setLastMatch, snapshot]);
-
-  useEffect(() => {
-    const cleanup = reportAndLeave();
-    return cleanup;
-  }, [reportAndLeave]);
+  useMatchReport({
+    result: snapshot.matchWinner === null ? null : (snapshot.session.result ?? null),
+    game: 'ratscrew',
+    mode: ratscrewModeForRules(snapshot.session.config),
+    localSeat: 0,
+    seats: soloSeats(snapshot.players),
+    id: `solo:ratscrew:${snapshot.session.seed}`,
+    won: snapshot.matchWinner === 0,
+    playAgain: () => router.push('/ratscrew/table'),
+  });
 
   const view = ratscrewTableView(snapshot, transport.legalMoves());
 
@@ -161,30 +117,15 @@ function LiveRatscrewTable({ transport }: { transport: RatscrewTransport }) {
  * dead race always resumes play (mirroring solo behavior bit-for-bit).
  */
 function ActiveMultiplayerRatscrewTable({ room }: { room: MultiplayerRoomSession }) {
-  const router = useRouter();
-  const setLastMatch = useMatchFlowStore((state) => state.setLastMatch);
-  const registerPlayAgain = useMatchFlowStore((state) => state.registerPlayAgain);
-  const recordResult = useProfileStore((state) => state.recordResult);
-  const recordMatch = useHistoryStore((state) => state.recordMatch);
+  const router = useWipeRouter();
   const snapshot = useSyncExternalStore(room.subscribe, room.getSnapshot, room.getSnapshot);
-  const reportedMatch = useRef(false);
   const armedClose = useRef<string | null>(null);
   const closeTimer = useRef<number | null>(null);
-  const [localError, setLocalError] = useState<string | null>(null);
   const session = multiplayerSession<RatscrewState, RatscrewConfig>(snapshot, 'ratscrew');
   const localSeat = snapshot.localSeat;
+  const roomMode = session ? ratscrewModeForRules(session.config) : 'classic';
 
-  const dispatch = useCallback(
-    (move: string, payload?: unknown) => {
-      try {
-        room.send(move, payload);
-        setLocalError(null);
-      } catch (error) {
-        setLocalError(error instanceof Error ? error.message : 'The move could not be sent.');
-      }
-    },
-    [room],
-  );
+  const { dispatch, error: localError } = useRoomDispatch(room);
 
   // Host duty: keep slap windows honest by injecting the authoritative close.
   useEffect(() => {
@@ -211,60 +152,16 @@ function ActiveMultiplayerRatscrewTable({ room }: { room: MultiplayerRoomSession
     };
   }, [room, session, snapshot.isHost]);
 
-  useEffect(() => {
-    if (!session?.result || localSeat === null || reportedMatch.current) return;
-    reportedMatch.current = true;
-    const mode = ratscrewModeForRules(session.config);
-    const id = `multiplayer:${snapshot.room?.code ?? 'room'}:${session.seed}:${
-      session.lastAppliedHash ?? session.log.length
-    }`;
-    recordResult({ won: session.result.winner === localSeat, blitzes: 0, knocks: 0, knockWins: 0 });
-    const seats = snapshot.seats.map((seat) => ({
-      seat: seat.seat,
-      name: seat.name,
-      avatarId: seat.avatarId,
-      kind: 'friend' as const,
-      key: friendKey(seat.profileId),
-    }));
-    const record = buildMatchRecord({
-      id,
-      at: Date.now(),
-      game: 'ratscrew',
-      mode,
-      result: session.result,
-      localSeat,
-      seats,
-    });
-    if (record) recordMatch(record);
-    setLastMatch({
-      id,
-      result: session.result,
-      seats,
-      game: 'ratscrew',
-      mode,
-      localSeat,
-    });
-    registerPlayAgain(() => {
-      router.push('/ratscrew/create');
-    });
-    const timer = window.setTimeout(() => {
-      room.close();
-      clearActiveMultiplayerSession();
-      router.push('/match-end');
-    }, 900);
-    return () => window.clearTimeout(timer);
-  }, [
+  useMatchReport({
+    result: session?.result ?? null,
+    game: 'ratscrew',
+    mode: roomMode,
     localSeat,
-    recordMatch,
-    recordResult,
-    registerPlayAgain,
-    room,
-    router,
-    session,
-    setLastMatch,
-    snapshot.room?.code,
-    snapshot.seats,
-  ]);
+    seats: roomSeats(snapshot.seats),
+    id: session ? roomMatchId(snapshot.room?.code, session) : '',
+    playAgain: () => router.push('/ratscrew/create'),
+    onLeave: () => leaveRoom(room),
+  });
 
   if (!session || localSeat === null) {
     return (
@@ -305,8 +202,7 @@ function ActiveMultiplayerRatscrewTable({ room }: { room: MultiplayerRoomSession
       onFlip={() => dispatch('flip')}
       onSlap={() => dispatch('slap')}
       onQuit={() => {
-        room.close();
-        clearActiveMultiplayerSession();
+        leaveRoom(room);
         router.push('/ratscrew');
       }}
     />

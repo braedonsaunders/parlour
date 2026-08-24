@@ -113,6 +113,31 @@ function foldRound<S, C extends RuleValues, MS>(
   };
 }
 
+/**
+ * Opens round `roundIndex` as a fresh, ordinary `GameSession`.
+ *
+ * ## A match cannot be veiled, and that is structural
+ *
+ * This deliberately passes no `veiled`/`deckOrder`. A veiled round needs a deck
+ * order produced by a shuffle ceremony that runs in the *transport* (see
+ * apps/web/src/lib/multiplayer/veil), and the match layer is pure engine code
+ * with no way to pause, run a multi-party protocol, and resume. Because
+ * `createSession` throws when `veiled` is set without an order, a `MatchDef` is
+ * structurally incapable of running under Veil — silently, because nothing here
+ * ever asks for one.
+ *
+ * The consequence is worth naming, because reading the engine's Veil support
+ * alone leads to the opposite conclusion: **Veil covers single-deal games
+ * only.** Wild, Rat Screw and a one-round Blitz can be veiled. Gin, Cribbage,
+ * Hearts and Spades cannot, because their friend rooms are match-shaped. The
+ * room layer refuses those combinations by name rather than downgrading them
+ * quietly — see `veilRefusal` in apps/web/src/lib/rooms/gameRegistry.ts.
+ *
+ * Lifting the ceiling means giving `MatchDef` a way to request a deck order for
+ * round N and suspend until the transport supplies one: an async seam this
+ * layer does not have, and should not grow casually, because every round would
+ * then be able to block on the network.
+ */
 function openRound<S, C extends RuleValues, MS>(
   session: MatchSession<S, C, MS>,
   roundIndex: number,

@@ -90,6 +90,30 @@ export function KlondikeTableScreen(props: KlondikeTableScreenProps) {
       };
     });
   };
+  /*
+   * The card the stock just turned up.
+   *
+   * Keyed by move number so it clears itself the moment anything else happens:
+   * a fresh card is only "fresh" until the player does the next thing, and the
+   * flag must never survive an undo or a restart.
+   */
+  const wasteTop = view?.waste.at(-1) ?? null;
+  const [drawn, setDrawn] = useState<{ move: number; card: string | null }>({
+    move: moveNo,
+    card: null,
+  });
+  const previousWaste = useRef<{ move: number; card: string | null }>({
+    move: moveNo,
+    card: wasteTop,
+  });
+  useEffect(() => {
+    const before = previousWaste.current;
+    previousWaste.current = { move: moveNo, card: wasteTop };
+    if (moveNo === before.move || wasteTop === null || wasteTop === before.card) return;
+    setDrawn({ move: moveNo, card: wasteTop });
+  }, [moveNo, wasteTop]);
+  const justDrawn = drawn.move === moveNo ? drawn.card : null;
+
   const [hintMove, setHintMove] = useState<number | null>(null);
   const showHint = hintMove === moveNo;
   const setShowHint = (visible: boolean) => setHintMove(visible ? moveNo : null);
@@ -140,6 +164,7 @@ export function KlondikeTableScreen(props: KlondikeTableScreenProps) {
       reducedMotion={reducedMotion}
       selection={selection}
       setSelection={setSelection}
+      justDrawn={justDrawn}
       showHint={showHint}
       setShowHint={setShowHint}
     />
@@ -162,6 +187,7 @@ function ReadyKlondikeTable({
   reducedMotion,
   selection,
   setSelection,
+  justDrawn,
   showHint,
   setShowHint,
 }: KlondikeTableScreenProps & {
@@ -170,6 +196,8 @@ function ReadyKlondikeTable({
   reducedMotion: boolean;
   selection: KlondikeSelection | null;
   setSelection: Dispatch<SetStateAction<KlondikeSelection | null>>;
+  /** The card the stock just turned up, called out until the next move. */
+  justDrawn: string | null;
   showHint: boolean;
   setShowHint: (visible: boolean) => void;
 }) {
@@ -227,7 +255,12 @@ function ReadyKlondikeTable({
       </TableHud>
 
       <TablePlayfield label="Klondike table" feltMark="K" className={styles.playfield}>
-        <div className={styles.board} data-testid="klondike-board" aria-busy={deal.dealing}>
+        <div
+          className={styles.board}
+          data-testid="klondike-board"
+          data-holding={selection ? '' : undefined}
+          aria-busy={deal.dealing}
+        >
           <div className={styles.topRow}>
             <div className={styles.stockWaste}>
               <PileLabel label={`Stock · ${view.stockCount}`}>
@@ -259,12 +292,16 @@ function ReadyKlondikeTable({
                   className={styles.pileButton}
                   data-zone="waste"
                   data-zone-face
+                  data-holds-selection={selection?.from === 'waste' || undefined}
                   data-hint={hintSource === 'waste' || hintTarget === 'waste' || undefined}
                 >
                   {view.waste.at(-1) ? (
                     <div
                       data-card={view.waste.at(-1)}
                       data-selected={selection?.from === 'waste' || undefined}
+                      data-just-drawn={
+                        justDrawn !== null && justDrawn === view.waste.at(-1) ? '' : undefined
+                      }
                       data-hint={hintSource === 'waste' || undefined}
                     >
                       <PlayingCard
@@ -327,6 +364,7 @@ function ReadyKlondikeTable({
                       data-zone={zone}
                       data-zone-face
                       data-legal-target={legalTarget || undefined}
+                      data-holds-selection={selection?.from === zone || undefined}
                       data-hint={hintTarget === zone || hintSource === zone || undefined}
                     >
                       {top ? (
@@ -545,6 +583,9 @@ function TableauColumn({
               data-card={card}
               data-zone-face={cardIndex === up.length - 1 || undefined}
               data-selected={(selection?.from === zone && selection.card === card) || undefined}
+              data-in-selected-run={
+                selection?.from === zone && up.indexOf(selection.card) <= cardIndex ? '' : undefined
+              }
               style={{ ['--card-row' as string]: visibleDown, ['--face-row' as string]: cardIndex }}
             >
               <PlayingCard

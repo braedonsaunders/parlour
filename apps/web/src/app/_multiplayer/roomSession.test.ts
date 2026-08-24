@@ -6,9 +6,8 @@ import {
   makeRng,
   stateHash,
 } from '@parlour/engine';
-import { createBlitzDef, type BlitzConfig, type BlitzState } from '@parlour/game-blitz';
+import { type BlitzConfig, type BlitzState } from '@parlour/game-blitz';
 import {
-  createCribbageDef,
   cribbageConfigSchema,
   type CribbageConfig,
   type CribbageState,
@@ -21,20 +20,17 @@ import {
   type EuchreState,
 } from '@parlour/game-euchre';
 import {
-  createGinMatchDef,
   ginConfigSchema,
   type GinConfig,
   type GinMatchState,
 } from '@parlour/game-gin';
 import {
   presidentConfig,
-  presidentGame,
   type PresidentRules,
   type PresidentState,
 } from '@parlour/game-president';
 import {
   ratscrewConfigSchema,
-  ratscrewGame,
   type RatscrewConfig,
   type RatscrewState,
 } from '@parlour/game-ratscrew';
@@ -44,11 +40,9 @@ import {
   type SpadesRules,
   type SpadesState,
 } from '@parlour/game-spades';
-import { heartsGame } from '@parlour/game-hearts';
 import { spadesModeForRules } from '@/lib/spades/modes';
 import {
   wildpileConfig,
-  wildpileGame,
   type WildpileRules,
   type WildpileState,
 } from '@parlour/game-wildpile';
@@ -56,6 +50,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { EngineAuthority } from '@/lib/multiplayer';
 import { NostrSignaling, type SignalPayload } from '@/lib/multiplayer/NostrSignaling';
 import type { RoomSettings } from '@/lib/multiplayer/types';
+import { MULTIPLAYER_GAME_IDS, ROOM_GAMES } from '@/lib/rooms/gameRegistry';
 import { multiplayerSession, MultiplayerRoomSession } from './roomSession';
 
 type SignalHandler = (sender: string, signal: SignalPayload) => void;
@@ -309,19 +304,12 @@ describe('multiplayer route composition', () => {
    * different path.
    */
   it('runs every room game veiled, with none left in the open tier', () => {
-    const packs = {
-      blitz: createBlitzDef(),
-      cribbage: createCribbageDef(),
-      wildpile: wildpileGame,
-      ratscrew: ratscrewGame,
-      euchre: createEuchreDef(),
-      hearts: heartsGame,
-      gin: createGinMatchDef(),
-      president: presidentGame,
-      spades: createSpadesDef(),
-    };
-    for (const [gameId, def] of Object.entries(packs)) {
-      expect(def.veil, `${gameId} should ship a veil block`).toBeDefined();
+    // Read off the registry rather than a list kept here, so game eleven is
+    // covered the day it is added instead of the day somebody remembers.
+    for (const gameId of MULTIPLAYER_GAME_IDS) {
+      const pack = ROOM_GAMES[gameId];
+      expect(pack.veilSupport(), `${gameId} should ship a veil block`).not.toBeNull();
+      expect(pack.veilRefusal, `${gameId} should not refuse Veil`).toBeNull();
     }
   });
 
@@ -344,7 +332,11 @@ describe('multiplayer route composition', () => {
     );
     const guest = new MultiplayerRoomSession(
       { name: 'Guest', avatarId: 'cobalt', profileId: 'seed-guest' },
-      { signaling: broker.signaling('seed-guest-peer'), peerConnection: rtc.factory('seed-guest'), seed: 7 },
+      {
+        signaling: broker.signaling('seed-guest-peer'),
+        peerConnection: rtc.factory('seed-guest'),
+        seed: 7,
+      },
     );
     sessions.push(host, guest);
 
@@ -371,11 +363,19 @@ describe('multiplayer route composition', () => {
     const rtc = new MockRtcNetwork();
     const host = new MultiplayerRoomSession(
       { name: 'Host', avatarId: 'ember', profileId: 'stage-host' },
-      { signaling: broker.signaling('stage-host-peer'), peerConnection: rtc.factory('stage-host'), seed: 42 },
+      {
+        signaling: broker.signaling('stage-host-peer'),
+        peerConnection: rtc.factory('stage-host'),
+        seed: 42,
+      },
     );
     const guest = new MultiplayerRoomSession(
       { name: 'Guest', avatarId: 'cobalt', profileId: 'stage-guest' },
-      { signaling: broker.signaling('stage-guest-peer'), peerConnection: rtc.factory('stage-guest'), seed: 7 },
+      {
+        signaling: broker.signaling('stage-guest-peer'),
+        peerConnection: rtc.factory('stage-guest'),
+        seed: 7,
+      },
     );
     sessions.push(host, guest);
 
@@ -1170,7 +1170,7 @@ describe('multiplayer route composition', () => {
     sessions.push(host);
 
     await expect(host.create({ gameId: 'cribbage', seats: 3 })).rejects.toThrow(
-      'Cribbage rooms require exactly two seats',
+      'Cribbage rooms seat exactly 2.',
     );
   });
 });
@@ -1292,10 +1292,16 @@ describe('president rooms on the shared stack', () => {
       { signaling: broker.signaling('cap-peer'), peerConnection: rtc.factory('host'), seed: 1 },
     );
     sessions.push(host);
-    await expect(host.create({ gameId: 'president', seats: 3 })).rejects.toThrow(/4–8 seats/);
-    await expect(host.create({ gameId: 'president', seats: 9 })).rejects.toThrow(/4–8 seats/);
+    await expect(host.create({ gameId: 'president', seats: 3 })).rejects.toThrow(
+      /President rooms seat 4–8/,
+    );
+    await expect(host.create({ gameId: 'president', seats: 9 })).rejects.toThrow(
+      /President rooms seat 4–8/,
+    );
     // blitz keeps its own 2–4 ring
-    await expect(host.create({ gameId: 'blitz', seats: 6 })).rejects.toThrow(/2–4 seats/);
+    await expect(host.create({ gameId: 'blitz', seats: 6 })).rejects.toThrow(
+      /Blitz rooms seat 2–4/,
+    );
   });
 });
 
@@ -1406,9 +1412,15 @@ describe('spades rooms on the shared stack', () => {
       { seed: 2 },
     );
     sessions.push(host);
-    await expect(host.create({ gameId: 'spades', seats: 3 })).rejects.toThrow(/4–4 seats/);
-    await expect(host.create({ gameId: 'spades', seats: 5 })).rejects.toThrow(/4–4 seats/);
-    await expect(host.create({ gameId: 'spades', seats: 2 })).rejects.toThrow(/4–4 seats/);
+    await expect(host.create({ gameId: 'spades', seats: 3 })).rejects.toThrow(
+      /Spades rooms seat exactly 4/,
+    );
+    await expect(host.create({ gameId: 'spades', seats: 5 })).rejects.toThrow(
+      /Spades rooms seat exactly 4/,
+    );
+    await expect(host.create({ gameId: 'spades', seats: 2 })).rejects.toThrow(
+      /Spades rooms seat exactly 4/,
+    );
   });
 
   // Engine v1 Veil is gone. Saying so out loud beats quietly downgrading a

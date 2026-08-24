@@ -2,6 +2,7 @@ import { applyPreset, createSession, type GameSession, type LegalMove } from '@p
 import { createEuchreDef, tierBot, type EuchreRules, type EuchreState } from '@parlour/game-euchre';
 import type { EuchreModeId } from '@/lib/euchre/modes';
 import { adaptSessionApply, SoloAuthority, type SoloDispatch } from './SoloAuthority';
+import { houseSeats, winningTeamOf } from './seating';
 
 /** House partners and opponents sit in table order around seat 0. */
 const EUCHRE_CAST = [
@@ -60,9 +61,9 @@ export class EuchreTransport {
       {
         snapshot: (live): EuchreSnapshot => ({
           mode: options.mode,
-          players: this.players(),
+          players: houseSeats(options.player, EUCHRE_CAST),
           session: live,
-          matchWinnerTeam: matchWinnerTeamOf(live),
+          matchWinnerTeam: winningTeamOf(live),
         }),
         apply: adaptSessionApply(this.def),
         isPlaying: (live) => live.status === 'playing',
@@ -103,23 +104,6 @@ export class EuchreTransport {
   playBotsUntilHuman(): EuchreDispatch[] {
     return this.authority.playBotsUntilHuman();
   }
-
-  private players(): EuchreSoloPlayer[] {
-    return [
-      {
-        seat: 0,
-        name: this.options.player.name.trim() || 'You',
-        avatarId: this.options.player.avatarId,
-        isBot: false,
-      },
-      ...EUCHRE_CAST.map((cast, index) => ({
-        seat: index + 1,
-        name: cast.name,
-        avatarId: cast.avatarId,
-        isBot: true,
-      })),
-    ];
-  }
 }
 
 const MODE_PRESETS: Record<EuchreModeId, string> = {
@@ -131,10 +115,4 @@ const MODE_PRESETS: Record<EuchreModeId, string> = {
 
 function presetForMode(mode: EuchreModeId): string {
   return MODE_PRESETS[mode];
-}
-
-function matchWinnerTeamOf(session: GameSession<EuchreState, EuchreRules>): 0 | 1 | null {
-  if (session.result === null) return null;
-  const rankOne = session.result.rankings.find((rank) => rank.rank === 1);
-  return rankOne ? ((rankOne.seat % 2) as 0 | 1) : null;
 }
