@@ -32,3 +32,6 @@ output/
 portrait.png
 scripts/shots*.mjs
 output/playwright/
+
+# Claude Code worktrees and scratch state — never part of the repo.
+.claude/

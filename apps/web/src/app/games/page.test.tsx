@@ -2,6 +2,11 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import GameSelectPage from './page';
+import { GAMES } from '@/lib/games';
+
+// Read from the registry rather than a literal: shipping a game should not
+// mean editing a count in a test that is not about counting.
+const SHELF_SIZE = GAMES.length;
 
 const router = vi.hoisted(() => ({ push: vi.fn() }));
 
@@ -45,8 +50,8 @@ describe('game library', () => {
 
     expect(input?.type).toBe('search');
     expect(container.querySelector('label[for="game-search"]')?.textContent).toBe('Search games');
-    expect(gameTiles()).toHaveLength(10);
-    expect(container.textContent).toContain('10 games ready to play');
+    expect(gameTiles()).toHaveLength(SHELF_SIZE);
+    expect(container.textContent).toContain(`${SHELF_SIZE} games ready to play`);
   });
 
   it('filters instantly across catalog metadata and keeps selection working', () => {
@@ -66,8 +71,8 @@ describe('game library', () => {
     const clear = container.querySelector<HTMLButtonElement>('[aria-label="Clear game search"]');
     act(() => clear?.click());
 
-    expect(gameTiles()).toHaveLength(10);
-    expect(container.textContent).toContain('10 games ready to play');
+    expect(gameTiles()).toHaveLength(SHELF_SIZE);
+    expect(container.textContent).toContain(`${SHELF_SIZE} games ready to play`);
   });
 
   it('offers a friendly recovery when no game matches', () => {
