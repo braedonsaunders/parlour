@@ -20,6 +20,8 @@ export function useSpadesFxAnimation(
   rootRef: RefObject<HTMLElement | null>,
   key: string | number,
   localSeat: number,
+  /** Profile-level calm motion; the OS media query is honoured either way. */
+  forceReduced = false,
 ) {
   const cues = useMemo(() => {
     try {
@@ -32,7 +34,25 @@ export function useSpadesFxAnimation(
   useEffect(() => {
     const root = rootRef.current;
     if (!root || cues.length === 0) return;
-    const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+    const reduced =
+      forceReduced || (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false);
+    if (reduced) {
+      // Calm motion has to mean no waiting, not merely no travel. Flashing each
+      // cue in place still held the timeline open for the cue's full duration —
+      // a hand-score sheet kept a reduced-motion player waiting 1.7s for a
+      // banner that never moved. Every one of these moments also has a
+      // permanent home on the table (seat bid chips, the broken-spades flag,
+      // the last-hand panel), so the honest answer is to skip the transient
+      // layer outright rather than stage a silent version of it.
+      const context = gsap.context(() => {
+        for (const cue of cues) {
+          const element = root.querySelector<HTMLElement>(`[data-fx-cue="${cue.id}"]`);
+          if (element) gsap.set(element, { autoAlpha: 0 });
+        }
+      }, root);
+      return () => context.revert();
+    }
+
     const bounds = root.getBoundingClientRect();
     const context = gsap.context(() => {
       const timeline = gsap.timeline();
@@ -40,12 +60,6 @@ export function useSpadesFxAnimation(
         const element = root.querySelector<HTMLElement>(`[data-fx-cue="${cue.id}"]`);
         if (!element) continue;
         const start = cue.startMs / 1000;
-        if (reduced) {
-          timeline
-            .set(element, { autoAlpha: 1 }, start)
-            .set(element, { autoAlpha: 0 }, start + Math.max(0.01, cue.durationMs / 1000));
-          continue;
-        }
 
         if (cue.type === 'bid') {
           const point = zonePoint(`seat:${cue.seat}` as never, root, bounds);
@@ -96,7 +110,7 @@ export function useSpadesFxAnimation(
       }
     }, root);
     return () => context.revert();
-  }, [cues, rootRef, key, localSeat]);
+  }, [cues, rootRef, key, localSeat, forceReduced]);
 
   return cues;
 }
@@ -107,13 +121,15 @@ export function SpadesFxLayer({
   fxKey,
   localSeat,
   rootRef,
+  reduced = false,
 }: {
   fx: readonly FxEvent[];
   fxKey: string | number;
   localSeat: number;
   rootRef: RefObject<HTMLElement | null>;
+  reduced?: boolean;
 }) {
-  const cues = useSpadesFxAnimation(fx, rootRef, fxKey, localSeat);
+  const cues = useSpadesFxAnimation(fx, rootRef, fxKey, localSeat, reduced);
   return (
     <div className={tableStyles.fxLayer} aria-live="polite">
       {cues.map((cue) => {
@@ -185,7 +201,7 @@ export function SpadesFxLayer({
               className={styles.fxSeatPop}
               style={{ '--pop-accent': '#c8566b' } as CSSProperties}
             >
-              −{cue.penalty} bags
+              bag penalty −{cue.penalty} points · {cue.bags} bag{cue.bags === 1 ? '' : 's'} left
             </div>
           );
         }

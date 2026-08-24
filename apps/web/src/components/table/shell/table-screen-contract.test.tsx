@@ -248,8 +248,8 @@ const SPADES_VIEW: SpadesTableView = {
   bags: [0, 0],
   targetScore: 500,
   teams: [
-    { team: 0, score: 0, bags: 0, contract: 6, tricks: 0, nilSeats: [], label: 'You & partner' },
-    { team: 1, score: 0, bags: 0, contract: 6, tricks: 0, nilSeats: [], label: 'Openers' },
+    { team: 0, score: 0, bags: 0, contract: 6, tricks: 0, nilTricks: 0, nilSeats: [], label: 'You & partner' },
+    { team: 1, score: 0, bags: 0, contract: 6, tricks: 0, nilTricks: 0, nilSeats: [], label: 'Openers' },
   ],
   handNo: 1,
   dealer: 3,

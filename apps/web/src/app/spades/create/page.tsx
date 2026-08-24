@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { RoomLobby } from '@/components/multiplayer/RoomLobby';
+import { SecurityBadge } from '@/components/multiplayer/TableSecurity';
 import { useProfileStore } from '@/stores/profile';
 import { useSpadesSetupStore } from '@/stores/spadesSetup';
 import {
@@ -102,9 +103,11 @@ function ActiveSpadesLobby({
           onStarted();
         }}
       />
+      <SecurityBadge security={snapshot.security} />
       <p className="max-w-xl text-center text-sm text-dusk-100/80">
-        You sit across from your partner. Share the code with three friends — empty chairs play as
-        bots until their owners reclaim them.
+        You sit across from your partner, and Spades needs all four seats filled — share the code
+        with three friends before starting. Spades rooms are open replay: every peer can see the
+        whole game state, so a modified client could read your hand.
       </p>
     </main>
   );

@@ -32,6 +32,7 @@ import {
   type SpadesRules,
   type SpadesState,
 } from '@parlour/game-spades';
+import { spadesModeForRules } from '@/lib/spades/modes';
 import { wildpileConfig, type WildpileRules, type WildpileState } from '@parlour/game-wildpile';
 import { afterEach, describe, expect, it } from 'vitest';
 import { EngineAuthority } from '@/lib/multiplayer';
@@ -1197,5 +1198,63 @@ describe('spades rooms on the shared stack', () => {
     expect(settings.security).toBe('open');
     expect(settings.seats).toBe(4);
     expect(settings.config).toMatchObject({ targetScore: 500, nil: true, bags: true });
+  });
+  it('resolves a Quick room back to the quick mode a rematch will reuse', async () => {
+    const host = new MultiplayerRoomSession(
+      { name: 'Host', avatarId: 'ember', profileId: 'spades-quick' },
+      {
+        signaling: new MockSignalingBroker().signaling('spades-quick-peer'),
+        peerConnection: new MockRtcNetwork().factory('host'),
+        seed: 21,
+      },
+    );
+    sessions.push(host);
+    await host.create({
+      gameId: 'spades',
+      seats: 4,
+      config: applyPreset(spadesConfig, 'quick'),
+    });
+    const session = multiplayerSession<SpadesState, SpadesRules>(host.getSnapshot(), 'spades')!;
+    // Play Again rebuilds the room from the setup store, so the mode has to be
+    // recoverable from the rules a guest actually played under.
+    expect(spadesModeForRules(session.config)).toBe('quick');
+    expect(session.config.targetScore).toBe(250);
+  });
+
+  it('resolves a Clean Books room back to clean-books', async () => {
+    const host = new MultiplayerRoomSession(
+      { name: 'Host', avatarId: 'ember', profileId: 'spades-clean' },
+      {
+        signaling: new MockSignalingBroker().signaling('spades-clean-peer'),
+        peerConnection: new MockRtcNetwork().factory('host'),
+        seed: 22,
+      },
+    );
+    sessions.push(host);
+    await host.create({
+      gameId: 'spades',
+      seats: 4,
+      config: applyPreset(spadesConfig, 'clean-books'),
+    });
+    const session = multiplayerSession<SpadesState, SpadesRules>(host.getSnapshot(), 'spades')!;
+    expect(spadesModeForRules(session.config)).toBe('clean-books');
+    expect(session.config.bags).toBe(false);
+  });
+
+  it('advertises an open room and never claims a veil tier', async () => {
+    const host = new MultiplayerRoomSession(
+      { name: 'Host', avatarId: 'ember', profileId: 'spades-badge' },
+      {
+        signaling: new MockSignalingBroker().signaling('spades-badge-peer'),
+        peerConnection: new MockRtcNetwork().factory('host'),
+        seed: 23,
+      },
+    );
+    sessions.push(host);
+    await host.create({ gameId: 'spades', seats: 4 });
+    const security = host.getSnapshot().security;
+    expect(security.tier).toBe('open');
+    // The badge copy the lobby renders must not imply hidden hands.
+    expect(`${security.label} ${security.detail}`.toLowerCase()).not.toContain('veil');
   });
 });

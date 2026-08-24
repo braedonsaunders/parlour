@@ -3,6 +3,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { spadesConfig } from '@parlour/game-spades';
+import { useProfileStore } from '@/stores/profile';
 import { SpadesTableScreen } from './SpadesTableScreen';
 import type { SpadesTableView } from '@/lib/spades/view';
 
@@ -32,8 +33,26 @@ function makeView(overrides: Partial<SpadesTableView> = {}): SpadesTableView {
     bags: [0, 0],
     targetScore: 500,
     teams: [
-      { team: 0, score: 0, bags: 0, contract: 0, tricks: 0, nilSeats: [], label: 'You & partner' },
-      { team: 1, score: 0, bags: 0, contract: 0, tricks: 0, nilSeats: [], label: 'Openers' },
+      {
+        team: 0,
+        score: 0,
+        bags: 0,
+        contract: 0,
+        tricks: 0,
+        nilTricks: 0,
+        nilSeats: [],
+        label: 'You & partner',
+      },
+      {
+        team: 1,
+        score: 0,
+        bags: 0,
+        contract: 0,
+        tricks: 0,
+        nilTricks: 0,
+        nilSeats: [],
+        label: 'Openers',
+      },
     ],
     handNo: 1,
     dealer: 3,
@@ -71,8 +90,26 @@ function playingView(overrides: Partial<SpadesTableView> = {}): SpadesTableView 
       bid: { seat: player.seat, tricks: 3, nil: false },
     })),
     teams: [
-      { team: 0, score: 0, bags: 0, contract: 6, tricks: 0, nilSeats: [], label: 'You & partner' },
-      { team: 1, score: 0, bags: 0, contract: 6, tricks: 0, nilSeats: [], label: 'Openers' },
+      {
+        team: 0,
+        score: 0,
+        bags: 0,
+        contract: 6,
+        tricks: 0,
+        nilTricks: 0,
+        nilSeats: [],
+        label: 'You & partner',
+      },
+      {
+        team: 1,
+        score: 0,
+        bags: 0,
+        contract: 6,
+        tricks: 0,
+        nilTricks: 0,
+        nilSeats: [],
+        label: 'Openers',
+      },
     ],
     ...overrides,
   });
@@ -84,26 +121,26 @@ function textSurface() {
   );
 }
 
+let container: HTMLDivElement;
+let root: Root;
+
+beforeEach(() => {
+  Object.defineProperty(window, 'matchMedia', {
+    configurable: true,
+    value: () => ({ matches: false }),
+  });
+  container = document.createElement('div');
+  document.body.append(container);
+  root = createRoot(container);
+});
+
+afterEach(() => {
+  act(() => root.unmount());
+  vi.useRealTimers();
+  container.remove();
+});
+
 describe('SpadesTableScreen', () => {
-  let container: HTMLDivElement;
-  let root: Root;
-
-  beforeEach(() => {
-    Object.defineProperty(window, 'matchMedia', {
-      configurable: true,
-      value: () => ({ matches: false }),
-    });
-    container = document.createElement('div');
-    document.body.append(container);
-    root = createRoot(container);
-  });
-
-  afterEach(() => {
-    act(() => root.unmount());
-    vi.useRealTimers();
-    container.remove();
-  });
-
   // --- bidding -------------------------------------------------------------
 
   it('offers every legal bid plus a distinct Nil action', () => {
@@ -314,6 +351,7 @@ describe('SpadesTableScreen', () => {
                 bags: 9,
                 contract: 6,
                 tricks: 4,
+                nilTricks: 0,
                 nilSeats: [],
                 label: 'You & partner',
               },
@@ -323,6 +361,7 @@ describe('SpadesTableScreen', () => {
                 bags: 2,
                 contract: 7,
                 tricks: 3,
+                nilTricks: 0,
                 nilSeats: [{ seat: 1, intact: true }],
                 label: 'Openers',
               },
@@ -556,5 +595,275 @@ describe('SpadesTableScreen', () => {
       (window as unknown as { render_game_to_text?: () => string }).render_game_to_text,
     ).toBeUndefined();
     root = createRoot(container);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// review fixups
+// ---------------------------------------------------------------------------
+
+const SUMMARY = {
+  handNo: 3,
+  dealer: 3,
+  bids: [
+    { seat: 0, tricks: 0, nil: true },
+    { seat: 1, tricks: 3, nil: false },
+    { seat: 2, tricks: 4, nil: false },
+    { seat: 3, tricks: 3, nil: false },
+  ],
+  tricksBySeat: [2, 4, 4, 3],
+  teams: [
+    {
+      team: 0 as const,
+      contract: 4,
+      nonNilTricks: 4,
+      nilTricks: 2,
+      made: true,
+      contractDelta: 40,
+      nilDelta: -100,
+      overtricks: 0,
+      bagsTaken: 2,
+      bagPenalty: 100,
+      delta: -160,
+      scoreAfter: 140,
+      bagsAfter: 1,
+    },
+    {
+      team: 1 as const,
+      contract: 6,
+      nonNilTricks: 7,
+      nilTricks: 0,
+      made: true,
+      contractDelta: 60,
+      nilDelta: 0,
+      overtricks: 1,
+      bagsTaken: 1,
+      bagPenalty: 0,
+      delta: 61,
+      scoreAfter: 261,
+      bagsAfter: 4,
+    },
+  ],
+};
+
+describe('SpadesTableScreen last-hand summary', () => {
+  it('keeps the previous hand readable after the table auto-deals, with no fx at all', () => {
+    // The open table deals the next hand immediately, so `fx` is empty by the
+    // time a player looks up. The summary must not depend on a 1.4s cue.
+    act(() =>
+      root.render(
+        createElement(SpadesTableScreen, {
+          view: makeView({ lastHand: SUMMARY as never, handNo: 4 }),
+          fx: [],
+          fxKey: 'after-deal',
+        }),
+      ),
+    );
+    const panel = container.querySelector('[data-testid="spades-last-hand"]')!;
+    expect(panel).not.toBeNull();
+    expect(panel.getAttribute('role')).toBe('status');
+    expect(panel.getAttribute('aria-label')).toContain('Hand 3');
+    expect(container.querySelectorAll('[data-testid="spades-last-hand-team"]')).toHaveLength(2);
+  });
+
+  it('shows the full breakdown: contract, nil, overtricks, bags, penalty, delta and total', () => {
+    act(() =>
+      root.render(
+        createElement(SpadesTableScreen, {
+          view: makeView({ lastHand: SUMMARY as never }),
+          fx: [],
+          fxKey: 'k',
+        }),
+      ),
+    );
+    const rows = container.querySelectorAll('[data-testid="spades-last-hand-team"]');
+    const us = rows[0]!.textContent ?? '';
+    expect(us).toContain('4/4');
+    expect(us).toContain('+40');
+    expect(us).toContain('-100');
+    expect(us).toContain('2 tricks taken');
+    expect(us).toContain('-160');
+    expect(us).toContain('140');
+    expect(us).toContain('2 this hand');
+    expect(us).toContain('1 on the card');
+    // A bag penalty must name itself as points, not read as "-100 bags".
+    const penalty = rows[0]!.querySelector('[data-testid="spades-bag-penalty"]')!;
+    expect(penalty.textContent).toContain('bag penalty');
+    // A typographic minus, matching the rest of the table's numerals.
+    expect(penalty.textContent).toContain('\u2212100 points');
+    expect(penalty.textContent).not.toContain('bags');
+
+    const them = rows[1]!.textContent ?? '';
+    expect(them).toContain('7/6');
+    expect(them).toContain('+61');
+    expect(them).toContain('261');
+  });
+
+  it('renders nothing before the first hand is scored', () => {
+    act(() =>
+      root.render(createElement(SpadesTableScreen, { view: makeView(), fx: [], fxKey: 'k' })),
+    );
+    expect(container.querySelector('[data-testid="spades-last-hand"]')).toBeNull();
+  });
+
+  it('says the match is playing on when both teams cross the target', () => {
+    act(() =>
+      root.render(
+        createElement(SpadesTableScreen, {
+          view: makeView({ lastHand: SUMMARY as never, overtime: true, targetScore: 250 }),
+          fx: [],
+          fxKey: 'k',
+        }),
+      ),
+    );
+    const flag = container.querySelector('[data-testid="spades-overtime"]')!;
+    expect(flag.textContent).toContain('250');
+    expect(flag.textContent).toContain('playing on');
+  });
+
+  it('publishes targetScore, matchOver, overtime and lastHand in the text surface', () => {
+    act(() =>
+      root.render(
+        createElement(SpadesTableScreen, {
+          view: makeView({
+            lastHand: SUMMARY as never,
+            overtime: true,
+            matchOver: false,
+            targetScore: 250,
+          }),
+          fx: [],
+          fxKey: 'k',
+        }),
+      ),
+    );
+    const text = textSurface();
+    expect(text.targetScore).toBe(250);
+    expect(text.matchOver).toBe(false);
+    expect(text.overtime).toBe(true);
+    expect(text.lastHand.handNo).toBe(3);
+    expect(text.lastHand.teams).toHaveLength(2);
+    expect(text.lastHand.teams[0].bagPenalty).toBe(100);
+  });
+});
+
+describe('SpadesTableScreen bid rail semantics', () => {
+  it('is a toolbar of buttons, because moving focus is not choosing a bid', () => {
+    act(() =>
+      root.render(createElement(SpadesTableScreen, { view: makeView(), fx: [], fxKey: 'k' })),
+    );
+    const rail = container.querySelector('[data-testid="spades-bid-rail"]')!;
+    expect(rail.getAttribute('role')).toBe('toolbar');
+    const chips = [...rail.querySelectorAll('[data-testid="spades-bid"]')];
+    // No chip may claim to be selected merely because it holds focus.
+    expect(chips.some((chip) => chip.hasAttribute('aria-checked'))).toBe(false);
+    expect(chips.every((chip) => chip.getAttribute('role') === null)).toBe(true);
+  });
+
+  it('dispatches exactly once for a native Enter, and never twice', () => {
+    const bids: number[] = [];
+    act(() =>
+      root.render(
+        createElement(SpadesTableScreen, {
+          view: makeView(),
+          fx: [],
+          fxKey: 'k',
+          onBid: (bid: number) => bids.push(bid),
+        }),
+      ),
+    );
+    const rail = container.querySelector<HTMLElement>('[data-testid="spades-bid-rail"]')!;
+    const chip = container.querySelector<HTMLButtonElement>('[data-bid="5"]')!;
+    act(() => {
+      chip.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+      // A real browser turns that keydown into exactly one click.
+      chip.click();
+    });
+    expect(bids).toEqual([5]);
+    void rail;
+  });
+
+  it('ignores auto-repeat so a held key cannot machine-gun Nil', () => {
+    let nils = 0;
+    act(() =>
+      root.render(
+        createElement(SpadesTableScreen, {
+          view: makeView(),
+          fx: [],
+          fxKey: 'k',
+          onBidNil: () => {
+            nils += 1;
+          },
+        }),
+      ),
+    );
+    const rail = container.querySelector<HTMLElement>('[data-testid="spades-bid-rail"]')!;
+    act(() => {
+      rail.dispatchEvent(new KeyboardEvent('keydown', { key: 'n', bubbles: true }));
+      rail.dispatchEvent(new KeyboardEvent('keydown', { key: 'n', bubbles: true, repeat: true }));
+      rail.dispatchEvent(new KeyboardEvent('keydown', { key: 'n', bubbles: true, repeat: true }));
+    });
+    expect(nils).toBe(1);
+  });
+});
+
+describe('SpadesTableScreen calm motion', () => {
+  it('leaves no delayed timeline when the profile asks for reduced motion', () => {
+    vi.useFakeTimers();
+    useProfileStore.setState((state) => ({
+      ...state,
+      settings: { ...state.settings, reducedMotion: true },
+    }));
+    const fx = [
+      { kind: 'spades.bid', payload: { seat: 0, bid: 4, nil: false }, at: 300 },
+      {
+        kind: 'spades.hand-score',
+        payload: { handNo: 1, teams: SUMMARY.teams },
+        at: 1_200,
+      },
+    ];
+    act(() =>
+      root.render(createElement(SpadesTableScreen, { view: playingView(), fx, fxKey: 'calm' })),
+    );
+
+    const cues = [...container.querySelectorAll<HTMLElement>('[data-fx-cue]')];
+    expect(cues.length).toBeGreaterThan(0);
+    // Immediately — not after the cue's start, and not after its duration.
+    for (const cue of cues) {
+      expect(cue.style.visibility).toBe('hidden');
+      expect(cue.style.opacity).toBe('0');
+    }
+
+    // Nothing may appear later either; a silent 1.7s wait is still a wait.
+    act(() => void vi.advanceTimersByTime(5_000));
+    for (const cue of container.querySelectorAll<HTMLElement>('[data-fx-cue]')) {
+      expect(cue.style.visibility).toBe('hidden');
+    }
+
+    useProfileStore.setState((state) => ({
+      ...state,
+      settings: { ...state.settings, reducedMotion: false },
+    }));
+  });
+
+  it('still animates when calm motion is off', () => {
+    const fx = [{ kind: 'spades.bid', payload: { seat: 0, bid: 4, nil: false }, at: 300 }];
+    act(() =>
+      root.render(createElement(SpadesTableScreen, { view: playingView(), fx, fxKey: 'lively' })),
+    );
+    const cue = container.querySelector<HTMLElement>('[data-fx-cue]');
+    expect(cue).not.toBeNull();
+    // The lively path stages the cue for later rather than hiding it outright.
+    expect(cue!.style.visibility).not.toBe('hidden');
+  });
+});
+
+describe('SpadesTableScreen orientation', () => {
+  it('asks for landscape rather than pretending thirteen cards fit in portrait', () => {
+    act(() =>
+      root.render(createElement(SpadesTableScreen, { view: playingView(), fx: [], fxKey: 'k' })),
+    );
+    const notice = container.querySelector('[data-testid="spades-rotate-notice"]')!;
+    expect(notice).not.toBeNull();
+    expect(notice.textContent).toContain('sideways');
   });
 });

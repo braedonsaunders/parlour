@@ -6,10 +6,28 @@ import { buildFxTimeline, type FxCue } from './fx-motion';
 
 type SetupCue = Extract<FxCue, { type: 'deal' | 'flip' }>;
 
+/**
+ * What one seat was dealt, as cues rather than identities.
+ *
+ * Counting distinct card ids was only ever right by accident: it happens to
+ * equal the cue count when a game deals face-up, distinct cards. Spades deals
+ * every card as `??` — even to you — so a Set collapsed thirteen cues into one
+ * and the whole hand appeared before a single card had landed. Cue count is
+ * the honest measure; identity is a bonus some games happen to provide.
+ */
+type SeatDealPlan = {
+  /** Deal cue ids for this seat, in deal order. */
+  cueIds: readonly string[];
+  /** Distinct planned identities, empty-ish when the deal is opaque. */
+  cards: ReadonlySet<string>;
+  cueIdByCard: ReadonlyMap<string, string>;
+  /** True when identities cannot address individual cues (duplicates/`??`). */
+  opaque: boolean;
+};
+
 type DealPlan = {
   cues: readonly SetupCue[];
-  cardsBySeat: ReadonlyMap<number, ReadonlySet<string>>;
-  cueIdByCard: ReadonlyMap<string, string>;
+  seats: ReadonlyMap<number, SeatDealPlan>;
   flipCueId: string | null;
 };
 
@@ -46,8 +64,8 @@ export function buildDealPlan(events: readonly FxEvent[]): DealPlan | null {
   );
   if (!setupCues.some((cue) => cue.type === 'deal')) return null;
 
-  const mutableCardsBySeat = new Map<number, Set<string>>();
-  const cueIdByCard = new Map<string, string>();
+  type Building = { cueIds: string[]; cards: Set<string>; byCard: Map<string, string> };
+  const building = new Map<number, Building>();
   let flipCueId: string | null = null;
 
   for (const cue of setupCues) {
@@ -57,23 +75,46 @@ export function buildDealPlan(events: readonly FxEvent[]): DealPlan | null {
     }
     const seat = seatFromHandZone(cue.to);
     if (seat === null) continue;
-    const cards = mutableCardsBySeat.get(seat) ?? new Set<string>();
-    cards.add(cue.card);
-    mutableCardsBySeat.set(seat, cards);
-    cueIdByCard.set(cue.card, cue.id);
+    const entry: Building = building.get(seat) ?? {
+      cueIds: [],
+      cards: new Set<string>(),
+      byCard: new Map<string, string>(),
+    };
+    entry.cueIds.push(cue.id);
+    entry.cards.add(cue.card);
+    entry.byCard.set(cue.card, cue.id);
+    building.set(seat, entry);
   }
 
-  return {
-    cues: setupCues,
-    cardsBySeat: mutableCardsBySeat,
-    cueIdByCard,
-    flipCueId,
-  };
+  const seats = new Map<number, SeatDealPlan>();
+  for (const [seat, entry] of building) {
+    seats.set(seat, {
+      cueIds: entry.cueIds,
+      cards: entry.cards,
+      cueIdByCard: entry.byCard,
+      // Fewer distinct identities than cues means at least one id was reused,
+      // so no id can name a single cue.
+      opaque: entry.cards.size !== entry.cueIds.length,
+    });
+  }
+
+  return { cues: setupCues, seats, flipCueId };
 }
+
+export type DealPresentationOptions = {
+  /**
+   * Collapse the deal immediately regardless of the OS media query. The
+   * profile's own "reduced motion" switch only sets a CSS class, so without
+   * this the JS-timed choreography kept running for someone who explicitly
+   * asked it to stop.
+   */
+  reduced?: boolean;
+};
 
 export function useDealPresentation(
   events: readonly FxEvent[],
   fxKey: string | number,
+  options: DealPresentationOptions = {},
 ): DealPresentation {
   const plan = useMemo(() => {
     try {
@@ -88,9 +129,12 @@ export function useDealPresentation(
   }>(() => ({ fxKey: null, cueIds: NO_LANDED_CUES }));
   const landedCueIds = landed.fxKey === fxKey ? landed.cueIds : NO_LANDED_CUES;
 
+  const forceReduced = options.reduced ?? false;
+
   useLayoutEffect(() => {
     if (!plan) return;
-    const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+    const reduced =
+      forceReduced || (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false);
     if (reduced) {
       const timer = window.setTimeout(
         () => setLanded({ fxKey, cueIds: new Set(plan.cues.map(({ id }) => id)) }),
@@ -108,7 +152,7 @@ export function useDealPresentation(
       }, cue.startMs + cue.durationMs),
     );
     return () => timers.forEach((timer) => window.clearTimeout(timer));
-  }, [fxKey, plan]);
+  }, [fxKey, plan, forceReduced]);
 
   if (!plan) return LIVE_PRESENTATION;
 
@@ -127,16 +171,24 @@ export function useDealPresentation(
     pendingStockCards: plan.cues.filter(({ id }) => !landedCueIds.has(id)).length,
     discardReady: plan.flipCueId === null || landedCueIds.has(plan.flipCueId),
     visibleCards(cards, seat) {
-      const plannedCards = plan.cardsBySeat.get(seat);
-      if (!plannedCards) return cards;
+      const seatPlan = plan.seats.get(seat);
+      if (!seatPlan) return cards;
+      const landedCount = landedBySeat.get(seat) ?? 0;
+      // Opaque deals, and deals whose planned ids simply are not these cards
+      // (a veiled hand opening into real ones), can only be revealed by count.
+      // The hand is already in presentation order, so the prefix is correct.
+      if (seatPlan.opaque || !cards.some((card) => seatPlan.cards.has(card))) {
+        const alreadyHeld = Math.max(0, cards.length - seatPlan.cueIds.length);
+        return cards.slice(0, alreadyHeld + landedCount);
+      }
       return cards.filter((card) => {
-        if (!plannedCards.has(card)) return true;
-        const cueId = plan.cueIdByCard.get(card);
+        if (!seatPlan.cards.has(card)) return true;
+        const cueId = seatPlan.cueIdByCard.get(card);
         return cueId !== undefined && landedCueIds.has(cueId);
       });
     },
     visibleCount(seat, finalCount) {
-      const plannedCount = plan.cardsBySeat.get(seat)?.size ?? 0;
+      const plannedCount = plan.seats.get(seat)?.cueIds.length ?? 0;
       return Math.max(0, finalCount - plannedCount) + (landedBySeat.get(seat) ?? 0);
     },
   };

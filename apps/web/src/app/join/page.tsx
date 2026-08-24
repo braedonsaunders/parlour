@@ -9,6 +9,7 @@ import {
   normalizeRoomCode,
   validateRoomHostPubkey,
 } from '@/lib/rooms/code';
+import { tableRouteFor } from '@/lib/rooms/tableRoute';
 import { useProfileStore } from '@/stores/profile';
 import styles from '@/styles/join.module.css';
 import {
@@ -127,25 +128,7 @@ export default function JoinPage() {
       <JoinStatus
         session={roomSession}
         fallbackError={error}
-        onConnected={(gameId) =>
-          router.replace(
-            gameId === 'wildpile'
-              ? '/wild/table'
-              : gameId === 'ratscrew'
-                ? '/ratscrew/table'
-                : gameId === 'euchre'
-                  ? '/euchre/table'
-                  : gameId === 'cribbage'
-                    ? '/cribbage/table'
-                    : gameId === 'hearts'
-                      ? '/hearts/table'
-                      : gameId === 'gin'
-                        ? '/gin/table'
-                        : gameId === 'president'
-                          ? '/president/table'
-                          : '/table',
-          )
-        }
+        onConnected={(gameId) => router.replace(tableRouteFor(gameId))}
       />
       <button
         type="button"

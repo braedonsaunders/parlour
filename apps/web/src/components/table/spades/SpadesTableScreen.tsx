@@ -16,6 +16,7 @@ import { SPADES_SFX_PACK } from '@/lib/audio/sfx';
 import { useMatchTension } from '@/lib/audio/tension';
 import { SPADES_MATCH_PACE_MS } from '@/lib/spades/modes';
 import { useMusicMood } from '@/stores/audio';
+import { useProfileStore } from '@/stores/profile';
 import { type DealPresentation, useDealPresentation } from '@/lib/table/deal-presentation';
 import { bidLabel, bidToken, type SpadesTableView } from '@/lib/spades/view';
 import { useTableAudio } from '../fx-animation';
@@ -62,7 +63,8 @@ export function SpadesTableScreen(props: SpadesTableScreenProps) {
   const { view, error } = props;
   const rootRef = useRef<HTMLElement>(null);
   const menu = useTableMenu(props.onQuit);
-  const deal = useDealPresentation(props.fx, props.fxKey);
+  const reducedMotion = useProfileStore((state) => state.settings.reducedMotion);
+  const deal = useDealPresentation(props.fx, props.fxKey, { reduced: reducedMotion });
   useTableAudio(props.fx, props.fxKey, SPADES_SFX_PACK.id);
 
   const tense = useMatchTension({
@@ -97,6 +99,9 @@ export function SpadesTableScreen(props: SpadesTableScreenProps) {
     legalCards: deal.dealing ? [] : (view?.legalCards ?? []),
     bidOptions: deal.dealing ? [] : (view?.bidOptions ?? []),
     canBidNil: view?.canBidNil ?? false,
+    targetScore: view?.targetScore ?? null,
+    matchOver: view?.matchOver ?? null,
+    lastHand: view?.lastHand ?? null,
   }));
 
   if (error) {
@@ -140,11 +145,26 @@ export function SpadesTableScreen(props: SpadesTableScreenProps) {
           fxKey={props.fxKey}
           localSeat={view.localSeat}
           rootRef={rootRef}
+          reduced={reducedMotion}
         />
+        <LastHandSummary view={view} />
         {view.decision === 'bid' && !localBusy && (
           <BidRail view={view} onBid={props.onBid} onBidNil={props.onBidNil} />
         )}
       </TablePlayfield>
+
+      {/* Thirteen cards cannot be fanned with honest tap targets on a portrait
+          phone. Saying so is better than shipping a hand nobody can hit. */}
+      <div className={styles.rotateNotice} data-testid="spades-rotate-notice" role="status">
+        <span className={styles.rotateMark} aria-hidden="true">
+          ♠
+        </span>
+        <strong>Turn your phone sideways</strong>
+        <p>
+          Spades deals thirteen cards to a hand. Landscape gives every card a tap target you can
+          actually hit — portrait would leave them slivers.
+        </p>
+      </div>
 
       <TableMenu open={menu.isOpen} onClose={menu.close} onQuit={menu.quit} />
     </TableShell>
@@ -274,6 +294,90 @@ function Seat({
   );
 }
 
+/**
+ * The previous hand's scoring, kept on screen.
+ *
+ * An open table deals the next hand automatically, so the FX sheet that
+ * announces a score is gone in about a second and a half — long enough to
+ * notice, nowhere near long enough to check the arithmetic on a −100 nil or a
+ * bag penalty. `lastHand` survives the auto-deal precisely so this can be read
+ * at leisure, so it renders from state, stays until the next hand scores, and
+ * is a plain live region rather than an animation.
+ */
+function LastHandSummary({ view }: { view: SpadesTableView }) {
+  const summary = view.lastHand;
+  if (!summary) return null;
+  return (
+    <section
+      className={styles.lastHand}
+      data-testid="spades-last-hand"
+      aria-label={`Hand ${summary.handNo} scoring`}
+      role="status"
+    >
+      <header className={styles.lastHandHead}>
+        <strong>Hand {summary.handNo}</strong>
+        {view.overtime && (
+          <em className={styles.overtimeFlag} data-testid="spades-overtime">
+            level at {view.targetScore} — playing on
+          </em>
+        )}
+      </header>
+      <ul className={styles.lastHandRows}>
+        {summary.teams.map((team) => (
+          <li
+            key={team.team}
+            className={styles.lastHandRow}
+            data-team={team.team}
+            data-made={team.made || undefined}
+            data-testid="spades-last-hand-team"
+            style={{ '--row-accent': TEAM_ACCENTS[team.team % 2] } as CSSProperties}
+          >
+            <span className={styles.lastHandVerdict}>
+              {team.made ? 'made' : 'set'} {team.nonNilTricks}/{team.contract}
+            </span>
+            <span className={styles.lastHandDelta}>
+              {team.delta >= 0 ? `+${team.delta}` : team.delta}
+            </span>
+            <span className={styles.lastHandTotal}>{team.scoreAfter}</span>
+            <dl className={styles.lastHandDetail}>
+              <div>
+                <dt>contract</dt>
+                <dd>{team.contractDelta >= 0 ? `+${team.contractDelta}` : team.contractDelta}</dd>
+              </div>
+              {(team.nilDelta !== 0 || team.nilTricks > 0) && (
+                <div>
+                  <dt>nil</dt>
+                  <dd>
+                    {team.nilDelta >= 0 ? `+${team.nilDelta}` : team.nilDelta}
+                    {team.nilTricks > 0 &&
+                      ` (${team.nilTricks} trick${team.nilTricks === 1 ? '' : 's'} taken)`}
+                  </dd>
+                </div>
+              )}
+              <div>
+                <dt>overtricks</dt>
+                <dd>{team.overtricks}</dd>
+              </div>
+              <div>
+                <dt>bags</dt>
+                <dd>
+                  {team.bagsTaken} this hand · {team.bagsAfter} on the card
+                </dd>
+              </div>
+              {team.bagPenalty > 0 && (
+                <div data-testid="spades-bag-penalty">
+                  <dt>bag penalty</dt>
+                  <dd>−{team.bagPenalty} points</dd>
+                </div>
+              )}
+            </dl>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 function TrickZone({ view }: { view: SpadesTableView }) {
   return (
     <div className={styles.trickZone} data-zone="trick" aria-label="Current trick">
@@ -398,6 +502,9 @@ function BidRail({
 
   const onKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
     const { key } = event;
+    // Enter and Space are left to the button element so a bid fires once, and
+    // held keys must not machine-gun a shortcut.
+    if (event.repeat) return;
     if (key === 'n' || key === 'N') {
       if (view.canBidNil) {
         event.preventDefault();
@@ -450,23 +557,27 @@ function BidRail({
       <p className={styles.bidPrompt}>
         How many tricks? {view.canBidNil && <span>Nil scores ±100 — take none at all.</span>}
       </p>
+      {/* A toolbar, not a radiogroup: moving the highlight is not choosing a
+          bid, and aria-checked would tell a screen-reader user they had
+          already bid the number they merely arrowed onto. Plain buttons keep
+          Enter/Space native, so nothing double-fires. */}
       <div
         ref={railRef}
         className={styles.bidOptions}
         data-testid="spades-bid-rail"
-        role="radiogroup"
+        role="toolbar"
         aria-label="Number of tricks to bid"
+        aria-orientation="horizontal"
         onKeyDown={onKeyDown}
       >
         {options.map((bid, index) => (
           <button
             key={bid}
             type="button"
-            role="radio"
-            aria-checked={focused === index}
             tabIndex={focused === index ? 0 : -1}
             data-testid="spades-bid"
             data-bid={bid}
+            data-focused={focused === index || undefined}
             className={styles.bidChip}
             onFocus={() => setFocused(index)}
             onClick={() => commit(index)}

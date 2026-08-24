@@ -146,6 +146,7 @@ function ActiveMultiplayerSpadesTable({ room }: { room: MultiplayerRoomSession }
   const recordResult = useProfileStore((state) => state.recordResult);
   const recordMatch = useHistoryStore((state) => state.recordMatch);
   const snapshot = useSyncExternalStore(room.subscribe, room.getSnapshot, room.getSnapshot);
+  const setSetupMode = useSpadesSetupStore((state) => state.setMode);
   const reportedMatch = useRef(false);
   const [localError, setLocalError] = useState<string | null>(null);
   const session = multiplayerSession<SpadesState, SpadesRules>(snapshot, 'spades');
@@ -198,6 +199,10 @@ function ActiveMultiplayerSpadesTable({ room }: { room: MultiplayerRoomSession }
       localSeat,
     });
     registerPlayAgain(() => {
+      // The new room is built from the setup store, so a rematch has to carry
+      // the mode this match was actually played under. Without this a guest
+      // who joined a Quick or Clean Books table would silently host Classic.
+      setSetupMode(mode);
       router.push('/spades/create');
     });
     const timer = window.setTimeout(() => {
@@ -215,6 +220,7 @@ function ActiveMultiplayerSpadesTable({ room }: { room: MultiplayerRoomSession }
     router,
     session,
     setLastMatch,
+    setSetupMode,
     snapshot.room?.code,
     snapshot.seats,
   ]);

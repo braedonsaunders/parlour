@@ -1,6 +1,8 @@
 import type { GameSession, LegalMove } from '@parlour/engine';
 import {
   teamContract,
+  teamNilTricks,
+  teamNonNilTricks,
   type HandSummary,
   type SpadesBid,
   type SpadesRules,
@@ -28,8 +30,14 @@ export interface SpadesTeamView {
   bags: number;
   /** Sum of the non-nil bids placed so far — grows during bidding. */
   contract: number;
-  /** Tricks this partnership has taken in the current hand. */
+  /**
+   * Tricks that count toward the contract — non-nil seats only. A nil seat's
+   * tricks are bags and a broken nil, never progress, so folding them in here
+   * would show a set partnership as having made its bid.
+   */
   tricks: number;
+  /** Tricks taken by this partnership's nil seats; every one of them is a bag. */
+  nilTricks: number;
   /** Seats on this team that bid nil, and whether each is still clean. */
   nilSeats: readonly { seat: number; intact: boolean }[];
   label: string;
@@ -186,7 +194,8 @@ function teamView(
     score: state.scores[team],
     bags: state.bags[team],
     contract: teamContract(placedBids, team),
-    tricks: seats.reduce((total, seat) => total + (state.tricksBySeat[seat] ?? 0), 0),
+    tricks: teamNonNilTricks(placedBids, state.tricksBySeat, team),
+    nilTricks: teamNilTricks(placedBids, state.tricksBySeat, team),
     nilSeats,
     // The local player's partnership always reads as "yours", whichever seat they hold.
     label: localSeat % 2 === team ? TEAM_LABELS[0] : TEAM_LABELS[1],

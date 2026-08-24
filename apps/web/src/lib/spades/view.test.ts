@@ -131,3 +131,104 @@ describe('bid projection', () => {
     expect(bidToken({ seat: 1, tricks: 0, nil: true })).toBe('nil');
   });
 });
+
+describe('nil tricks never read as contract progress', () => {
+  it('counts only non-nil seats toward the partnership contract', () => {
+    // Seat 0 bids nil and takes 2 (broken, and both are bags); seat 2 bids 4
+    // and takes 4. The HUD must read 4/4 made — not 6/4, which would tell the
+    // player they were comfortably over when they had in fact gone set on nil.
+    const view = spadesTableView(
+      {
+        mode: 'classic',
+        players: [0, 1, 2, 3].map((seat) => ({
+          seat,
+          name: `Seat ${seat}`,
+          avatarId: 'ember',
+          isBot: seat !== 0,
+        })),
+        session: {
+          status: 'playing',
+          phase: { actor: 1 },
+          state: {
+            ...baseState(),
+            bids: [
+              { seat: 0, tricks: 0, nil: true },
+              { seat: 1, tricks: 3, nil: false },
+              { seat: 2, tricks: 4, nil: false },
+              { seat: 3, tricks: 3, nil: false },
+            ],
+            tricksBySeat: [2, 3, 4, 3],
+          },
+        },
+        matchWinnerTeam: null,
+      } as unknown as SpadesSnapshot,
+      [],
+    );
+
+    expect(view.teams[0].contract).toBe(4);
+    expect(view.teams[0].tricks).toBe(4);
+    expect(view.teams[0].nilTricks).toBe(2);
+    expect(view.teams[0].nilSeats).toEqual([{ seat: 0, intact: false }]);
+    // The opposing partnership is unaffected.
+    expect(view.teams[1].contract).toBe(6);
+    expect(view.teams[1].tricks).toBe(6);
+    expect(view.teams[1].nilTricks).toBe(0);
+  });
+
+  it('keeps an intact nil marked intact and contributing nothing', () => {
+    const view = spadesTableView(
+      {
+        mode: 'classic',
+        players: [0, 1, 2, 3].map((seat) => ({
+          seat,
+          name: `Seat ${seat}`,
+          avatarId: 'ember',
+          isBot: seat !== 0,
+        })),
+        session: {
+          status: 'playing',
+          phase: { actor: 1 },
+          state: {
+            ...baseState(),
+            bids: [
+              { seat: 0, tricks: 0, nil: true },
+              { seat: 1, tricks: 3, nil: false },
+              { seat: 2, tricks: 5, nil: false },
+              { seat: 3, tricks: 3, nil: false },
+            ],
+            tricksBySeat: [0, 2, 5, 2],
+          },
+        },
+        matchWinnerTeam: null,
+      } as unknown as SpadesSnapshot,
+      [],
+    );
+    expect(view.teams[0].nilSeats).toEqual([{ seat: 0, intact: true }]);
+    expect(view.teams[0].tricks).toBe(5);
+    expect(view.teams[0].nilTricks).toBe(0);
+  });
+});
+
+function baseState() {
+  return {
+    rules: { targetScore: 500, nil: true, bags: true },
+    veiled: false,
+    scores: [0, 0] as const,
+    bags: [0, 0] as const,
+    handNo: 1,
+    dealer: 3,
+    hands: [[], [], [], []],
+    stage: 'playing' as const,
+    turn: 1,
+    leader: 0,
+    trick: null,
+    tricksPlayed: 9,
+    trickWinners: [],
+    spadesBroken: true,
+    overtime: false,
+    plays: [],
+    summary: null,
+    lastHand: null,
+    lastHandSummary: null,
+  };
+}
