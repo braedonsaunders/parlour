@@ -1,9 +1,9 @@
-import type { LegalMove } from '@parlour/engine';
+import type { FxEvent, LegalMove } from '@parlour/engine';
 import type { WildpileColor } from '@parlour/game-wildpile';
 import { getWildMode, type WildModeId } from '@/lib/wild/modes';
 import type { WildSnapshot } from '@/lib/solo/WildTransport';
 
-export type WildDecision = 'play' | 'choose-color' | 'jump-in';
+export type WildDecision = 'play' | 'choose-color' | 'choose-target' | 'jump-in';
 
 export interface WildSeatView {
   seat: number;
@@ -12,6 +12,8 @@ export interface WildSeatView {
   handCount: number;
   isLocal: boolean;
   isBot: boolean;
+  /** True once the seat has armed last-card protection. */
+  lastCardArmed: boolean;
 }
 
 export interface WildTableView {
@@ -28,11 +30,20 @@ export interface WildTableView {
   hand: readonly string[];
   /** The local seat's pending decision, or null while others act. */
   decision: WildDecision | null;
+  /** True once the local seat has armed last-card protection. */
+  lastCardArmed: boolean;
+  /** Card the local seat just drew and may still play, if any. */
+  drawnCard: string | null;
   legal: {
     playCards: readonly string[];
     draw: boolean;
     declineJump: boolean;
     chooseColor: boolean;
+    callLastCard: boolean;
+    /** Decline the card you just drew. Absent when the table forces the play. */
+    pass: boolean;
+    /** Seats whose hand the local seat may take. */
+    swapTargets: readonly number[];
   };
 }
 
@@ -41,8 +52,14 @@ function payloadCard(move: LegalMove): string | null {
   return typeof card === 'string' ? card : null;
 }
 
+function payloadSeat(move: LegalMove): number | null {
+  const seat = (move.payload as { seat?: unknown } | undefined)?.seat;
+  return typeof seat === 'number' ? seat : null;
+}
+
 function localDecision(phase: string): WildDecision {
   if (phase === 'choose-color') return 'choose-color';
+  if (phase === 'choose-target') return 'choose-target';
   if (phase === 'interrupt') return 'jump-in';
   return 'play';
 }
@@ -72,6 +89,7 @@ export function wildTableView(
       handCount: state.hands[player.seat]?.length ?? 0,
       isLocal: player.seat === localSeat,
       isBot: player.isBot,
+      lastCardArmed: state.calledLastCard[player.seat] ?? false,
     })),
     activeSeat: session.phase.actor,
     stockCount: state.stock.length,
@@ -82,13 +100,161 @@ export function wildTableView(
     phaseLabel: wildPhaseLabel(snapshot.mode, state.pendingDraw),
     hand: state.hands[localSeat] ?? [],
     decision: isLocalTurn ? localDecision(session.phase.phase) : null,
+    lastCardArmed: state.calledLastCard[localSeat] ?? false,
+    drawnCard: state.turn === localSeat ? state.drawnCard : null,
     legal: {
       playCards,
       draw: offered.some((move) => move.id === 'draw'),
       declineJump: offered.some((move) => move.id === 'declineJump'),
       chooseColor: offered.some((move) => move.id === 'chooseColor'),
+      callLastCard: offered.some((move) => move.id === 'callLastCard'),
+      pass: offered.some((move) => move.id === 'pass'),
+      swapTargets: offered.flatMap((move) =>
+        move.id === 'chooseTarget' && payloadSeat(move) !== null ? [payloadSeat(move)!] : [],
+      ),
     },
   };
+}
+
+export type WildAnnouncementKind =
+  'caught' | 'skip' | 'reverse' | 'draw-stack' | 'last-card' | 'swap' | 'rotate' | 'shuffle-hands';
+
+export interface WildAnnouncement {
+  id: string;
+  kind: WildAnnouncementKind;
+  /** Headline shown center-table. */
+  text: string;
+  /** Supporting line — usually who it landed on. */
+  detail: string | null;
+  /** Seat the call is about, for the per-seat stamp. */
+  seat: number | null;
+  atMs: number;
+}
+
+/** Fixed order so a burst that skips *and* catches someone reads top-down. */
+const ANNOUNCEMENT_ORDER: readonly WildAnnouncementKind[] = [
+  'reverse',
+  'skip',
+  'draw-stack',
+  'shuffle-hands',
+  'rotate',
+  'swap',
+  'last-card',
+  'caught',
+];
+
+/**
+ * Turns Wild's namespaced engine effects into table calls. Action cards used to
+ * be audible only, which made a skip look like a dropped turn; every effect that
+ * changes who acts next now has something to read on screen.
+ */
+export function wildAnnouncements(
+  fx: readonly FxEvent[],
+  players: readonly WildSeatView[],
+): WildAnnouncement[] {
+  const nameOf = (seat: number | null): string | null => {
+    if (seat === null) return null;
+    const player = players.find((entry) => entry.seat === seat);
+    if (!player) return null;
+    return player.isLocal ? 'You' : player.name;
+  };
+
+  const calls = fx.flatMap((event, index): WildAnnouncement[] => {
+    const atMs = Math.max(0, event.at ?? 0);
+    const seat = numberField(event, 'seat');
+    const base = { id: `${index}:${event.kind}`, atMs, seat };
+    switch (event.kind) {
+      case 'wildpile.skip':
+        return [
+          {
+            ...base,
+            kind: 'skip',
+            text: 'Skipped',
+            detail: nameOf(seat) === 'You' ? 'You lose this turn' : `${nameOf(seat)} loses a turn`,
+          },
+        ];
+      case 'wildpile.reverse':
+        return [
+          {
+            ...base,
+            kind: 'reverse',
+            seat: null,
+            text: 'Reverse',
+            detail: numberField(event, 'direction') === 1 ? 'Play goes left' : 'Play goes right',
+          },
+        ];
+      case 'wildpile.draw-stack': {
+        const amount = numberField(event, 'amount') ?? 0;
+        return [
+          { ...base, kind: 'draw-stack', seat: null, text: `+${amount}`, detail: 'Pick it up' },
+        ];
+      }
+      case 'wildpile.swap': {
+        const target = numberField(event, 'target');
+        return [
+          {
+            ...base,
+            kind: 'swap',
+            text: 'Hands swapped',
+            detail: `${nameOf(seat)} took ${nameOf(target)}'s hand`,
+          },
+        ];
+      }
+      case 'wildpile.rotate':
+        return [
+          {
+            ...base,
+            kind: 'rotate',
+            seat: null,
+            text: 'Pass it on',
+            detail:
+              numberField(event, 'direction') === 1
+                ? 'Every hand moves left'
+                : 'Every hand moves right',
+          },
+        ];
+      case 'wildpile.shuffle-hands':
+        return [
+          {
+            ...base,
+            kind: 'shuffle-hands',
+            seat: null,
+            text: 'Reshuffle',
+            detail: 'New hands all round',
+          },
+        ];
+      case 'wildpile.last-card':
+        return [{ ...base, kind: 'last-card', text: 'Last card!', detail: nameOf(seat) }];
+      case 'wildpile.caught': {
+        const amount = numberField(event, 'amount') ?? 0;
+        return [
+          {
+            ...base,
+            kind: 'caught',
+            text: 'Caught!',
+            detail:
+              nameOf(seat) === 'You'
+                ? `No call — draw ${amount}`
+                : `${nameOf(seat)} forgot to call — draws ${amount}`,
+          },
+        ];
+      }
+      default:
+        return [];
+    }
+  });
+
+  return calls.sort(
+    (a, b) => ANNOUNCEMENT_ORDER.indexOf(a.kind) - ANNOUNCEMENT_ORDER.indexOf(b.kind),
+  );
+}
+
+function numberField(event: FxEvent, field: string): number | null {
+  if (typeof event.payload !== 'object' || event.payload === null || Array.isArray(event.payload)) {
+    return null;
+  }
+  const value = (event.payload as Record<string, unknown>)[field];
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
 }
 
 function wildPhaseLabel(mode: WildModeId, pendingDraw: number): string {

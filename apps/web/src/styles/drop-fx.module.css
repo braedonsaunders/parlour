@@ -1,0 +1,161 @@
+/* Card-drop flourishes. Everything is driven by --drop-color and
+   --drop-intensity so a game pack only has to pick a shape and a tint. */
+
+.layer {
+  position: absolute;
+  inset: 0;
+  z-index: 12;
+  pointer-events: none;
+}
+
+.burst {
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  display: grid;
+  place-items: center;
+  width: 9rem;
+  height: 9rem;
+  translate: -50% -50%;
+  color: var(--drop-color, #f0e2ff);
+}
+
+.ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 3px solid currentColor;
+  opacity: calc(0.35 + var(--drop-intensity) * 0.5);
+  box-shadow:
+    0 0 calc(1rem * var(--drop-intensity)) currentColor,
+    inset 0 0 calc(1.4rem * var(--drop-intensity)) currentColor;
+}
+
+.spoke {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0.28rem;
+  height: calc(2.6rem + 2rem * var(--drop-intensity));
+  border-radius: 999px;
+  background: linear-gradient(to top, transparent, currentColor);
+  transform-origin: 50% 100%;
+  rotate: var(--spoke-angle, 0deg);
+  translate: -50% -100%;
+  opacity: calc(0.45 + var(--drop-intensity) * 0.45);
+}
+
+.glyph {
+  position: relative;
+  font-family: var(--font-display), sans-serif;
+  font-size: calc(1.1rem + 0.7rem * var(--drop-intensity));
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: #fff6e4;
+  text-shadow: 0 0 0.6rem var(--drop-color, #f0e2ff);
+}
+
+/* --- per-shape character ---------------------------------------------------- */
+
+/* A soft pulse: ring only, no spokes, no glow spill. */
+.burst[data-shape='ripple'] .ring {
+  border-width: 2px;
+  box-shadow: 0 0 0.5rem currentColor;
+}
+
+/* Weight: a thick, short-lived ring. */
+.burst[data-shape='shockwave'] .ring {
+  border-width: 5px;
+}
+
+/* Direction: the ring is cut open and the spokes trail behind it. */
+.burst[data-shape='swirl'] .ring {
+  border-style: dashed;
+  animation: dropSpin var(--drop-ms, 900ms) cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+.burst[data-shape='swirl'] .spoke {
+  height: calc(3.4rem + 1.6rem * var(--drop-intensity));
+  background: linear-gradient(to top, transparent, currentColor 70%, transparent);
+}
+
+/* A turn taken away: two crossed bars, no ring glow. */
+.burst[data-shape='slash'] .ring {
+  opacity: 0.2;
+}
+.burst[data-shape='slash'] .spoke {
+  width: 0.42rem;
+  height: calc(5rem + 1.5rem * var(--drop-intensity));
+  translate: -50% -50%;
+  transform-origin: 50% 50%;
+  rotate: calc(45deg + var(--spoke-angle, 0deg));
+  background: linear-gradient(to top, transparent, currentColor 25%, currentColor 75%, transparent);
+}
+
+/* Penalties throw debris outward. */
+.burst[data-shape='sparks'] .spoke {
+  width: 0.2rem;
+  height: calc(1.6rem + 2.4rem * var(--drop-intensity));
+  animation: dropFling var(--drop-ms, 900ms) cubic-bezier(0.15, 0.85, 0.25, 1);
+}
+
+/* Wilds open into the deck's four colors rather than one tint. */
+.burst[data-shape='prism'] .ring {
+  border-color: transparent;
+  background: conic-gradient(from 0deg, #e0685c 0 25%, #f2c45c 0 50%, #6cbb87 0 75%, #58acc7 0);
+  opacity: calc(0.22 + var(--drop-intensity) * 0.28);
+  mask: radial-gradient(circle, transparent 52%, #000 56%);
+  animation: dropSpin var(--drop-ms, 900ms) linear;
+}
+.burst[data-shape='prism'] .spoke:nth-child(4n + 2) {
+  color: #e0685c;
+}
+.burst[data-shape='prism'] .spoke:nth-child(4n + 3) {
+  color: #f2c45c;
+}
+.burst[data-shape='prism'] .spoke:nth-child(4n + 4) {
+  color: #6cbb87;
+}
+.burst[data-shape='prism'] .spoke:nth-child(4n + 5) {
+  color: #58acc7;
+}
+
+/* Hands changing places: two arcs sweeping past each other. */
+.burst[data-shape='trade'] .ring {
+  border-style: double;
+  border-width: 7px;
+  animation: dropSpin var(--drop-ms, 900ms) ease-in-out reverse;
+}
+.burst[data-shape='trade'] .spoke {
+  width: 0.34rem;
+  height: calc(4rem + 1.5rem * var(--drop-intensity));
+  border-radius: 999px;
+  rotate: calc(90deg + var(--spoke-angle, 0deg));
+  translate: -50% -50%;
+  transform-origin: 50% 50%;
+}
+
+@keyframes dropSpin {
+  from {
+    rotate: 0deg;
+  }
+  to {
+    rotate: 320deg;
+  }
+}
+
+@keyframes dropFling {
+  from {
+    height: 0.4rem;
+    opacity: 1;
+  }
+  to {
+    height: calc(1.6rem + 2.4rem * var(--drop-intensity));
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .layer {
+    display: none;
+  }
+}

@@ -1,6 +1,6 @@
 import type { WildpileRules } from '@parlour/game-wildpile';
 
-export type WildModeId = 'classic' | 'party';
+export type WildModeId = 'classic' | 'party' | 'houseRules';
 
 export interface WildModeDef {
   id: WildModeId;
@@ -31,12 +31,22 @@ export const WILD_MODES: readonly WildModeDef[] = [
   {
     id: 'party',
     name: 'Party',
-    tagline: 'House rules on',
+    tagline: 'Stack and slam',
     description:
       'Draw-twos and draw-fours pile up, and an exact match lets anyone jump in out of turn. Chaos, warmly lit.',
     facts: ['stacking on', 'jump-ins on', '~5 min'],
     accent: '#c8566b',
     shade: '#7c2c3e',
+  },
+  {
+    id: 'houseRules',
+    name: 'House Rules',
+    tagline: 'Everything on',
+    description:
+      'Sevens trade hands, zeroes pass them along, swap-hand wilds join the deck, and a card you drew has to be played.',
+    facts: ['7-0 swaps', 'swap wilds', 'force play'],
+    accent: '#7f6bd0',
+    shade: '#402f7a',
   },
 ];
 
@@ -58,6 +68,13 @@ export function isWildModeId(value: unknown): value is WildModeId {
   return typeof value === 'string' && BY_ID.has(value as WildModeId);
 }
 
+/**
+ * Best-fit mode label for a set of rules that arrived over the wire. Tables can
+ * be tuned knob by knob, so this is presentation only — never a rules source.
+ */
 export function wildModeForRules(rules: WildpileRules): WildModeId {
-  return rules.stacking || rules.jumpIn ? 'party' : 'classic';
+  if (rules.sevenZero || rules.swapCards || rules.drawToMatch || rules.forcePlay) {
+    return 'houseRules';
+  }
+  return rules.stackDrawTwo || rules.stackDrawFour || rules.jumpIn ? 'party' : 'classic';
 }

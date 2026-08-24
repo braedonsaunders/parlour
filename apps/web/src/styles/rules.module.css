@@ -1,0 +1,197 @@
+/* Generated rule-config panel. Shared by every game: the controls come from
+   the game's ConfigSchema, so nothing in here is game specific. */
+
+.panel {
+  width: 100%;
+  padding: 0;
+  overflow: hidden;
+}
+
+.summary {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.9rem 1.1rem;
+  background: none;
+  border: 0;
+  color: #f3e7d4;
+  font-family: var(--font-display), sans-serif;
+  font-size: 0.95rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+
+.summary > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.summary i {
+  font-style: normal;
+  transition: rotate 160ms var(--ease-pop);
+}
+
+.summary i[data-open='true'] {
+  rotate: 180deg;
+}
+
+.changed {
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  background: rgba(226, 147, 73, 0.24);
+  border: 1px solid rgba(226, 147, 73, 0.6);
+  color: #ffd7a8;
+  font-size: 0.62rem;
+  font-style: normal;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.body {
+  display: grid;
+  gap: 1rem;
+  padding: 0 1.1rem 1.1rem;
+}
+
+.group {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.groupHeading {
+  margin: 0;
+  color: rgba(214, 226, 232, 0.62);
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.houseNote {
+  margin: 0.35rem 0 0;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(255, 244, 223, 0.12);
+  color: rgba(214, 226, 232, 0.6);
+  font-size: 0.72rem;
+  line-height: 1.4;
+}
+
+.field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.5rem 0;
+}
+
+.fieldText label {
+  display: block;
+  color: #f3e7d4;
+  font-family: var(--font-display), sans-serif;
+  font-size: 0.86rem;
+  font-weight: 800;
+}
+
+.fieldText p {
+  margin: 0.1rem 0 0;
+  max-width: 34ch;
+  color: rgba(214, 226, 232, 0.62);
+  font-size: 0.72rem;
+  line-height: 1.35;
+}
+
+.toggle {
+  position: relative;
+  flex: none;
+  width: 3.1rem;
+  height: 1.75rem;
+  padding: 0;
+  border: 2px solid rgba(255, 244, 223, 0.28);
+  border-radius: 999px;
+  background: rgba(10, 24, 30, 0.85);
+  cursor: pointer;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease;
+}
+
+.toggle[aria-checked='true'] {
+  background: linear-gradient(180deg, #6fc98d, #357a54);
+  border-color: rgba(220, 255, 232, 0.7);
+}
+
+.toggle i {
+  position: absolute;
+  top: 50%;
+  left: 0.18rem;
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 50%;
+  background: #fff6e4;
+  box-shadow: 0 2px 6px rgba(3, 11, 15, 0.6);
+  translate: 0 -50%;
+  transition: left 160ms var(--ease-pop);
+}
+
+.toggle[aria-checked='true'] i {
+  left: calc(100% - 1.43rem);
+}
+
+.stepper,
+.choices {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.stepper button,
+.choices button {
+  min-width: 2.1rem;
+  height: 2.1rem;
+  padding: 0 0.6rem;
+  border: 2px solid rgba(255, 244, 223, 0.24);
+  border-radius: 0.65rem;
+  background: rgba(10, 24, 30, 0.85);
+  color: #f3e7d4;
+  font-family: var(--font-display), sans-serif;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.stepper button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.choices button[aria-pressed='true'] {
+  background: linear-gradient(180deg, #e2a349, #96471c);
+  border-color: rgba(255, 237, 207, 0.7);
+  color: #1c0f06;
+}
+
+.stepper output {
+  min-width: 1.75rem;
+  text-align: center;
+  color: #f3e7d4;
+  font-family: var(--font-display), sans-serif;
+  font-size: 1.05rem;
+  font-weight: 800;
+}
+
+.reset {
+  justify-self: start;
+  padding: 0.35rem 0.75rem;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 244, 223, 0.08);
+  color: rgba(214, 226, 232, 0.8);
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+}

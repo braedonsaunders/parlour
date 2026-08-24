@@ -24,6 +24,8 @@ export type HandRailCardProps = {
   index: number;
   count: number;
   playable?: boolean;
+  /** Marks the card the seat just drew, so the fan can call it out. */
+  justDrawn?: boolean;
   children: ReactNode;
 };
 
@@ -35,7 +37,14 @@ export function calculateFanStep(width: number, cardWidth: number, count: number
 }
 
 /** Shared motion and hit-target chassis for every playable card in a hand rail. */
-export function HandRailCard({ cardId, index, count, playable, children }: HandRailCardProps) {
+export function HandRailCard({
+  cardId,
+  index,
+  count,
+  playable,
+  justDrawn,
+  children,
+}: HandRailCardProps) {
   const fanIndex = index - (count - 1) / 2;
   return (
     <motion.div
@@ -44,6 +53,7 @@ export function HandRailCard({ cardId, index, count, playable, children }: HandR
       className={styles.handCard}
       data-hand-card
       data-playable={playable}
+      data-just-drawn={justDrawn || undefined}
       style={{ '--fan-index': fanIndex, '--fan-abs': Math.abs(fanIndex) } as CSSProperties}
       initial={{ y: 24, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}

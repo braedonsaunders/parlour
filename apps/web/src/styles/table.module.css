@@ -428,6 +428,19 @@
   opacity: 0.68;
 }
 
+/* The card you just drew: lifted clear of the fan so the decision is obvious. */
+.handCard[data-just-drawn] {
+  --playable-y: -1.15rem;
+  z-index: 6;
+}
+
+.handCard[data-just-drawn] .card {
+  box-shadow:
+    0 16px 28px -8px rgba(3, 11, 15, 0.85),
+    0 0 0 3px rgba(184, 255, 205, 0.75),
+    0 0 26px rgba(140, 235, 175, 0.5);
+}
+
 @media (hover: hover) and (pointer: fine) {
   .handCard:hover .handFan,
   .handCard:focus-within .handFan {
