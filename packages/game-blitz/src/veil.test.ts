@@ -72,6 +72,28 @@ describe('blitz under Veil', () => {
     expect(open.phase.actors).toBeUndefined();
     expect(def.flow.legalMovesFor!(open.state, open.phase, 1)).toEqual([]);
   });
+
+  it('exchanges a spent public discard for fresh unpaired handles before drawing', () => {
+    const { session } = veiled();
+    const retired = ['H2', 'D4'];
+    const issue = ['v#52', 'v#53'];
+    const spent: Session = {
+      ...session,
+      state: { ...session.state, stock: [], discard: ['S2', ...retired] },
+    };
+
+    expect(sessionApply(def, spent, 0, 'draw.stock').rejected?.code).toBe('stock-not-reveiled');
+    const outcome = sessionApply(def, spent, 0, 'draw.stock', undefined, {
+      recycle: { retire: retired, issue },
+    });
+
+    expect(outcome.rejected).toBeUndefined();
+    expect(outcome.session.state.discard).toEqual(['S2']);
+    expect(outcome.session.state.stock).toEqual(['v#53']);
+    expect(outcome.session.state.hands[0]).toContain('v#52');
+    expect(outcome.events[0]?.recycle).toEqual({ retire: retired, issue });
+    expect(outcome.events[0]).not.toHaveProperty('conceals');
+  });
 });
 
 describe('blitz claims', () => {

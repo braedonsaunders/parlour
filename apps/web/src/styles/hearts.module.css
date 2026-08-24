@@ -1,0 +1,186 @@
+/* Hearts-specific table dressing. Shared chassis lives in table.module.css. */
+
+.trickArea {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.trickSlot {
+  position: absolute;
+  left: 50%;
+  top: 47%;
+  --trick-x: 0px;
+  --trick-y: 0px;
+  transform: translate(calc(-50% + var(--trick-x)), calc(-50% + var(--trick-y)));
+}
+
+.trickSlot0 {
+  --trick-x: 0px;
+  --trick-y: 92px;
+}
+
+.trickSlot1 {
+  --trick-x: -128px;
+  --trick-y: 0px;
+}
+
+.trickSlot2 {
+  --trick-x: 0px;
+  --trick-y: -92px;
+}
+
+.trickSlot3 {
+  --trick-x: 128px;
+  --trick-y: 0px;
+}
+
+@media (max-width: 720px) {
+  .trickSlot0 {
+    --trick-y: 64px;
+  }
+  .trickSlot1 {
+    --trick-x: -84px;
+  }
+  .trickSlot2 {
+    --trick-y: -64px;
+  }
+  .trickSlot3 {
+    --trick-x: 84px;
+  }
+}
+
+.scoreChip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--seat-shade, #333) 55%, transparent);
+  font-family: var(--font-display, inherit);
+  font-weight: 800;
+  font-size: 0.95rem;
+  color: #fff8ec;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+
+.takenChip {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: rgba(20, 12, 6, 0.55);
+  color: #ffd9c9;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.tableBadges {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.directionChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 11px;
+  border-radius: 999px;
+  background: rgba(24, 15, 8, 0.62);
+  border: 1px solid rgba(255, 214, 170, 0.22);
+  color: #ffe7cd;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.brokenChip {
+  composes: directionChip;
+  color: #ff9f9f;
+  border-color: rgba(255, 130, 130, 0.35);
+}
+
+.passBanner {
+  position: absolute;
+  left: 50%;
+  bottom: 26%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+  text-align: center;
+}
+
+.passCount {
+  display: inline-flex;
+  gap: 6px;
+}
+
+.passPip {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 220, 180, 0.4);
+  background: transparent;
+  transition:
+    background 150ms ease-pop,
+    transform 150ms ease-pop;
+}
+
+.passPip[data-filled='true'] {
+  background: linear-gradient(180deg, #ffb27a, #d96a3a);
+  border-color: transparent;
+  transform: scale(1.15);
+}
+
+.handEnd {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  background: rgba(12, 7, 4, 0.66);
+  backdrop-filter: blur(3px);
+}
+
+.handEndPanel {
+  width: min(30rem, calc(100vw - 3rem));
+  padding: 1.4rem 1.5rem 1.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.handEndRows {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.handEndRow {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 14px;
+  background: rgba(255, 240, 220, 0.05);
+}
+
+.handEndRow[data-winner='true'] {
+  background: linear-gradient(120deg, rgba(255, 178, 122, 0.18), rgba(217, 106, 58, 0.12));
+  outline: 1px solid rgba(255, 190, 140, 0.35);
+}
+
+.moonStamp {
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  color: #ffd27a;
+}

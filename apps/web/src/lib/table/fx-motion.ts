@@ -33,11 +33,27 @@ export type FxCue =
       to: 'discard';
       seat: number;
     })
+  | (BaseCue & {
+      type: 'trick-play';
+      card: string;
+      seat: number;
+      index: number;
+      from: `hand:${number}`;
+      to: `seat:${number}`;
+    })
+  | (BaseCue & { type: 'trick-collect'; seat: number; count: number })
+  | (BaseCue & { type: 'transfer'; card: string; from: Zone; to: Zone })
   | (BaseCue & { type: 'knock'; seat: number })
   | (BaseCue & { type: 'blitz'; seat: number; handValue: number })
   | (BaseCue & { type: 'showdown'; seat: number; handValue: number })
   | (BaseCue & { type: 'chip-loss'; seat: number; livesLeft: number })
-  | (BaseCue & { type: 'turn'; seat: number });
+  | (BaseCue & { type: 'turn'; seat: number })
+  | (BaseCue & {
+      type: 'gin-burst';
+      burst: 'gin' | 'big-gin' | 'undercut';
+      seat: number;
+    })
+  | (BaseCue & { type: 'layoff'; card: string; from: Zone; to: Zone });
 
 type Payload = Record<string, unknown>;
 
@@ -151,14 +167,20 @@ function cueFor(event: FxEvent, index: number): FxCue | null {
         handValue: numberField(event, 'handValue'),
         durationMs: FX_TIMING.blitzMs,
       };
-    case Fx.ShowdownReveal:
+    case Fx.ShowdownReveal: {
+      // Blitz stamps handValue; Gin stamps deadwood — either drives the reveal
+      const value = payloadOf(event).handValue ?? payloadOf(event).deadwood;
+      if (typeof value !== 'number' || !Number.isFinite(value)) {
+        throw new Error(`${event.kind} fx requires a finite handValue or deadwood`);
+      }
       return {
         ...base,
         type: 'showdown',
         seat: numberField(event, 'seat'),
-        handValue: numberField(event, 'handValue'),
+        handValue: value,
         durationMs: FX_TIMING.showdownMs,
       };
+    }
     case Fx.ChipLoss:
       return {
         ...base,
@@ -173,6 +195,85 @@ function cueFor(event: FxEvent, index: number): FxCue | null {
         type: 'turn',
         seat: numberField(event, 'seat'),
         durationMs: FX_TIMING.settleMs * 3,
+      };
+    // Trick-taking vocabulary (@parlour/tricks) — shared by Hearts and friends.
+    case 'tricks.play': {
+      const playSeat = numberField(event, 'seat');
+      return {
+        ...base,
+        type: 'trick-play',
+        card: stringField(event, 'card'),
+        seat: playSeat,
+        index: numberField(event, 'index'),
+        from: `hand:${playSeat}`,
+        to: `seat:${playSeat}`,
+        durationMs: FX_TIMING.cardFlightMs + FX_TIMING.settleMs,
+      };
+    }
+    case 'tricks.collect':
+      return {
+        ...base,
+        type: 'trick-collect',
+        seat: numberField(event, 'seat'),
+        count: numberField(event, 'count'),
+        durationMs: FX_TIMING.showdownMs,
+      };
+    // A card passing between hands (secret passes): same flight shape as a
+    // deal, but the zones name the two hands involved.
+    case 'hearts.transfer': {
+      const from = zoneField(event, 'from');
+      const to = zoneField(event, 'to');
+      return {
+        ...base,
+        type: 'transfer',
+        card: stringField(event, 'card'),
+        from,
+        to,
+        durationMs: FX_TIMING.cardFlightMs,
+      };
+    }
+    // Hearts moments ride the shared burst vocabulary.
+    case 'hearts.moon':
+      return {
+        ...base,
+        type: 'blitz',
+        seat: numberField(event, 'seat'),
+        handValue: 26,
+        durationMs: FX_TIMING.blitzMs,
+      };
+    case 'hearts.queen':
+      return {
+        ...base,
+        type: 'knock',
+        seat: numberField(event, 'seat'),
+        durationMs: FX_TIMING.knockMs,
+      };
+    case 'hearts.broken':
+      return {
+        ...base,
+        type: 'turn',
+        seat: numberField(event, 'seat'),
+        durationMs: FX_TIMING.settleMs * 4,
+      };
+    case 'gin.gin':
+    case 'gin.big-gin':
+    case 'gin.undercut':
+      return {
+        ...base,
+        type: 'gin-burst',
+        burst:
+          event.kind === 'gin.gin' ? 'gin' : event.kind === 'gin.big-gin' ? 'big-gin' : 'undercut',
+        seat: numberField(event, 'seat'),
+        durationMs: event.kind === 'gin.undercut' ? 700 : event.kind === 'gin.big-gin' ? 1100 : 900,
+      };
+    case 'gin.layoff':
+      return {
+        ...base,
+        type: 'layoff',
+        card: stringField(event, 'card'),
+        from: zoneField(event, 'from'),
+        to: zoneField(event, 'to'),
+        durationMs: FX_TIMING.cardFlightMs + FX_TIMING.settleMs,
       };
     default:
       return null;

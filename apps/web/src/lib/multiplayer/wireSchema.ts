@@ -16,8 +16,13 @@ const MAX_WIRE_BYTES = 512_000;
 const MAX_ID_LENGTH = 128;
 const MAX_LABEL_LENGTH = 128;
 const MAX_HASH_LENGTH = 256;
-const MAX_PEERS = 4;
-const MAX_SEATS = 4;
+const MAX_PEERS = 8;
+/**
+ * Wire-level seat ceiling for every game — the shared table shell supports up
+ * to eight chairs (President's full ring). Per-game capacity lives in
+ * lib/rooms/seatRange; this bound only keeps hostile packets sane.
+ */
+const MAX_SEATS = 8;
 const MAX_APPLIED_EVENTS = 64;
 const MAX_SNAPSHOT_EVENTS = 4_096;
 const MAX_FX_EVENTS = 256;
@@ -191,13 +196,13 @@ function isPresenceSnapshot(value: unknown, maxSeats: number): value is Presence
 function isPlayerAction(value: unknown): value is PlayerAction {
   return (
     isRecord(value) &&
-    hasOnlyKeys(value, ['id', 'seat', 'move'], ['payload', 'reveals', 'conceals']) &&
+    hasOnlyKeys(value, ['id', 'seat', 'move'], ['payload', 'reveals', 'recycle']) &&
     isBoundedString(value.id) &&
     isSeat(value.seat) &&
     isBoundedString(value.move, MAX_LABEL_LENGTH) &&
     (!Object.hasOwn(value, 'payload') || isJsonValue(value.payload)) &&
     (!Object.hasOwn(value, 'reveals') || isCardMapping(value.reveals)) &&
-    (!Object.hasOwn(value, 'conceals') || isCardMapping(value.conceals))
+    (!Object.hasOwn(value, 'recycle') || isCardRecycle(value.recycle))
   );
 }
 
@@ -207,7 +212,7 @@ function isAppliedEvent(value: unknown): value is AppliedEvent {
     hasOnlyKeys(
       value,
       ['seq', 'seat', 'move'],
-      ['payload', 'ts', 'atMs', 'automatic', 'injected', 'reveals', 'conceals', 'hash'],
+      ['payload', 'ts', 'atMs', 'automatic', 'injected', 'reveals', 'recycle', 'hash'],
     ) &&
     isBoundedInteger(value.seq, MAX_SEQUENCE) &&
     (value.seat === null || isSeat(value.seat)) &&
@@ -218,15 +223,15 @@ function isAppliedEvent(value: unknown): value is AppliedEvent {
     (!Object.hasOwn(value, 'automatic') || typeof value.automatic === 'boolean') &&
     (!Object.hasOwn(value, 'injected') || typeof value.injected === 'boolean') &&
     (!Object.hasOwn(value, 'reveals') || isCardMapping(value.reveals)) &&
-    (!Object.hasOwn(value, 'conceals') || isCardMapping(value.conceals)) &&
+    (!Object.hasOwn(value, 'recycle') || isCardRecycle(value.recycle)) &&
     (!Object.hasOwn(value, 'hash') || isBoundedString(value.hash, MAX_HASH_LENGTH))
   );
 }
 
 /**
- * Veil openings and re-veilings ride on the event. Each is a pair of card ids
- * and there can never be more than a deck's worth in one move, so the bound is
- * the deck, not whatever the sender claims.
+ * Veil openings ride on the event as pairs of card ids. There can never be more
+ * than a deck's worth in one move, so the bound is the deck, not whatever the
+ * sender claims.
  */
 function isCardMapping(value: unknown): value is Array<[string, string]> {
   return (
@@ -241,6 +246,27 @@ function isCardMapping(value: unknown): value is Array<[string, string]> {
         isBoundedString(pair[1], MAX_LABEL_LENGTH),
     ) &&
     new Set(value.map((pair) => (pair as string[])[0])).size === value.length
+  );
+}
+
+/** A recycle exposes the two sets but never a card-to-handle pairing. */
+function isCardRecycle(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    hasOnlyKeys(value, ['retire', 'issue']) &&
+    isCardList(value.retire) &&
+    isCardList(value.issue) &&
+    value.retire.length === value.issue.length
+  );
+}
+
+function isCardList(value: unknown): value is string[] {
+  return (
+    Array.isArray(value) &&
+    value.length > 0 &&
+    value.length <= MAX_DECK_ORDER &&
+    value.every((card) => isBoundedString(card, MAX_LABEL_LENGTH)) &&
+    new Set(value).size === value.length
   );
 }
 

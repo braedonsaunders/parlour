@@ -30,7 +30,16 @@ const validMessages = [
   },
   { type: 'mesh.peers', peers: [{ peerId: 'peer', profile }] },
   { type: 'presence.state', presence: migration.presence },
-  { type: 'intent', action: { id: 'action', seat: 1, move: 'draw', payload: null } },
+  {
+    type: 'intent',
+    action: {
+      id: 'action',
+      seat: 1,
+      move: 'draw',
+      payload: null,
+      recycle: { retire: ['H2', 'D4'], issue: ['v#52', 'v#53'] },
+    },
+  },
   {
     type: 'applied',
     packet: {
@@ -43,6 +52,7 @@ const validMessages = [
           atMs: 25,
           automatic: false,
           injected: false,
+          recycle: { retire: ['H2', 'D4'], issue: ['v#52', 'v#53'] },
           hash: 'event-hash',
         },
       ],
@@ -84,7 +94,23 @@ describe('wire message schema', () => {
       },
     ],
     ['fractional seat', { type: 'intent', action: { id: 'a', seat: 1.5, move: 'draw' } }],
-    ['out-of-range seat', { type: 'intent', action: { id: 'a', seat: 4, move: 'draw' } }],
+    ['out-of-range seat', { type: 'intent', action: { id: 'a', seat: 8, move: 'draw' } }],
+    [
+      'old recycle pairing that leaks the mapping',
+      { type: 'intent', action: { id: 'a', seat: 1, move: 'draw', conceals: [['H2', 'v#52']] } },
+    ],
+    [
+      'recycle that changes the deck size',
+      {
+        type: 'intent',
+        action: {
+          id: 'a',
+          seat: 1,
+          move: 'draw',
+          recycle: { retire: ['H2'], issue: ['v#52', 'v#53'] },
+        },
+      },
+    ],
     ['negative sequence', { type: 'sync.request', expectedSeq: -1 }],
     ['non-finite timestamp', '{"type":"heartbeat","sentAt":1e400}'],
     ['empty host change identity', { type: 'host.changed', hostId: '', snapshot: migration }],
@@ -93,7 +119,7 @@ describe('wire message schema', () => {
       'too many peers',
       {
         type: 'mesh.peers',
-        peers: Array.from({ length: 5 }, (_, index) => ({
+        peers: Array.from({ length: 9 }, (_, index) => ({
           peerId: `peer-${index}`,
           profile: { ...profile, profileId: `profile-${index}` },
         })),
@@ -105,7 +131,7 @@ describe('wire message schema', () => {
         type: 'sync.snapshot',
         snapshot: {
           ...migration,
-          replay: { ...snapshot, settings: { ...snapshot.settings, seats: 5 } },
+          replay: { ...snapshot, settings: { ...snapshot.settings, seats: 9 } },
         },
       },
     ],

@@ -172,44 +172,70 @@ export function applyReveals<S>(state: S, reveals: readonly CardReveal[]): S {
   return substituteCardIds(state, new Map(reveals));
 }
 
-/** The inverse of a reveal: a public card going back under the veil. */
-export type CardConcealment = readonly [card: CardId, handle: CardId];
+/**
+ * Sending a spent pile back under the veil.
+ *
+ * The obvious primitive — "card X becomes handle H" — is worthless. Writing
+ * that pairing into the log publishes exactly the thing the re-veil exists to
+ * hide, and a public reshuffle of the relabelled handles keeps it readable.
+ *
+ * So a recycle never declares a pairing. It retires a set of public cards and
+ * issues a list of fresh handles whose order came out of a new shuffle
+ * ceremony. Which retired card sits behind which issued handle is known to
+ * nobody — that is the point — while the table still knows *which* cards are in
+ * the stock, exactly as it would in a physical game.
+ */
+export interface CardRecycle {
+  /** public cards leaving the table */
+  retire: readonly CardId[];
+  /** fresh handles entering, in the order the new ceremony produced */
+  issue: readonly CardId[];
+}
 
 /**
- * Structural checks for re-veiling.
+ * Structural checks for a recycle, run before the move that places the handles.
  *
- * Recycling a spent discard pile into the stock is the one place a veiled round
- * would otherwise leak everything: the cards are public, so a plain reshuffle
- * makes every remaining draw readable by the whole table. Re-veiling hands the
- * pile back to a fresh shuffle ceremony, which returns new handles. The table
- * still knows *which* cards are in the stock — it does in a physical game too —
- * but no longer their order.
- *
- * `minHandleIndex` keeps a new epoch's handles clear of the ones the round has
- * already used, so a spent handle can never be quietly recycled to mean a
- * different card.
+ * `minHandleIndex` keeps a new epoch's handles clear of the ones already spent,
+ * so a retired handle can never be quietly reused to mean a different card.
  */
-export function validateConceals(
+export function validateRecycle(
   state: unknown,
-  conceals: readonly CardConcealment[],
+  recycle: CardRecycle,
   minHandleIndex = 0,
 ): RuleError | null {
-  const cards = new Set<string>();
-  const handles = new Set<string>();
-  for (const concealment of conceals) {
-    if (!Array.isArray(concealment) || concealment.length !== 2) {
-      return revealError('bad-conceal', 'each concealment must be a [card, handle] pair');
+  const { retire, issue } = recycle;
+  if (!Array.isArray(retire) || !Array.isArray(issue)) {
+    return revealError('bad-recycle', 'a recycle needs a retire list and an issue list');
+  }
+  if (retire.length === 0) {
+    return revealError('empty-recycle', 'a recycle must retire at least one card');
+  }
+  if (retire.length !== issue.length) {
+    return revealError(
+      'recycle-not-conserved',
+      `retiring ${retire.length} cards cannot issue ${issue.length} handles`,
+    );
+  }
+
+  const seenCards = new Set<string>();
+  for (const card of retire) {
+    if (typeof card !== 'string' || card.length === 0 || isVeilHandle(card)) {
+      return revealError('bad-recycle', `${String(card)} is not a public card`);
     }
-    const [card, handle] = concealment;
-    if (typeof card !== 'string' || typeof handle !== 'string' || card.length === 0) {
-      return revealError('bad-conceal', 'concealment entries must be card ids');
+    if (seenCards.has(card)) {
+      return revealError('duplicate-retire', `${card} is retired twice`);
     }
-    if (isVeilHandle(card)) {
-      return revealError('conceal-of-handle', `${card} is already veiled`);
+    if (!stateContainsCardId(state, card)) {
+      return revealError('unknown-card', `${card} is not in play`);
     }
+    seenCards.add(card);
+  }
+
+  const seenHandles = new Set<string>();
+  for (const handle of issue) {
     const index = veilHandleIndex(handle);
     if (index === null) {
-      return revealError('not-a-handle', `${handle} is not a veil handle`);
+      return revealError('not-a-handle', `${String(handle)} is not a veil handle`);
     }
     if (index < minHandleIndex) {
       return revealError(
@@ -217,28 +243,35 @@ export function validateConceals(
         `${handle} reuses a handle from an earlier deck epoch (need index ≥ ${minHandleIndex})`,
       );
     }
-    if (cards.has(card)) {
-      return revealError('duplicate-conceal', `${card} is concealed twice in one move`);
-    }
-    if (handles.has(handle)) {
-      return revealError('duplicate-handle', `${handle} is issued twice in one move`);
-    }
-    if (!stateContainsCardId(state, card)) {
-      return revealError('unknown-card', `${card} is not in play`);
+    if (seenHandles.has(handle)) {
+      return revealError('duplicate-handle', `${handle} is issued twice`);
     }
     if (stateContainsCardId(state, handle)) {
       return revealError('handle-in-use', `${handle} is already in play`);
     }
-    cards.add(card);
-    handles.add(handle);
+    seenHandles.add(handle);
   }
   return null;
 }
 
-/** Applies validated concealments. Run {@link validateConceals} first. */
-export function applyConceals<S>(state: S, conceals: readonly CardConcealment[]): S {
-  if (conceals.length === 0) return state;
-  return substituteCardIds(state, new Map(conceals));
+/**
+ * Conservation check run *after* the move placed the handles. A reducer that
+ * left a retired card on the table, or dropped an issued handle, has silently
+ * changed the deck — better to fail loudly than to play on with a board the
+ * audit will reject at match end.
+ */
+export function recycleSettled(state: unknown, recycle: CardRecycle): RuleError | null {
+  for (const card of recycle.retire) {
+    if (stateContainsCardId(state, card)) {
+      return revealError('retire-not-applied', `${card} is still on the table after the recycle`);
+    }
+  }
+  for (const handle of recycle.issue) {
+    if (!stateContainsCardId(state, handle)) {
+      return revealError('issue-not-applied', `${handle} never reached the table`);
+    }
+  }
+  return null;
 }
 
 /**

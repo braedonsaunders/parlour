@@ -34,7 +34,7 @@ import {
   type VeilShare,
 } from './ceremony';
 import { createIdentity, type VeilIdentity } from './signing';
-import { VeilTranscript, type VeilRoundHeader } from './transcript';
+import { VeilTranscript, type SignedVeilEntry, type VeilRoundHeader } from './transcript';
 import { auditRound, type AuditReport, type VeilAuditState } from './audit';
 import {
   packageRecovery,
@@ -44,6 +44,9 @@ import {
   type RecoveryPackage,
   type RecoveryPolicy,
 } from './recovery';
+
+/** Why this client is allowed to read a given face. */
+export type FaceScope = 'mine' | 'public' | 'surrogate';
 
 export interface VeilSessionOptions {
   roomCode: string;
@@ -72,6 +75,13 @@ export interface VeilDealPlan {
   publicSetup: readonly CardId[];
 }
 
+/** Signed declaration of the public cards and live seats in a recycled epoch. */
+export interface VeilRecycleEntry {
+  epoch: number;
+  cards: readonly CardId[];
+  participants: readonly SeatId[];
+}
+
 function recoveryKey(seat: SeatId, epoch: number): string {
   return `${seat}:${epoch}`;
 }
@@ -82,8 +92,16 @@ export class VeilSession {
   private readonly epochs = new Map<number, VeilEpoch>();
   private readonly secrets = new Map<number, VeilLayerSecret>();
   private readonly baseDecks = new Map<number, readonly string[]>();
-  /** handle -> card face this seat is entitled to see */
-  private readonly known = new Map<CardId, CardId>();
+  /**
+   * handle -> the face behind it, and why this client may read it.
+   *
+   * `mine` is a card dealt to this seat, `public` is one the table turned over,
+   * and `surrogate` is one belonging to a seat that dropped and whose layer the
+   * room rebuilt. Surrogate faces are deliberately kept out of the rendered
+   * view: the host needs them to play the bot's turn, and must not see them on
+   * its own table.
+   */
+  private readonly known = new Map<CardId, { card: CardId; scope: FaceScope }>();
   /** every opening the room performed, for the audit */
   private readonly openings: { epoch: number; position: number; card: CardId }[] = [];
   /** sealed layers other seats published, keyed `seat:epoch` */
@@ -135,7 +153,7 @@ export class VeilSession {
       deck: [...deck],
     };
     this.transcript = await VeilTranscript.open(header);
-    await this.beginEpoch(0, deck);
+    await this.beginEpoch(0, deck, this.allSeats());
     return header;
   }
 
@@ -148,13 +166,42 @@ export class VeilSession {
     if (header.keys[this.options.seat] !== this.identity?.publicKey)
       return 'the header does not carry this seat’s key';
     this.transcript = await VeilTranscript.open(header);
-    await this.beginEpoch(0, header.deck);
+    await this.beginEpoch(0, header.deck, this.allSeats());
     return null;
   }
 
-  private async beginEpoch(epoch: number, cards: readonly CardId[]): Promise<VeilEpoch> {
+  private allSeats(): SeatId[] {
+    return Array.from({ length: this.options.seats }, (_, seat) => seat);
+  }
+
+  private validateParticipants(participants: readonly SeatId[]): SeatId[] {
+    const ordered = [...participants].sort((a, b) => a - b);
+    if (
+      ordered.length === 0 ||
+      new Set(ordered).size !== ordered.length ||
+      ordered.some((seat) => !Number.isInteger(seat) || seat < 0 || seat >= this.options.seats)
+    ) {
+      throw new Error('a Veil epoch needs distinct live seats from this room');
+    }
+    return ordered;
+  }
+
+  private async beginEpoch(
+    epoch: number,
+    cards: readonly CardId[],
+    participants: readonly SeatId[],
+  ): Promise<VeilEpoch> {
+    if (this.epochs.has(epoch)) throw new Error(`deck epoch ${epoch} already exists`);
+    const latest = Math.max(-1, ...this.epochs.keys());
+    if (epoch !== latest + 1) throw new Error(`deck epoch ${epoch} is out of sequence`);
     const roundId = roundIdFor(this.options.roomCode, this.options.seed, epoch);
-    const opened = await openEpoch(epoch, roundId, cards, this.nextHandleBase);
+    const opened = await openEpoch(
+      epoch,
+      roundId,
+      cards,
+      this.nextHandleBase,
+      this.validateParticipants(participants),
+    );
     this.nextHandleBase += cards.length;
     this.epochs.set(epoch, opened);
     this.baseDecks.set(epoch, baseDeck(opened));
@@ -162,8 +209,33 @@ export class VeilSession {
   }
 
   /** Starts a fresh epoch for a recycled pile, so its new order is unknown again. */
-  async recycle(epoch: number, cards: readonly CardId[]): Promise<VeilEpoch> {
-    return this.beginEpoch(epoch, cards);
+  async recycle(
+    epoch: number,
+    cards: readonly CardId[],
+    participants: readonly SeatId[] = this.allSeats(),
+  ): Promise<VeilEpoch> {
+    return this.beginEpoch(epoch, cards, participants);
+  }
+
+  /** Starts and signs a recycled epoch for the rest of the room to adopt. */
+  async startRecycle(
+    epoch: number,
+    cards: readonly CardId[],
+    participants: readonly SeatId[],
+  ): Promise<SignedVeilEntry<VeilRecycleEntry>> {
+    if (!this.identity || !this.transcript) throw new Error('the Veil round is not open');
+    const entry: VeilRecycleEntry = {
+      epoch,
+      cards: [...cards],
+      participants: this.validateParticipants(participants),
+    };
+    await this.beginEpoch(epoch, entry.cards, entry.participants);
+    return this.transcript.append(this.identity, this.options.seat, 'ceremony.recycle', entry);
+  }
+
+  /** Adopts a recycle declaration after its transcript signature was checked. */
+  async acceptRecycle(entry: VeilRecycleEntry): Promise<void> {
+    await this.beginEpoch(entry.epoch, entry.cards, entry.participants);
   }
 
   epochAt(epoch: number): VeilEpoch | null {
@@ -179,11 +251,23 @@ export class VeilSession {
     return [...this.epochs.keys()].sort((a, b) => a - b);
   }
 
+  participantsFor(epoch: number): readonly SeatId[] {
+    return this.epochs.get(epoch)?.participants ?? [];
+  }
+
+  participates(seat: SeatId, epoch: number): boolean {
+    return this.participantsFor(epoch).includes(seat);
+  }
+
+  recoveryFor(epoch: number): RecoveryPolicy {
+    return recoveryPolicyFor(this.participantsFor(epoch).length);
+  }
+
   progress(epoch = 0): VeilCeremonyProgress {
     const current = this.epochs.get(epoch);
     return {
       laid: current?.layers.length ?? 0,
-      seats: this.options.seats,
+      seats: current?.participants.length ?? this.options.seats,
       ready: current?.deck !== null && current !== undefined,
       awaitingPublicOpens: current?.deck !== null && current !== undefined,
     };
@@ -196,7 +280,8 @@ export class VeilSession {
   async layLayer(epoch = 0): Promise<VeilLayerEntry | null> {
     const current = this.epochs.get(epoch);
     if (!current || !this.identity || !this.transcript) return null;
-    if (current.layers.length !== this.options.seat) return null;
+    const expectedSeat = current.participants[current.layers.length];
+    if (expectedSeat !== this.options.seat) return null;
     const input =
       current.layers.length === 0
         ? (this.baseDecks.get(epoch) as readonly string[])
@@ -209,7 +294,7 @@ export class VeilSession {
     );
     this.secrets.set(epoch, secret);
     await this.transcript.append(this.identity, this.options.seat, 'ceremony.layer', entry);
-    this.epochs.set(epoch, acceptLayer(current, entry, this.options.seats));
+    this.epochs.set(epoch, acceptLayer(current, entry, current.participants));
     return entry;
   }
 
@@ -221,9 +306,13 @@ export class VeilSession {
       current.layers.length === 0
         ? (this.baseDecks.get(entry.epoch) as readonly string[])
         : (current.layers[current.layers.length - 1] as VeilLayerEntry).deck;
-    const fault = checkLayer(current, entry, input, current.layers.length);
+    const expectedSeat = current.participants[current.layers.length];
+    if (expectedSeat === undefined) {
+      return { code: 'out-of-turn', message: 'this deck epoch is already closed' };
+    }
+    const fault = checkLayer(current, entry, input, expectedSeat);
     if (fault) return fault;
-    this.epochs.set(entry.epoch, acceptLayer(current, entry, this.options.seats));
+    this.epochs.set(entry.epoch, acceptLayer(current, entry, current.participants));
     return null;
   }
 
@@ -250,21 +339,44 @@ export class VeilSession {
     epoch: number,
     position: number,
     shares: readonly VeilShare[],
-    visibility: 'private' | 'public',
+    visibility: 'private' | 'public' | 'surrogate',
   ): { card: CardId } | { code: string; message: string } {
     const current = this.epochs.get(epoch);
     if (!current) return { code: 'unknown-epoch', message: 'unknown deck epoch' };
-    const result = finishOpen(current, shares, this.options.seats);
+    const result = finishOpen(current, shares, current.participants.length);
     if ('code' in result) return result;
     const handle = handleForPosition(current, position);
-    this.known.set(handle, result.card);
+    const scope: FaceScope =
+      visibility === 'public' ? 'public' : visibility === 'surrogate' ? 'surrogate' : 'mine';
+    // A card already readable for a better reason keeps that reason: opening a
+    // public card again must not demote it to surrogate-only.
+    const existing = this.known.get(handle);
+    if (!existing || existing.scope === 'surrogate')
+      this.known.set(handle, { card: result.card, scope });
     if (visibility === 'public') this.openings.push({ epoch, position, card: result.card });
     return { card: result.card };
   }
 
-  /** Faces this seat may render. Handles it has never been dealt are absent. */
+  /**
+   * Every face this client can compute, including ones it holds only as a
+   * surrogate for a departed seat. Used to turn a played card back into its
+   * opening — the bot driver needs it, the renderer must not.
+   */
   knownFaces(): ReadonlyMap<CardId, CardId> {
-    return this.known;
+    return new Map([...this.known].map(([handle, entry]) => [handle, entry.card]));
+  }
+
+  /**
+   * Faces this seat is entitled to *see*: its own cards and public ones. A
+   * departed seat's hand is excluded, so recovering a layer never quietly turns
+   * the host's table face up.
+   */
+  visibleFaces(): ReadonlyMap<CardId, CardId> {
+    const visible = new Map<CardId, CardId>();
+    for (const [handle, entry] of this.known) {
+      if (entry.scope !== 'surrogate') visible.set(handle, entry.card);
+    }
+    return visible;
   }
 
   handleFor(epoch: number, position: number): CardId | null {
@@ -288,9 +400,9 @@ export class VeilSession {
   revealsFor(handles: readonly CardId[]): (readonly [CardId, CardId])[] | null {
     const reveals: (readonly [CardId, CardId])[] = [];
     for (const handle of handles) {
-      const card = this.known.get(handle);
-      if (!card) return null;
-      reveals.push([handle, card]);
+      const entry = this.known.get(handle);
+      if (!entry) return null;
+      reveals.push([handle, entry.card]);
     }
     return reveals;
   }
@@ -331,11 +443,12 @@ export class VeilSession {
     holders: readonly SeatId[],
   ): Promise<{ holder: SeatId; pack: RecoveryPackage }[]> {
     const secret = this.secrets.get(epoch);
-    if (!secret || this.recovery.mode === 'none' || holders.length === 0) return [];
+    const policy = this.recoveryFor(epoch);
+    if (!secret || policy.mode === 'none' || holders.length === 0) return [];
     const pack = await packageRecovery(
       secret,
       this.options.seat,
-      this.recovery,
+      policy,
       [...holders],
       this.options.random ?? randomBytes,
     );
@@ -379,7 +492,7 @@ export class VeilSession {
     if (!pack) {
       return { code: 'tampered', message: `seat ${seat} never published a sealed layer` };
     }
-    const result = await recoverLayer(pack, offered, this.recovery);
+    const result = await recoverLayer(pack, offered, this.recoveryFor(epoch));
     if ('code' in result) return result;
     if (result.epoch !== epoch) {
       return { code: 'tampered', message: 'the recovered layer belongs to another epoch' };

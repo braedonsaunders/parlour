@@ -25,9 +25,15 @@
 import type { CardId } from '@parlour/engine';
 import { sha256Hex } from './hash';
 import { fromHex, utf8 } from './bytes';
-import type { VeilSession } from './session';
+import type { VeilSession, VeilRecycleEntry } from './session';
 import type { VeilShare } from './ceremony';
 import type { VeilMessage } from './wire';
+
+/**
+ * Who an opening is for. `surrogate` is a departed seat's card, opened so a bot
+ * can play its turn — readable for that, and deliberately not rendered.
+ */
+export type FaceVisibility = 'private' | 'public' | 'surrogate';
 
 export interface VeilLink {
   /** `to === null` broadcasts to the room. */
@@ -48,7 +54,7 @@ export interface PeelReceipt {
 type Pending = {
   epoch: number;
   position: number;
-  visibility: 'private' | 'public';
+  visibility: FaceVisibility;
   shares: VeilShare[];
   resolve: (card: CardId) => void;
   reject: (error: Error) => void;
@@ -119,10 +125,21 @@ export class VeilRoom {
     return true;
   }
 
+  /** Opens a fresh signed epoch for a public spent pile, then starts its cascade. */
+  async startRecycle(
+    epoch: number,
+    cards: readonly CardId[],
+    participants: readonly number[],
+  ): Promise<void> {
+    const entry = await this.session.startRecycle(epoch, cards, participants);
+    this.link.send({ type: 'veil.entry', entry }, null);
+    await this.advanceCeremony(epoch);
+  }
+
   private async distributeRecovery(epoch: number): Promise<void> {
-    const holders = Array.from({ length: this.seats }, (_, seat) => seat).filter(
-      (seat) => seat !== this.session.seat,
-    );
+    const holders = this.session
+      .participantsFor(epoch)
+      .filter((seat) => seat !== this.session.seat);
     for (const { holder, pack } of await this.session.sealRecovery(epoch, holders)) {
       const peer = this.link.peerIdForSeat(holder);
       if (peer) this.link.send({ type: 'veil.recovery', pack }, peer);
@@ -151,7 +168,8 @@ export class VeilRoom {
    * says so instead of pretending the cards are gone forever.
    */
   recoverSeat(lostSeat: number, epoch = 0): Promise<boolean> {
-    if (this.session.recovery.mode === 'none') return Promise.resolve(false);
+    if (!this.session.participates(lostSeat, epoch)) return Promise.resolve(true);
+    if (this.session.recoveryFor(epoch).mode === 'none') return Promise.resolve(false);
     if (this.session.canCoverSeat(lostSeat, epoch)) return Promise.resolve(true);
     const key = `${lostSeat}:${epoch}`;
     // Several openings can stall on the same missing seat at once; they all
@@ -181,7 +199,7 @@ export class VeilRoom {
   private async tryRecover(key: string): Promise<void> {
     const waiting = this.recovering.get(key);
     if (!waiting) return;
-    if (waiting.offers.size < this.session.recovery.threshold) return;
+    if (waiting.offers.size < this.session.recoveryFor(waiting.epoch).threshold) return;
     const result = await this.session.recover(waiting.lostSeat, waiting.epoch, [
       ...waiting.offers.values(),
     ]);
@@ -195,7 +213,7 @@ export class VeilRoom {
    * Starts an opening for a deck position. Resolves with the card once the
    * chain comes back; rejects if a hop lies or never answers.
    */
-  open(epoch: number, position: number, visibility: 'private' | 'public'): Promise<CardId> {
+  open(epoch: number, position: number, visibility: FaceVisibility): Promise<CardId> {
     const locked = this.session.lockedAt(epoch, position);
     if (!locked) return Promise.reject(new Error('the ceremony has not closed yet'));
     const key = `${epoch}:${position}`;
@@ -213,15 +231,16 @@ export class VeilRoom {
   }
 
   /** Seats that peel, in order, with the recipient last. */
-  private chain(): number[] {
-    const others = Array.from({ length: this.seats }, (_, seat) => seat).filter(
-      (seat) => seat !== this.session.seat,
-    );
-    return [...others, this.session.seat];
+  private chain(epoch: number): number[] {
+    const participants = this.session.participantsFor(epoch);
+    const others = participants.filter((seat) => seat !== this.session.seat);
+    return participants.includes(this.session.seat)
+      ? [...others, this.session.seat]
+      : [...participants];
   }
 
   private forward(epoch: number, position: number, locked: string, sequence: number): void {
-    const order = this.chain();
+    const order = this.chain(epoch);
     const seat = order[sequence];
     if (seat === undefined) return;
     if (seat === this.session.seat) {
@@ -239,7 +258,7 @@ export class VeilRoom {
       this.fail(
         epoch,
         position,
-        this.session.recovery.mode === 'none'
+        this.session.recoveryFor(epoch).mode === 'none'
           ? `Seat ${seat} left. With two players there is no way to reopen their cards without ` +
               `handing over enough key material to read a live hand, so the round pauses here.`
           : `Seat ${seat} left and their layer has not been recovered yet, so this card cannot ` +
@@ -292,7 +311,7 @@ export class VeilRoom {
     const waiting = this.pending.get(key);
     if (!waiting) return;
     waiting.shares.push(share);
-    if (waiting.shares.length < this.seats) return;
+    if (waiting.shares.length < this.session.participantsFor(epoch).length) return;
     clearTimeout(waiting.timer);
     this.pending.delete(key);
     const result = this.session.open(epoch, position, waiting.shares, waiting.visibility);
@@ -337,6 +356,18 @@ export class VeilRoom {
   async receive(peerId: string, message: VeilMessage): Promise<void> {
     switch (message.type) {
       case 'veil.hello':
+        if (this.link.seatForPeer(peerId) !== message.seat) {
+          throw new Error('veil hello claimed another seat');
+        }
+        if (!this.keys.has(message.seat) && message.seat !== this.session.seat) {
+          const ownKey = this.keys.get(this.session.seat);
+          if (ownKey) {
+            this.link.send(
+              { type: 'veil.hello', seat: this.session.seat, publicKey: ownKey },
+              peerId,
+            );
+          }
+        }
         this.keys.set(message.seat, message.publicKey);
         return;
       case 'veil.header': {
@@ -345,10 +376,14 @@ export class VeilRoom {
         return;
       }
       case 'veil.entry': {
-        if (message.entry.kind !== 'ceremony.layer') return;
         const transcript = this.session.transcriptRef();
         const chainFault = await transcript?.accept(message.entry);
         if (chainFault) throw new Error(`veil transcript rejected an entry: ${chainFault.message}`);
+        if (message.entry.kind === 'ceremony.recycle') {
+          await this.session.acceptRecycle(message.entry.payload as VeilRecycleEntry);
+          return;
+        }
+        if (message.entry.kind !== 'ceremony.layer') return;
         const fault = this.session.acceptLayer(
           message.entry.payload as Parameters<VeilSession['acceptLayer']>[0],
         );
@@ -360,7 +395,7 @@ export class VeilRoom {
         // plaintext: it hands the still-locked value to the next hop.
         const share = this.session.share(message.epoch, message.position, message.locked);
         if (!share) return;
-        const order = this.chainFor(message.forSeat);
+        const order = this.chainFor(message.forSeat, message.epoch);
         const sequence = order.indexOf(this.session.seat);
         await this.recordReceipt(
           message.epoch,
@@ -416,11 +451,10 @@ export class VeilRoom {
     }
   }
 
-  private chainFor(recipient: number): number[] {
-    const others = Array.from({ length: this.seats }, (_, seat) => seat).filter(
-      (seat) => seat !== recipient,
-    );
-    return [...others, recipient];
+  private chainFor(recipient: number, epoch: number): number[] {
+    const participants = this.session.participantsFor(epoch);
+    const others = participants.filter((seat) => seat !== recipient);
+    return participants.includes(recipient) ? [...others, recipient] : [...participants];
   }
 
   /**
@@ -433,7 +467,7 @@ export class VeilRoom {
     if (!waiting) return;
     if (waiting.shares.some((existing) => existing.seat === share.seat)) return;
     waiting.shares.push(share);
-    const order = this.chain();
+    const order = this.chain(share.epoch);
     const next = sequence + 1;
     if (next >= order.length) return;
     this.forward(share.epoch, share.position, share.value, next);

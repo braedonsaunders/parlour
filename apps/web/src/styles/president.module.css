@@ -1,0 +1,164 @@
+/* President-specific presentation: pile reads, role plaques, exchange flow. */
+
+.pileArea {
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.55rem;
+  transform: translate(-50%, -50%);
+}
+
+.pileStack {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 4.6rem;
+  min-width: 6.4rem;
+}
+
+.pileSet {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  display: flex;
+  transform-origin: 50% 120%;
+}
+
+.pileSet > * {
+  margin-inline: -0.85rem;
+}
+
+.pileSetTop {
+  filter: drop-shadow(0 10px 16px rgba(4, 14, 20, 0.45));
+}
+
+.rankChip {
+  position: absolute;
+  right: -2.4rem;
+  bottom: -0.9rem;
+  padding: 0.18rem 0.6rem;
+  border-radius: 999px;
+  border: 2px solid rgba(255, 236, 200, 0.35);
+  background: rgba(12, 30, 38, 0.82);
+  color: var(--hearth-100, #ffe3ae);
+  font-family: var(--font-display), sans-serif;
+  font-weight: 800;
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.emptyPileHint {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  border: 2px dashed rgba(255, 236, 200, 0.22);
+  border-radius: 1rem;
+  color: rgba(255, 236, 200, 0.4);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.roleBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-top: 0.22rem;
+  padding: 0.14rem 0.55rem;
+  border-radius: 999px;
+  font-size: clamp(0.56rem, 1vw, 0.72rem);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  background: rgba(12, 30, 38, 0.7);
+  border: 1px solid rgba(255, 236, 200, 0.28);
+  color: #ffe8bd;
+}
+
+.roleBadgePresident {
+  background: linear-gradient(180deg, #f0c04e, #b07a1c);
+  color: #40280a;
+  border-color: rgba(255, 244, 214, 0.75);
+  box-shadow: 0 0 14px rgba(240, 192, 78, 0.45);
+}
+
+.roleBadgeScum {
+  background: linear-gradient(180deg, #6b7a84, #3d4a52);
+  color: #e8eef1;
+  border-color: rgba(220, 235, 240, 0.3);
+}
+
+.scoreChip {
+  margin-top: 0.22rem;
+  font-size: clamp(0.6rem, 1.05vw, 0.76rem);
+  font-weight: 800;
+  color: rgba(255, 236, 200, 0.85);
+}
+
+.exchangeBanner {
+  position: absolute;
+  left: 50%;
+  bottom: clamp(9.5rem, 22vh, 13rem);
+  z-index: 12;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+  transform: translateX(-50%);
+  padding: 0.85rem 1.15rem;
+  max-width: min(92vw, 34rem);
+  text-align: center;
+}
+
+.exchangeHint {
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: var(--hearth-50, #fff4e0);
+}
+
+.selectionCount {
+  font-family: var(--font-display), sans-serif;
+  font-weight: 800;
+  font-size: 0.95rem;
+  color: var(--hearth-200, #ffd79a);
+}
+
+.celebration {
+  position: absolute;
+  left: 50%;
+  top: 38%;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+
+.celebrationCrown {
+  font-size: clamp(3rem, 8vw, 6rem);
+  filter: drop-shadow(0 6px 18px rgba(240, 192, 78, 0.65));
+}
+
+.celebrationScum {
+  font-size: clamp(2.4rem, 6vw, 4.4rem);
+  filter: grayscale(0.35) drop-shadow(0 6px 16px rgba(20, 40, 50, 0.65));
+}
+
+.celebrationLabel {
+  margin-top: 0.2rem;
+  padding: 0.3rem 1rem;
+  border-radius: 999px;
+  background: rgba(12, 30, 38, 0.85);
+  border: 2px solid rgba(255, 236, 200, 0.4);
+  color: var(--hearth-100, #ffe3ae);
+  font-family: var(--font-display), sans-serif;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-size: clamp(0.72rem, 1.6vw, 1rem);
+}
