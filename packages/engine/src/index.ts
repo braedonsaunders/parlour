@@ -1,5 +1,6 @@
 export * from './types';
 export * from './zones';
+export * from './veil';
 export * from './bots';
 export * from './match';
 export { defineConfig, applyPreset } from './config';

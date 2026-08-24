@@ -152,6 +152,7 @@ function timedRoundGame(options: BlitzDefOptions, durationMs: number) {
 
   const game: GameDef<BlitzTimedRoundState, BlitzConfig> = {
     id: 'blitz-timed-round',
+    howToPlay: base.howToPlay,
     configSchema: base.configSchema,
     setup(ctx) {
       return { ...base.setup(ctx), matchClockExpiredAtMs: null };

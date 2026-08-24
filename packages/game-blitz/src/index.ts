@@ -10,6 +10,7 @@ export {
   suitSums,
 } from './hand';
 export { blitzSeat, createBlitzDef, HAND_SIZE } from './rules';
+export { blitzHowToPlay } from './howto';
 export {
   createBlitzLivesMatchDef,
   createBlitzTimedMatchDef,

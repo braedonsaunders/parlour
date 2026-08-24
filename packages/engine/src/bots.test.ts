@@ -44,6 +44,7 @@ const raceOver = (state: RaceState) => {
 
 const raceGame: GameDef<RaceState, RaceRules> = {
   id: 'race',
+  howToPlay: { summary: 'test stub', objective: 'test stub', sections: [] },
   configSchema: schema,
   setup: ({ seats }) => ({ seats, scores: Array.from({ length: seats }, () => 0), turn: 0 }),
   moves: { take1: raceMove(1), take2: raceMove(2), take0: raceMove(0) },

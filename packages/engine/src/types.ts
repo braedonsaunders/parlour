@@ -8,6 +8,8 @@
  * no new Date(), no Math.random. Randomness ONLY via Rng.
  */
 
+import type { VeilSupport } from './veil';
+
 export type SeatId = number;
 export type CardId = string;
 
@@ -105,6 +107,18 @@ export interface MoveCtx {
 export interface ApplyMeta {
   /** Non-negative, monotonic, authority-normalized milliseconds. */
   atMs?: number;
+  /**
+   * Veil openings applied immediately before this move (spec:
+   * docs/VEILED-DECK-PROTOCOL.md). Each pair swaps an opaque handle for the
+   * card face behind it. The runtime records them on the event, so a replay
+   * reproduces the same board without ever learning a card that stayed hidden.
+   */
+  reveals?: readonly (readonly [CardId, CardId])[];
+  /**
+   * Cards going back under the veil before this move — a recycled discard pile
+   * handed to a fresh shuffle ceremony. Applied after `reveals`.
+   */
+  conceals?: readonly (readonly [CardId, CardId])[];
 }
 
 export interface Move<S> {
@@ -207,6 +221,13 @@ export interface AppliedEvent {
    * once the authority logs it, every replay reproduces it bit-for-bit.
    */
   injected?: boolean;
+  /**
+   * Veil openings applied before this event's move. Part of the deterministic
+   * log: replay re-applies them in order, so a veiled round replays exactly.
+   */
+  reveals?: readonly (readonly [CardId, CardId])[];
+  /** Cards re-veiled before this event's move (stock recycle). Replayed in order. */
+  conceals?: readonly (readonly [CardId, CardId])[];
   hash?: string;
 }
 
@@ -228,23 +249,38 @@ export interface MatchResult {
 
 export type ConfigFieldValue = boolean | number | string;
 
-export type ConfigField =
-  | { key: string; kind: 'toggle'; label: string; default: boolean }
-  | {
-      key: string;
-      kind: 'enum';
-      label: string;
-      options: readonly { value: ConfigFieldValue; label: string }[];
-      default: ConfigFieldValue;
-    }
-  | {
-      key: string;
-      kind: 'int';
-      label: string;
-      min: number;
-      max: number;
-      default: number;
-    };
+/**
+ * Presentation hints shared by every field kind. The generated settings UI reads
+ * them; rule evaluation never does, so they are safe to add to any game.
+ */
+export interface ConfigFieldMeta {
+  /** One line of plain-language explanation shown under the label. */
+  help?: string;
+  /** Section heading the generated UI groups this field under. */
+  group?: string;
+  /** Hidden behind the "advanced" disclosure — house rules, not table basics. */
+  advanced?: boolean;
+}
+
+export type ConfigField = ConfigFieldMeta &
+  (
+    | { key: string; kind: 'toggle'; label: string; default: boolean }
+    | {
+        key: string;
+        kind: 'enum';
+        label: string;
+        options: readonly { value: ConfigFieldValue; label: string }[];
+        default: ConfigFieldValue;
+      }
+    | {
+        key: string;
+        kind: 'int';
+        label: string;
+        min: number;
+        max: number;
+        default: number;
+      }
+  );
 
 export type RuleValues = Record<string, ConfigFieldValue>;
 
@@ -334,6 +370,27 @@ export interface BotPolicy<S> {
 }
 
 // ---------------------------------------------------------------------------
+// How-to-play docs (each game pack ships its own full instructions; the app
+// renders them verbatim in the per-game "?" help modal — no markdown parsing)
+// ---------------------------------------------------------------------------
+
+export interface HowToPlaySection {
+  heading: string;
+  /** short paragraphs shown under the heading */
+  body?: readonly string[];
+  /** bullet list shown after the paragraphs (rules, card effects, toggles…) */
+  bullets?: readonly { label: string; text: string }[];
+}
+
+export interface HowToPlayDoc {
+  /** one-line pitch shown at the top of the help modal */
+  summary: string;
+  /** what winning means, stated in one or two sentences */
+  objective: string;
+  sections: readonly HowToPlaySection[];
+}
+
+// ---------------------------------------------------------------------------
 // Game definition
 // ---------------------------------------------------------------------------
 
@@ -342,17 +399,33 @@ export interface SetupCtx<C extends RuleValues> {
   seats: number;
   rng: Rng;
   fx: FxEmitter;
+  /** true when the room runs the Veil privacy protocol (hands dealt as handles) */
+  veiled?: boolean;
+  /**
+   * Ceremony-supplied deck order for veiled rooms. Every entry is an opaque
+   * handle except the setup cards the room opened in public. Deal from it with
+   * `dealOrder(ctx, deck)` instead of `shuffledIds(deck, rng)`.
+   */
+  deckOrder?: readonly CardId[];
 }
 
 export interface GameDef<S, C extends RuleValues> {
   id: string;
   configSchema: ConfigSchema<C>;
+  /** full player-facing instructions; rendered by the app's per-game help modal */
+  howToPlay: HowToPlayDoc;
   setup(ctx: SetupCtx<C>): S;
   moves: Record<string, Move<S>>;
   flow: Flow<S>;
   playerView(state: S, seat: SeatId): S;
   end(state: S): MatchResult | null;
   bots: readonly BotPolicy<S>[];
+  /**
+   * Opt-in support for veiled (hidden-hand) rooms. Absent means the game can
+   * only be played in the open tier — the room UI must say so rather than
+   * silently claiming privacy it does not have.
+   */
+  veil?: VeilSupport;
 }
 
 // ---------------------------------------------------------------------------
@@ -381,12 +454,26 @@ export interface GameSession<S, C extends RuleValues = RuleValues> {
   setupFx?: readonly FxEvent[];
   /** hash of the most recently applied event; compare to a log tail to detect divergence */
   lastAppliedHash?: string | null;
+  /** true when this round was dealt under Veil */
+  veiled?: boolean;
+  /** the ceremony deck order this round was dealt from (veiled rooms only) */
+  deckOrder?: readonly CardId[];
 }
 
 export declare function stateHash(state: unknown): string;
+export interface SessionOptions<C extends RuleValues> {
+  seed: number;
+  config: C;
+  seats: number;
+  /** run the round under Veil: hands are dealt as opaque handles */
+  veiled?: boolean;
+  /** ceremony deck order for veiled rooms; required whenever `veiled` is set */
+  deckOrder?: readonly CardId[];
+}
+
 export declare function createSession<S, C extends RuleValues>(
   def: GameDef<S, C>,
-  opts: { seed: number; config: C; seats: number },
+  opts: SessionOptions<C>,
 ): GameSession<S, C>;
 export declare function sessionApply<S, C extends RuleValues>(
   def: GameDef<S, C>,
@@ -407,6 +494,6 @@ export declare function replaySession<S, C extends RuleValues>(
   def: GameDef<S, C>,
   seed: number,
   log: readonly AppliedEvent[],
-  opts?: { config?: C; seats?: number },
+  opts?: { config?: C; seats?: number; veiled?: boolean; deckOrder?: readonly CardId[] },
 ): GameSession<S, C>;
 export declare function makeRng(seed: number): Rng;

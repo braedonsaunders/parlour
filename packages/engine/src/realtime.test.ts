@@ -77,6 +77,7 @@ const slapFlow: Flow<SlapState> = {
 
 const slapGame: GameDef<SlapState, SlapRules> = {
   id: 'slap-test',
+  howToPlay: { summary: 'test stub', objective: 'test stub', sections: [] },
   configSchema: slapConfig,
   setup: ({ seats }) => ({ seats, winner: null }),
   moves: { slap },
@@ -149,6 +150,7 @@ const clockFlow: Flow<ClockState> = {
 
 const clockGame: GameDef<ClockState, ClockRules> = {
   id: 'clock-test',
+  howToPlay: { summary: 'test stub', objective: 'test stub', sections: [] },
   configSchema: clockConfig,
   setup: ({ config, seats }) => ({
     seats,

@@ -1,9 +1,37 @@
-import type { CardFace, CardId, DeckDef } from '@parlour/engine';
+import { isVeilHandle, type CardFace, type CardId, type DeckDef } from '@parlour/engine';
 
 export const WILDPILE_COLORS = ['red', 'yellow', 'green', 'blue'] as const;
 
 export type WildpileColor = (typeof WILDPILE_COLORS)[number];
-export type WildpileKind = 'number' | 'skip' | 'reverse' | 'draw-two' | 'wild' | 'wild-draw-four';
+
+/**
+ * Every face the pile can hold. The first six make up the standard 108-card
+ * deck; the two swap wilds are the optional extras dealt in when the table
+ * turns on hand-swapping.
+ */
+export type WildpileKind =
+  | 'number'
+  | 'skip'
+  | 'reverse'
+  | 'draw-two'
+  | 'wild'
+  | 'wild-draw-four'
+  | 'wild-swap'
+  | 'wild-shuffle'
+  /** a card dealt under Veil: present at the table, unreadable by it */
+  | 'veiled';
+
+/** Wilds pick a color; two of them also move hands around the table. */
+export const WILDPILE_WILD_KINDS: readonly WildpileKind[] = [
+  'wild',
+  'wild-draw-four',
+  'wild-swap',
+  'wild-shuffle',
+];
+
+export function isWildKind(kind: WildpileKind): boolean {
+  return WILDPILE_WILD_KINDS.includes(kind);
+}
 
 export interface WildpileCardMeta extends Record<string, unknown> {
   kind: WildpileKind;
@@ -70,20 +98,61 @@ for (let copy = 0; copy < 4; copy++) {
   });
 }
 
+/** The standard deck ends here; everything after is opt-in. */
+const baseCardIds: CardId[] = cardIds.slice();
+
+for (let copy = 0; copy < 2; copy++) {
+  add(`wild-swap-${copy}`, {
+    label: 'wild swap hands',
+    short: '⇄',
+    meta: { kind: 'wild-swap' },
+  });
+  add(`wild-shuffle-${copy}`, {
+    label: 'wild shuffle hands',
+    short: '↻↻',
+    meta: { kind: 'wild-shuffle' },
+  });
+}
+
 export const wildpileDeck: DeckDef = {
-  id: 'wildpile-108',
+  id: 'wildpile-116',
   cardIds,
   faces,
 };
 
+/** The 108 cards every Wild table deals, without the optional swap wilds. */
+export const WILDPILE_BASE_CARD_IDS: readonly CardId[] = baseCardIds;
+
+/** The four optional swap wilds, dealt in only when the table enables them. */
+export const WILDPILE_SWAP_CARD_IDS: readonly CardId[] = cardIds.filter(
+  (id) => !baseCardIds.includes(id),
+);
+
+/**
+ * The face every veiled handle wears. It matches nothing and plays on nothing,
+ * so a rule that reaches for a hidden card's colour or kind gets a definite
+ * "no" instead of a crash — and no rule can accidentally read through the veil.
+ */
+export const WILDPILE_VEILED_FACE: WildpileFace = Object.freeze({
+  label: 'face down',
+  short: '',
+  meta: Object.freeze({ kind: 'veiled' }) as WildpileCardMeta,
+});
+
 export function wildpileFace(card: CardId): WildpileFace {
   const face = faces[card];
-  if (!face) throw new Error(`unknown wildpile card: ${card}`);
-  return face;
+  if (face) return face;
+  if (isVeilHandle(card)) return WILDPILE_VEILED_FACE;
+  throw new Error(`unknown wildpile card: ${card}`);
+}
+
+export function isVeiledFace(face: WildpileFace): boolean {
+  return face.meta.kind === 'veiled';
 }
 
 export function sameWildpileFace(left: CardId, right: CardId): boolean {
   const a = wildpileFace(left);
   const b = wildpileFace(right);
+  if (isVeiledFace(a) || isVeiledFace(b)) return false;
   return a.color === b.color && a.meta.kind === b.meta.kind && a.meta.value === b.meta.value;
 }

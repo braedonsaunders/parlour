@@ -1,8 +1,18 @@
 import { makeRng } from './rng';
 import {
+  applyConceals,
+  applyReveals,
+  validateConceals,
+  validateReveals,
+  type CardConcealment,
+  type CardReveal,
+} from './veil';
+import {
   createFx,
   isActingSeat,
   type AppliedEvent,
+  type CardId,
+  type SessionOptions,
   type ApplyMeta,
   type ApplyOutcome,
   type FxEmitter,
@@ -60,12 +70,22 @@ function allBots(_seat: SeatId): boolean {
 
 export function createSession<S, C extends RuleValues>(
   def: GameDef<S, C>,
-  opts: { seed: number; config: C; seats: number },
+  opts: SessionOptions<C>,
 ): GameSession<S, C> {
   const rng = makeRng(opts.seed);
   const fx = createFx();
   const config = def.configSchema.resolve(opts.config);
-  const state = def.setup({ config, seats: opts.seats, rng, fx });
+  if (opts.veiled && !opts.deckOrder) {
+    throw new Error(`${def.id}: a veiled session needs the ceremony deck order`);
+  }
+  const state = def.setup({
+    config,
+    seats: opts.seats,
+    rng,
+    fx,
+    veiled: opts.veiled === true,
+    deckOrder: opts.deckOrder,
+  });
   let phase = def.flow.start(state, opts.seats);
   // A match can be over before any move (e.g. a blitz dealt on the deal).
   const initialResult = def.end(state);
@@ -85,6 +105,8 @@ export function createSession<S, C extends RuleValues>(
     botsEnabled: allBots,
     setupFx: fx.events.slice(),
     lastAppliedHash: null,
+    veiled: opts.veiled === true,
+    deckOrder: opts.deckOrder ? [...opts.deckOrder] : undefined,
   };
 }
 
@@ -99,6 +121,8 @@ interface StepInput {
   automatic: boolean;
   injected?: boolean;
   atMs?: number;
+  reveals?: readonly CardReveal[];
+  conceals?: readonly CardConcealment[];
 }
 
 interface Cursor<S> {
@@ -121,7 +145,13 @@ function applyStep<S, C extends RuleValues>(
   if (!move) throw new Error(`unknown move: ${input.moveId}`);
   const seq = cursor.seq;
   const seat = input.seat ?? -1;
-  const state = move.apply(cursor.state, seat, input.payload, {
+  // Veil openings land before the move, so the reducer that follows sees real
+  // card ids and every existing rule keeps working unchanged.
+  const opened = applyConceals(
+    applyReveals(cursor.state, input.reveals ?? []),
+    input.conceals ?? [],
+  );
+  const state = move.apply(opened, seat, input.payload, {
     rng: eventRng(seed, seq),
     fx,
     event: input.atMs === undefined ? { seq } : { seq, atMs: input.atMs },
@@ -137,6 +167,12 @@ function applyStep<S, C extends RuleValues>(
   if (input.automatic) event.automatic = true;
   if (input.injected) event.injected = true;
   if (input.atMs !== undefined) event.atMs = input.atMs;
+  if (input.reveals && input.reveals.length > 0) {
+    event.reveals = input.reveals.map(([handle, card]) => [handle, card] as const);
+  }
+  if (input.conceals && input.conceals.length > 0) {
+    event.conceals = input.conceals.map(([card, handle]) => [card, handle] as const);
+  }
 
   cursor.state = state;
   cursor.seq = seq + 1;
@@ -203,6 +239,41 @@ function rejection<S, C extends RuleValues>(
   return { events: [], fx: [], session, rejected: { code, message } };
 }
 
+/**
+ * Guards Veil openings before anything else looks at them: only a veiled round
+ * may carry reveals, the game must have opted into Veil, and every opening has
+ * to conserve the deck (known handle in, unseen face out).
+ */
+function revealRejection<S, C extends RuleValues>(
+  def: GameDef<S, C>,
+  session: GameSession<S, C>,
+  reveals: readonly CardReveal[],
+  conceals: readonly CardConcealment[],
+): ApplyOutcome<S, C> | null {
+  if (reveals.length === 0 && conceals.length === 0) return null;
+  if (!session.veiled) {
+    return rejection(session, 'not-veiled', 'this room is not running the Veil protocol');
+  }
+  if (!def.veil) {
+    return rejection(session, 'veil-unsupported', `${def.id} does not support veiled rooms`);
+  }
+  const deck = def.veil.deck(session.config);
+  const faces = deck.faces;
+  for (const [, card] of reveals) {
+    if (!Object.hasOwn(faces, card as CardId)) {
+      return rejection(session, 'card-not-in-deck', `${String(card)} is not a card in this deck`);
+    }
+  }
+  const fault = validateReveals(session.state, reveals);
+  if (fault) return rejection(session, fault.code, fault.message);
+  const concealFault = validateConceals(
+    applyReveals(session.state, reveals),
+    conceals,
+    deck.cardIds.length,
+  );
+  return concealFault ? rejection(session, concealFault.code, concealFault.message) : null;
+}
+
 function timingError(log: readonly AppliedEvent[], meta: Readonly<ApplyMeta>): RuleError | null {
   if (meta.atMs === undefined) return null;
   if (!Number.isSafeInteger(meta.atMs) || meta.atMs < 0) {
@@ -253,7 +324,15 @@ export function sessionApply<S, C extends RuleValues>(
   const invalidTiming = timingError(session.log, meta);
   if (invalidTiming) return rejection(session, invalidTiming.code, invalidTiming.message);
 
-  const legal = legalMovesForSeat(def, session.state, session.phase, seat);
+  const reveals = meta.reveals ?? [];
+  const conceals = meta.conceals ?? [];
+  const revealFault = revealRejection(def, session, reveals, conceals);
+  if (revealFault) return revealFault;
+  // Legality and validation run against the *opened* board: a veiled hand only
+  // becomes legal to play once its handle has been resolved to a real card.
+  const opened = applyConceals(applyReveals(session.state, reveals), conceals);
+
+  const legal = legalMovesForSeat(def, opened, session.phase, seat);
   const match = legal.find((m) => m.id === moveId);
   if (!match) {
     return rejection(session, 'illegal-move', `move ${moveId} is not legal right now`);
@@ -264,7 +343,7 @@ export function sessionApply<S, C extends RuleValues>(
   }
 
   const effectivePayload = payload === undefined ? match.payload : payload;
-  const verdict = move.validate(session.state, seat, effectivePayload);
+  const verdict = move.validate(opened, seat, effectivePayload);
   if (verdict !== true) {
     return { events: [], fx: [], session, rejected: verdict as RuleError };
   }
@@ -283,7 +362,7 @@ export function sessionApply<S, C extends RuleValues>(
     def,
     session.seed,
     cursor,
-    { seat, moveId, payload: effectivePayload, automatic: false, atMs: meta.atMs },
+    { seat, moveId, payload: effectivePayload, automatic: false, atMs: meta.atMs, reveals, conceals },
     fx,
   );
   settle(def, session.seed, session.seats, cursor, event, fx);
@@ -331,7 +410,17 @@ export function sessionInject<S, C extends RuleValues>(
   }
   const invalidTiming = timingError(session.log, meta);
   if (invalidTiming) return rejection(session, invalidTiming.code, invalidTiming.message);
-  const verdict = def.flow.canInject(session.state, session.phase, moveId, payload, meta);
+  const reveals = meta.reveals ?? [];
+  const conceals = meta.conceals ?? [];
+  const revealFault = revealRejection(def, session, reveals, conceals);
+  if (revealFault) return revealFault;
+  const verdict = def.flow.canInject(
+    applyConceals(applyReveals(session.state, reveals), conceals),
+    session.phase,
+    moveId,
+    payload,
+    meta,
+  );
   if (verdict !== true) {
     return { events: [], fx: [], session, rejected: verdict };
   }
@@ -357,6 +446,8 @@ export function sessionInject<S, C extends RuleValues>(
       automatic: false,
       injected: true,
       atMs: meta.atMs,
+      reveals,
+      conceals,
     },
     fx,
   );
@@ -395,11 +486,17 @@ export function replaySession<S, C extends RuleValues>(
   def: GameDef<S, C>,
   seed: number,
   log: readonly AppliedEvent[],
-  opts?: { config?: C; seats?: number },
+  opts?: { config?: C; seats?: number; veiled?: boolean; deckOrder?: readonly CardId[] },
 ): GameSession<S, C> {
   const config = opts?.config ?? def.configSchema.defaults();
   const seats = opts?.seats ?? deriveSeats(log);
-  const base = createSession(def, { seed, config, seats });
+  const base = createSession(def, {
+    seed,
+    config,
+    seats,
+    veiled: opts?.veiled,
+    deckOrder: opts?.deckOrder,
+  });
 
   const fx = createFx();
   const cursor: Cursor<S> = {
@@ -424,6 +521,8 @@ export function replaySession<S, C extends RuleValues>(
         automatic: logged.automatic === true,
         injected: logged.injected === true,
         atMs: logged.atMs,
+        reveals: logged.reveals,
+        conceals: logged.conceals,
       },
       fx,
     );

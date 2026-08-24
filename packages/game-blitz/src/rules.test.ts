@@ -34,6 +34,7 @@ function freshState(partial: Partial<BlitzState> = {}): BlitzState {
     drawnFromDiscard: null,
     pickups: [],
     outcome: null,
+    veiled: false,
     ...partial,
   };
 }

@@ -1,17 +1,22 @@
 import {
   addTo,
+  dealOrder,
   Fx,
+  hasVeiledCard,
+  isVeilHandle,
   removeFrom,
-  shuffledIds,
   stdDeck,
+  veilSupport,
   type BotPolicy,
   type CardId,
   type GameDef,
   type LegalMove,
   type Move,
   type MoveCtx,
+  type PhaseState,
   type SeatId,
 } from '@parlour/engine';
+import { blitzHowToPlay } from './howto';
 import { blitzConfigSchema, type BlitzConfig } from './config';
 import { isBlitz } from './hand';
 import { TIER_BOTS } from './bots/personas';
@@ -30,12 +35,36 @@ function withDrawnFromDiscard(state: BlitzState, card: CardId | null): BlitzStat
   return { ...state, drawnFromDiscard: card };
 }
 
-/** lowest-numbered seat currently holding a suited 31, if any (spec §5.1) */
+/**
+ * Lowest-numbered seat currently holding a suited 31, if any (spec §5.1).
+ *
+ * A veiled hand is unreadable — the table literally cannot see 31 in it — so it
+ * is skipped here and its owner claims with `blitz.claim` instead.
+ */
 export function blitzSeat(state: BlitzState): SeatId | null {
   for (let seat = 0; seat < state.seats; seat++) {
-    if (isBlitz(state.hands[seat] ?? [])) return seat;
+    const hand = state.hands[seat] ?? [];
+    if (hasVeiledCard(hand)) continue;
+    if (isBlitz(hand)) return seat;
   }
   return null;
+}
+
+/** Seats whose hand is still face down to the table. */
+function veiledSeats(state: BlitzState): SeatId[] {
+  const seats: SeatId[] = [];
+  for (let seat = 0; seat < state.seats; seat++) {
+    if (hasVeiledCard(state.hands[seat] ?? [])) seats.push(seat);
+  }
+  return seats;
+}
+
+function isRealCard(card: CardId): boolean {
+  return !isVeilHandle(card);
+}
+
+function allSeats(state: BlitzState): SeatId[] {
+  return Array.from({ length: state.seats }, (_, seat) => seat);
 }
 
 function reshuffleStock(state: BlitzState, ctx: MoveCtx): BlitzState {
@@ -57,6 +86,15 @@ const drawStock: Move<BlitzState> = {
   validate(state) {
     if (state.stock.length === 0 && state.discard.length <= 1) {
       return { code: 'no-cards-to-draw', message: 'stock and discard are both exhausted' };
+    }
+    // Recycling a spent discard is the one moment a veiled round could quietly
+    // go public: the pile is face up, so shuffling it as-is would make every
+    // remaining draw readable. The room has to re-veil it first.
+    if (state.veiled && state.stock.length === 0 && state.discard.slice(1).some(isRealCard)) {
+      return {
+        code: 'stock-not-reveiled',
+        message: 'the discard pile must be re-veiled before it becomes the stock',
+      };
     }
     return true;
   },
@@ -149,6 +187,59 @@ const knock: Move<BlitzState> = {
 };
 
 // ---------------------------------------------------------------------------
+// veil moves — the honest cost of hiding hands (docs/VEILED-DECK-PROTOCOL.md §5)
+// ---------------------------------------------------------------------------
+
+/**
+ * Claim a 31 under Veil.
+ *
+ * In an open room the flow spots a blitz the instant it exists, because it can
+ * read every hand. Under Veil only the owner can, so the claim carries the
+ * openings for the claimant's whole hand and the table checks the arithmetic
+ * itself. A false claim is rejected without ever entering the log, so the
+ * bluff costs the claimant nothing but also gains them nothing — and a true
+ * claim is settled by the same `blitz` move an open room uses.
+ */
+const claimBlitz: Move<BlitzState> = {
+  validate(state, seat) {
+    if (state.outcome) return { code: 'round-over', message: 'the round is already decided' };
+    const hand = state.hands[seat] ?? [];
+    if (hasVeiledCard(hand)) {
+      return { code: 'claim-not-opened', message: 'a blitz claim must open the whole hand' };
+    }
+    if (hand.length !== HAND_SIZE) {
+      return { code: 'claim-mid-turn', message: 'finish the turn before claiming a blitz' };
+    }
+    if (!isBlitz(hand)) {
+      return { code: 'not-a-blitz', message: `seat ${seat} is not holding 31` };
+    }
+    return true;
+  },
+  // The openings already landed; `flow.advance` now sees the 31 and runs the
+  // ordinary `blitz` settlement, so claimed and unclaimed blitzes score alike.
+  apply: (state) => state,
+};
+
+/**
+ * Open a hand for the showdown. Under Veil the knock window closing is not
+ * enough to score the round — the hands have to come face up first, and each
+ * seat opens its own.
+ */
+const openForShowdown: Move<BlitzState> = {
+  validate(state, seat) {
+    if (state.outcome) return { code: 'round-over', message: 'the round is already decided' };
+    const hand = state.hands[seat] ?? [];
+    return hasVeiledCard(hand)
+      ? { code: 'hand-not-opened', message: 'the whole hand must be opened' }
+      : true;
+  },
+  apply(state, seat, _payload, ctx) {
+    ctx.fx.emit('veil.open', { seat, cards: (state.hands[seat] ?? []).length });
+    return state;
+  },
+};
+
+// ---------------------------------------------------------------------------
 // system moves (applied automatically by the flow)
 // ---------------------------------------------------------------------------
 
@@ -190,8 +281,32 @@ const showdown: Move<BlitzState> = {
 // flow
 // ---------------------------------------------------------------------------
 
-function turnPhase(state: BlitzState) {
-  return { phase: 'turn', actor: state.turn, round: 1 };
+/**
+ * Under Veil every seat stays an acting seat so it can claim a blitz the table
+ * cannot see. `legalMovesFor` still keeps the turn itself to one seat, so this
+ * widens who may *speak up*, never who may play.
+ */
+function withClaimants(state: BlitzState, phase: PhaseState): PhaseState {
+  return state.veiled ? { ...phase, actors: allSeats(state) } : phase;
+}
+
+function turnPhase(state: BlitzState): PhaseState {
+  return withClaimants(state, { phase: 'turn', actor: state.turn, round: 1 });
+}
+
+function discardPhase(state: BlitzState): PhaseState {
+  return withClaimants(state, { phase: 'discard', actor: state.turn, round: 1 });
+}
+
+/**
+ * A seat may claim once its hand is back to three cards. Legality is deliberately
+ * public — it depends only on the card *count*, which the whole table can see.
+ * Whether the hand is actually 31 is settled by `claimBlitz.validate` against
+ * the openings the claim carried, so legality never leaks the hand.
+ */
+function canClaimBlitz(state: BlitzState, seat: SeatId): boolean {
+  if (!state.veiled || state.outcome) return false;
+  return (state.hands[seat] ?? []).length === HAND_SIZE;
 }
 
 const flow: GameDef<BlitzState, BlitzConfig>['flow'] = {
@@ -199,6 +314,7 @@ const flow: GameDef<BlitzState, BlitzConfig>['flow'] = {
 
   legalMoves(state, phase) {
     if (phase.actor === null || state.outcome) return [];
+    if (phase.phase === 'showdown.reveal') return [];
     if (phase.phase === 'discard') {
       return (state.hands[phase.actor] ?? []).map(
         (card) =>
@@ -212,6 +328,20 @@ const flow: GameDef<BlitzState, BlitzConfig>['flow'] = {
     if (state.discard.length > 0) moves.push({ id: 'draw.discard' });
     if (state.knocker === null) moves.push({ id: 'knock' });
     return moves;
+  },
+
+  legalMovesFor(state, phase, seat) {
+    if (state.outcome) return [];
+    if (phase.phase === 'showdown.reveal') {
+      // The phase itself lists the seats still owing a reveal, so this stays
+      // true even after the move's own openings have landed.
+      return (phase.actors ?? []).includes(seat) ? [{ id: 'showdown.open' }] : [];
+    }
+    const claim: LegalMove[] = canClaimBlitz(state, seat)
+      ? [{ id: 'blitz.claim', hint: 'you are holding 31' }]
+      : [];
+    if (phase.actor !== seat) return claim;
+    return [...flow.legalMoves(state, phase), ...claim];
   },
 
   advance(state, event, _seats) {
@@ -230,6 +360,20 @@ const flow: GameDef<BlitzState, BlitzConfig>['flow'] = {
     }
 
     if (state.knocker !== null && state.postKnockTurns === 0) {
+      // Veiled hands cannot be scored, so the knock window closing opens a
+      // reveal phase instead of scoring straight away.
+      const closed = veiledSeats(state);
+      if (closed.length > 0) {
+        return {
+          phase: {
+            phase: 'showdown.reveal',
+            actor: closed[0] as SeatId,
+            actors: closed,
+            round: 1,
+            label: 'showdown reveal',
+          },
+        };
+      }
       return {
         phase: turnPhase(state),
         autoMoves: [{ seat: null, move: 'showdown', reason: 'knock window closed' }],
@@ -237,7 +381,7 @@ const flow: GameDef<BlitzState, BlitzConfig>['flow'] = {
     }
 
     if (event.move.startsWith('draw.')) {
-      return { phase: { phase: 'discard', actor: state.turn, round: 1 } };
+      return { phase: discardPhase(state) };
     }
     return { phase: turnPhase(state) };
   },
@@ -259,9 +403,15 @@ export function createBlitzDef(options: BlitzDefOptions = {}): GameDef<BlitzStat
   const bots = options.bots ?? TIER_BOTS;
   return {
     id: 'blitz',
+    howToPlay: blitzHowToPlay,
     configSchema: blitzConfigSchema,
-    setup({ config, seats, rng, fx }) {
-      const ids = shuffledIds(DECK, rng);
+    // Veil, inherited: three cards a seat, then one card the room turns face up
+    // in public to start the discard.
+    veil: veilSupport({ deck: DECK, handSize: HAND_SIZE, publicSetup: 'one' }),
+
+    setup(ctx) {
+      const { config, seats, fx } = ctx;
+      const ids = dealOrder(ctx, DECK);
       const hands: CardId[][] = [];
       let cursor = 0;
       for (let seat = 0; seat < seats; seat++) {
@@ -301,6 +451,7 @@ export function createBlitzDef(options: BlitzDefOptions = {}): GameDef<BlitzStat
         drawnFromDiscard: null,
         pickups: [],
         outcome: null,
+        veiled: ctx.veiled === true,
       };
 
       // a blitz dealt on the deal ends the round before any turn (spec §5.1)
@@ -317,6 +468,8 @@ export function createBlitzDef(options: BlitzDefOptions = {}): GameDef<BlitzStat
       knock,
       blitz,
       showdown,
+      'blitz.claim': claimBlitz,
+      'showdown.open': openForShowdown,
     },
 
     flow,

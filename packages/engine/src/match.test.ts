@@ -72,6 +72,7 @@ const rollFlow: Flow<RollState> = {
 
 const rollGame: GameDef<RollState, RollRules> = {
   id: 'roll-test',
+  howToPlay: { summary: 'test stub', objective: 'test stub', sections: [] },
   configSchema: rollConfig,
   setup({ config, seats, rng }) {
     const rolls = Array.from({ length: seats }, () => (config.instant ? rng.int(1000) : null));

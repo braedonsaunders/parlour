@@ -1,7 +1,9 @@
 import {
+  applyPreset,
   createFx,
   createSession,
   makeRng,
+  runBotGame,
   replaySession,
   sessionApply,
   stateHash,
@@ -10,7 +12,9 @@ import {
 import { describe, expect, it } from 'vitest';
 import {
   GAME_ID,
+  WILDPILE_BASE_CARD_IDS,
   WILDPILE_COLORS,
+  WILDPILE_SWAP_CARD_IDS,
   wildpileConfig,
   wildpileDeck,
   wildpileGame,
@@ -42,9 +46,13 @@ function fixture(overrides: Partial<WildpileState> = {}): GameSession<WildpileSt
     pendingDraw: 0,
     pendingKind: null,
     awaitingColor: null,
+    awaitingSwap: null,
     interrupt: null,
+    drawnCard: null,
+    calledLastCard: [false, false, false],
     winner: null,
     rules: defaults,
+    veiled: false,
     ...overrides,
   };
   return {
@@ -56,16 +64,24 @@ function fixture(overrides: Partial<WildpileState> = {}): GameSession<WildpileSt
 }
 
 describe('wildpile deck and setup', () => {
-  it('defines the complete unique 108-card custom deck', () => {
+  it('defines the complete 108-card standard deck plus the optional swap wilds', () => {
     expect(GAME_ID).toBe('wildpile');
-    expect(wildpileDeck.cardIds).toHaveLength(108);
-    expect(new Set(wildpileDeck.cardIds)).toHaveLength(108);
+    expect(WILDPILE_BASE_CARD_IDS).toHaveLength(108);
+    expect(WILDPILE_SWAP_CARD_IDS).toHaveLength(4);
+    expect(wildpileDeck.cardIds).toHaveLength(112);
+    expect(new Set(wildpileDeck.cardIds)).toHaveLength(112);
     expect(
       Object.values(wildpileDeck.faces).filter((face) => face.meta?.kind === 'wild'),
     ).toHaveLength(4);
     expect(
       Object.values(wildpileDeck.faces).filter((face) => face.meta?.kind === 'wild-draw-four'),
     ).toHaveLength(4);
+    expect(
+      Object.values(wildpileDeck.faces).filter((face) => face.meta?.kind === 'wild-swap'),
+    ).toHaveLength(2);
+    expect(
+      Object.values(wildpileDeck.faces).filter((face) => face.meta?.kind === 'wild-shuffle'),
+    ).toHaveLength(2);
   });
 
   it('deals seven each, starts on a number, emits deal fx, and is seed-stable', () => {
@@ -96,12 +112,123 @@ describe('wildpile moves and flow', () => {
     expect(played.session.phase).toMatchObject({ phase: 'interrupt', actor: 1 });
     expect(played.session.state.interrupt?.resumeTurn).toBe(1);
 
-    const jumped = sessionApply(wildpileGame, played.session, 1, 'playCard', {
+    // Protection is offered inside the jump-in window too — the jumper is about
+    // to drop to one card just as surely as if it were their own turn.
+    const armed = sessionApply(wildpileGame, played.session, 1, 'callLastCard');
+    expect(armed.rejected).toBeUndefined();
+    expect(armed.session.phase).toMatchObject({ phase: 'interrupt', actor: 1 });
+
+    const jumped = sessionApply(wildpileGame, armed.session, 1, 'playCard', {
       card: card('5', 'red', 1),
     });
     expect(jumped.rejected).toBeUndefined();
     expect(jumped.session.state.hands[1]).toEqual([card('2', 'blue')]);
     expect(jumped.session.state.turn).toBe(2);
+  });
+
+  it('keeps a skipped seat out of the jump-in queue so the skip actually skips', () => {
+    // Seat 1 holds the twin skip: without the guard it would jump straight back
+    // in and undo the card that was played to pass over it.
+    const skipped = sessionApply(
+      wildpileGame,
+      fixture({
+        hands: [
+          [card('skip'), card('6', 'green')],
+          [card('skip', 'red', 1), card('2', 'blue')],
+          [card('9', 'green')],
+        ],
+      }),
+      0,
+      'playCard',
+      { card: card('skip') },
+    );
+
+    expect(skipped.rejected).toBeUndefined();
+    expect(skipped.session.state.interrupt).toBeNull();
+    expect(skipped.session.phase).toMatchObject({ phase: 'play', actor: 2 });
+    expect(skipped.fx).toContainEqual({ kind: 'wildpile.skip', payload: { seat: 1 } });
+  });
+
+  it('lets a head-to-head reverse take the extra turn it earned', () => {
+    // With two seats a reverse is a skip, so the twin in the other hand must not
+    // buy a jump-in back into the turn it was just denied.
+    const heads = createSession(wildpileGame, { seed: 5, config: defaults, seats: 2 });
+    const state: WildpileState = {
+      ...heads.state,
+      seats: 2,
+      hands: [
+        [card('reverse'), card('6', 'green')],
+        [card('reverse', 'red', 1), card('2', 'blue')],
+      ],
+      turn: 0,
+      direction: 1,
+      activeColor: 'red',
+      discard: [card('3')],
+      calledLastCard: [true, false],
+    };
+    const reversed = sessionApply(
+      wildpileGame,
+      { ...heads, state, phase: wildpileGame.flow.start(state, 2) },
+      0,
+      'playCard',
+      { card: card('reverse') },
+    );
+
+    expect(reversed.session.state.direction).toBe(-1);
+    expect(reversed.session.state.interrupt).toBeNull();
+    expect(reversed.session.phase).toMatchObject({ phase: 'play', actor: 0 });
+  });
+
+  it('arms last-card protection without spending the turn and announces the call', () => {
+    const armed = sessionApply(
+      wildpileGame,
+      fixture({ hands: [[card('5'), card('6')], [card('1')], [card('2')]] }),
+      0,
+      'callLastCard',
+    );
+
+    expect(armed.rejected).toBeUndefined();
+    expect(armed.session.state.calledLastCard).toEqual([true, false, false]);
+    expect(armed.session.state.hands[0]).toHaveLength(2);
+    expect(armed.session.phase).toMatchObject({ phase: 'play', actor: 0 });
+    expect(armed.fx).toContainEqual({ kind: 'wildpile.last-card-armed', payload: { seat: 0 } });
+
+    const played = sessionApply(wildpileGame, armed.session, 0, 'playCard', { card: card('5') });
+    expect(played.session.state.hands[0]).toHaveLength(1);
+    expect(played.fx).toContainEqual({ kind: 'wildpile.last-card', payload: { seat: 0 } });
+    expect(played.fx.some((event) => event.kind === 'wildpile.caught')).toBe(false);
+  });
+
+  it('catches a seat that reaches one card without arming protection', () => {
+    const played = sessionApply(
+      wildpileGame,
+      fixture({ hands: [[card('5'), card('6')], [card('1')], [card('2')]] }),
+      0,
+      'playCard',
+      { card: card('5') },
+    );
+
+    expect(played.fx).toContainEqual(
+      expect.objectContaining({ kind: 'wildpile.caught', payload: { seat: 0, amount: 2 } }),
+    );
+    expect(played.session.state.hands[0]).toHaveLength(3);
+  });
+
+  it('only offers protection on the second-to-last card, and re-arms after a draw', () => {
+    const three = fixture({ hands: [[card('5'), card('6'), card('7')], [card('1')], [card('2')]] });
+    expect(wildpileGame.flow.legalMoves(three.state, three.phase).map((m) => m.id)).not.toContain(
+      'callLastCard',
+    );
+
+    const two = fixture({ hands: [[card('5'), card('6')], [card('1')], [card('2')]] });
+    const armed = sessionApply(wildpileGame, two, 0, 'callLastCard').session;
+    expect(wildpileGame.flow.legalMoves(armed.state, armed.phase).map((m) => m.id)).not.toContain(
+      'callLastCard',
+    );
+
+    // Drawing lifts the hand off the cliff, so the call has to be made again.
+    const drawn = sessionApply(wildpileGame, armed, 0, 'draw').session;
+    expect(drawn.state.calledLastCard[0]).toBe(false);
   });
 
   it('supports skip, reverse, draw-two, and deterministic stock recycling', () => {
@@ -128,16 +255,22 @@ describe('wildpile moves and flow', () => {
       hands: [[card('draw-two'), card('6', 'green')], [card('1')], [card('2')]],
       stock: [],
       discard: [card('3'), card('7', 'blue'), card('8', 'yellow')],
+      calledLastCard: [true, false, false],
     });
     const stacked = sessionApply(wildpileGame, drawState, 0, 'playCard', {
       card: card('draw-two'),
     });
-    expect(stacked.session.state.pendingDraw).toBe(2);
-    const drawn = sessionApply(wildpileGame, stacked.session, 1, 'draw');
-    expect(drawn.rejected).toBeUndefined();
-    expect(drawn.session.state.hands[1]).toHaveLength(3);
-    expect(drawn.session.state.discard).toHaveLength(1);
-    expect(drawn.fx.map((event) => event.kind)).toContain('stock.shuffle');
+    // Seat 1 holds nothing to stack, so the flow takes the pickup for them.
+    expect(stacked.fx).toContainEqual({
+      kind: 'wildpile.draw-stack',
+      payload: { seat: 0, amount: 2 },
+    });
+    expect(stacked.session.state.pendingDraw).toBe(0);
+    expect(stacked.session.state.hands[1]).toHaveLength(3);
+    expect(stacked.session.state.turn).toBe(2);
+    expect(stacked.session.state.discard).toHaveLength(1);
+    expect(stacked.fx.map((event) => event.kind)).toContain('stock.shuffle');
+    expect(stacked.session.log.at(-1)).toMatchObject({ move: 'draw', seat: 1, automatic: true });
   });
 
   it('requires a color sub-decision after a wild and applies draw-four stacking rules', () => {
@@ -155,17 +288,28 @@ describe('wildpile moves and flow', () => {
       activeColor: 'blue',
       pendingDraw: 4,
       pendingKind: 'wild-draw-four',
-      hands: [[card('1')], [card('wild-draw-four', 'red', 1)], [card('2')]],
+      hands: [[card('1')], [card('wild-draw-four', 'red', 1), card('3', 'green')], [card('2')]],
+      stock: Array.from({ length: 12 }, (_, index) =>
+        card(String(Math.floor(index / 2) + 1), 'yellow', index % 2),
+      ),
+      calledLastCard: [false, true, false],
     });
     const stack = sessionApply(wildpileGame, pending, 1, 'playCard', {
       card: card('wild-draw-four', 'red', 1),
     });
     expect(stack.rejected).toBeUndefined();
     expect(stack.session.state.pendingDraw).toBe(8);
+    expect(stack.session.phase).toMatchObject({ phase: 'choose-color', actor: 1 });
+
+    // The eight only lands once the color is called, and seat 2 cannot stack.
+    const resolved = sessionApply(wildpileGame, stack.session, 1, 'chooseColor', { color: 'green' });
+    expect(resolved.session.state.pendingDraw).toBe(0);
+    expect(resolved.session.state.hands[2]).toHaveLength(9);
+    expect(resolved.session.state.turn).toBe(0);
 
     const noStackState = fixture({
       ...pending.state,
-      rules: { ...defaults, stacking: false },
+      rules: { ...defaults, stackDrawFour: false },
     });
     const noStack = sessionApply(wildpileGame, noStackState, 1, 'playCard', {
       card: card('wild-draw-four', 'red', 1),
@@ -217,6 +361,142 @@ describe('wildpile moves and flow', () => {
     }
     expect(session.status).toBe('ended');
     expect(session.result?.winner).not.toBeNull();
+  });
+
+  it.each(['classic', 'party', 'houseRules'])(
+    'finishes every %s deal at 2, 3 and 4 seats',
+    (preset) => {
+      for (const seats of [2, 3, 4]) {
+        for (let seed = 0; seed < 25; seed++) {
+          const record = runBotGame(wildpileGame, {
+            seed,
+            policies: Array.from({ length: seats }, () => wildpileGame.bots[0]),
+            config: applyPreset(wildpileConfig, preset),
+            maxEvents: 6_000,
+          });
+          expect(record.result?.winner, `${preset} ${seats}p seed ${seed}`).not.toBeNull();
+        }
+      }
+    },
+  );
+
+  it('swaps hands on a seven and passes them along on a zero', () => {
+    const houseRules = { ...defaults, sevenZero: true, jumpIn: false };
+    const swapped = sessionApply(
+      wildpileGame,
+      fixture({
+        rules: houseRules,
+        hands: [
+          [card('7'), card('6', 'green'), card('5', 'blue')],
+          [card('1'), card('2', 'blue'), card('4', 'green')],
+          [card('9', 'green')],
+        ],
+      }),
+      0,
+      'playCard',
+      { card: card('7') },
+    );
+    expect(swapped.session.phase).toMatchObject({ phase: 'choose-target', actor: 0 });
+
+    const taken = sessionApply(wildpileGame, swapped.session, 0, 'chooseTarget', { seat: 1 });
+    expect(taken.session.state.hands[0]).toEqual([
+      card('1'),
+      card('2', 'blue'),
+      card('4', 'green'),
+    ]);
+    expect(taken.session.state.hands[1]).toEqual([card('6', 'green'), card('5', 'blue')]);
+    expect(taken.session.state.turn).toBe(1);
+
+    const rotated = sessionApply(
+      wildpileGame,
+      fixture({
+        rules: houseRules,
+        discard: [card('0')],
+        hands: [
+          [card('0', 'blue'), card('6', 'green'), card('5', 'blue')],
+          [card('1')],
+          [card('9', 'green'), card('8', 'green'), card('4', 'green')],
+        ],
+      }),
+      0,
+      'playCard',
+      { card: card('0', 'blue') },
+    );
+    // Hands move one seat along the direction of play: 0 → 1 → 2 → 0.
+    expect(rotated.session.state.hands[1]).toEqual([card('6', 'green'), card('5', 'blue')]);
+    expect(rotated.session.state.hands[2]).toEqual([card('1')]);
+    expect(rotated.session.state.hands[0]).toHaveLength(3);
+  });
+
+  it('keeps the turn after a voluntary draw lands something playable', () => {
+    const drew = sessionApply(
+      wildpileGame,
+      fixture({
+        hands: [[card('9', 'blue'), card('8', 'blue')], [card('1')], [card('2')]],
+        stock: [card('4'), card('7', 'green')],
+      }),
+      0,
+      'draw',
+    );
+
+    // red-4-0 matches the active color, so seat 0 still holds the turn.
+    expect(drew.session.state.drawnCard).toBe(card('4'));
+    expect(drew.session.state.turn).toBe(0);
+    const offered = wildpileGame.flow.legalMoves(drew.session.state, drew.session.phase);
+    expect(offered.map((move) => move.id).sort()).toEqual(['pass', 'playCard']);
+
+    const passed = sessionApply(wildpileGame, drew.session, 0, 'pass');
+    expect(passed.session.state.drawnCard).toBeNull();
+    expect(passed.session.state.turn).toBe(1);
+  });
+
+  it('removes the pass option when the table forces the play', () => {
+    const drew = sessionApply(
+      wildpileGame,
+      fixture({
+        rules: { ...defaults, forcePlay: true },
+        hands: [[card('9', 'blue'), card('8', 'blue')], [card('1')], [card('2')]],
+        stock: [card('4'), card('7', 'green')],
+      }),
+      0,
+      'draw',
+    );
+
+    expect(wildpileGame.flow.legalMoves(drew.session.state, drew.session.phase)).toEqual([
+      { id: 'playCard', payload: { card: card('4') } },
+    ]);
+    expect(sessionApply(wildpileGame, drew.session, 0, 'pass').rejected?.code).toBe('illegal-move');
+  });
+
+  it('draws until something is playable when the table asks for it', () => {
+    const drew = sessionApply(
+      wildpileGame,
+      fixture({
+        rules: { ...defaults, drawToMatch: true },
+        hands: [[card('9', 'blue'), card('8', 'blue')], [card('1')], [card('2')]],
+        stock: [card('7', 'green'), card('6', 'blue'), card('4'), card('2', 'green')],
+      }),
+      0,
+      'draw',
+    );
+
+    expect(drew.session.state.hands[0]).toHaveLength(5);
+    expect(drew.session.state.drawnCard).toBe(card('4'));
+  });
+
+  it('deals the swap wilds only when the table turns them on', () => {
+    const off = createSession(wildpileGame, { seed: 3, config: defaults, seats: 4 });
+    const inPlay = (session: GameSession<WildpileState>) =>
+      [...session.state.stock, ...session.state.hands.flat(), ...session.state.discard];
+    expect(inPlay(off).some((id) => WILDPILE_SWAP_CARD_IDS.includes(id))).toBe(false);
+    expect(inPlay(off)).toHaveLength(108);
+
+    const on = createSession(wildpileGame, {
+      seed: 3,
+      config: { ...defaults, swapCards: true },
+      seats: 4,
+    });
+    expect(inPlay(on)).toHaveLength(112);
   });
 
   it('publishes all four legal wild colors', () => {

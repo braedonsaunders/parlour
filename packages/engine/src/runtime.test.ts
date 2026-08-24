@@ -126,6 +126,7 @@ const flow: Flow<MiniState> = {
 
 const miniGame: GameDef<MiniState, MiniRules> = {
   id: 'mini',
+  howToPlay: { summary: 'test stub', objective: 'test stub', sections: [] },
   configSchema,
   setup({ config, seats, rng, fx }) {
     const ids = shuffledIds(stdDeck(), rng);
