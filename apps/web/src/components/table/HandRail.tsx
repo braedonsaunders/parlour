@@ -9,7 +9,11 @@ import {
   type ReactNode,
 } from 'react';
 import { motion } from 'motion/react';
-import { useCardArriving, useCardDeparting, useFanReceiving } from '@/lib/table/arrival-presentation';
+import {
+  useCardArriving,
+  useCardDeparting,
+  useFanReceiving,
+} from '@/lib/table/arrival-presentation';
 import styles from '@/styles/table.module.css';
 
 export type HandRailProps = {

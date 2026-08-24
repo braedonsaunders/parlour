@@ -153,124 +153,128 @@ export function WildTableScreen(props: WildTableScreenProps) {
 
   return (
     <ArrivalProvider fx={props.fx} fxKey={props.fxKey} localSeat={view.localSeat}>
-    <TableShell rootRef={rootRef} dealState={dealStateAttr(deal)}>
-      <TableHud onOpenMenu={menu.open}>
-        <TableTitlePill eyebrow="Wild" status={view.phaseLabel} />
-        {remainingMs !== null && <MatchClock remainingMs={remainingMs} />}
-      </TableHud>
+      <TableShell rootRef={rootRef} dealState={dealStateAttr(deal)}>
+        <TableHud onOpenMenu={menu.open}>
+          <TableTitlePill eyebrow="Wild" status={view.phaseLabel} />
+          {remainingMs !== null && <MatchClock remainingMs={remainingMs} />}
+        </TableHud>
 
-      <TablePlayfield label="Wild table" feltMark="W">
-        {view.players.map((player) => (
-          <Seat
-            key={player.seat}
-            player={player}
-            position={tablePosition(player.seat, view.localSeat, view.players.length)}
-            active={view.activeSeat === player.seat}
-            displayCount={deal.visibleCount(player.seat, player.handCount)}
-            stamp={seatStamp(calls, player.seat)}
+        <TablePlayfield label="Wild table" feltMark="W">
+          {view.players.map((player) => (
+            <Seat
+              key={player.seat}
+              player={player}
+              position={tablePosition(player.seat, view.localSeat, view.players.length)}
+              active={view.activeSeat === player.seat}
+              displayCount={deal.visibleCount(player.seat, player.handCount)}
+              stamp={seatStamp(calls, player.seat)}
+            />
+          ))}
+          <TableBadges view={view} />
+          {finalMinute && remainingMs !== null && (
+            <LiveStandings players={view.players} remainingMs={remainingMs} />
+          )}
+          <Piles view={view} busy={localBusy} onDraw={props.onDraw} deal={deal} />
+          {props.turnDurationMs !== undefined && view.activeSeat !== null && (
+            <TurnClock
+              key={props.turnClockKey}
+              durationMs={props.turnDurationMs}
+              mine={view.activeSeat === view.localSeat}
+            />
+          )}
+          <LocalHand view={view} busy={localBusy} onPlay={props.onPlay} deal={deal} />
+          <TableFxLayer
+            fx={props.fx}
+            fxKey={props.fxKey}
+            rootRef={rootRef}
+            renderCue={(cue) => <Cue cue={cue} localSeat={view.localSeat} />}
           />
-        ))}
-        <TableBadges view={view} />
-        {finalMinute && remainingMs !== null && (
-          <LiveStandings players={view.players} remainingMs={remainingMs} />
-        )}
-        <Piles view={view} busy={localBusy} onDraw={props.onDraw} deal={deal} />
-        {props.turnDurationMs !== undefined && view.activeSeat !== null && (
-          <TurnClock
-            key={props.turnClockKey}
-            durationMs={props.turnDurationMs}
-            mine={view.activeSeat === view.localSeat}
-          />
-        )}
-        <LocalHand view={view} busy={localBusy} onPlay={props.onPlay} deal={deal} />
-        <TableFxLayer
-          fx={props.fx}
-          fxKey={props.fxKey}
-          rootRef={rootRef}
-          renderCue={(cue) => <Cue cue={cue} localSeat={view.localSeat} />}
-        />
-        <CardDropFx fx={props.fx} fxKey={props.fxKey} packId={WILD_DROP_EFFECTS.id} />
-        <PickupCounter pickup={pickup} count={pickupCount} players={view.players} />
-        <Announcer calls={calls} fxKey={props.fxKey} />
-        {view.decision === 'jump-in' && !localBusy && (
-          <div className={`${wildStyles.jumpBanner} panel-soft`} role="alertdialog">
-            <strong>Exact match — jump in?</strong>
-            <button type="button" className="btn-fat btn-fat--ghost" onClick={props.onDeclineJump}>
-              Pass
-            </button>
-          </div>
-        )}
-        {view.decision === 'choose-color' && !localBusy && (
-          <ColorChooser onChooseColor={props.onChooseColor} />
-        )}
-        {view.decision === 'choose-target' && !localBusy && (
-          <SwapChooser view={view} onChooseTarget={props.onChooseTarget} />
-        )}
-        {view.challenge && view.legal.challengeDrawFour && !localBusy && (
-          <ChallengePrompt
-            challenge={view.challenge}
-            onChallenge={props.onChallengeDrawFour}
-            onAccept={props.onDraw}
-          />
-        )}
-      </TablePlayfield>
+          <CardDropFx fx={props.fx} fxKey={props.fxKey} packId={WILD_DROP_EFFECTS.id} />
+          <PickupCounter pickup={pickup} count={pickupCount} players={view.players} />
+          <Announcer calls={calls} fxKey={props.fxKey} />
+          {view.decision === 'jump-in' && !localBusy && (
+            <div className={`${wildStyles.jumpBanner} panel-soft`} role="alertdialog">
+              <strong>Exact match — jump in?</strong>
+              <button
+                type="button"
+                className="btn-fat btn-fat--ghost"
+                onClick={props.onDeclineJump}
+              >
+                Pass
+              </button>
+            </div>
+          )}
+          {view.decision === 'choose-color' && !localBusy && (
+            <ColorChooser onChooseColor={props.onChooseColor} />
+          )}
+          {view.decision === 'choose-target' && !localBusy && (
+            <SwapChooser view={view} onChooseTarget={props.onChooseTarget} />
+          )}
+          {view.challenge && view.legal.challengeDrawFour && !localBusy && (
+            <ChallengePrompt
+              challenge={view.challenge}
+              onChallenge={props.onChallengeDrawFour}
+              onAccept={props.onDraw}
+            />
+          )}
+        </TablePlayfield>
 
-      {/* No draw button: the stock pile is the draw, and forced pickups resolve
+        {/* No draw button: the stock pile is the draw, and forced pickups resolve
           themselves. The only rail action left is protecting your last card. */}
-      <TableActionRail>
-        <AnimatePresence initial={false}>
-          {view.legal.pass && !localBusy && (
-            <motion.button
-              key="pass"
-              type="button"
-              data-testid="pass-drawn-card"
-              className="btn-fat btn-fat--ghost"
-              initial={{ opacity: 0, scale: 0.7, y: 12 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.7, y: 12 }}
-              transition={{ duration: 0.2 }}
-              onClick={props.onPass}
-            >
-              Keep it
-            </motion.button>
-          )}
-          {view.legal.callLastCard && !localBusy && (
-            <motion.button
-              key="call-last-card"
-              type="button"
-              data-testid="call-last-card"
-              className={`btn-fat ${wildStyles.lastCardButton}`}
-              initial={{ opacity: 0, scale: 0.7, y: 12 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.7, y: 12 }}
-              transition={{ duration: 0.22, ease: [0.34, 1.56, 0.64, 1] }}
-              onClick={props.onCallLastCard}
-            >
-              Last card!
-            </motion.button>
-          )}
-          {view.lastCardArmed && (
-            <motion.span
-              key="last-card-armed"
-              className={wildStyles.lastCardArmed}
-              data-testid="last-card-armed"
-              initial={{ opacity: 0, scale: 0.7 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.7 }}
-            >
-              Protected
-            </motion.span>
-          )}
-        </AnimatePresence>
-      </TableActionRail>
+        <TableActionRail>
+          <AnimatePresence initial={false}>
+            {view.legal.pass && !localBusy && (
+              <motion.button
+                key="pass"
+                type="button"
+                data-testid="pass-drawn-card"
+                className="btn-fat btn-fat--ghost"
+                initial={{ opacity: 0, scale: 0.7, y: 12 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.7, y: 12 }}
+                transition={{ duration: 0.2 }}
+                onClick={props.onPass}
+              >
+                Keep it
+              </motion.button>
+            )}
+            {view.legal.callLastCard && !localBusy && (
+              <motion.button
+                key="call-last-card"
+                type="button"
+                data-testid="call-last-card"
+                className={`btn-fat ${wildStyles.lastCardButton}`}
+                initial={{ opacity: 0, scale: 0.7, y: 12 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.7, y: 12 }}
+                transition={{ duration: 0.22, ease: [0.34, 1.56, 0.64, 1] }}
+                onClick={props.onCallLastCard}
+              >
+                Last card!
+              </motion.button>
+            )}
+            {view.lastCardArmed && (
+              <motion.span
+                key="last-card-armed"
+                className={wildStyles.lastCardArmed}
+                data-testid="last-card-armed"
+                initial={{ opacity: 0, scale: 0.7 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.7 }}
+              >
+                Protected
+              </motion.span>
+            )}
+          </AnimatePresence>
+        </TableActionRail>
 
-      <TableMenu
-        open={menu.isOpen}
-        onClose={menu.close}
-        howToPlay={{ doc: wildpileHowToPlay, title: 'Wild', subtitle: view.phaseLabel }}
-        onQuit={menu.quit}
-      />
-    </TableShell>
+        <TableMenu
+          open={menu.isOpen}
+          onClose={menu.close}
+          howToPlay={{ doc: wildpileHowToPlay, title: 'Wild', subtitle: view.phaseLabel }}
+          onQuit={menu.quit}
+        />
+      </TableShell>
     </ArrivalProvider>
   );
 }

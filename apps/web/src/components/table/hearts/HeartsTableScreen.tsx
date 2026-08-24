@@ -125,82 +125,86 @@ export function HeartsTableScreen(props: HeartsTableScreenProps) {
 
   return (
     <ArrivalProvider fx={props.fx} fxKey={props.fxKey} localSeat={view.localSeat}>
-    <TableShell rootRef={rootRef} dealState={dealStateAttr(deal)}>
-      <TableHud onOpenMenu={menu.open}>
-        <TableTitlePill eyebrow="Hearts" status={view.phaseLabel} />
-      </TableHud>
+      <TableShell rootRef={rootRef} dealState={dealStateAttr(deal)}>
+        <TableHud onOpenMenu={menu.open}>
+          <TableTitlePill eyebrow="Hearts" status={view.phaseLabel} />
+        </TableHud>
 
-      <TablePlayfield label="Hearts table" feltMark="♥">
-        {view.players.map((player) => (
-          <Seat
-            key={player.seat}
-            player={player}
-            active={view.activeSeat === player.seat}
-            choosing={view.awaitingPass.includes(player.seat)}
-            displayCount={deal.visibleCount(player.seat, player.handCount)}
+        <TablePlayfield label="Hearts table" feltMark="♥">
+          {view.players.map((player) => (
+            <Seat
+              key={player.seat}
+              player={player}
+              active={view.activeSeat === player.seat}
+              choosing={view.awaitingPass.includes(player.seat)}
+              displayCount={deal.visibleCount(player.seat, player.handCount)}
+            />
+          ))}
+          <TableBadges view={view} />
+          <TrickArea trick={view.trick} />
+          <LocalHand
+            view={view}
+            busy={localBusy}
+            selectedPass={selectedPass}
+            onTogglePass={togglePass}
+            onPlayCard={props.onPlayCard}
+            deal={deal}
           />
-        ))}
-        <TableBadges view={view} />
-        <TrickArea trick={view.trick} />
-        <LocalHand
-          view={view}
-          busy={localBusy}
-          selectedPass={selectedPass}
-          onTogglePass={togglePass}
-          onPlayCard={props.onPlayCard}
-          deal={deal}
-        />
-        <TableFxLayer
-          fx={props.fx}
-          fxKey={props.fxKey}
-          rootRef={rootRef}
-          renderCue={(cue) => <Cue cue={cue} localSeat={view.localSeat} />}
-        />
-        {view.decision === 'pass' && !localBusy && (
-          <div
-            className={heartsStyles.passBanner}
-            role="group"
-            aria-label="Choose three cards to pass"
-          >
-            <div className={heartsStyles.passCount} aria-hidden="true">
-              {[0, 1, 2].map((index) => (
-                <span
-                  key={index}
-                  className={heartsStyles.passPip}
-                  data-filled={index < selectedPass.length}
-                />
-              ))}
+          <TableFxLayer
+            fx={props.fx}
+            fxKey={props.fxKey}
+            rootRef={rootRef}
+            renderCue={(cue) => <Cue cue={cue} localSeat={view.localSeat} />}
+          />
+          {view.decision === 'pass' && !localBusy && (
+            <div
+              className={heartsStyles.passBanner}
+              role="group"
+              aria-label="Choose three cards to pass"
+            >
+              <div className={heartsStyles.passCount} aria-hidden="true">
+                {[0, 1, 2].map((index) => (
+                  <span
+                    key={index}
+                    className={heartsStyles.passPip}
+                    data-filled={index < selectedPass.length}
+                  />
+                ))}
+              </div>
             </div>
-          </div>
+          )}
+        </TablePlayfield>
+
+        <TableActionRail>
+          {view.decision === 'pass' && !localBusy ? (
+            <button
+              type="button"
+              className="btn-fat"
+              disabled={!passReady}
+              data-testid="confirm-pass"
+              onClick={() => {
+                if (passReady) props.onPass?.(selectedPass);
+              }}
+            >
+              {passReady
+                ? `Pass ${PASS_SIZE} ${view.passDirection ?? ''}`.trim()
+                : `Pick ${PASS_SIZE - selectedPass.length} more`}
+            </button>
+          ) : (
+            !localBusy && view.decision === 'play' && <TableTurnIndicator />
+          )}
+        </TableActionRail>
+
+        {props.handEnd && (
+          <HandEndOverlay
+            info={props.handEnd}
+            players={view.players}
+            onNextHand={props.onNextHand}
+          />
         )}
-      </TablePlayfield>
 
-      <TableActionRail>
-        {view.decision === 'pass' && !localBusy ? (
-          <button
-            type="button"
-            className="btn-fat"
-            disabled={!passReady}
-            data-testid="confirm-pass"
-            onClick={() => {
-              if (passReady) props.onPass?.(selectedPass);
-            }}
-          >
-            {passReady
-              ? `Pass ${PASS_SIZE} ${view.passDirection ?? ''}`.trim()
-              : `Pick ${PASS_SIZE - selectedPass.length} more`}
-          </button>
-        ) : (
-          !localBusy && view.decision === 'play' && <TableTurnIndicator />
-        )}
-      </TableActionRail>
-
-      {props.handEnd && (
-        <HandEndOverlay info={props.handEnd} players={view.players} onNextHand={props.onNextHand} />
-      )}
-
-      <TableMenu open={menu.isOpen} onClose={menu.close} onQuit={menu.quit} />
-    </TableShell>
+        <TableMenu open={menu.isOpen} onClose={menu.close} onQuit={menu.quit} />
+      </TableShell>
     </ArrivalProvider>
   );
 }

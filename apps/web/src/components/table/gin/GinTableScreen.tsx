@@ -128,85 +128,89 @@ export function GinTableScreen(props: GinTableScreenProps) {
 
   return (
     <ArrivalProvider fx={props.fx} fxKey={props.fxKey} localSeat={view.localSeat}>
-    <TableShell rootRef={rootRef} dealState={dealStateAttr(deal)}>
-      <TableHud onOpenMenu={menu.open}>
-        <TableTitlePill eyebrow="Gin" status={view.phaseLabel} className="flex items-center gap-2">
-          <span aria-label="Scores" className="text-xs font-bold text-dusk-100/80">
-            {view.players.map((player) => `${player.name} ${player.score}`).join(' · ')}
-            <span className="text-dusk-200/70"> → {view.matchTarget}</span>
-          </span>
-        </TableTitlePill>
-      </TableHud>
+      <TableShell rootRef={rootRef} dealState={dealStateAttr(deal)}>
+        <TableHud onOpenMenu={menu.open}>
+          <TableTitlePill
+            eyebrow="Gin"
+            status={view.phaseLabel}
+            className="flex items-center gap-2"
+          >
+            <span aria-label="Scores" className="text-xs font-bold text-dusk-100/80">
+              {view.players.map((player) => `${player.name} ${player.score}`).join(' · ')}
+              <span className="text-dusk-200/70"> → {view.matchTarget}</span>
+            </span>
+          </TableTitlePill>
+        </TableHud>
 
-      <TablePlayfield label="Gin table" feltMark="♣">
-        {opponent && (
-          <Seat
-            player={opponent}
-            active={view.activeSeat === opponent.seat}
-            displayCount={deal.visibleCount(opponent.seat, opponent.handCount)}
+        <TablePlayfield label="Gin table" feltMark="♣">
+          {opponent && (
+            <Seat
+              player={opponent}
+              active={view.activeSeat === opponent.seat}
+              displayCount={deal.visibleCount(opponent.seat, opponent.handCount)}
+            />
+          )}
+          <Piles
+            view={view}
+            busy={busy}
+            onDraw={props.onDraw}
+            deal={deal}
+            onTakeUpcard={props.onTakeUpcard}
+            onPassUpcard={props.onPassUpcard}
+          />
+          <LocalHand
+            view={view}
+            busy={busy}
+            deal={deal}
+            meldedSet={meldedSet}
+            onDiscard={props.onDiscard}
+          />
+          <div className={styles.ownerStatusRail} aria-label="Your status">
+            <output
+              className={ginStyles.deadwoodMeter}
+              data-low={(view.deadwood ?? 99) <= view.knockCap}
+              aria-label={`Your deadwood: ${view.deadwood ?? '—'}, knock cap ${view.knockCap}`}
+            >
+              <span>Deadwood</span>
+              <strong>{view.handEnd ? '—' : (view.deadwood ?? '—')}</strong>
+            </output>
+          </div>
+          <TableFxLayer
+            fx={props.fx}
+            fxKey={props.fxKey}
+            rootRef={rootRef}
+            renderCue={(cue) => <Cue cue={cue} localSeat={view.localSeat} />}
+          />
+        </TablePlayfield>
+
+        {!view.handEnd && (
+          <TableActionRail>
+            <button
+              type="button"
+              className="btn-fat"
+              disabled={!view.canKnock || busy || view.decision !== 'act'}
+              onClick={props.onKnock}
+            >
+              Knock
+            </button>
+          </TableActionRail>
+        )}
+
+        {view.handEnd && !view.matchOver && (
+          <HandEndSheet
+            view={view}
+            onReady={props.onReady}
+            readySent={!view.handEnd.waitingFor.includes(view.localSeat)}
           />
         )}
-        <Piles
-          view={view}
-          busy={busy}
-          onDraw={props.onDraw}
-          deal={deal}
-          onTakeUpcard={props.onTakeUpcard}
-          onPassUpcard={props.onPassUpcard}
-        />
-        <LocalHand
-          view={view}
-          busy={busy}
-          deal={deal}
-          meldedSet={meldedSet}
-          onDiscard={props.onDiscard}
-        />
-        <div className={styles.ownerStatusRail} aria-label="Your status">
-          <output
-            className={ginStyles.deadwoodMeter}
-            data-low={(view.deadwood ?? 99) <= view.knockCap}
-            aria-label={`Your deadwood: ${view.deadwood ?? '—'}, knock cap ${view.knockCap}`}
-          >
-            <span>Deadwood</span>
-            <strong>{view.handEnd ? '—' : (view.deadwood ?? '—')}</strong>
-          </output>
-        </div>
-        <TableFxLayer
-          fx={props.fx}
-          fxKey={props.fxKey}
-          rootRef={rootRef}
-          renderCue={(cue) => <Cue cue={cue} localSeat={view.localSeat} />}
-        />
-      </TablePlayfield>
 
-      {!view.handEnd && (
-        <TableActionRail>
-          <button
-            type="button"
-            className="btn-fat"
-            disabled={!view.canKnock || busy || view.decision !== 'act'}
-            onClick={props.onKnock}
-          >
-            Knock
-          </button>
-        </TableActionRail>
-      )}
-
-      {view.handEnd && !view.matchOver && (
-        <HandEndSheet
-          view={view}
-          onReady={props.onReady}
-          readySent={!view.handEnd.waitingFor.includes(view.localSeat)}
+        <TableMenu
+          open={menu.isOpen}
+          onClose={menu.close}
+          howToPlay={{ doc: ginHowToPlay, title: 'Gin', subtitle: 'the rummy classic' }}
+          onQuit={menu.quit}
         />
-      )}
-
-      <TableMenu
-        open={menu.isOpen}
-        onClose={menu.close}
-        howToPlay={{ doc: ginHowToPlay, title: 'Gin', subtitle: 'the rummy classic' }}
-        onQuit={menu.quit}
-      />
-    </TableShell>
+      </TableShell>
     </ArrivalProvider>
   );
 }

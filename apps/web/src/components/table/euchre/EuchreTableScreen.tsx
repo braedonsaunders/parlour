@@ -106,85 +106,85 @@ export function EuchreTableScreen(props: EuchreTableScreenProps) {
 
   return (
     <ArrivalProvider fx={props.fx} fxKey={props.fxKey} localSeat={view.localSeat}>
-    <TableShell rootRef={rootRef} dealState={dealStateAttr(deal)}>
-      <TableHud onOpenMenu={menu.open}>
-        <section className={styles.hudCluster}>
-          <TableTitlePill eyebrow="Euchre" status={view.stageLabel} />
-          <TeamScores view={view} />
-        </section>
-      </TableHud>
+      <TableShell rootRef={rootRef} dealState={dealStateAttr(deal)}>
+        <TableHud onOpenMenu={menu.open}>
+          <section className={styles.hudCluster}>
+            <TableTitlePill eyebrow="Euchre" status={view.stageLabel} />
+            <TeamScores view={view} />
+          </section>
+        </TableHud>
 
-      <TablePlayfield label="Euchre table" feltMark="E">
-        {view.trump && (
-          <div
-            className={styles.trumpBadge}
-            style={{ '--trump-color': SUIT_COLOR[view.trump] } as CSSProperties}
-          >
-            <i>{SUIT_GLYPH[view.trump]}</i> trump
-          </div>
-        )}
-        {view.alone && (
-          <p className={styles.partnerNote}>
-            {view.caller === view.localSeat
-              ? 'You are playing this hand alone'
-              : partner && view.sittingOut === partner.seat
-                ? `${partner.name} is playing alone`
-                : 'A lone hand is running'}
-          </p>
-        )}
-        {view.players.map((player) => (
-          <Seat
-            key={player.seat}
-            player={player}
-            active={view.activeSeat === player.seat}
-            displayCount={deal.visibleCount(player.seat, player.handCount)}
-          />
-        ))}
-        <CenterTable view={view} deal={deal} />
-        <LocalHand
-          view={view}
-          busy={localBusy}
-          burying={view.decision === 'dealer-discard'}
-          onPlay={props.onPlay}
-          onDiscard={props.onDiscard}
-          deal={deal}
-        />
-        {/* Shared flights paint first; named Euchre moments stay readable above them. */}
-        <SharedCueLayer
-          fx={props.fx}
-          fxKey={props.fxKey}
-          localSeat={view.localSeat}
-          rootRef={rootRef}
-        />
-        <EuchreFxLayer
-          fx={props.fx}
-          fxKey={props.fxKey}
-          localSeat={view.localSeat}
-          rootRef={rootRef}
-        />
-        {view.decision && !localBusy && (
-          <BidRail
+        <TablePlayfield label="Euchre table" feltMark="E">
+          {view.trump && (
+            <div
+              className={styles.trumpBadge}
+              style={{ '--trump-color': SUIT_COLOR[view.trump] } as CSSProperties}
+            >
+              <i>{SUIT_GLYPH[view.trump]}</i> trump
+            </div>
+          )}
+          {view.alone && (
+            <p className={styles.partnerNote}>
+              {view.caller === view.localSeat
+                ? 'You are playing this hand alone'
+                : partner && view.sittingOut === partner.seat
+                  ? `${partner.name} is playing alone`
+                  : 'A lone hand is running'}
+            </p>
+          )}
+          {view.players.map((player) => (
+            <Seat
+              key={player.seat}
+              player={player}
+              active={view.activeSeat === player.seat}
+              displayCount={deal.visibleCount(player.seat, player.handCount)}
+            />
+          ))}
+          <CenterTable view={view} deal={deal} />
+          <LocalHand
             view={view}
-            alonePending={alonePending}
-            onAloneToggle={() => setAlonePending((value) => !value)}
-            onOrderUp={(alone) => {
-              clearAlone();
-              props.onOrderUp?.(alone);
-            }}
-            onCallTrump={(suit, alone) => {
-              clearAlone();
-              props.onCallTrump?.(suit, alone);
-            }}
-            onPass={() => {
-              clearAlone();
-              props.onPass?.();
-            }}
+            busy={localBusy}
+            burying={view.decision === 'dealer-discard'}
+            onPlay={props.onPlay}
+            onDiscard={props.onDiscard}
+            deal={deal}
           />
-        )}
-      </TablePlayfield>
+          {/* Shared flights paint first; named Euchre moments stay readable above them. */}
+          <SharedCueLayer
+            fx={props.fx}
+            fxKey={props.fxKey}
+            localSeat={view.localSeat}
+            rootRef={rootRef}
+          />
+          <EuchreFxLayer
+            fx={props.fx}
+            fxKey={props.fxKey}
+            localSeat={view.localSeat}
+            rootRef={rootRef}
+          />
+          {view.decision && !localBusy && (
+            <BidRail
+              view={view}
+              alonePending={alonePending}
+              onAloneToggle={() => setAlonePending((value) => !value)}
+              onOrderUp={(alone) => {
+                clearAlone();
+                props.onOrderUp?.(alone);
+              }}
+              onCallTrump={(suit, alone) => {
+                clearAlone();
+                props.onCallTrump?.(suit, alone);
+              }}
+              onPass={() => {
+                clearAlone();
+                props.onPass?.();
+              }}
+            />
+          )}
+        </TablePlayfield>
 
-      <TableMenu open={menu.isOpen} onClose={menu.close} onQuit={menu.quit} />
-    </TableShell>
+        <TableMenu open={menu.isOpen} onClose={menu.close} onQuit={menu.quit} />
+      </TableShell>
     </ArrivalProvider>
   );
 }

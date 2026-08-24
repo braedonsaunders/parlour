@@ -90,63 +90,63 @@ export function CribbageTableScreen(props: CribbageTableScreenProps) {
   const tableBusy = (props.busy ?? false) || deal.dealing;
   return (
     <ArrivalProvider fx={props.fx} fxKey={props.fxKey} localSeat={view.localSeat}>
-    <TableShell rootRef={rootRef} className={styles.screen} dealState={dealStateAttr(deal)}>
-      <TableHud onOpenMenu={menu.open}>
-        <TableTitlePill eyebrow="Cribbage" status={phaseCopy(view)} />
-      </TableHud>
+      <TableShell rootRef={rootRef} className={styles.screen} dealState={dealStateAttr(deal)}>
+        <TableHud onOpenMenu={menu.open}>
+          <TableTitlePill eyebrow="Cribbage" status={phaseCopy(view)} />
+        </TableHud>
 
-      <TablePlayfield label="Cribbage table">
-        <div className={styles.feltMonogram} aria-hidden="true">
-          121
-        </div>
-        <OpponentSeat view={view} deal={deal} />
-        <PeggingBoard view={view} fx={props.fx} />
-        <TableCards view={view} deal={deal} />
-        <LocalHand
-          key={`${view.localSeat}:${view.dealNo}`}
-          {...props}
-          view={view}
-          busy={tableBusy}
-          deal={deal}
+        <TablePlayfield label="Cribbage table">
+          <div className={styles.feltMonogram} aria-hidden="true">
+            121
+          </div>
+          <OpponentSeat view={view} deal={deal} />
+          <PeggingBoard view={view} fx={props.fx} />
+          <TableCards view={view} deal={deal} />
+          <LocalHand
+            key={`${view.localSeat}:${view.dealNo}`}
+            {...props}
+            view={view}
+            busy={tableBusy}
+            deal={deal}
+          />
+          <CribbageFxLayer
+            fx={props.fx}
+            fxKey={props.fxKey}
+            rootRef={rootRef}
+            localSeat={view.localSeat}
+          />
+        </TablePlayfield>
+
+        <TableActionRail className={styles.actionRail}>
+          {view.legal.cut && (
+            <button type="button" className="btn-fat" disabled={tableBusy} onClick={props.onCut}>
+              Cut the starter
+            </button>
+          )}
+          {view.legal.claim && (
+            <button type="button" className="btn-fat" disabled={tableBusy} onClick={props.onClaim}>
+              Claim points
+            </button>
+          )}
+          {view.legal.steal && (
+            <button
+              type="button"
+              className="btn-fat btn-fat--teal"
+              disabled={tableBusy}
+              onClick={props.onSteal}
+            >
+              Muggins!
+            </button>
+          )}
+        </TableActionRail>
+
+        <TableMenu
+          open={menu.isOpen}
+          onClose={menu.close}
+          howToPlay={{ doc: cribbageHowToPlay, title: 'Cribbage', subtitle: 'the pegging race' }}
+          onQuit={menu.quit}
         />
-        <CribbageFxLayer
-          fx={props.fx}
-          fxKey={props.fxKey}
-          rootRef={rootRef}
-          localSeat={view.localSeat}
-        />
-      </TablePlayfield>
-
-      <TableActionRail className={styles.actionRail}>
-        {view.legal.cut && (
-          <button type="button" className="btn-fat" disabled={tableBusy} onClick={props.onCut}>
-            Cut the starter
-          </button>
-        )}
-        {view.legal.claim && (
-          <button type="button" className="btn-fat" disabled={tableBusy} onClick={props.onClaim}>
-            Claim points
-          </button>
-        )}
-        {view.legal.steal && (
-          <button
-            type="button"
-            className="btn-fat btn-fat--teal"
-            disabled={tableBusy}
-            onClick={props.onSteal}
-          >
-            Muggins!
-          </button>
-        )}
-      </TableActionRail>
-
-      <TableMenu
-        open={menu.isOpen}
-        onClose={menu.close}
-        howToPlay={{ doc: cribbageHowToPlay, title: 'Cribbage', subtitle: 'the pegging race' }}
-        onQuit={menu.quit}
-      />
-    </TableShell>
+      </TableShell>
     </ArrivalProvider>
   );
 }

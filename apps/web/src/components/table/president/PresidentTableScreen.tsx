@@ -155,128 +155,130 @@ export function PresidentTableScreen(props: PresidentTableScreenProps) {
 
   return (
     <ArrivalProvider fx={props.fx} fxKey={props.fxKey} localSeat={view.localSeat}>
-    <TableShell rootRef={rootRef} dealState={dealStateAttr(deal)}>
-      <TableHud onOpenMenu={menu.open}>
-        <TableTitlePill eyebrow="President" status={view.phaseLabel} />
-      </TableHud>
+      <TableShell rootRef={rootRef} dealState={dealStateAttr(deal)}>
+        <TableHud onOpenMenu={menu.open}>
+          <TableTitlePill eyebrow="President" status={view.phaseLabel} />
+        </TableHud>
 
-      <TablePlayfield
-        label="President table"
-        feltMark="♛"
-        className={compactRing ? tableStyles.compactRing : undefined}
-        seatCount={view.players.length}
-      >
-        {view.players.map((player) => (
-          <Seat
-            key={player.seat}
-            player={player}
-            active={view.activeSeat === player.seat}
-            finished={view.finishedOrder.includes(player.seat)}
-            displayCount={deal.visibleCount(player.seat, player.handCount)}
+        <TablePlayfield
+          label="President table"
+          feltMark="♛"
+          className={compactRing ? tableStyles.compactRing : undefined}
+          seatCount={view.players.length}
+        >
+          {view.players.map((player) => (
+            <Seat
+              key={player.seat}
+              player={player}
+              active={view.activeSeat === player.seat}
+              finished={view.finishedOrder.includes(player.seat)}
+              displayCount={deal.visibleCount(player.seat, player.handCount)}
+            />
+          ))}
+          <CenterPile view={view} deal={deal} />
+          <LocalHand
+            view={view}
+            busy={localBusy}
+            selected={selected}
+            onToggle={toggleCard}
+            deal={deal}
           />
-        ))}
-        <CenterPile view={view} deal={deal} />
-        <LocalHand
-          view={view}
-          busy={localBusy}
-          selected={selected}
-          onToggle={toggleCard}
-          deal={deal}
-        />
-        <TableFxLayer
-          fx={props.fx}
-          fxKey={props.fxKey}
-          rootRef={rootRef}
-          renderCue={(cue) => <Cue cue={cue} localSeat={view.localSeat} />}
-        />
-        {(view.decision === 'give' || view.decision === 'return') && !localBusy && (
-          <div className={`${styles.exchangeBanner} panel-soft`} data-testid="exchange-banner">
-            <strong>
-              {view.decision === 'give'
-                ? 'The exchange — pay tribute'
-                : 'The exchange — send back your pick'}
-            </strong>
-            <span className={styles.exchangeHint}>
-              {view.decision === 'give'
-                ? 'The low seats hand their best cards up before the deal.'
-                : 'Choose what the low seats get back.'}
-            </span>
-          </div>
-        )}
-        {moments.current && (
-          <div className={styles.celebration} aria-live="polite" data-testid="role-moment">
-            <motion.div
-              initial={{ scale: 0.4, opacity: 0 }}
-              animate={{ scale: [0.4, 1.15, 1], opacity: 1 }}
-              transition={{ duration: 0.5, ease: [0.34, 1.56, 0.64, 1] }}
-            >
-              <span
-                className={
-                  moments.current.role === 'scum' ? styles.celebrationScum : styles.celebrationCrown
-                }
-                aria-hidden="true"
-              >
-                {moments.current.role === 'scum' ? '🪠' : '👑'}
+          <TableFxLayer
+            fx={props.fx}
+            fxKey={props.fxKey}
+            rootRef={rootRef}
+            renderCue={(cue) => <Cue cue={cue} localSeat={view.localSeat} />}
+          />
+          {(view.decision === 'give' || view.decision === 'return') && !localBusy && (
+            <div className={`${styles.exchangeBanner} panel-soft`} data-testid="exchange-banner">
+              <strong>
+                {view.decision === 'give'
+                  ? 'The exchange — pay tribute'
+                  : 'The exchange — send back your pick'}
+              </strong>
+              <span className={styles.exchangeHint}>
+                {view.decision === 'give'
+                  ? 'The low seats hand their best cards up before the deal.'
+                  : 'Choose what the low seats get back.'}
               </span>
-              <div className={styles.celebrationLabel}>
-                {ROLE_LABELS[moments.current.role] ?? moments.current.role}
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </TablePlayfield>
+            </div>
+          )}
+          {moments.current && (
+            <div className={styles.celebration} aria-live="polite" data-testid="role-moment">
+              <motion.div
+                initial={{ scale: 0.4, opacity: 0 }}
+                animate={{ scale: [0.4, 1.15, 1], opacity: 1 }}
+                transition={{ duration: 0.5, ease: [0.34, 1.56, 0.64, 1] }}
+              >
+                <span
+                  className={
+                    moments.current.role === 'scum'
+                      ? styles.celebrationScum
+                      : styles.celebrationCrown
+                  }
+                  aria-hidden="true"
+                >
+                  {moments.current.role === 'scum' ? '🪠' : '👑'}
+                </span>
+                <div className={styles.celebrationLabel}>
+                  {ROLE_LABELS[moments.current.role] ?? moments.current.role}
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </TablePlayfield>
 
-      <TableActionRail>
-        {view.decision === 'lead-or-follow' && (
-          <>
-            <button
-              type="button"
-              className="btn-fat"
-              disabled={!selectionValid || localBusy}
-              onClick={() => {
-                if (selectionValid) {
-                  props.onConfirm?.(selected);
-                  setSelection({ key: props.fxKey, cards: [] });
-                }
-              }}
-            >
-              {confirmLabel}
-              {selected.length > 0 ? ` (${selected.length})` : ''}
-            </button>
-            <button
-              type="button"
-              className="btn-fat btn-fat--ghost"
-              disabled={!view.legal.pass || localBusy}
-              onClick={props.onPass}
-            >
-              Pass
-            </button>
-          </>
-        )}
-        {(view.decision === 'give' || view.decision === 'return') && (
-          <>
-            <span className={styles.selectionCount}>
-              Selected {selected.length}/{requiredCount}
-            </span>
-            <button
-              type="button"
-              className="btn-fat"
-              disabled={!selectionValid || localBusy}
-              onClick={() => {
-                if (selectionValid) {
-                  props.onConfirm?.(selected);
-                  setSelection({ key: props.fxKey, cards: [] });
-                }
-              }}
-            >
-              {confirmLabel}
-            </button>
-          </>
-        )}
-      </TableActionRail>
+        <TableActionRail>
+          {view.decision === 'lead-or-follow' && (
+            <>
+              <button
+                type="button"
+                className="btn-fat"
+                disabled={!selectionValid || localBusy}
+                onClick={() => {
+                  if (selectionValid) {
+                    props.onConfirm?.(selected);
+                    setSelection({ key: props.fxKey, cards: [] });
+                  }
+                }}
+              >
+                {confirmLabel}
+                {selected.length > 0 ? ` (${selected.length})` : ''}
+              </button>
+              <button
+                type="button"
+                className="btn-fat btn-fat--ghost"
+                disabled={!view.legal.pass || localBusy}
+                onClick={props.onPass}
+              >
+                Pass
+              </button>
+            </>
+          )}
+          {(view.decision === 'give' || view.decision === 'return') && (
+            <>
+              <span className={styles.selectionCount}>
+                Selected {selected.length}/{requiredCount}
+              </span>
+              <button
+                type="button"
+                className="btn-fat"
+                disabled={!selectionValid || localBusy}
+                onClick={() => {
+                  if (selectionValid) {
+                    props.onConfirm?.(selected);
+                    setSelection({ key: props.fxKey, cards: [] });
+                  }
+                }}
+              >
+                {confirmLabel}
+              </button>
+            </>
+          )}
+        </TableActionRail>
 
-      <TableMenu open={menu.isOpen} onClose={menu.close} onQuit={menu.quit} />
-    </TableShell>
+        <TableMenu open={menu.isOpen} onClose={menu.close} onQuit={menu.quit} />
+      </TableShell>
     </ArrivalProvider>
   );
 }

@@ -6,7 +6,10 @@ export type DioramaOptions = {
   getReducedMotion: () => boolean;
 };
 
-export function mountParlourDiorama(canvas: HTMLCanvasElement, options: DioramaOptions): () => void {
+export function mountParlourDiorama(
+  canvas: HTMLCanvasElement,
+  options: DioramaOptions,
+): () => void {
   const ctx = canvas.getContext('2d', { alpha: false, desynchronized: true });
   if (!ctx) return () => {};
 
@@ -127,8 +130,22 @@ export function mountParlourDiorama(canvas: HTMLCanvasElement, options: DioramaO
     c.fillStyle = color;
     c.beginPath();
     c.moveTo(x - bw, y);
-    c.bezierCurveTo(x - bw * 1.24, y - hh * 0.3, x - bw * 0.45 + tip * 0.45, y - hh * 0.62, x + tip, y - hh);
-    c.bezierCurveTo(x + bw * 0.45 + tip * 0.45, y - hh * 0.56, x + bw * 1.24, y - hh * 0.27, x + bw, y);
+    c.bezierCurveTo(
+      x - bw * 1.24,
+      y - hh * 0.3,
+      x - bw * 0.45 + tip * 0.45,
+      y - hh * 0.62,
+      x + tip,
+      y - hh,
+    );
+    c.bezierCurveTo(
+      x + bw * 0.45 + tip * 0.45,
+      y - hh * 0.56,
+      x + bw * 1.24,
+      y - hh * 0.27,
+      x + bw,
+      y,
+    );
     c.closePath();
     c.fill();
     c.restore();
@@ -296,7 +313,12 @@ export function mountParlourDiorama(canvas: HTMLCanvasElement, options: DioramaO
       sprig(90, -35, 1);
       sprig(30, 190, 1);
       c.fillStyle = 'rgba(141,196,205,0.10)';
-      [[62, 20], [8, 100], [112, 62], [58, 140]].forEach(([x, y]) => {
+      [
+        [62, 20],
+        [8, 100],
+        [112, 62],
+        [58, 140],
+      ].forEach(([x, y]) => {
         c.beginPath();
         c.arc(x, y, 1.3, 0, Math.PI * 2);
         c.fill();
@@ -327,7 +349,10 @@ export function mountParlourDiorama(canvas: HTMLCanvasElement, options: DioramaO
       quat(28, 28, 0.5);
       quat(84, 84, 0.5);
       c.fillStyle = 'rgba(47,134,161,0.5)';
-      [[84, 28], [28, 84]].forEach(([x, y]) => {
+      [
+        [84, 28],
+        [28, 84],
+      ].forEach(([x, y]) => {
         c.save();
         c.translate(x, y);
         c.rotate(Math.PI / 4);
@@ -375,11 +400,16 @@ export function mountParlourDiorama(canvas: HTMLCanvasElement, options: DioramaO
       for (let i = 0; i < 300; i += 1) {
         const x = rnd() * 200;
         const y = 24 + rnd() * 76;
-        c.strokeStyle = `rgba(${12 + rnd() * 34 | 0},${44 + rnd() * 56 | 0},${22 + rnd() * 22 | 0},${0.25 + rnd() * 0.45})`;
+        c.strokeStyle = `rgba(${(12 + rnd() * 34) | 0},${(44 + rnd() * 56) | 0},${(22 + rnd() * 22) | 0},${0.25 + rnd() * 0.45})`;
         c.lineWidth = 1;
         c.beginPath();
         c.moveTo(x, y);
-        c.quadraticCurveTo(x + (rnd() - 0.5) * 6, y - 9, x + (rnd() - 0.5) * 5, y - 13 - rnd() * 11);
+        c.quadraticCurveTo(
+          x + (rnd() - 0.5) * 6,
+          y - 9,
+          x + (rnd() - 0.5) * 5,
+          y - 13 - rnd() * 11,
+        );
         c.stroke();
       }
     });
@@ -459,10 +489,10 @@ export function mountParlourDiorama(canvas: HTMLCanvasElement, options: DioramaO
       makeTex(48, 256, (c) => {
         const g = c.createLinearGradient(0, 0, 0, 256);
         g.addColorStop(0, hex(color, 0));
-        g.addColorStop(0.4, hex(color, 0.10));
-        g.addColorStop(0.72, hex(color, 0.30));
+        g.addColorStop(0.4, hex(color, 0.1));
+        g.addColorStop(0.72, hex(color, 0.3));
         g.addColorStop(0.9, hex(color, 0.58));
-        g.addColorStop(0.97, hex(color, 0.30));
+        g.addColorStop(0.97, hex(color, 0.3));
         g.addColorStop(1, hex(color, 0));
         c.fillStyle = g;
         c.fillRect(0, 0, 48, 256);
@@ -778,7 +808,7 @@ export function mountParlourDiorama(canvas: HTMLCanvasElement, options: DioramaO
       const rx = spread * (0.7 + rnd() * 0.55);
       const ry = h * (0.055 + rnd() * 0.05);
       const sh = 10 + tt * 16;
-      c.fillStyle = `rgb(${sh * 0.8 | 0},${16 + sh | 0},${12 + sh * 0.55 | 0})`;
+      c.fillStyle = `rgb(${(sh * 0.8) | 0},${(16 + sh) | 0},${(12 + sh * 0.55) | 0})`;
       c.beginPath();
       c.ellipse(xx, yy, rx, ry, (rnd() - 0.5) * 0.5, 0, Math.PI * 2);
       c.fill();
@@ -789,7 +819,15 @@ export function mountParlourDiorama(canvas: HTMLCanvasElement, options: DioramaO
       if (lit) {
         c.fillStyle = hex('#e29349', 0.08 + tt * 0.14);
         c.beginPath();
-        c.ellipse(xx + dir * rx * 0.42, yy + ry * 0.1, rx * 0.4, ry * 0.5, dir * 0.25, 0, Math.PI * 2);
+        c.ellipse(
+          xx + dir * rx * 0.42,
+          yy + ry * 0.1,
+          rx * 0.4,
+          ry * 0.5,
+          dir * 0.25,
+          0,
+          Math.PI * 2,
+        );
         c.fill();
       }
     }
@@ -810,7 +848,8 @@ export function mountParlourDiorama(canvas: HTMLCanvasElement, options: DioramaO
   let my = 0;
   let px = 0;
   let py = 0;
-  let reduced = options.getReducedMotion() || window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let reduced =
+    options.getReducedMotion() || window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   const plates = { campfire: null, casino: null, snug: null };
   const EX = { campfire: {}, casino: {}, snug: {} };
@@ -826,7 +865,14 @@ export function mountParlourDiorama(canvas: HTMLCanvasElement, options: DioramaO
     const rt = mulberry(0x7a11);
     twinkles.length = 0;
     for (let i = 0; i < 18; i += 1) {
-      twinkles.push({ x: rt(), y: rt() * 0.42, r: 0.6 + rt() * 1.4, a: 0.35 + rt() * 0.6, s: 1.6 + rt() * 2.4, p: rt() * 6.28 });
+      twinkles.push({
+        x: rt(),
+        y: rt() * 0.42,
+        r: 0.6 + rt() * 1.4,
+        a: 0.35 + rt() * 0.6,
+        s: 1.6 + rt() * 2.4,
+        p: rt() * 6.28,
+      });
     }
     const rf = mulberry(0xf12e);
     flies.length = 0;
@@ -866,7 +912,13 @@ export function mountParlourDiorama(canvas: HTMLCanvasElement, options: DioramaO
     const rrn = mulberry(0x9a17);
     rain.length = 0;
     for (let i = 0; i < 40; i += 1) {
-      rain.push({ x: rrn(), y: rrn(), len: 8 + rrn() * 15, s: 0.8 + rrn() * 0.9, a: 0.2 + rrn() * 0.3 });
+      rain.push({
+        x: rrn(),
+        y: rrn(),
+        len: 8 + rrn() * 15,
+        s: 0.8 + rrn() * 0.9,
+        a: 0.2 + rrn() * 0.3,
+      });
     }
     const rm = mulberry(0xd057);
     motes.length = 0;
@@ -890,7 +942,13 @@ export function mountParlourDiorama(canvas: HTMLCanvasElement, options: DioramaO
 
   function blitPlates(arr) {
     for (let i = 0; i < arr.length; i += 1) {
-      ctx.drawImage(arr[i].c, -PAD - px * DEPTHS[i], -PAD - py * DEPTHS[i] * 0.6, W + PAD * 2, H + PAD * 2);
+      ctx.drawImage(
+        arr[i].c,
+        -PAD - px * DEPTHS[i],
+        -PAD - py * DEPTHS[i] * 0.6,
+        W + PAD * 2,
+        H + PAD * 2,
+      );
     }
   }
 
@@ -973,7 +1031,14 @@ export function mountParlourDiorama(canvas: HTMLCanvasElement, options: DioramaO
     ex.moon = { x: moonX, y: moonY, r: moonR };
     glow(g, moonX, moonY, moonR * 4.6, '#fff6dc', 0.13);
     glow(g, moonX, moonY, moonR * 1.7, '#fff8e4', 0.42);
-    const moonGrad = g.createRadialGradient(moonX - moonR * 0.4, moonY - moonR * 0.4, moonR * 0.15, moonX, moonY, moonR);
+    const moonGrad = g.createRadialGradient(
+      moonX - moonR * 0.4,
+      moonY - moonR * 0.4,
+      moonR * 0.15,
+      moonX,
+      moonY,
+      moonR,
+    );
     moonGrad.addColorStop(0, '#fffef8');
     moonGrad.addColorStop(0.6, '#f2e7ca');
     moonGrad.addColorStop(1, '#cdc0a0');
@@ -982,7 +1047,13 @@ export function mountParlourDiorama(canvas: HTMLCanvasElement, options: DioramaO
     g.arc(moonX, moonY, moonR, 0, Math.PI * 2);
     g.fill();
     g.fillStyle = 'rgba(150,138,112,0.3)';
-    [[-0.25, 0.2, 0.2], [0.3, -0.28, 0.14], [0.16, 0.34, 0.17], [-0.42, -0.2, 0.1], [0.46, 0.18, 0.1]].forEach(([dx, dy, r]) => {
+    [
+      [-0.25, 0.2, 0.2],
+      [0.3, -0.28, 0.14],
+      [0.16, 0.34, 0.17],
+      [-0.42, -0.2, 0.1],
+      [0.46, 0.18, 0.1],
+    ].forEach(([dx, dy, r]) => {
       g.beginPath();
       g.arc(moonX + dx * moonR, moonY + dy * moonR, r * moonR, 0, Math.PI * 2);
       g.fill();
@@ -1116,7 +1187,14 @@ export function mountParlourDiorama(canvas: HTMLCanvasElement, options: DioramaO
       },
       () => {
         fillPat(n, T.grass, -PAD, H * 0.62, W + PAD * 2, H * 0.5, 0.9);
-        const dirt = n.createRadialGradient(W * 0.5, H * 0.85, 30, W * 0.5, H * 0.87, Math.min(W, H) * 0.5);
+        const dirt = n.createRadialGradient(
+          W * 0.5,
+          H * 0.85,
+          30,
+          W * 0.5,
+          H * 0.87,
+          Math.min(W, H) * 0.5,
+        );
         dirt.addColorStop(0, 'rgba(66,42,22,0.9)');
         dirt.addColorStop(0.5, 'rgba(52,34,18,0.55)');
         dirt.addColorStop(1, 'rgba(52,34,18,0)');
@@ -1130,7 +1208,14 @@ export function mountParlourDiorama(canvas: HTMLCanvasElement, options: DioramaO
         n.fillStyle = edgeShade;
         n.fillRect(-PAD, H * 0.6, W + PAD * 2, H * 0.5 + PAD);
         n.globalCompositeOperation = 'screen';
-        const warmBase = n.createRadialGradient(W * 0.5, H * 0.82, 20, W * 0.5, H * 0.84, Math.min(W, H) * 0.44);
+        const warmBase = n.createRadialGradient(
+          W * 0.5,
+          H * 0.82,
+          20,
+          W * 0.5,
+          H * 0.84,
+          Math.min(W, H) * 0.44,
+        );
         warmBase.addColorStop(0, 'rgba(226,147,73,0.22)');
         warmBase.addColorStop(1, 'rgba(226,147,73,0)');
         n.fillStyle = warmBase;
@@ -1233,7 +1318,10 @@ export function mountParlourDiorama(canvas: HTMLCanvasElement, options: DioramaO
     n.lineTo(th * 0.8, 16);
     n.stroke();
     n.fillStyle = '#c99b52';
-    [[-th * 0.8, 16], [th * 0.8, 16]].forEach(([sx, sy]) => {
+    [
+      [-th * 0.8, 16],
+      [th * 0.8, 16],
+    ].forEach(([sx, sy]) => {
       n.fillRect(sx - 1.4, sy - 2, 2.8, 8);
     });
     n.fillStyle = '#e29349';
@@ -1257,7 +1345,14 @@ export function mountParlourDiorama(canvas: HTMLCanvasElement, options: DioramaO
       const y = H * (0.68 + rrock() * 0.06);
       const r = 3 + rrock() * 6;
       ellipse(n, x, y + r * 0.4, r, r * 0.36, 'rgba(3,8,8,0.5)');
-      ellipse(n, x, y, r, r * 0.66, `rgb(${70 + rrock() * 24 | 0},${74 + rrock() * 18 | 0},${76 | 0})`);
+      ellipse(
+        n,
+        x,
+        y,
+        r,
+        r * 0.66,
+        `rgb(${(70 + rrock() * 24) | 0},${(74 + rrock() * 18) | 0},${76 | 0})`,
+      );
       ellipse(n, x - r * 0.25, y - r * 0.2, r * 0.5, r * 0.3, 'rgba(226,147,73,0.25)');
     }
 
@@ -1280,7 +1375,8 @@ export function mountParlourDiorama(canvas: HTMLCanvasElement, options: DioramaO
       f.rotate(rot);
       clipDraw(
         f,
-        () => f.roundRect(-len * 0.5 * fs, -thick * 0.5 * fs, len * fs, thick * fs, thick * 0.5 * fs),
+        () =>
+          f.roundRect(-len * 0.5 * fs, -thick * 0.5 * fs, len * fs, thick * fs, thick * 0.5 * fs),
         () => fillPat(f, T.bark, -len * 0.5 * fs, -thick * 0.6 * fs, len * fs, thick * 1.3 * fs),
       );
       const charG = f.createLinearGradient(-len * 0.5 * fs, 0, len * 0.5 * fs, 0);
@@ -1317,10 +1413,17 @@ export function mountParlourDiorama(canvas: HTMLCanvasElement, options: DioramaO
       const rx = (26 + hashi(i, 3) * 12) * fs;
       const ry = rx * (0.62 + hashi(i, 5) * 0.12);
       ellipse(f, sxp, syp + ry * 0.55, rx * 1.05, ry * 0.42, 'rgba(3,8,10,0.5)');
-      const sg = f.createRadialGradient(sxp - rx * 0.2, syp - ry * 0.5, rx * 0.1, sxp, syp, rx * 1.2);
+      const sg = f.createRadialGradient(
+        sxp - rx * 0.2,
+        syp - ry * 0.5,
+        rx * 0.1,
+        sxp,
+        syp,
+        rx * 1.2,
+      );
       const nn = hashi(i, 9);
-      sg.addColorStop(0, `rgb(${118 + nn * 26 | 0},${118 + nn * 18 | 0},${116 | 0})`);
-      sg.addColorStop(0.6, `rgb(${76 + nn * 20 | 0},${80 + nn * 14 | 0},${82 | 0})`);
+      sg.addColorStop(0, `rgb(${(118 + nn * 26) | 0},${(118 + nn * 18) | 0},${116 | 0})`);
+      sg.addColorStop(0.6, `rgb(${(76 + nn * 20) | 0},${(80 + nn * 14) | 0},${82 | 0})`);
       sg.addColorStop(1, `rgb(${44 | 0},${48 | 0},${52 | 0})`);
       f.fillStyle = sg;
       f.beginPath();
@@ -1328,7 +1431,15 @@ export function mountParlourDiorama(canvas: HTMLCanvasElement, options: DioramaO
       f.fill();
       f.fillStyle = hex('#ffb24a', 0.24 + nn * 0.14);
       f.beginPath();
-      f.ellipse(sxp - Math.cos(a) * rx * 0.3, syp - ry * 0.42, rx * 0.55, ry * 0.4, 0, 0, Math.PI * 2);
+      f.ellipse(
+        sxp - Math.cos(a) * rx * 0.3,
+        syp - ry * 0.42,
+        rx * 0.55,
+        ry * 0.4,
+        0,
+        0,
+        Math.PI * 2,
+      );
       f.fill();
       f.fillStyle = hex('#3d6a3a', 0.14);
       f.beginPath();
@@ -1427,13 +1538,13 @@ export function mountParlourDiorama(canvas: HTMLCanvasElement, options: DioramaO
     f.lineCap = 'round';
     f.beginPath();
     f.moveTo(W * 0.63, H + 20);
-    f.quadraticCurveTo(W * 0.60, H * 0.92, W * 0.552, H * 0.845);
+    f.quadraticCurveTo(W * 0.6, H * 0.92, W * 0.552, H * 0.845);
     f.stroke();
     f.strokeStyle = 'rgba(255,205,140,0.35)';
     f.lineWidth = 1.4;
     f.beginPath();
     f.moveTo(W * 0.626, H + 20);
-    f.quadraticCurveTo(W * 0.597, H * 0.92, W * 0.550, H * 0.848);
+    f.quadraticCurveTo(W * 0.597, H * 0.92, W * 0.55, H * 0.848);
     f.stroke();
     f.save();
     f.translate(W * 0.549, H * 0.842);
@@ -1578,9 +1689,40 @@ export function mountParlourDiorama(canvas: HTMLCanvasElement, options: DioramaO
 
       tongue(ctx, t, FX, FY + 6 * fs, 62 * fs, 205 * fs, hex('#b8431c', 0.66), 0.3, 4 * fs);
       tongue(ctx, t, FX, FY + 6 * fs, 48 * fs, 170 * fs, hex('#e26a28', 0.88), 1.3, -3 * fs);
-      tongue(ctx, t, FX - 34 * fs, FY + 10 * fs, 17 * fs, 66 * fs, hex('#e29349', 0.85), 4.1, -5 * fs);
-      tongue(ctx, t, FX + 36 * fs, FY + 10 * fs, 15 * fs, 58 * fs, hex('#e28434', 0.85), 5.3, 6 * fs);
-      tongue(ctx, t, FX, FY + 4 * fs, 33 * fs, 126 * fs, hex('#f6a94f', 0.95), 2.2, 2 * fs, 'lighter');
+      tongue(
+        ctx,
+        t,
+        FX - 34 * fs,
+        FY + 10 * fs,
+        17 * fs,
+        66 * fs,
+        hex('#e29349', 0.85),
+        4.1,
+        -5 * fs,
+      );
+      tongue(
+        ctx,
+        t,
+        FX + 36 * fs,
+        FY + 10 * fs,
+        15 * fs,
+        58 * fs,
+        hex('#e28434', 0.85),
+        5.3,
+        6 * fs,
+      );
+      tongue(
+        ctx,
+        t,
+        FX,
+        FY + 4 * fs,
+        33 * fs,
+        126 * fs,
+        hex('#f6a94f', 0.95),
+        2.2,
+        2 * fs,
+        'lighter',
+      );
       tongue(ctx, t, FX, FY + 2 * fs, 18 * fs, 74 * fs, hex('#fff3d6', 0.95), 3.4, 0, 'lighter');
 
       ctx.save();
@@ -1745,7 +1887,12 @@ export function mountParlourDiorama(canvas: HTMLCanvasElement, options: DioramaO
     g.beginPath();
     g.roundRect(W * 0.5 - SW / 2 + 10, SY - SW * 0.115 + 10, SW - 20, SW * 0.23 - 20, SW * 0.045);
     g.stroke();
-    [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([qx, qy]) => {
+    [
+      [-1, -1],
+      [1, -1],
+      [-1, 1],
+      [1, 1],
+    ].forEach(([qx, qy]) => {
       ellipse(g, W * 0.5 + qx * (SW / 2 - 16), SY + qy * (SW * 0.115 - 14), 4, 4, '#e2c289');
       ellipse(g, W * 0.5 + qx * (SW / 2 - 17), SY + qy * (SW * 0.115 - 15), 1.6, 1.6, '#fff3d6');
     });
@@ -1902,7 +2049,11 @@ export function mountParlourDiorama(canvas: HTMLCanvasElement, options: DioramaO
     n.stroke();
     /* buttons + tray */
     rr(n, -46, -74, 92, 18, 6, '#1c0810');
-    [[-28, '#bd2f3a'], [0, '#e2c289'], [28, '#2f86a1']].forEach(([dx, col]) => {
+    [
+      [-28, '#bd2f3a'],
+      [0, '#e2c289'],
+      [28, '#2f86a1'],
+    ].forEach(([dx, col]) => {
       ellipse(n, dx, -65, 9, 6.4, col);
       ellipse(n, dx - 2, -67, 3, 2, 'rgba(255,255,255,0.4)');
     });
@@ -2052,7 +2203,11 @@ export function mountParlourDiorama(canvas: HTMLCanvasElement, options: DioramaO
     f.beginPath();
     f.ellipse(TXc, TB, RXr * 0.7, RYr * 0.7, 0, Math.PI * 1.08, Math.PI * 1.92);
     f.stroke();
-    [[-0.13, 0.012, -0.1], [0, 0, 0], [0.13, 0.012, 0.1]].forEach(([ux, uy, rot]) => {
+    [
+      [-0.13, 0.012, -0.1],
+      [0, 0, 0],
+      [0.13, 0.012, 0.1],
+    ].forEach(([ux, uy, rot]) => {
       f.save();
       f.translate(TXc + W * ux, H * (0.815 + uy));
       f.rotate(rot);
@@ -2070,10 +2225,10 @@ export function mountParlourDiorama(canvas: HTMLCanvasElement, options: DioramaO
     chipStack(f, W * 0.305, H * 0.965, '#25586e', 4, 1.15);
     chipStack(f, W * 0.665, H * 0.935, '#2f86a1', 6, 1.15);
     chipStack(f, W * 0.635, H * 0.968, '#bd2f3a', 3, 1.15);
-    chipStack(f, W * 0.70, H * 0.962, '#2c6e4f', 4, 1.15);
+    chipStack(f, W * 0.7, H * 0.962, '#2c6e4f', 4, 1.15);
     card(f, W * 0.468, H * 0.945, -0.2, 'A', '♠', false, 1.5);
     card(f, W * 0.527, H * 0.938, 0.12, 'K', '♥', true, 1.5);
-    cardBack(f, W * 0.60, H * 0.975, 0.32, 1.4);
+    cardBack(f, W * 0.6, H * 0.975, 0.32, 1.4);
 
     plates.casino = [far, mid, near, fore];
 
@@ -2122,7 +2277,12 @@ export function mountParlourDiorama(canvas: HTMLCanvasElement, options: DioramaO
       ctx.globalAlpha = 1;
       ctx.textAlign = 'center';
       ctx.font = `700 ${Math.round(fsz * 0.34)}px "Baloo 2", sans-serif`;
-      [['♠', '#9fdcef', -3], ['♥', '#ff9d7a', -1], ['♦', '#ff9d7a', 1], ['♣', '#9fdcef', 3]].forEach(([ch, col, u]) => {
+      [
+        ['♠', '#9fdcef', -3],
+        ['♥', '#ff9d7a', -1],
+        ['♦', '#ff9d7a', 1],
+        ['♣', '#9fdcef', 3],
+      ].forEach(([ch, col, u]) => {
         ctx.fillStyle = col;
         ctx.globalAlpha = 0.55 + 0.45 * (0.5 + 0.5 * Math.sin(t * 1.8 + u * 2));
         ctx.fillText(ch, s.x + u * fsz * 0.42, s.y + s.w * 0.078);
@@ -2152,12 +2312,18 @@ export function mountParlourDiorama(canvas: HTMLCanvasElement, options: DioramaO
         ctx.save();
         ctx.translate(ch.x, ch.y);
         ctx.rotate(rot);
-        ctx.drawImage(S.chand, -S.chandHang[0] * 2 * sc, -S.chandHang[1] * 2 * sc, 640 * sc, 600 * sc);
+        ctx.drawImage(
+          S.chand,
+          -S.chandHang[0] * 2 * sc,
+          -S.chandHang[1] * 2 * sc,
+          640 * sc,
+          600 * sc,
+        );
         ctx.restore();
         const cosA = Math.cos(rot);
         const sinA = Math.sin(rot);
         S.chandBulbs.forEach(([bx, by], kk) => {
-          const dx = (bx) * ch.s * 0.5 * 2 * 0.5;
+          const dx = bx * ch.s * 0.5 * 2 * 0.5;
           const dy = (by - 8) * ch.s * 0.5 * 2 * 0.5;
           const gx = ch.x + dx * cosA - dy * sinA;
           const gy = ch.y + dx * sinA + dy * cosA;
@@ -2183,7 +2349,7 @@ export function mountParlourDiorama(canvas: HTMLCanvasElement, options: DioramaO
       ctx.save();
       ctx.globalCompositeOperation = 'screen';
       motes.forEach((mo) => {
-        const u = ((t / mo.s + mo.p) % 1 + 1) % 1;
+        const u = (((t / mo.s + mo.p) % 1) + 1) % 1;
         const x = mo.x * W + Math.sin(t * 0.5 + mo.p * 9) * 14;
         glow(ctx, x, H * 0.8 - u * H * 0.55, mo.r * 2, '#e2c289', 0.3 * Math.sin(u * Math.PI));
       });
@@ -2199,7 +2365,13 @@ export function mountParlourDiorama(canvas: HTMLCanvasElement, options: DioramaO
         ellipse(ctx, b.x, b.y, 2.4, 2.4, `rgba(255,236,196,${0.4 + 0.6 * on})`);
       });
       const symbols = ['7', '♠', '♥', '★', '♦'];
-      const symColor = { 7: '#bd5f20', '♠': '#20475c', '♥': '#bd3f24', '★': '#b9884a', '♦': '#bd3f24' };
+      const symColor = {
+        7: '#bd5f20',
+        '♠': '#20475c',
+        '♥': '#bd3f24',
+        '★': '#b9884a',
+        '♦': '#bd3f24',
+      };
       ex.reels.forEach((r0, i) => {
         ctx.save();
         ctx.beginPath();
@@ -2213,7 +2385,7 @@ export function mountParlourDiorama(canvas: HTMLCanvasElement, options: DioramaO
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         for (let kk = -1; kk <= 1; kk += 1) {
-          const sym = symbols[((idx + kk) % 5 + 5) % 5];
+          const sym = symbols[(((idx + kk) % 5) + 5) % 5];
           ctx.fillStyle = symColor[sym];
           ctx.fillText(sym, r0.x, r0.y + (kk + frac) * r0.h * 0.7);
         }
@@ -2284,7 +2456,14 @@ export function mountParlourDiorama(canvas: HTMLCanvasElement, options: DioramaO
     g.fillRect(-PAD, -PAD, W + PAD * 2, PAD + H * 0.06);
     g.save();
     g.globalCompositeOperation = 'screen';
-    const hearthStain = g.createRadialGradient(W * 0.175, H * 0.6, 30, W * 0.175, H * 0.62, W * 0.4);
+    const hearthStain = g.createRadialGradient(
+      W * 0.175,
+      H * 0.6,
+      30,
+      W * 0.175,
+      H * 0.62,
+      W * 0.4,
+    );
     hearthStain.addColorStop(0, 'rgba(226,147,73,0.12)');
     hearthStain.addColorStop(1, 'rgba(226,147,73,0)');
     g.fillStyle = hearthStain;
@@ -2396,7 +2575,13 @@ export function mountParlourDiorama(canvas: HTMLCanvasElement, options: DioramaO
         g.fillRect(WX0 + ww * 0.17, WY0 + wh2 * 0.47, ww * 0.03, wh2 * 0.09);
         g.fillRect(WX0 + ww * 0.71, WY0 + wh2 * 0.44, ww * 0.03, wh2 * 0.1);
         /* lit windows */
-        [[0.14, 0.72], [0.3, 0.7], [0.42, 0.68], [0.63, 0.74], [0.8, 0.68]].forEach(([u, v], i2) => {
+        [
+          [0.14, 0.72],
+          [0.3, 0.7],
+          [0.42, 0.68],
+          [0.63, 0.74],
+          [0.8, 0.68],
+        ].forEach(([u, v], i2) => {
           const lx = WX0 + ww * u;
           const ly = WY0 + wh2 * v;
           glow(g, lx, ly, 8, '#f2b06a', 0.5);
@@ -2434,7 +2619,11 @@ export function mountParlourDiorama(canvas: HTMLCanvasElement, options: DioramaO
     g.strokeStyle = '#2c6e4f';
     g.lineWidth = 2.2;
     g.lineCap = 'round';
-    [[-6, -30, -10], [0, -34, 2], [6, -28, 10]].forEach(([x1, y1, x2]) => {
+    [
+      [-6, -30, -10],
+      [0, -34, 2],
+      [6, -28, 10],
+    ].forEach(([x1, y1, x2]) => {
       g.beginPath();
       g.moveTo(0, -14);
       g.quadraticCurveTo(x1, y1 * 0.7, x2, y1);
@@ -2512,7 +2701,14 @@ export function mountParlourDiorama(canvas: HTMLCanvasElement, options: DioramaO
     m.lineTo(W * 0.7, H * 0.9);
     m.closePath();
     m.fill();
-    const hearthSheen = m.createRadialGradient(W * 0.175, H * 0.74, 8, W * 0.175, H * 0.76, W * 0.14);
+    const hearthSheen = m.createRadialGradient(
+      W * 0.175,
+      H * 0.74,
+      8,
+      W * 0.175,
+      H * 0.76,
+      W * 0.14,
+    );
     hearthSheen.addColorStop(0, 'rgba(255,178,74,0.14)');
     hearthSheen.addColorStop(1, 'rgba(255,178,74,0)');
     m.fillStyle = hearthSheen;
@@ -2677,47 +2873,55 @@ export function mountParlourDiorama(canvas: HTMLCanvasElement, options: DioramaO
     n.restore();
 
     /* firebox interior */
-    clipDraw(n, () => archPath(n), () => {
-      n.fillStyle = '#070302';
-      n.fillRect(OX - OHW, OTY - 6, OHW * 2, OBY - OTY + 8);
-      fillPat(n, T.brick, OX - OHW, OTY, OHW * 2, OBY - OTY, 0.3);
-      const soot = n.createLinearGradient(0, OTY, 0, OBY);
-      soot.addColorStop(0, 'rgba(0,0,0,0.85)');
-      soot.addColorStop(0.55, 'rgba(0,0,0,0.5)');
-      soot.addColorStop(1, 'rgba(20,8,2,0.25)');
-      n.fillStyle = soot;
-      n.fillRect(OX - OHW, OTY - 6, OHW * 2, OBY - OTY + 8);
-      const inGlow = n.createRadialGradient(OX, OBY - 8, 4, OX, OBY - 8, OHW * 1.15);
-      inGlow.addColorStop(0, 'rgba(255,138,48,0.55)');
-      inGlow.addColorStop(0.6, 'rgba(200,80,24,0.22)');
-      inGlow.addColorStop(1, 'rgba(120,40,10,0)');
-      n.fillStyle = inGlow;
-      n.fillRect(OX - OHW, OTY, OHW * 2, OBY - OTY);
-      /* logs in the box */
-      n.save();
-      n.translate(OX, OBY - 9);
-      n.rotate(-0.14);
-      rr(n, -OHW * 0.62, -6, OHW * 1.24, 12, 6, '#2c160a');
-      fillPat(n, T.bark, -OHW * 0.62, -7, OHW * 1.24, 15, 0.6);
-      n.rotate(0.3);
-      rr(n, -OHW * 0.54, -3, OHW * 1.08, 11, 5, '#38200e');
-      fillPat(n, T.bark, -OHW * 0.54, -4, OHW * 1.08, 14, 0.55);
-      n.restore();
-      n.strokeStyle = 'rgba(255,150,60,0.8)';
-      n.lineWidth = 1.6;
-      [[-0.4, -14], [-0.1, -10], [0.24, -13]].forEach(([u, dy]) => {
-        n.beginPath();
-        n.moveTo(OX + u * OHW, OBY + dy);
-        n.lineTo(OX + u * OHW + 6, OBY + dy + 5);
-        n.stroke();
-      });
-      /* andirons */
-      n.fillStyle = '#8a6a2c';
-      [-OHW * 0.66, OHW * 0.66].forEach((dx) => {
-        n.fillRect(OX + dx - 2, OBY - 22, 4, 22);
-        ellipse(n, OX + dx, OBY - 24, 4, 4, '#c99b52');
-      });
-    });
+    clipDraw(
+      n,
+      () => archPath(n),
+      () => {
+        n.fillStyle = '#070302';
+        n.fillRect(OX - OHW, OTY - 6, OHW * 2, OBY - OTY + 8);
+        fillPat(n, T.brick, OX - OHW, OTY, OHW * 2, OBY - OTY, 0.3);
+        const soot = n.createLinearGradient(0, OTY, 0, OBY);
+        soot.addColorStop(0, 'rgba(0,0,0,0.85)');
+        soot.addColorStop(0.55, 'rgba(0,0,0,0.5)');
+        soot.addColorStop(1, 'rgba(20,8,2,0.25)');
+        n.fillStyle = soot;
+        n.fillRect(OX - OHW, OTY - 6, OHW * 2, OBY - OTY + 8);
+        const inGlow = n.createRadialGradient(OX, OBY - 8, 4, OX, OBY - 8, OHW * 1.15);
+        inGlow.addColorStop(0, 'rgba(255,138,48,0.55)');
+        inGlow.addColorStop(0.6, 'rgba(200,80,24,0.22)');
+        inGlow.addColorStop(1, 'rgba(120,40,10,0)');
+        n.fillStyle = inGlow;
+        n.fillRect(OX - OHW, OTY, OHW * 2, OBY - OTY);
+        /* logs in the box */
+        n.save();
+        n.translate(OX, OBY - 9);
+        n.rotate(-0.14);
+        rr(n, -OHW * 0.62, -6, OHW * 1.24, 12, 6, '#2c160a');
+        fillPat(n, T.bark, -OHW * 0.62, -7, OHW * 1.24, 15, 0.6);
+        n.rotate(0.3);
+        rr(n, -OHW * 0.54, -3, OHW * 1.08, 11, 5, '#38200e');
+        fillPat(n, T.bark, -OHW * 0.54, -4, OHW * 1.08, 14, 0.55);
+        n.restore();
+        n.strokeStyle = 'rgba(255,150,60,0.8)';
+        n.lineWidth = 1.6;
+        [
+          [-0.4, -14],
+          [-0.1, -10],
+          [0.24, -13],
+        ].forEach(([u, dy]) => {
+          n.beginPath();
+          n.moveTo(OX + u * OHW, OBY + dy);
+          n.lineTo(OX + u * OHW + 6, OBY + dy + 5);
+          n.stroke();
+        });
+        /* andirons */
+        n.fillStyle = '#8a6a2c';
+        [-OHW * 0.66, OHW * 0.66].forEach((dx) => {
+          n.fillRect(OX + dx - 2, OBY - 22, 4, 22);
+          ellipse(n, OX + dx, OBY - 24, 4, 4, '#c99b52');
+        });
+      },
+    );
 
     /* hearth slab on the floor in front of the opening */
     n.save();
@@ -2801,7 +3005,11 @@ export function mountParlourDiorama(canvas: HTMLCanvasElement, options: DioramaO
         glow(n, 22, -18, 14, '#fff6dc', 0.6);
         ellipse(n, 22, -18, 5, 5, '#fef8e6');
         n.fillStyle = '#081420';
-        [[-38, 12], [-20, 6], [40, 10]].forEach(([tx0, s0]) => {
+        [
+          [-38, 12],
+          [-20, 6],
+          [40, 10],
+        ].forEach(([tx0, s0]) => {
           n.beginPath();
           n.moveTo(tx0 - s0, 38);
           n.lineTo(tx0, 2 - s0);
@@ -2836,7 +3044,11 @@ export function mountParlourDiorama(canvas: HTMLCanvasElement, options: DioramaO
       n.quadraticCurveTo(0, -3 + i * 6, 26 - i * 2, -10 + i * 6);
       n.stroke();
     }
-    [[-10, -14, -0.2], [6, -17, 0.24], [-2, -20, 0]].forEach(([dx, dy, rot0]) => {
+    [
+      [-10, -14, -0.2],
+      [6, -17, 0.24],
+      [-2, -20, 0],
+    ].forEach(([dx, dy, rot0]) => {
       n.save();
       n.translate(dx, dy);
       n.rotate(rot0);
@@ -2863,7 +3075,17 @@ export function mountParlourDiorama(canvas: HTMLCanvasElement, options: DioramaO
     n.fillRect(SX0 - 6, SHY - 10, shw + 12, 2.4);
     n.fillStyle = '#120a06';
     n.fillRect(SX0 + 7, SHY + 4, shw - 14, H * 0.72 - SHY - 12);
-    const bookCols = ['#96471c', '#25586e', '#62301b', '#2c6e4f', '#bd5f20', '#244a5c', '#8a5a35', '#7a1f2b', '#3d5c4a'];
+    const bookCols = [
+      '#96471c',
+      '#25586e',
+      '#62301b',
+      '#2c6e4f',
+      '#bd5f20',
+      '#244a5c',
+      '#8a5a35',
+      '#7a1f2b',
+      '#3d5c4a',
+    ];
     const br = mulberry(0xb00c);
     const shelfH = (H * 0.72 - SHY - 16) / 4;
     for (let shelf = 0; shelf < 4; shelf += 1) {
@@ -2992,7 +3214,15 @@ export function mountParlourDiorama(canvas: HTMLCanvasElement, options: DioramaO
     n.beginPath();
     n.roundRect(pwX, pwY, pwW, pwH, 5);
     n.stroke();
-    ex.clock = { x: CX, pivotY: pwY - 4, winX: pwX, winY: pwY, winW: pwW, winH: pwH, len: pwH * 0.78 };
+    ex.clock = {
+      x: CX,
+      pivotY: pwY - 4,
+      winX: pwX,
+      winY: pwY,
+      winW: pwW,
+      winH: pwH,
+      len: pwH * 0.78,
+    };
 
     /* record console far right */
     const KX0 = W * 0.845;
@@ -3011,7 +3241,7 @@ export function mountParlourDiorama(canvas: HTMLCanvasElement, options: DioramaO
     rr(n, KX0 + 8, KTY + H * 0.028, kw * 0.44, H * 0.07, 4, '#241609');
     n.fillStyle = 'rgba(226,194,137,0.2)';
     for (let gx = 0; gx < 6; gx += 1) {
-      n.fillRect(KX0 + 12 + gx * (kw * 0.44 - 8) / 6, KTY + H * 0.032, 1.6, H * 0.062);
+      n.fillRect(KX0 + 12 + (gx * (kw * 0.44 - 8)) / 6, KTY + H * 0.032, 1.6, H * 0.062);
     }
     /* legs */
     n.strokeStyle = '#3b2417';
@@ -3141,7 +3371,14 @@ export function mountParlourDiorama(canvas: HTMLCanvasElement, options: DioramaO
     f.lineTo(78, 46);
     f.stroke();
     /* tufting */
-    [[-26, -52], [0, -56], [26, -52], [-26, -28], [0, -32], [26, -28]].forEach(([dx, dy]) => {
+    [
+      [-26, -52],
+      [0, -56],
+      [26, -52],
+      [-26, -28],
+      [0, -32],
+      [26, -28],
+    ].forEach(([dx, dy]) => {
       f.strokeStyle = 'rgba(12,32,42,0.7)';
       f.lineWidth = 1.4;
       f.beginPath();
@@ -3166,7 +3403,10 @@ export function mountParlourDiorama(canvas: HTMLCanvasElement, options: DioramaO
     const armG = f.createLinearGradient(0, -20, 0, 40);
     armG.addColorStop(0, '#2e6a84');
     armG.addColorStop(1, '#153847');
-    [[-1, 0], [1, 0]].forEach(([sgn]) => {
+    [
+      [-1, 0],
+      [1, 0],
+    ].forEach(([sgn]) => {
       f.fillStyle = armG;
       f.beginPath();
       f.moveTo(sgn * 58, -16);
@@ -3470,11 +3710,15 @@ export function mountParlourDiorama(canvas: HTMLCanvasElement, options: DioramaO
       ctx.restore();
       /* z's */
       for (let i = 0; i < 2; i += 1) {
-        const u = ((t * 0.24 + i * 0.5) % 1);
+        const u = (t * 0.24 + i * 0.5) % 1;
         ctx.globalAlpha = u < 0.2 ? u * 5 : 1 - u;
         ctx.font = `700 ${(13 + i * 5) * cs * 0.55}px "Baloo 2", sans-serif`;
         ctx.fillStyle = 'rgba(190,226,236,0.85)';
-        ctx.fillText('z', cat.x + (30 + u * 22 + i * 8) * cs * 0.55, cat.y - (26 + u * 40 + i * 12) * cs * 0.55);
+        ctx.fillText(
+          'z',
+          cat.x + (30 + u * 22 + i * 8) * cs * 0.55,
+          cat.y - (26 + u * 40 + i * 12) * cs * 0.55,
+        );
       }
       ctx.globalAlpha = 1;
 
@@ -3489,7 +3733,12 @@ export function mountParlourDiorama(canvas: HTMLCanvasElement, options: DioramaO
         const bx = mug.x + i * 6 - 3;
         const by = mug.y - u * 34 * mug.s;
         ctx.moveTo(bx, mug.y);
-        ctx.quadraticCurveTo(bx + Math.sin(u * 7 + i * 2) * 6, (mug.y + by) / 2, bx + Math.sin(u * 4 + i) * 4, by);
+        ctx.quadraticCurveTo(
+          bx + Math.sin(u * 7 + i * 2) * 6,
+          (mug.y + by) / 2,
+          bx + Math.sin(u * 4 + i) * 4,
+          by,
+        );
         ctx.stroke();
       }
       ctx.globalAlpha = 1;
@@ -3499,8 +3748,15 @@ export function mountParlourDiorama(canvas: HTMLCanvasElement, options: DioramaO
       ctx.globalCompositeOperation = 'screen';
       motes.forEach((mo, i) => {
         if (i > 7) return;
-        const u = ((t / mo.s + mo.p) % 1 + 1) % 1;
-        glow(ctx, mo.x * W * 0.55 + W * 0.05, H * 0.78 - u * H * 0.42, mo.r * 2, '#f2b06a', 0.26 * Math.sin(u * Math.PI));
+        const u = (((t / mo.s + mo.p) % 1) + 1) % 1;
+        glow(
+          ctx,
+          mo.x * W * 0.55 + W * 0.05,
+          H * 0.78 - u * H * 0.42,
+          mo.r * 2,
+          '#f2b06a',
+          0.26 * Math.sin(u * Math.PI),
+        );
       });
       ctx.restore();
     });
@@ -3545,7 +3801,6 @@ export function mountParlourDiorama(canvas: HTMLCanvasElement, options: DioramaO
     vignette();
   }
 
-
   let frameId = 0;
   let resizeTimer = 0;
 
@@ -3553,7 +3808,8 @@ export function mountParlourDiorama(canvas: HTMLCanvasElement, options: DioramaO
     const t = now * 0.001;
     const next = options.getScene();
     if (next !== scene) scene = next;
-    reduced = options.getReducedMotion() || window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    reduced =
+      options.getReducedMotion() || window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     if (reduced) {
       px = 0;
       py = 0;
