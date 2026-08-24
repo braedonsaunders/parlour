@@ -54,10 +54,18 @@
   transition: transform 160ms cubic-bezier(0.2, 0.8, 0.3, 1);
 }
 
-.trickCard[data-seat='0'] { transform: translate(0%, 26%) rotate(-3deg); }
-.trickCard[data-seat='1'] { transform: translate(-58%, 0%) rotate(6deg); }
-.trickCard[data-seat='2'] { transform: translate(0%, -30%) rotate(4deg); }
-.trickCard[data-seat='3'] { transform: translate(58%, 0%) rotate(-5deg); }
+.trickCard[data-seat='0'] {
+  transform: translate(0%, 26%) rotate(-3deg);
+}
+.trickCard[data-seat='1'] {
+  transform: translate(-58%, 0%) rotate(6deg);
+}
+.trickCard[data-seat='2'] {
+  transform: translate(0%, -30%) rotate(4deg);
+}
+.trickCard[data-seat='3'] {
+  transform: translate(58%, 0%) rotate(-5deg);
+}
 
 .kitty {
   position: absolute;
@@ -81,9 +89,15 @@
   inset: 0;
 }
 
-.kittyStack > *:nth-child(2) { translate: 2px -2px; }
-.kittyStack > *:nth-child(3) { translate: 4px -4px; }
-.kittyStack > *:nth-child(4) { translate: 6px -6px; }
+.kittyStack > *:nth-child(2) {
+  translate: 2px -2px;
+}
+.kittyStack > *:nth-child(3) {
+  translate: 4px -4px;
+}
+.kittyStack > *:nth-child(4) {
+  translate: 6px -6px;
+}
 
 .kittyLabel,
 .upcardLabel {
@@ -196,7 +210,9 @@
   color: var(--suit-color, #fdf6ea);
   background: rgba(255, 255, 255, 0.05);
   cursor: pointer;
-  transition: transform 140ms ease-pop, border-color 140ms ease;
+  transition:
+    transform 140ms ease-pop,
+    border-color 140ms ease;
 }
 
 .suitPick:hover {

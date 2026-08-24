@@ -81,7 +81,8 @@ export function discardDesirability(card: string, trump: EuchreSuit | null): num
   if (isRightBower(card, trump)) return 100;
   if (isLeftBower(card, trump)) return 90;
   const suit = suitLetterOf(card);
-  if (suit !== null && effectiveSuit(card, trump) === trump) return 20 + (rank === 1 ? 6 : rank >= 9 ? rank - 9 : 0);
+  if (suit !== null && effectiveSuit(card, trump) === trump)
+    return 20 + (rank === 1 ? 6 : rank >= 9 ? rank - 9 : 0);
   return rank === 1 ? 15 : rank === 13 ? 10 : rank === 12 ? 7 : rank === 11 ? 5 : rank - 9;
 }
 
@@ -147,10 +148,7 @@ export function lowestFollower(
 }
 
 /** A side-suit ace worth leading early, preferring singletons. */
-export function singletonAceLead(
-  hand: readonly string[],
-  trump: EuchreSuit,
-): string | null {
+export function singletonAceLead(hand: readonly string[], trump: EuchreSuit): string | null {
   const counts = suitCounts(hand);
   let best: string | null = null;
   let bestCount = 99;

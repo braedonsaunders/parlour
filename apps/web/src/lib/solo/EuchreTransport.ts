@@ -10,13 +10,7 @@ import {
   type LegalMove,
   type RuleError,
 } from '@parlour/engine';
-import {
-  createEuchreDef,
-  euchreConfig,
-  tierBot,
-  type EuchreRules,
-  type EuchreState,
-} from '@parlour/game-euchre';
+import { createEuchreDef, tierBot, type EuchreRules, type EuchreState } from '@parlour/game-euchre';
 import type { EuchreModeId } from '@/lib/euchre/modes';
 
 /** House partners and opponents sit in table order around seat 0. */
@@ -111,7 +105,9 @@ export class EuchreTransport {
     }
     const legal = this.def.flow.legalMoves(this.session.state, this.session.phase);
     if (legal.length === 0) throw new Error(`bot seat ${seat} has no legal move`);
-    const rng = makeRng(this.options.seed).fork(`hand:${this.session.state.handNo}:event:${this.session.log.length}`);
+    const rng = makeRng(this.options.seed).fork(
+      `hand:${this.session.state.handNo}:event:${this.session.log.length}`,
+    );
     const view = this.def.playerView(this.session.state, seat);
     const choice = chooseBotMove(this.policy, view, seat, legal, rng) ?? legal[0]!;
     const applied = sessionApply(this.def, this.session, seat, choice.id, choice.payload);

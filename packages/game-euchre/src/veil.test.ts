@@ -86,8 +86,7 @@ describe('euchre under Veil', () => {
   it('refuses to play an unopened handle once tricks begin', () => {
     const { session } = veiledSession();
     let current = session;
-    current = sessionApply(def, current, current.phase.actor!, 'orderUp', { alone: false })
-      .session;
+    current = sessionApply(def, current, current.phase.actor!, 'orderUp', { alone: false }).session;
     current = sessionApply(def, current, 0, 'dealerDiscard', {
       card: (current.state as EuchreState).hands[0]!.at(-1)!,
     }).session;
@@ -101,8 +100,7 @@ describe('euchre under Veil', () => {
   it('lets the dealer bury a handle without opening it — the kitty stays dark', () => {
     const { session } = veiledSession();
     let current = session;
-    current = sessionApply(def, current, current.phase.actor!, 'orderUp', { alone: false })
-      .session;
+    current = sessionApply(def, current, current.phase.actor!, 'orderUp', { alone: false }).session;
     const buriedHandle = (current.state as EuchreState).hands[0]![0]!;
     expect(isVeilHandle(buriedHandle)).toBe(true);
     const outcome = sessionApply(def, current, 0, 'dealerDiscard', { card: buriedHandle });
@@ -133,9 +131,16 @@ describe('euchre under Veil', () => {
       const hand = (current.state as EuchreState).hands[seat]!;
       const handle = hand[0]!;
       const face = faceOf.get(handle)!;
-      const outcome = sessionApply(def, current, seat, 'playCard', { card: face }, {
-        reveals: [[handle, face]],
-      });
+      const outcome = sessionApply(
+        def,
+        current,
+        seat,
+        'playCard',
+        { card: face },
+        {
+          reveals: [[handle, face]],
+        },
+      );
       expect(outcome.rejected).toBeUndefined();
       current = outcome.session;
       const trick = (current.state as EuchreState).trick;
@@ -204,7 +209,12 @@ describe('euchre under Veil', () => {
 
     // replay reproduces the veiled round bit-for-bit, injections included
     const log = dealt.session.log;
-    const replayed = replaySession(def, seed, log, { config, seats: 4, veiled: true, deckOrder: veiledSession(seed).order });
+    const replayed = replaySession(def, seed, log, {
+      config,
+      seats: 4,
+      veiled: true,
+      deckOrder: veiledSession(seed).order,
+    });
     expect(stateHash(replayed.state)).toBe(stateHash(dealt.session.state));
   });
 });

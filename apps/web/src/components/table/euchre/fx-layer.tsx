@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type RefObject } from 'react';
+import { useMemo, useEffect, type CSSProperties, type RefObject } from 'react';
 import { type FxEvent } from '@parlour/engine';
 import type { EuchreSuit } from '@parlour/game-euchre';
 import { gsap } from 'gsap';
@@ -57,8 +57,17 @@ export function useEuchreFxAnimation(
           const card = element.querySelector<HTMLElement>('[data-flight-card]') ?? element;
           timeline
             .set(element, { x: from.x, y: from.y, autoAlpha: 1 }, start)
-            .fromTo(card, { rotateY: -70, rotate: cue.seat % 2 ? -6 : 6 }, { rotateY: 0, rotate: 0, duration: 0.16 }, start)
-            .to(element, { x: to.x, y: to.y, duration: cue.durationMs / 1000, ease: 'power2.out' }, start)
+            .fromTo(
+              card,
+              { rotateY: -70, rotate: cue.seat % 2 ? -6 : 6 },
+              { rotateY: 0, rotate: 0, duration: 0.16 },
+              start,
+            )
+            .to(
+              element,
+              { x: to.x, y: to.y, duration: cue.durationMs / 1000, ease: 'power2.out' },
+              start,
+            )
             .set(element, { autoAlpha: 0 }, start + cue.durationMs / 1000);
         } else if (cue.type === 'trick-collect') {
           const from = zonePoint('trick' as never, root, bounds);
@@ -66,7 +75,11 @@ export function useEuchreFxAnimation(
           const flight = (cue.durationMs - FX_TIMING.settleMs) / 1000;
           timeline
             .set(element, { x: from.x, y: from.y, autoAlpha: 0.95, scale: 1 }, start)
-            .to(element, { x: to.x, y: to.y, scale: 0.5, duration: flight, ease: 'power2.in' }, start)
+            .to(
+              element,
+              { x: to.x, y: to.y, scale: 0.5, duration: flight, ease: 'power2.in' },
+              start,
+            )
             .to(element, { autoAlpha: 0, duration: 0.12 }, start + flight);
         } else if (cue.type === 'hand-score' || cue.type === 'call') {
           const point =
@@ -75,9 +88,17 @@ export function useEuchreFxAnimation(
               : zonePoint(`seat:${cue.seat}` as never, root, bounds);
           timeline
             .set(element, { x: point.x, y: point.y, autoAlpha: 0, scale: 0.4 }, start)
-            .to(element, { autoAlpha: 1, scale: 1.12, duration: 0.22, ease: 'back.out(2.2)' }, start)
+            .to(
+              element,
+              { autoAlpha: 1, scale: 1.12, duration: 0.22, ease: 'back.out(2.2)' },
+              start,
+            )
             .to(element, { scale: 1, duration: 0.14 }, start + 0.22)
-            .to(element, { autoAlpha: 0, y: '-=18', duration: 0.26 }, start + cue.durationMs / 1000 - 0.3);
+            .to(
+              element,
+              { autoAlpha: 0, y: '-=18', duration: 0.26 },
+              start + cue.durationMs / 1000 - 0.3,
+            );
         } else if (cue.type === 'score-chip') {
           const point = zonePoint(`seat:${cue.team}` as never, root, bounds);
           timeline
@@ -126,11 +147,7 @@ export function EuchreFxLayer({
         if (cue.type === 'trick-play' || cue.type === 'trick-collect') {
           const faceDown = cue.type === 'trick-play' && cue.seat !== localSeat;
           return (
-            <div
-              key={`${fxKey}:${cue.id}`}
-              data-fx-cue={cue.id}
-              className={styles.flyingTrickCard}
-            >
+            <div key={`${fxKey}:${cue.id}`} data-fx-cue={cue.id} className={styles.flyingTrickCard}>
               <span data-flight-card>
                 <PlayingCard
                   card={
@@ -146,7 +163,11 @@ export function EuchreFxLayer({
         }
         if (cue.type === 'hand-score') {
           const accent =
-            cue.reason === 'euchred' ? '#a06bb4' : cue.reason === 'march-alone' ? '#f0c04e' : '#5fae7b';
+            cue.reason === 'euchred'
+              ? '#a06bb4'
+              : cue.reason === 'march-alone'
+                ? '#f0c04e'
+                : '#5fae7b';
           return (
             <div
               key={`${fxKey}:${cue.id}`}
@@ -217,20 +238,3 @@ export function bannerSubtitle(reason: string, points: number): string {
 }
 
 export const EUCHRE_SUIT_META = { SUIT_GLYPH, SUIT_COLOR };
-
-/** Small helper for components that need a stable random-free rotation. */
-export function useStableRotation(seedText: string): number {
-  const ref = useRef(0);
-  if (ref.current === 0) {
-    let hash = 13;
-    for (let i = 0; i < seedText.length; i += 1) hash = (hash * 31 + seedText.charCodeAt(i)) | 0;
-    ref.current = (Math.abs(hash) % 15) - 7;
-  }
-  return ref.current;
-}
-
-export function useHasMounted(): boolean {
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
-  return mounted;
-}

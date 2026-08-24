@@ -2,12 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { euchreConfig } from '../config';
 import { PERSONAS, makePersonaBot } from '../bots/personas';
 import { tierBot } from '../bots';
-import {
-  DEFAULT_THRESHOLDS,
-  runBalanceGates,
-  teamWinShare,
-  type GateThresholds,
-} from './gates';
+import { DEFAULT_THRESHOLDS, runBalanceGates, teamWinShare, type GateThresholds } from './gates';
 
 describe('bot roster', () => {
   it('ships three distinct tiers', () => {

@@ -53,10 +53,7 @@ export const euchreCatalog: GameCatalogEntry<EuchreRules> = {
       facts: ['game to 5', '~10 min'],
       accent: '#e29349',
       shade: '#96471c',
-      art: [
-        { label: '9♣' },
-        { label: 'A♦', tint: ['#e2b049', '#b07a1c'] },
-      ],
+      art: [{ label: '9♣' }, { label: 'A♦', tint: ['#e2b049', '#b07a1c'] }],
     },
     {
       id: 'long-game',
@@ -67,10 +64,7 @@ export const euchreCatalog: GameCatalogEntry<EuchreRules> = {
       facts: ['game to 15', '~30 min'],
       accent: '#c8566b',
       shade: '#7c2c3e',
-      art: [
-        { label: 'K♠', tint: ['#4ba1ba', '#25586e'] },
-        { label: 'Q♠' },
-      ],
+      art: [{ label: 'K♠', tint: ['#4ba1ba', '#25586e'] }, { label: 'Q♠' }],
     },
     {
       id: 'old-school',
@@ -82,10 +76,7 @@ export const euchreCatalog: GameCatalogEntry<EuchreRules> = {
       facts: ['game to 10', 'no stick', '~20 min'],
       accent: '#4ba1ba',
       shade: '#25586e',
-      art: [
-        { label: '10♥', tint: ['#d95763', '#a3372c'] },
-        { label: 'K♦' },
-      ],
+      art: [{ label: '10♥', tint: ['#d95763', '#a3372c'] }, { label: 'K♦' }],
     },
   ],
 };

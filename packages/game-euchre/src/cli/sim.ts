@@ -77,7 +77,9 @@ console.log('');
 console.log('gate 3 — identical-policy team symmetry');
 console.log(
   `  team 0 share ${
-    report.symmetry.teamZeroShare === null ? 'n/a' : `${(report.symmetry.teamZeroShare * 100).toFixed(1)}%`
+    report.symmetry.teamZeroShare === null
+      ? 'n/a'
+      : `${(report.symmetry.teamZeroShare * 100).toFixed(1)}%`
   } over ${report.symmetry.games} matches — ${report.symmetry.passes ? 'PASS' : 'FAIL'}`,
 );
 

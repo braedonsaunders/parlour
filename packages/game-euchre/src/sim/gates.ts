@@ -167,7 +167,12 @@ export function runBalanceGates(opts: {
   const h2hRecords = simulateGames(gameDef(), games, {
     baseSeed,
     tolerateStalls: true,
-    seatPoliciesFor: alternating<ReturnType<typeof tierBot>>([tierBot(3), tierBot(1), tierBot(3), tierBot(1)]),
+    seatPoliciesFor: alternating<ReturnType<typeof tierBot>>([
+      tierBot(3),
+      tierBot(1),
+      tierBot(3),
+      tierBot(1),
+    ]),
     seatLabelsFor: alternating<string>(['hard', 'easy', 'hard', 'easy']),
   });
   const h2hRows = aggregateWinRates(h2hRecords, recordLabel);
@@ -223,9 +228,14 @@ export function runBalanceGates(opts: {
   const share = teamWinShare(symmetricRecords, 0);
   const symmetryPasses =
     share !== null && share >= thresholds.symmetryBandMin && share <= thresholds.symmetryBandMax;
-  const symmetry: SymmetryGate = { teamZeroShare: share, games: symmetryGames, passes: symmetryPasses };
+  const symmetry: SymmetryGate = {
+    teamZeroShare: share,
+    games: symmetryGames,
+    passes: symmetryPasses,
+  };
 
-  const stalls = countStalls(h2hRecords) + countStalls(personaRecords) + countStalls(symmetricRecords);
+  const stalls =
+    countStalls(h2hRecords) + countStalls(personaRecords) + countStalls(symmetricRecords);
   const stallRate = stalls / Math.max(1, games * 2 + symmetryGames);
 
   return {

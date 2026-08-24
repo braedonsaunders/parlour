@@ -24,12 +24,7 @@ export interface TeamScoreView {
   label: string;
 }
 
-export type EuchreDecision =
-  | 'order-up'
-  | 'call-trump'
-  | 'dealer-discard'
-  | 'play'
-  | null;
+export type EuchreDecision = 'order-up' | 'call-trump' | 'dealer-discard' | 'play' | null;
 
 export interface EuchreTableView {
   players: readonly EuchrePlayerView[];
@@ -135,12 +130,9 @@ export function euchreTableView(
             : null;
 
   const legalCards = playMoves.map((move) => payloadOf(move).card as string);
-  const callSuits = [
-    ...new Set(callMoves.map((move) => payloadOf(move).suit as EuchreSuit)),
-  ];
+  const callSuits = [...new Set(callMoves.map((move) => payloadOf(move).suit as EuchreSuit))];
 
-  const makerTeam: 0 | 1 | null =
-    state.caller === null ? null : ((state.caller % 2) as 0 | 1);
+  const makerTeam: 0 | 1 | null = state.caller === null ? null : ((state.caller % 2) as 0 | 1);
   const tricksBy = (team: 0 | 1): number =>
     state.trickWinners.filter((seat) => seat % 2 === team).length;
 

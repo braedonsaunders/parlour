@@ -39,12 +39,7 @@ export default function CreateEuchreRoomPage() {
   }, [avatarId, mode, name]);
 
   if (!session) return <EuchreLobbyLoading />;
-  return (
-    <ActiveEuchreLobby
-      session={session}
-      onStarted={() => router.push('/euchre/table')}
-    />
-  );
+  return <ActiveEuchreLobby session={session} onStarted={() => router.push('/euchre/table')} />;
 }
 
 function ActiveEuchreLobby({

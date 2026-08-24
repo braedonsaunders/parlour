@@ -96,8 +96,7 @@ function ActiveSoloEuchreTable({ transport }: { transport: EuchreTransport }) {
     const botSeat = snapshot.session.phase.actor;
     if (botSeat === null || botSeat === 0) return;
     // bidding decisions read as conversation; trick play keeps a human beat
-    const delay =
-      snapshot.session.state.stage === 'playing' ? 480 + botSeat * 90 : 320;
+    const delay = snapshot.session.state.stage === 'playing' ? 480 + botSeat * 90 : 320;
     const timer = window.setTimeout(() => {
       try {
         accept(transport.playBotTurn());
@@ -110,6 +109,7 @@ function ActiveSoloEuchreTable({ transport }: { transport: EuchreTransport }) {
     accept,
     snapshot.session.log.length,
     snapshot.session.phase.actor,
+    snapshot.session.state.stage,
     snapshot.session.status,
     transport,
   ]);
@@ -211,8 +211,7 @@ function ActiveMultiplayerEuchreTable({ room }: { room: MultiplayerRoomSession }
     const id = `multiplayer:${snapshot.room?.code ?? 'room'}:${session.seed}:${
       session.lastAppliedHash ?? session.log.length
     }`;
-    const localRank =
-      session.result.rankings.find((rank) => rank.seat === localSeat)?.rank ?? 99;
+    const localRank = session.result.rankings.find((rank) => rank.seat === localSeat)?.rank ?? 99;
     recordResult({ won: localRank === 1, blitzes: 0, knocks: 0, knockWins: 0 });
     const seats = snapshot.seats.map((seat) => ({
       seat: seat.seat,
@@ -272,8 +271,7 @@ function ActiveMultiplayerEuchreTable({ room }: { room: MultiplayerRoomSession }
     );
   }
 
-  const isLocalTurn =
-    session.status === 'playing' && session.phase.actor === localSeat;
+  const isLocalTurn = session.status === 'playing' && session.phase.actor === localSeat;
   const legal: readonly LegalMove[] = isLocalTurn
     ? session.def.flow.legalMoves(session.state, session.phase)
     : [];

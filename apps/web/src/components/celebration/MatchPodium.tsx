@@ -161,9 +161,10 @@ export function MatchPodium({
 
 function teamScoreOf(snapshot: MatchSnapshot, seat: number): number {
   const detail = snapshot.result.rankings.find((rank) => rank.seat === seat)?.detail;
-  const score = detail && typeof detail === 'object' && 'score' in detail
-    ? (detail as { score?: unknown }).score
-    : undefined;
+  const score =
+    detail && typeof detail === 'object' && 'score' in detail
+      ? (detail as { score?: unknown }).score
+      : undefined;
   return typeof score === 'number' ? score : 0;
 }
 

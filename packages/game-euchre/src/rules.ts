@@ -63,9 +63,7 @@ function payloadAlone(payload: unknown): boolean {
 function payloadDeckOrder(payload: unknown): readonly CardId[] | null {
   const order = (payload as { deckOrder?: unknown } | undefined)?.deckOrder;
   if (!Array.isArray(order) || order.length !== DECK_SIZE) return null;
-  return order.every((id) => typeof id === 'string' && id.length > 0)
-    ? (order as CardId[])
-    : null;
+  return order.every((id) => typeof id === 'string' && id.length > 0) ? (order as CardId[]) : null;
 }
 
 function partnerOf(seat: SeatId): SeatId {
@@ -104,11 +102,7 @@ interface FreshDeal {
  * of the dealer, then the kitty — whose top card turns face up. `order` comes
  * from `dealOrder(ctx, …)` in setup, or from a veiled room's ceremony order.
  */
-function dealFreshHand(
-  dealer: SeatId,
-  order: readonly CardId[],
-  fx: MoveCtx['fx'],
-): FreshDeal {
+function dealFreshHand(dealer: SeatId, order: readonly CardId[], fx: MoveCtx['fx']): FreshDeal {
   const hands: CardId[][] = [[], [], [], []];
   let cursor = 0;
   for (let cardIndex = 0; cardIndex < HAND_SIZE; cardIndex++) {
@@ -269,11 +263,7 @@ const bidPass: Move<EuchreState> = {
       };
     }
 
-    if (
-      state.rules.stickDealer &&
-      seat === state.dealer &&
-      state.passesThisRound === 3
-    ) {
+    if (state.rules.stickDealer && seat === state.dealer && state.passesThisRound === 3) {
       // unreachable through the flow — bidPass.validate refuses this call
       throw new Error('bidPass: stick-the-dealer required a call');
     }
@@ -480,18 +470,10 @@ const scoreHandMove: Move<EuchreState> = {
       points: Math.max(summary.makerPoints, summary.defenderPoints),
     });
     if (summary.makerPoints > 0) {
-      ctx.fx.emit(
-        'euchre.score-chip',
-        { team: makerTeam, total: scores[makerTeam] },
-        120,
-      );
+      ctx.fx.emit('euchre.score-chip', { team: makerTeam, total: scores[makerTeam] }, 120);
     }
     if (summary.defenderPoints > 0) {
-      ctx.fx.emit(
-        'euchre.score-chip',
-        { team: defenderTeam, total: scores[defenderTeam] },
-        120,
-      );
+      ctx.fx.emit('euchre.score-chip', { team: defenderTeam, total: scores[defenderTeam] }, 120);
     }
     if (scores[0] >= state.rules.targetScore || scores[1] >= state.rules.targetScore) {
       ctx.fx.emit(Fx.RoundEnd, { reason: 'match-over' }, 240);
@@ -594,8 +576,7 @@ function legalBiddingMoves(state: EuchreState, seat: SeatId): LegalMove[] | null
   const calls = suits.flatMap((suit) =>
     aloneVariants.map((alone) => ({ id: 'callTrump', payload: { suit, alone } })),
   );
-  const forced =
-    state.rules.stickDealer && state.passesThisRound === 3 && seat === state.dealer;
+  const forced = state.rules.stickDealer && state.passesThisRound === 3 && seat === state.dealer;
   return forced ? calls : [...calls, { id: 'bidPass' }];
 }
 

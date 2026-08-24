@@ -96,7 +96,7 @@ export function chooseFromProfile(
   if (legal.some((move) => move.id === 'dealerDiscard')) {
     // bury the least useful card; keep bowers, trump and aces
     const options = legal
-      .map((move) => ((move.payload as { card?: string })?.card ?? ''))
+      .map((move) => (move.payload as { card?: string })?.card ?? '')
       .filter(Boolean);
     const trump = state.trump;
     if (options.length > 1 && trump) {
@@ -111,7 +111,7 @@ export function chooseFromProfile(
 
   if (legal.every((move) => move.id === 'playCard')) {
     const cards = legal
-      .map((move) => ((move.payload as { card?: string })?.card ?? ''))
+      .map((move) => (move.payload as { card?: string })?.card ?? '')
       .filter(Boolean);
     if (cards.length > 0 && state.trump) {
       const choice = decidePlay(state, seat, cards, profile.play);

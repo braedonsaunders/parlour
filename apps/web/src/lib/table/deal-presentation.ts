@@ -83,6 +83,10 @@ export function useDealPresentation(
   const [landedCueIds, setLandedCueIds] = useState<ReadonlySet<string>>(() => new Set());
 
   useLayoutEffect(() => {
+    // Both early exits below are sync-only derivations (clearing between
+    // plans; marking everything landed under prefers-reduced-motion where no
+    // timer will ever fire), so the effect intentionally sets state directly.
+    /* eslint-disable react-hooks/set-state-in-effect -- sync-only derivations */
     if (!plan) {
       setLandedCueIds(new Set());
       return;
@@ -92,6 +96,7 @@ export function useDealPresentation(
       setLandedCueIds(new Set(plan.cues.map(({ id }) => id)));
       return;
     }
+    /* eslint-enable react-hooks/set-state-in-effect */
 
     setLandedCueIds(new Set());
     const timers = plan.cues.map((cue) =>

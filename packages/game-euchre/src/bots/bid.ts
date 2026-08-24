@@ -63,9 +63,7 @@ function decideRoundOne(
 
   if (strength >= threshold) {
     const alone =
-      state.rules.goingAlone &&
-      strength >= params.aloneMin &&
-      trumpCount(effective, suit) >= 4;
+      state.rules.goingAlone && strength >= params.aloneMin && trumpCount(effective, suit) >= 4;
     return { move: 'orderUp', payload: { alone } };
   }
   return { move: 'bidPass' };
@@ -84,8 +82,7 @@ function decideRoundTwo(
   const candidate = bestCallCandidate(hand, allowed);
   if (!candidate) return { move: 'bidPass' };
 
-  const forced =
-    state.rules.stickDealer && state.passesThisRound === 3 && seat === state.dealer;
+  const forced = state.rules.stickDealer && state.passesThisRound === 3 && seat === state.dealer;
   if (forced) {
     return { move: 'callTrump', payload: { suit: candidate.suit, alone: false } };
   }
@@ -93,9 +90,7 @@ function decideRoundTwo(
   const threshold = jitter(params.callMin, params.jitter, rng);
   if (candidate.strength >= threshold && candidate.count >= 3) {
     const alone =
-      state.rules.goingAlone &&
-      candidate.strength >= params.aloneMin &&
-      candidate.count >= 4;
+      state.rules.goingAlone && candidate.strength >= params.aloneMin && candidate.count >= 4;
     return { move: 'callTrump', payload: { suit: candidate.suit, alone } };
   }
   return { move: 'bidPass' };

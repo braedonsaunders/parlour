@@ -24,17 +24,7 @@ export {
   trickWinner,
   teamOf,
 } from './deck';
-export {
-  TIER_BOTS,
-  tierBot,
-  chooseFromProfile,
-  type BotProfile,
-} from './bots';
-export {
-  PERSONAS,
-  makePersonaBot,
-  personaById,
-  type PersonaDef,
-} from './bots/personas';
+export { TIER_BOTS, tierBot, chooseFromProfile, type BotProfile } from './bots';
+export { PERSONAS, makePersonaBot, personaById, type PersonaDef } from './bots/personas';
 export { runBalanceGates, DEFAULT_THRESHOLDS, type GateReport } from './sim/gates';
 export { euchreCatalog } from './catalog';

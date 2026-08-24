@@ -13,7 +13,11 @@ export interface PersonaDef {
   readonly profile: BotProfile;
 }
 
-function skew(base: BotProfile, bid: Partial<BotProfile['bid']>, play: Partial<BotProfile['play']>): BotProfile {
+function skew(
+  base: BotProfile,
+  bid: Partial<BotProfile['bid']>,
+  play: Partial<BotProfile['play']>,
+): BotProfile {
   return { bid: { ...base.bid, ...bid }, play: { ...base.play, ...play } };
 }
 
@@ -38,7 +42,11 @@ export const PERSONAS: readonly PersonaDef[] = [
     blurb: 'Orders it up when she is good and ready, thank you.',
     emotes: ['oh dear', 'sorry, dear', 'beg pardon'],
     tier: 2,
-    profile: skew(MEDIUM, { orderUpMin: 5.8, callMin: 5.4, aloneMin: Number.POSITIVE_INFINITY }, {}),
+    profile: skew(
+      MEDIUM,
+      { orderUpMin: 5.8, callMin: 5.4, aloneMin: Number.POSITIVE_INFINITY },
+      {},
+    ),
   },
   {
     id: 'marge',
@@ -56,9 +64,13 @@ export const PERSONAS: readonly PersonaDef[] = [
     blurb: 'Retired grinder. Never met a pass he regretted.',
     emotes: ['nope', 'not today', 'safe is smart'],
     tier: 2,
-    profile: skew(MEDIUM, { orderUpMin: 6.1, callMin: 5.7, aloneMin: Number.POSITIVE_INFINITY }, {
-      eagerRuff: false,
-    }),
+    profile: skew(
+      MEDIUM,
+      { orderUpMin: 6.1, callMin: 5.7, aloneMin: Number.POSITIVE_INFINITY },
+      {
+        eagerRuff: false,
+      },
+    ),
   },
   {
     id: 'vinny',

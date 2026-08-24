@@ -1,16 +1,16 @@
 import { applyPreset, stateHash } from '@parlour/engine';
-import {
-  chooseBotMove,
-  createSession,
-  makeRng,
-} from '@parlour/engine';
+import { chooseBotMove, createSession, makeRng } from '@parlour/engine';
 import { createEuchreDef, euchreConfig, tierBot } from '@parlour/game-euchre';
 import { wildpileConfig } from '@parlour/game-wildpile';
 import { afterEach, describe, expect, it } from 'vitest';
 import { EngineAuthority } from '@/lib/multiplayer';
 import { NostrSignaling, type SignalPayload } from '@/lib/multiplayer/NostrSignaling';
 import type { RoomSettings } from '@/lib/multiplayer/types';
-import { MultiplayerRoomSession, euchreMultiplayerSession, wildMultiplayerSession } from './roomSession';
+import {
+  MultiplayerRoomSession,
+  euchreMultiplayerSession,
+  wildMultiplayerSession,
+} from './roomSession';
 
 type SignalHandler = (sender: string, signal: SignalPayload) => void;
 
@@ -217,7 +217,11 @@ describe('multiplayer route composition', () => {
 
     expect(host.getSnapshot()).toMatchObject({ gameId: 'wildpile' });
     expect(guest.getSnapshot()).toMatchObject({ gameId: 'wildpile' });
-    expect(guest.getSnapshot().settings?.config).toMatchObject({ stackDrawTwo: true, stackDrawFour: true, jumpIn: true });
+    expect(guest.getSnapshot().settings?.config).toMatchObject({
+      stackDrawTwo: true,
+      stackDrawFour: true,
+      jumpIn: true,
+    });
 
     const hostSession = wildMultiplayerSession(host.getSnapshot());
     expect(hostSession).not.toBeNull();
@@ -336,13 +340,14 @@ describe('multiplayer route composition', () => {
       if (seat === null) break;
       const legal = def.flow.legalMoves(session.state, session.phase);
       if (legal.length === 0) break;
-      const choice = chooseBotMove(
-        tierBot(2),
-        def.playerView(session.state, seat),
-        seat,
-        legal,
-        makeRng(seed).fork(`ev:${session.log.length}`),
-      ) ?? legal[0]!;
+      const choice =
+        chooseBotMove(
+          tierBot(2),
+          def.playerView(session.state, seat),
+          seat,
+          legal,
+          makeRng(seed).fork(`ev:${session.log.length}`),
+        ) ?? legal[0]!;
       const packet = hostAuth.apply({
         id: `action:${guard}`,
         seat,

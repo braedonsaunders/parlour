@@ -92,35 +92,3 @@ function GameTile({ def, onSelect }: { def: GameCatalogEntry; onSelect?: () => v
     </div>
   );
 }
-<<<<<<< HEAD
-
-function Preview({ kind }: { kind: GamePreviewKind }) {
-  return (
-    <span className={modeStyles.preview}>
-      {kind === 'blitz-fan' && (
-        <>
-          <span className={gameStyles.fanCard}>A♠</span>
-          <span className={gameStyles.fanCard}>31</span>
-          <span className={gameStyles.fanCard}>K♠</span>
-        </>
-      )}
-      {kind === 'wild-fan' && (
-        <>
-          <span className={gameStyles.wildCard}>7</span>
-          <span className={gameStyles.wildCard}>⤺</span>
-          <span className={gameStyles.wildCard}>⊘</span>
-          <span className={gameStyles.wildCard}>+4</span>
-        </>
-      )}
-      {kind === 'euchre-fan' && (
-        <>
-          <span className={gameStyles.fanCard}>J♥</span>
-          <span className={gameStyles.fanCard}>J♦</span>
-          <span className={gameStyles.fanCard}>A♥</span>
-        </>
-      )}
-    </span>
-  );
-}
-=======
->>>>>>> main

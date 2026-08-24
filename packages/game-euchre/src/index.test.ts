@@ -33,7 +33,10 @@ function makeSession(
   options: EuchreDefOptions = {},
 ) {
   const def = createEuchreDef(options);
-  return { def, session: createSession(def, { seed, config: euchreConfig.resolve(overrides), seats: 4 }) };
+  return {
+    def,
+    session: createSession(def, { seed, config: euchreConfig.resolve(overrides), seats: 4 }),
+  };
 }
 
 /** Applies a move chosen by predicate, asserting it was legal. Records fx. */
@@ -54,7 +57,6 @@ function act(
   lastFxEvents = outcome.fx.slice();
   return outcome.session;
 }
-
 
 describe('euchre deck', () => {
   it('is the 24-card nine-to-ace deck', () => {
@@ -78,7 +80,15 @@ describe('euchre deck', () => {
   });
 
   it('evaluates trick winners with bower precedence', () => {
-    expect(trickWinner([{ seat: 0, card: 'H1' }, { seat: 1, card: 'H11' }], 'H')).toBe(1);
+    expect(
+      trickWinner(
+        [
+          { seat: 0, card: 'H1' },
+          { seat: 1, card: 'H11' },
+        ],
+        'H',
+      ),
+    ).toBe(1);
     // right bower over left bower over trump ace
     expect(
       trickWinner(
@@ -125,7 +135,9 @@ describe('setup', () => {
     expect(state.stage).toBe('bidding');
     expect(state.turn).toBe(1); // left of the dealer (seat 0)
     expect(state.dealer).toBe(0);
-    const dealFlights = (session.setupFx ?? []).filter((fx: { kind: string }) => fx.kind === 'card.fly');
+    const dealFlights = (session.setupFx ?? []).filter(
+      (fx: { kind: string }) => fx.kind === 'card.fly',
+    );
     expect(dealFlights).toHaveLength(20);
     expect(session.setupFx?.some((fx: { kind: string }) => fx.kind === 'card.flip')).toBe(true);
   });
@@ -193,7 +205,10 @@ describe('bidding round one', () => {
 });
 
 describe('bidding round two', () => {
-  function passRoundOne(def: GameDef<EuchreState, EuchreRules>, session: ReturnType<typeof makeSession>['session']) {
+  function passRoundOne(
+    def: GameDef<EuchreState, EuchreRules>,
+    session: ReturnType<typeof makeSession>['session'],
+  ) {
     let current = session;
     for (const seat of [1, 2, 3, 0]) current = act(def, current, seat, 'bidPass');
     return current;
@@ -334,14 +349,16 @@ describe('trick play', () => {
     let current = session;
     current = act(def, current, 1, 'orderUp', { alone: true });
     const dealerHand = current.state.hands[current.state.dealer]!;
-      const dealerCard = dealerHand.at(-1)!;
+    const dealerCard = dealerHand.at(-1)!;
     current = act(def, current, current.state.dealer, 'dealerDiscard', { card: dealerCard });
     expect(current.state.sittingOut).toBe(3);
     // play out the hand: seat 3 must never be asked to play; count collects
     let collects = 0;
     while (collects < 5 && current.state.stage === 'playing') {
       expect(current.state.turn).not.toBe(3);
-      const play = def.flow.legalMoves(current.state, current.phase).find((m) => m.id === 'playCard');
+      const play = def.flow
+        .legalMoves(current.state, current.phase)
+        .find((m) => m.id === 'playCard');
       expect(play).toBeDefined();
       current = act(def, current, current.state.turn, 'playCard', play!.payload);
       collects += lastFx.filter(([kind]) => kind === 'euchre.trick-collect').length;
@@ -453,18 +470,28 @@ describe('presentation hints', () => {
     current = act(def, current, 0, 'dealerDiscard', { card: dealerCard });
 
     for (let plays = 0; plays < 4; plays++) {
-      const play = def.flow.legalMoves(current.state, current.phase).find((m) => m.id === 'playCard');
+      const play = def.flow
+        .legalMoves(current.state, current.phase)
+        .find((m) => m.id === 'playCard');
       current = act(def, current, current.state.turn, 'playCard', play!.payload);
       expect(lastFx.filter(([kind]) => kind === 'euchre.trick-play').length).toBe(1);
     }
-    expect(lastFx.some(([kind, at]) => kind === 'euchre.trick-collect' && (at ?? 0) === 260)).toBe(true);
-    expect((lastFx.find(([kind]) => kind === 'euchre.trick-collect')?.[1] ?? -1) !== undefined).toBe(true);
+    expect(lastFx.some(([kind, at]) => kind === 'euchre.trick-collect' && (at ?? 0) === 260)).toBe(
+      true,
+    );
+    expect(
+      (lastFx.find(([kind]) => kind === 'euchre.trick-collect')?.[1] ?? -1) !== undefined,
+    ).toBe(true);
   });
 
   it('announces hand scores with chips and a round-end burst at match point', () => {
     const def = createEuchreDef();
     // drive a full match by hand so the final scoring fx can be inspected
-    let current = createSession(def, { seed: 4242, config: euchreConfig.resolve({ targetScore: 5 }), seats: 4 });
+    let current = createSession(def, {
+      seed: 4242,
+      config: euchreConfig.resolve({ targetScore: 5 }),
+      seats: 4,
+    });
     let sawScoreChip = false;
     let guard = 0;
     while (current.status === 'playing' && guard++ < 500) {

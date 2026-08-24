@@ -19,7 +19,7 @@ import {
 } from '@parlour/engine';
 import { ratscrewConfigSchema, type RatscrewConfig } from './config';
 import { ratscrewHowToPlay } from './howto';
-import { chancesFor, detectPattern, isFaceCard, rankOf, type SlapPattern } from './patterns';
+import { chancesFor, detectPattern, isFaceCard, type SlapPattern } from './patterns';
 
 export { ratscrewHowToPlay } from './howto';
 
@@ -149,7 +149,11 @@ const flip: Move<RatscrewState> = {
           turn: target,
           challenge: { challenger: seat, target, chancesLeft: chancesFor(card) },
         };
-        ctx.fx.emit('ratscrew.challenge', { challenger: seat, target, chancesLeft: chancesFor(card) }, 120);
+        ctx.fx.emit(
+          'ratscrew.challenge',
+          { challenger: seat, target, chancesLeft: chancesFor(card) },
+          120,
+        );
       }
     } else if (next.challenge) {
       const challenge = next.challenge;
@@ -204,7 +208,11 @@ const slap: Move<RatscrewState> = {
     const pattern = state.window?.pattern;
     if (!pattern) throw new Error('slap apply requires an open window');
     ctx.fx.emit('ratscrew.slap', { seat, pattern });
-    const collected = collectCenter({ ...state, window: null, pendingWin: null, challenge: null }, seat, ctx);
+    const collected = collectCenter(
+      { ...state, window: null, pendingWin: null, challenge: null },
+      seat,
+      ctx,
+    );
     ctx.fx.emit(Fx.TurnRing, { seat }, 80);
     return { ...collected, turn: seat };
   },
@@ -290,7 +298,9 @@ export const houseBot: BotPolicy<RatscrewState> = {
   label: 'House Bot',
   tier: 2,
   chooseMove(_view, _seat, legal) {
-    return legal.find((move) => move.id === 'slap') ?? legal.find((move) => move.id === 'flip') ?? null;
+    return (
+      legal.find((move) => move.id === 'slap') ?? legal.find((move) => move.id === 'flip') ?? null
+    );
   },
 };
 

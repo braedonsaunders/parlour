@@ -27,10 +27,11 @@ export function pairedTeams(seatCount: number, teamCount = 2): TeamMap {
     );
   }
   if (seatCount % teamCount !== 0) {
-    throw new Error(`pairedTeams: ${seatCount} seats do not split evenly across ${teamCount} teams`);
+    throw new Error(
+      `pairedTeams: ${seatCount} seats do not split evenly across ${teamCount} teams`,
+    );
   }
-  const normalized = (seat: SeatId): SeatId =>
-    ((seat % seatCount) + seatCount) % seatCount;
+  const normalized = (seat: SeatId): SeatId => ((seat % seatCount) + seatCount) % seatCount;
   return {
     teamCount,
     seatCount,
@@ -41,7 +42,7 @@ export function pairedTeams(seatCount: number, teamCount = 2): TeamMap {
       return members;
     },
     partnerOf: (seat) =>
-      teamCount === seatCount ? null : ((normalized(seat) + teamCount) % seatCount),
+      teamCount === seatCount ? null : (normalized(seat) + teamCount) % seatCount,
   };
 }
 

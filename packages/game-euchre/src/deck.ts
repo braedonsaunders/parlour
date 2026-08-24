@@ -87,11 +87,7 @@ function ordinaryOrdinal(rank: number): number {
  * right bower > left bower > A > K > Q > 10 > 9 of trump, then led-suit cards.
  * Null means "cannot win this trick" (off-suit throw-in).
  */
-export function trickStrength(
-  card: CardId,
-  trump: EuchreSuit,
-  ledSuit: EuchreSuit,
-): number | null {
+export function trickStrength(card: CardId, trump: EuchreSuit, ledSuit: EuchreSuit): number | null {
   const nominal = suitLetterOf(card);
   if (nominal === null) return null;
   const rank = rankOf(card);

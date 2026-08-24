@@ -1,12 +1,7 @@
 import type { EuchreSuit } from '../deck';
 import { effectiveSuit, isLeftBower, isRightBower, rankOf, suitLetterOf } from '../deck';
 import type { EuchreState } from '../state';
-import {
-  cheapestWinner,
-  currentTrickWinner,
-  singletonAceLead,
-  weakestCard,
-} from './evaluate';
+import { cheapestWinner, currentTrickWinner, singletonAceLead, weakestCard } from './evaluate';
 
 /** Tunable trick-play behaviour — tiers and personas skew these weights. */
 export interface PlayParams {

@@ -46,6 +46,7 @@ export function EuchreTableScreen(props: EuchreTableScreenProps) {
   const rootRef = useRef<HTMLElement>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [alonePending, setAlonePending] = useState(false);
+  const clearAlone = () => setAlonePending(false);
   const deal = useDealPresentation(props.fx, props.fxKey);
   useTableAudio(props.fx, props.fxKey, EUCHRE_SFX_PACK.id);
 
@@ -54,8 +55,6 @@ export function EuchreTableScreen(props: EuchreTableScreenProps) {
     running: Boolean(view) && view?.activeSeat !== null,
   });
   useMusicMood(tense ? 'tense' : null);
-
-  useEffect(() => setAlonePending(false), [view?.decision, view?.handNo]);
 
   useEffect(() => {
     const gameWindow = window as Window & { render_game_to_text?: () => string };
@@ -138,7 +137,10 @@ export function EuchreTableScreen(props: EuchreTableScreenProps) {
           E
         </div>
         {view.trump && (
-          <div className={styles.trumpBadge} style={{ '--trump-color': SUIT_COLOR[view.trump] } as CSSProperties}>
+          <div
+            className={styles.trumpBadge}
+            style={{ '--trump-color': SUIT_COLOR[view.trump] } as CSSProperties}
+          >
             <i>{SUIT_GLYPH[view.trump]}</i> trump
           </div>
         )}
@@ -168,17 +170,36 @@ export function EuchreTableScreen(props: EuchreTableScreenProps) {
           onDiscard={props.onDiscard}
           deal={deal}
         />
-        <EuchreFxLayer fx={props.fx} fxKey={props.fxKey} localSeat={view.localSeat} rootRef={rootRef} />
+        <EuchreFxLayer
+          fx={props.fx}
+          fxKey={props.fxKey}
+          localSeat={view.localSeat}
+          rootRef={rootRef}
+        />
         {/* shared cues: deal flights, kitty flip, turn rings */}
-        <SharedCueLayer fx={props.fx} fxKey={props.fxKey} localSeat={view.localSeat} rootRef={rootRef} />
+        <SharedCueLayer
+          fx={props.fx}
+          fxKey={props.fxKey}
+          localSeat={view.localSeat}
+          rootRef={rootRef}
+        />
         {view.decision && !localBusy && (
           <BidRail
             view={view}
             alonePending={alonePending}
             onAloneToggle={() => setAlonePending((value) => !value)}
-            onOrderUp={(alone) => props.onOrderUp?.(alone)}
-            onCallTrump={(suit, alone) => props.onCallTrump?.(suit, alone)}
-            onPass={() => props.onPass?.()}
+            onOrderUp={(alone) => {
+              clearAlone();
+              props.onOrderUp?.(alone);
+            }}
+            onCallTrump={(suit, alone) => {
+              clearAlone();
+              props.onCallTrump?.(suit, alone);
+            }}
+            onPass={() => {
+              clearAlone();
+              props.onPass?.();
+            }}
           />
         )}
       </section>
@@ -345,9 +366,7 @@ function LocalHand({
               <PlayingCard
                 card={card}
                 disabled={disabled}
-                onClick={
-                  burying ? () => onDiscard?.(card) : () => onPlay?.(card)
-                }
+                onClick={burying ? () => onDiscard?.(card) : () => onPlay?.(card)}
               />
             </HandRailCard>
           );
@@ -376,9 +395,7 @@ function BidRail({
   const suits = useMemo(
     () =>
       ALL_SUITS.filter(
-        (suit) =>
-          view.turnedDown === null ||
-          suitLabel(suit) !== suitOf(view.turnedDown as string),
+        (suit) => view.turnedDown === null || suitLabel(suit) !== suitOf(view.turnedDown as string),
       ),
     [view.turnedDown],
   );
@@ -479,7 +496,11 @@ function SharedCueLayer({
           if (cue.type === 'deal') {
             const faceDown = cue.to !== `hand:${localSeat}` && cue.to !== 'discard';
             return (
-              <div key={`${fxKey}:${cue.id}`} data-fx-cue={cue.id} className={tableStyles.flyingCard}>
+              <div
+                key={`${fxKey}:${cue.id}`}
+                data-fx-cue={cue.id}
+                className={tableStyles.flyingCard}
+              >
                 <i className={tableStyles.cardTrail} />
                 <span data-flight-card className={tableStyles.flightCardVisual}>
                   <PlayingCard
@@ -493,7 +514,11 @@ function SharedCueLayer({
           }
           if (cue.type === 'flip') {
             return (
-              <div key={`${fxKey}:${cue.id}`} data-fx-cue={cue.id} className={tableStyles.flyingCard}>
+              <div
+                key={`${fxKey}:${cue.id}`}
+                data-fx-cue={cue.id}
+                className={tableStyles.flyingCard}
+              >
                 <i className={tableStyles.cardTrail} />
                 <span data-flight-card className={tableStyles.flightCardVisual}>
                   <PlayingCard card={cue.card} />
