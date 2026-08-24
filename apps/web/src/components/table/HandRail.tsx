@@ -16,7 +16,6 @@ export type HandRailProps = {
   zone: string;
   label: string;
   dealState?: 'dealing' | 'complete';
-  accessory?: ReactNode;
   children: ReactNode;
 };
 
@@ -56,8 +55,8 @@ export function HandRailCard({ cardId, index, count, playable, children }: HandR
   );
 }
 
-/** A centered UNO-style fan that compresses to keep every card inside the table rail. */
-export function HandRail({ count, zone, label, dealState, accessory, children }: HandRailProps) {
+/** A cards-only fan; player HUD and controls belong in the table's side gutters. */
+export function HandRail({ count, zone, label, dealState, children }: HandRailProps) {
   const railRef = useRef<HTMLDivElement>(null);
   const [step, setStep] = useState(0);
 
@@ -103,7 +102,6 @@ export function HandRail({ count, zone, label, dealState, accessory, children }:
       data-deal-state={dealState}
       aria-label={label}
     >
-      {accessory}
       <div className={styles.handTrack}>{children}</div>
     </div>
   );

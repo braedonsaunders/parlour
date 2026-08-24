@@ -295,52 +295,49 @@ function LocalHand(props: TableScreenProps & { view: TableView; deal: DealPresen
   const canChoose = props.view.legal.discardCards.length > 0 && !props.busy;
   const currentCount = ownerCurrentCount([{ hand: visibleHand, isLocal: true }]);
   return (
-    <HandRail
-      count={visibleHand.length}
-      zone={`hand:${player.seat}`}
-      label="Your hand"
-      dealState={props.deal.sequence ? (props.deal.complete ? 'complete' : 'dealing') : undefined}
-      accessory={
-        <>
-          <output
-            className={styles.ownerCount}
-            aria-label={`My current count: ${currentCount ?? 0}`}
-          >
-            <span>My count</span>
-            <strong>{currentCount ?? 0}</strong>
-          </output>
-          <div className={styles.ownerLives} aria-label={`My lives: ${player.lives}`}>
-            <span aria-hidden="true">My lives</span>
-            <span className={styles.ownerLifePips} aria-hidden="true">
-              {Array.from({ length: player.lives }, (_, index) => (
-                <i key={index} />
-              ))}
-            </span>
-          </div>
-        </>
-      }
-    >
-      <AnimatePresence initial={false} mode="popLayout">
-        {visibleHand.map((card, index) => {
-          const playable = canChoose && props.view.legal.discardCards.includes(card);
-          return (
-            <HandRailCard
-              key={card}
-              cardId={card}
-              index={index}
-              count={visibleHand.length}
-              playable={canChoose ? playable : undefined}
-            >
-              <PlayingCard
-                card={card}
-                disabled={!playable}
-                onClick={() => props.onDiscard?.(card)}
-              />
-            </HandRailCard>
-          );
-        })}
-      </AnimatePresence>
-    </HandRail>
+    <>
+      <div className={styles.ownerStatusRail} aria-label="Your status">
+        <output className={styles.ownerCount} aria-label={`My current count: ${currentCount ?? 0}`}>
+          <span>My count</span>
+          <strong>{currentCount ?? 0}</strong>
+        </output>
+        <div className={styles.ownerLives} aria-label={`My lives: ${player.lives}`}>
+          <span aria-hidden="true">My lives</span>
+          <span className={styles.ownerLifePips} aria-hidden="true">
+            {Array.from({ length: player.lives }, (_, index) => (
+              <i key={index} />
+            ))}
+          </span>
+        </div>
+      </div>
+      <HandRail
+        count={visibleHand.length}
+        zone={`hand:${player.seat}`}
+        label="Your hand"
+        dealState={props.deal.sequence ? (props.deal.complete ? 'complete' : 'dealing') : undefined}
+      >
+        <AnimatePresence initial={false} mode="popLayout">
+          {visibleHand.map((card, index) => {
+            const playable = canChoose && props.view.legal.discardCards.includes(card);
+            return (
+              <HandRailCard
+                key={card}
+                cardId={card}
+                index={index}
+                count={visibleHand.length}
+                playable={canChoose ? playable : undefined}
+              >
+                <PlayingCard
+                  card={card}
+                  disabled={!playable}
+                  onClick={() => props.onDiscard?.(card)}
+                />
+              </HandRailCard>
+            );
+          })}
+        </AnimatePresence>
+      </HandRail>
+    </>
   );
 }
 

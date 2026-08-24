@@ -2,7 +2,7 @@
   position: relative;
   width: 100vw;
   height: 100dvh;
-  min-height: 420px;
+  min-height: min(420px, 100dvh);
   overflow: hidden;
   isolation: isolate;
 }
@@ -307,11 +307,20 @@
   animation: dealFanBloom 360ms var(--ease-pop) both;
 }
 
+.ownerStatusRail {
+  position: absolute;
+  z-index: 12;
+  left: max(4.75rem, calc(env(safe-area-inset-left) + 3.75rem));
+  bottom: max(1rem, env(safe-area-inset-bottom));
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  pointer-events: none;
+}
+
 .ownerCount,
 .ownerLives {
-  position: absolute;
-  z-index: 3;
-  top: 4.2rem;
+  position: relative;
   display: grid;
   justify-items: center;
   min-width: 4.8rem;
@@ -325,10 +334,6 @@
     0 8px 18px rgba(3, 15, 20, 0.46);
   font-family: var(--font-display), sans-serif;
   line-height: 1;
-}
-
-.ownerCount {
-  left: 0;
 }
 
 .ownerCount span {
@@ -346,7 +351,6 @@
 }
 
 .ownerLives {
-  right: 0;
   width: 4.8rem;
   padding-block: 0.64rem;
 }
@@ -530,17 +534,17 @@ button.card:not(:disabled):hover {
 .actionRail {
   position: absolute;
   right: max(1.25rem, env(safe-area-inset-right));
-  top: max(5.1rem, calc(env(safe-area-inset-top) + 4.25rem));
+  bottom: max(1rem, env(safe-area-inset-bottom));
   z-index: 22;
   display: flex;
   gap: 0.45rem;
 }
 .actionRail button {
   min-width: 0;
-  min-height: 2.35rem;
-  padding: 0.48rem 0.82rem;
+  min-height: 2.75rem;
+  padding: 0.58rem 1rem;
   border-radius: 0.85rem;
-  font-size: 0.78rem;
+  font-size: 0.86rem;
   letter-spacing: 0.035em;
 }
 .actionRail button:disabled {
@@ -910,25 +914,13 @@ button.card:not(:disabled):hover {
     bottom: -0.4rem;
     width: min(30rem, 100vw);
   }
-  .ownerCount,
-  .ownerLives {
-    top: -2.9rem;
-  }
-  .ownerCount {
-    left: calc(50% - 0.25rem);
-    translate: -100% 0;
-  }
-  .ownerLives {
-    right: auto;
-    left: calc(50% + 0.25rem);
-  }
   .actionRail {
     right: max(0.9rem, env(safe-area-inset-right));
-    top: max(4.8rem, calc(env(safe-area-inset-top) + 4rem));
+    bottom: max(0.9rem, env(safe-area-inset-bottom));
   }
 }
 
-@media (max-height: 560px) {
+@media (orientation: landscape) and (max-height: 560px) {
   .seat2 {
     top: 1.25rem;
   }
@@ -937,16 +929,15 @@ button.card:not(:disabled):hover {
     top: 44%;
   }
   .localHand {
-    bottom: -1.5rem;
+    bottom: -4rem;
     transform: translateX(-50%) scale(0.82);
   }
-  .ownerCount {
-    left: -1.2rem;
-    translate: 0 0;
-  }
-  .ownerLives {
-    right: -1.2rem;
-    left: auto;
+  .ownerStatusRail {
+    left: max(4.75rem, calc(env(safe-area-inset-left) + 3.75rem));
+    bottom: max(0.65rem, env(safe-area-inset-bottom));
+    gap: 0.35rem;
+    transform: scale(0.88);
+    transform-origin: bottom left;
   }
   .piles {
     top: 50.5%;
@@ -956,9 +947,9 @@ button.card:not(:disabled):hover {
     inset: -0.65rem -1rem;
   }
   .actionRail {
-    top: 4rem;
-    transform: scale(0.82);
-    transform-origin: top right;
+    right: max(0.75rem, env(safe-area-inset-right));
+    bottom: max(0.65rem, env(safe-area-inset-bottom));
+    transform-origin: bottom right;
   }
 }
 
