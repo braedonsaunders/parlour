@@ -41,12 +41,14 @@ const VIEW: WildTableView = {
   decision: 'play',
   lastCardArmed: false,
   drawnCard: null,
+  challenge: null,
   legal: {
     playCards: ['red-7-0'],
     draw: true,
     declineJump: false,
     chooseColor: false,
     callLastCard: false,
+    challengeDrawFour: false,
     pass: false,
     swapTargets: [],
   },
@@ -344,6 +346,75 @@ describe('WildTableScreen turn affordances', () => {
 
     const layer = container.querySelector('[data-testid="card-drop-fx"]');
     expect(layer?.querySelector('[data-shape="swirl"]')).not.toBeNull();
+  });
+
+  it('offers the Draw Four challenge with both prices on it', () => {
+    const onChallengeDrawFour = vi.fn();
+    const onDraw = vi.fn();
+    act(() =>
+      root.render(
+        createElement(WildTableScreen, {
+          view: {
+            ...VIEW,
+            pendingDraw: 4,
+            challenge: { accused: 1, accusedName: 'Slate', amount: 4, penalty: 6 },
+            legal: { ...VIEW.legal, playCards: [], challengeDrawFour: true },
+          },
+          fx: [],
+          fxKey: 0,
+          onChallengeDrawFour,
+          onDraw,
+        }),
+      ),
+    );
+
+    const prompt = container.querySelector('[data-testid="challenge-prompt"]');
+    expect(prompt?.textContent).toContain('Slate played a Draw Four');
+    expect(prompt?.textContent).toContain('they take 4');
+    expect(prompt?.textContent).toContain('you take 6');
+
+    act(() =>
+      container.querySelector<HTMLButtonElement>('[data-testid="accept-draw-four"]')?.click(),
+    );
+    expect(onDraw).toHaveBeenCalledOnce();
+    act(() =>
+      container.querySelector<HTMLButtonElement>('[data-testid="challenge-draw-four"]')?.click(),
+    );
+    expect(onChallengeDrawFour).toHaveBeenCalledOnce();
+  });
+
+  it('counts a stacked pickup out card by card instead of dumping it', () => {
+    vi.useFakeTimers();
+    const fx = [
+      { kind: 'wildpile.pickup', payload: { seat: 0, amount: 4, reason: 'penalty' }, at: 300 },
+      { kind: Fx.DrawCard, payload: { card: 'red-1-0', seat: 0, from: 'stock' }, at: 300 },
+      { kind: Fx.DrawCard, payload: { card: 'red-2-0', seat: 0, from: 'stock' }, at: 450 },
+      { kind: Fx.DrawCard, payload: { card: 'red-3-0', seat: 0, from: 'stock' }, at: 600 },
+      { kind: Fx.DrawCard, payload: { card: 'red-4-0', seat: 0, from: 'stock' }, at: 750 },
+    ];
+    act(() => root.render(createElement(WildTableScreen, { view: VIEW, fx, fxKey: 'pickup' })));
+
+    const counter = () => container.querySelector('[data-testid="wild-pickup"]');
+    expect(counter()?.getAttribute('data-active')).toBe('false');
+
+    // Nothing until the first card is actually in the air.
+    act(() => void vi.advanceTimersByTime(310));
+    expect(counter()?.getAttribute('data-active')).toBe('true');
+    expect(counter()?.textContent).toContain('You pick up');
+    expect(counter()?.textContent).toContain('+4');
+    expect(counter()?.textContent).toContain('0 of 4');
+
+    act(() => void vi.advanceTimersByTime(200));
+    expect(counter()?.textContent).toContain('1 of 4');
+    expect(counter()?.querySelectorAll('[data-landed]')).toHaveLength(1);
+
+    act(() => void vi.advanceTimersByTime(450));
+    expect(counter()?.querySelectorAll('[data-landed]')).toHaveLength(4);
+    expect(counter()?.textContent).toContain('Turn lost');
+
+    // ...then it releases the table rather than sitting there.
+    act(() => void vi.advanceTimersByTime(900));
+    expect(counter()?.getAttribute('data-active')).toBe('false');
   });
 
   it('keeps Wild cards full size during center-to-hand flights', () => {

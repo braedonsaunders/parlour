@@ -54,6 +54,10 @@ export const wildpileHowToPlay: HowToPlayDoc = {
         },
         { label: 'Force play', text: 'a card you drew that can be played must be played' },
         {
+          label: 'Challenge Draw Fours',
+          text: 'a Draw Four is only honest with nothing in the old colour — call the bluff and they take the pile, get it wrong and you take two more',
+        },
+        {
           label: 'Sevens and zeroes',
           text: 'a 7 swaps your hand with a player you name; a 0 passes every hand one seat along',
         },

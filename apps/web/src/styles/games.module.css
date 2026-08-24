@@ -207,3 +207,22 @@
   font-weight: 800;
   opacity: 0.7;
 }
+
+/* --- rules button on a tile ------------------------------------------------ */
+
+/* Tiles are buttons, so the rules control sits beside one rather than inside
+   it. The wrapper takes over as the carousel's flex item and shrink-wraps the
+   tile, which keeps its own width rule (and the phone override) intact. */
+.tileWrap {
+  position: relative;
+  display: flex;
+  flex: none;
+  scroll-snap-align: center;
+}
+
+.tileHelp {
+  position: absolute;
+  z-index: 3;
+  top: 0.7rem;
+  right: 0.7rem;
+}
