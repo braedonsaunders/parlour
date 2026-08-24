@@ -175,8 +175,18 @@ works as it does today. Layer secrets need their own policy:
   them read your hand, so the round pauses instead. `recoveryPolicyFor(2)`
   returns `mode: 'none'` and says so.
 
-A bot can continue public turn structure but cannot play a missing human's still
-private hand until the threshold opens that layer.
+**What recovery is actually for.** Every peel chain needs every seat's layer, so
+one missing seat blocks _everyone's_ cards, not just its own. Rebuilding the
+departed layer is what lets the remaining players keep drawing and playing their
+own hands. Reading the departed player's hand is a side effect of holding their
+layer, not the goal.
+
+**There is no bot takeover.** A seat that drops is marked as a bot in the room
+list, but nothing in the multiplayer path enumerates moves for it or submits
+them — in an open room or a veiled one. Its turn simply does not arrive. That is
+a pre-existing gap in the room layer, not something Veil introduced, and until
+it is closed a disconnect stalls the round at that seat's turn even when the
+cryptography has fully recovered.
 
 **Recovery is a privacy loss and is reported as one.** Rebuilding a departed
 seat's layer means whoever holds it can read every card that seat was dealt. The
@@ -226,4 +236,12 @@ stated in the tier picker before the room is opened.
    two-player disconnect messaging.
 5. ✅ Threshold recovery wired into live seat loss (including the host), with
    forced-disconnect integration tests over the mesh harness.
-6. ⬜ Independent cryptographic review before calling Veil production-secure.
+6. ⬜ Bot takeover for a dropped seat. The room marks the seat as a bot but
+   nothing plays for it, in either tier, so a disconnect still stalls the round
+   at that seat's turn. Independent of Veil, but Veil cannot claim a disconnect
+   is survivable until it exists.
+7. ⬜ Re-veiling a recycled stock. `VeilSession.recycle()` and the engine's
+   `conceals` path are built and tested, but nothing calls them yet, so a round
+   that exhausts the stock hits the `stock-not-reveiled` guard and cannot draw.
+   Short rounds never reach it; a long Blitz round can.
+8. ⬜ Independent cryptographic review before calling Veil production-secure.

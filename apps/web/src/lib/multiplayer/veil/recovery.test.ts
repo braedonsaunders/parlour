@@ -232,6 +232,46 @@ describe('a seat disconnects mid-round', () => {
   });
 });
 
+describe('a recycled stock has its own layer to lose', () => {
+  it('recovers every live epoch, not just the opening deal', async () => {
+    const mesh = await dealtRoom(4);
+    // A stock recycle starts a second epoch with fresh handles and its own
+    // layers, so every seat lays again.
+    for (const session of mesh.sessions) await session.recycle(1, DECK.slice(0, 6));
+    for (let seat = 0; seat < 4; seat++) {
+      expect(await mesh.rooms[seat]!.advanceCeremony(1)).toBe(true);
+      await mesh.settle();
+    }
+    expect(mesh.sessions[0]!.liveEpochs()).toEqual([0, 1]);
+
+    mesh.drop(2);
+    expect(await mesh.pump(mesh.rooms[0]!.recoverSeat(2, 0))).toBe(true);
+    expect(await mesh.pump(mesh.rooms[0]!.recoverSeat(2, 1))).toBe(true);
+
+    // Both epochs are openable again, which is the point: recovering only the
+    // opening deal would leave every reshuffled card stuck.
+    expect(mesh.sessions[0]!.canCoverSeat(2, 0)).toBe(true);
+    expect(mesh.sessions[0]!.canCoverSeat(2, 1)).toBe(true);
+    const card = await mesh.pump(mesh.rooms[0]!.open(1, 3, 'private'));
+    expect(DECK).toContain(card);
+  });
+
+  it('does not let one epoch’s recovery stand in for another', async () => {
+    const mesh = await dealtRoom(4);
+    for (const session of mesh.sessions) await session.recycle(1, DECK.slice(0, 6));
+    for (let seat = 0; seat < 4; seat++) {
+      expect(await mesh.rooms[seat]!.advanceCeremony(1)).toBe(true);
+      await mesh.settle();
+    }
+    mesh.drop(2);
+    await mesh.pump(mesh.rooms[0]!.recoverSeat(2, 0));
+    expect(mesh.sessions[0]!.canCoverSeat(2, 1)).toBe(false);
+    await expect(mesh.pump(mesh.rooms[0]!.open(1, 3, 'private'))).rejects.toThrow(
+      /has not been recovered yet/,
+    );
+  });
+});
+
 describe('what recovery refuses to do', () => {
   it('will not recover at two seats — the round pauses and the message says so', async () => {
     const mesh = await dealtRoom(2);

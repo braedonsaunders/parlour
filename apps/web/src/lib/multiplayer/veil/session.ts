@@ -170,6 +170,15 @@ export class VeilSession {
     return this.epochs.get(epoch) ?? null;
   }
 
+  /**
+   * Every deck epoch this round has opened. A recycled stock starts a new one,
+   * and a departed seat's layer has to be rebuilt for all of them — recovering
+   * only the opening epoch would leave the reshuffled stock unopenable.
+   */
+  liveEpochs(): number[] {
+    return [...this.epochs.keys()].sort((a, b) => a - b);
+  }
+
   progress(epoch = 0): VeilCeremonyProgress {
     const current = this.epochs.get(epoch);
     return {

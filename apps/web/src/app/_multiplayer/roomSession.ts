@@ -330,6 +330,10 @@ export class MultiplayerRoomSession {
     if (!this.transport || this.snapshot.localSeat === null) {
       throw new Error('your seat is not connected');
     }
+    // A paused veiled round means a seat's cards cannot be reopened at all.
+    // Letting moves through anyway would print "paused" while the table kept
+    // playing into a board nobody can finish scoring.
+    if (this.snapshot.security.paused) throw new Error(this.snapshot.security.paused);
     this.transport.send({
       id: `${this.profile.profileId}:${this.sequence++}`,
       seat: this.snapshot.localSeat,
@@ -417,7 +421,11 @@ export class MultiplayerRoomSession {
     const veil = this.veil;
     if (!veil || seat === this.snapshot.localSeat) return;
     veil.room.markSeatLost(seat);
-    const recovered = await veil.room.recoverSeat(seat, 0);
+    // Every epoch, not just the opening deal: a recycled stock has its own
+    // layer, and leaving that one sealed would wedge the round just as surely.
+    const epochs = veil.session.liveEpochs();
+    const results = await Promise.all(epochs.map((epoch) => veil.room.recoverSeat(seat, epoch)));
+    const recovered = results.length > 0 && results.every(Boolean);
     this.update({
       security: {
         ...this.snapshot.security,
