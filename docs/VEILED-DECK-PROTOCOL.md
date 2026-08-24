@@ -126,6 +126,12 @@ re-veiled: the cards start a fresh epoch with new handles and a new ceremony.
 The table still knows _which_ cards are in the stock — it does in a physical
 game too — but no longer their order.
 
+The event records two unpaired lists — public cards retired and fresh handles
+issued. It never records `[card, handle]` pairs, because that would publish the
+new order Veil is meant to hide. If somebody has already left, only connected
+seats contribute layers to the fresh epoch; the signed declaration names that
+participant set and the audit recomputes exactly those layers.
+
 ### 6. Hidden-rule claims
 
 Deck privacy and rule integrity are different problems. A seat that alone can
@@ -181,12 +187,14 @@ departed layer is what lets the remaining players keep drawing and playing their
 own hands. Reading the departed player's hand is a side effect of holding their
 layer, not the goal.
 
-**There is no bot takeover.** A seat that drops is marked as a bot in the room
-list, but nothing in the multiplayer path enumerates moves for it or submits
-them — in an open room or a veiled one. Its turn simply does not arrive. That is
-a pre-existing gap in the room layer, not something Veil introduced, and until
-it is closed a disconnect stalls the round at that seat's turn even when the
-cryptography has fully recovered.
+**Bot takeover.** The authority host immediately drives a dropped seat through
+the game pack's ordinary bot policy, using the same legal-move enumeration and
+reducers as a human. In a veiled room the host opens the departed hand only as
+a surrogate view: enough to choose its move, never enough to render that hand
+on the host's table. Only the card the bot actually makes public enters the log.
+A host migration resumes the same deterministic decision from the same log
+position, and a returning profile reclaims the seat before another scheduled
+bot move can fire. Takeover bots snap-play in under 150 ms.
 
 **Recovery is a privacy loss and is reported as one.** Rebuilding a departed
 seat's layer means whoever holds it can read every card that seat was dealt. The
@@ -230,18 +238,14 @@ stated in the tier picker before the room is opened.
 
 1. ✅ Signed transcript, canonical encoding, hostile-input tests.
 2. ✅ Commutative shuffle ceremony and private draw/open, with a mesh harness.
-3. ✅ Opaque handles and reveal/conceal in the engine, without changing the
+3. ✅ Opaque handles and reveal/recycle metadata in the engine, without changing the
    public deterministic reducer contract.
 4. ✅ Room security selection, ceremony progress, audit badge and explicit
    two-player disconnect messaging.
 5. ✅ Threshold recovery wired into live seat loss (including the host), with
    forced-disconnect integration tests over the mesh harness.
-6. ⬜ Bot takeover for a dropped seat. The room marks the seat as a bot but
-   nothing plays for it, in either tier, so a disconnect still stalls the round
-   at that seat's turn. Independent of Veil, but Veil cannot claim a disconnect
-   is survivable until it exists.
-7. ⬜ Re-veiling a recycled stock. `VeilSession.recycle()` and the engine's
-   `conceals` path are built and tested, but nothing calls them yet, so a round
-   that exhausts the stock hits the `stock-not-reveiled` guard and cannot draw.
-   Short rounds never reach it; a long Blitz round can.
+6. ✅ Host-owned bot takeover for dropped seats in open and Veil rooms, including
+   deterministic host handoff, surrogate-only hidden faces and profile reclaim.
+7. ✅ Re-veiling a recycled stock with a signed fresh epoch, unpaired engine
+   metadata, active-seat participant sets and replay-stable reducer support.
 8. ⬜ Independent cryptographic review before calling Veil production-secure.

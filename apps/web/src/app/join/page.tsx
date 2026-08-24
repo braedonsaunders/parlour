@@ -123,7 +123,9 @@ export default function JoinPage() {
               ? '/wild/table'
               : gameId === 'cribbage'
                 ? '/cribbage/table'
-                : '/table',
+                : gameId === 'president'
+                  ? '/president/table'
+                  : '/table',
           )
         }
       />

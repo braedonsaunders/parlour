@@ -7,6 +7,7 @@ import {
   type GameSession,
   type RuleValues,
 } from '@parlour/engine';
+import { DEFAULT_SEAT_RANGE, type SeatRange } from '@/lib/rooms/seatRange';
 import type {
   AppliedPacket,
   AuthorityAdapter,
@@ -15,17 +16,14 @@ import type {
   RoomSettings,
 } from './types';
 
-/** A veiled room replays from the ceremony order, not from the seeded shuffle. */
-function veilOptions(settings: RoomSettings, deckOrder: readonly string[] | undefined) {
-  return settings.security === 'veil' ? { veiled: true, deckOrder } : {};
-}
-
 type EngineAuthorityOptions<S, C extends RuleValues> = {
   def: GameDef<S, C>;
   session: GameSession<S, C>;
   settings: RoomSettings;
   now?: () => number;
   onSeatBot?: (seat: number, bot: boolean) => void;
+  /** room capacity bounds for snapshot validation; defaults to the shared 2–4 ring */
+  seatsRange?: SeatRange;
 };
 
 type AuthorityState<S, C extends RuleValues> = {
@@ -37,12 +35,17 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
+function veilOptions(settings: RoomSettings, deckOrder: readonly string[] | undefined) {
+  return settings.security === 'veil' ? { veiled: true, deckOrder } : {};
+}
+
 export class EngineAuthority<S, C extends RuleValues> implements AuthorityAdapter {
   private authorityState: AuthorityState<S, C>;
   private acceptedActions = new Map<string, number>();
   private readonly def: GameDef<S, C>;
   private readonly now: () => number;
   private readonly onSeatBot?: (seat: number, bot: boolean) => void;
+  private readonly seatsRange: SeatRange;
   private clockAnchorWallMs: number;
   private clockAnchorAtMs = 0;
 
@@ -52,6 +55,7 @@ export class EngineAuthority<S, C extends RuleValues> implements AuthorityAdapte
     this.now = options.now ?? (() => Date.now());
     this.clockAnchorWallMs = this.now();
     this.onSeatBot = options.onSeatBot;
+    this.seatsRange = options.seatsRange ?? DEFAULT_SEAT_RANGE;
   }
 
   apply(action: PlayerAction): AppliedPacket {
@@ -61,7 +65,7 @@ export class EngineAuthority<S, C extends RuleValues> implements AuthorityAdapte
     const outcome = sessionApply(this.def, session, action.seat, action.move, action.payload, {
       atMs,
       reveals: action.reveals,
-      conceals: action.conceals,
+      recycle: action.recycle,
     });
     if (outcome.rejected) throw new Error(outcome.rejected.message);
     const events = outcome.events.map((event) => ({ ...event, ts: timestamp }));
@@ -139,10 +143,11 @@ export class EngineAuthority<S, C extends RuleValues> implements AuthorityAdapte
 
   importSnapshot(snapshot: ReplaySnapshot): void {
     if (snapshot.settings.gameId !== this.def.id) throw new Error('snapshot game mismatch');
+    const { min, max } = this.seatsRange;
     if (
       !Number.isInteger(snapshot.settings.seats) ||
-      snapshot.settings.seats < 2 ||
-      snapshot.settings.seats > 4
+      snapshot.settings.seats < min ||
+      snapshot.settings.seats > max
     ) {
       throw new Error('invalid snapshot seats');
     }
