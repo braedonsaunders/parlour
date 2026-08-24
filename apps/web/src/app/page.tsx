@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { motion } from 'motion/react';
 import { AvatarBadge } from '@/components/AvatarBadge';
 import { MainMenuMuteButton } from '@/components/MainMenuMuteButton';
+import { ScenePicker } from '@/components/backgrounds/ScenePicker';
 import { useAudioManager } from '@/stores/audio';
 import { useProfileStore } from '@/stores/profile';
 import { getAvatar } from '@/lib/avatars';
@@ -52,15 +53,15 @@ export default function TitlePage() {
         pull up a chair
       </motion.p>
 
-      <motion.h1
-        variants={rise}
-        initial="hidden"
-        animate="shown"
-        custom={0.06}
-        className="text-warm-glow font-display text-7xl font-extrabold leading-none tracking-tight text-hearth-50 sm:text-8xl"
-      >
-        parlour
-      </motion.h1>
+      <h1 aria-label="parlour" className="-my-8">
+        {/* eslint-disable-next-line @next/next/no-img-element -- static asset with baked-in SVG animation; next/image would proxy it needlessly */}
+        <img
+          src="/parlour-logo-home.svg"
+          alt=""
+          draggable={false}
+          className="pointer-events-none w-[min(84vw,27rem)] select-none"
+        />
+      </h1>
 
       <motion.p
         variants={rise}
@@ -108,6 +109,8 @@ export default function TitlePage() {
           Blitz · the 31 game
         </span>
       </motion.div>
+
+      <ScenePicker />
 
       <span className="sr-only">{getAvatar(avatarId).name}</span>
     </main>

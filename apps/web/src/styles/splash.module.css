@@ -1,0 +1,186 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  cursor: pointer;
+  background: radial-gradient(120% 100% at 50% 42%, #1b3547 0%, #152833 48%, #0a141c 100%);
+  transition: opacity 550ms ease;
+}
+
+.leaving {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.rays {
+  position: absolute;
+  left: 50%;
+  top: 42%;
+  width: 160vmax;
+  height: 160vmax;
+  border-radius: 50%;
+  background: repeating-conic-gradient(
+    from 0deg,
+    rgba(226, 147, 73, 0.14) 0deg 9deg,
+    transparent 9deg 30deg
+  );
+  mask: radial-gradient(closest-side, #000 0%, rgba(0, 0, 0, 0.55) 42%, transparent 72%);
+  -webkit-mask: radial-gradient(closest-side, #000 0%, rgba(0, 0, 0, 0.55) 42%, transparent 72%);
+  will-change: transform, opacity;
+  animation:
+    raysSpin 46s linear infinite,
+    raysIn 1.1s ease-out both;
+}
+
+@keyframes raysSpin {
+  from {
+    transform: translate(-50%, -50%) rotate(0deg);
+  }
+  to {
+    transform: translate(-50%, -50%) rotate(360deg);
+  }
+}
+
+@keyframes raysIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.bloom {
+  position: absolute;
+  left: 50%;
+  top: 42%;
+  width: 90vmin;
+  height: 90vmin;
+  border-radius: 50%;
+  background: radial-gradient(
+    50% 50% at 50% 50%,
+    rgba(242, 176, 106, 0.32) 0%,
+    rgba(226, 147, 73, 0.12) 46%,
+    transparent 74%
+  );
+  filter: blur(10px);
+  will-change: transform, opacity;
+  animation: bloom 0.9s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes bloom {
+  from {
+    transform: translate(-50%, -50%) scale(0.2);
+    opacity: 0;
+  }
+  to {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 1;
+  }
+}
+
+.suit {
+  position: absolute;
+  left: 50%;
+  top: 44%;
+  font-weight: 700;
+  opacity: 0;
+  will-change: transform, opacity;
+  animation: burst 1.25s cubic-bezier(0.16, 0.84, 0.36, 1) var(--delay, 0.2s) both;
+}
+
+@keyframes burst {
+  0% {
+    transform: translate(-50%, -50%) rotate(var(--spin-from, -20deg)) scale(0.3);
+    opacity: 0;
+  }
+  16% {
+    opacity: var(--peak, 0.5);
+  }
+  100% {
+    transform: translate(
+        calc(-50% + var(--dx, 20vmin)),
+        calc(-50% + var(--dy, -20vmin))
+      )
+      rotate(var(--spin-to, 24deg)) scale(var(--grow, 1.5));
+    opacity: 0;
+  }
+}
+
+.sweep {
+  position: absolute;
+  top: -20%;
+  bottom: -20%;
+  left: 0;
+  width: 26%;
+  background: linear-gradient(
+    100deg,
+    transparent 0%,
+    rgba(253, 246, 236, 0.07) 45%,
+    rgba(253, 246, 236, 0.12) 50%,
+    rgba(253, 246, 236, 0.07) 55%,
+    transparent 100%
+  );
+  transform: translate3d(-130%, 0, 0) skewX(-12deg);
+  will-change: transform;
+  animation: sweep 1s ease-in-out 1.35s both;
+}
+
+@keyframes sweep {
+  from {
+    transform: translate3d(-130%, 0, 0) skewX(-12deg);
+  }
+  to {
+    transform: translate3d(520%, 0, 0) skewX(-12deg);
+  }
+}
+
+.logo {
+  position: relative;
+  width: min(88vw, 72vh);
+  height: auto;
+}
+
+.vignette {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(80% 68% at 50% 46%, transparent 46%, rgba(6, 13, 18, 0.7) 100%);
+  pointer-events: none;
+}
+
+.hint {
+  position: absolute;
+  left: 50%;
+  bottom: 4.5%;
+  transform: translateX(-50%);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: rgba(175, 218, 228, 0.45);
+  animation: hintIn 0.6s ease-out 2s both;
+}
+
+@keyframes hintIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 6px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .overlay *,
+  .overlay *::before,
+  .overlay *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}

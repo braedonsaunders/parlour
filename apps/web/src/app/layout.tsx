@@ -2,7 +2,8 @@ import type { Metadata, Viewport } from 'next';
 import { Baloo_2, Nunito_Sans } from 'next/font/google';
 import { ComfortSync } from '@/components/ComfortSync';
 import { AudioDirector } from '@/components/AudioDirector';
-import { DioramaStage } from '@/components/DioramaStage';
+import { SceneStage } from '@/components/backgrounds/SceneStage';
+import { SplashScreen } from '@/components/SplashScreen';
 import { PwaRegister } from '@/components/PwaRegister';
 import { RotatePrompt } from '@/components/RotatePrompt';
 import './globals.css';
@@ -41,9 +42,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className={`${display.variable} ${body.variable}`}>
       <body className="min-h-dvh antialiased">
-        <DioramaStage />
+        <SceneStage />
         <div className="relative z-10 min-h-dvh">{children}</div>
         <RotatePrompt />
+        <SplashScreen />
         <ComfortSync />
         <AudioDirector />
         <PwaRegister />
