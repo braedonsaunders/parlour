@@ -175,6 +175,13 @@
     left: max(1.25rem, env(safe-area-inset-left));
   }
 
+  .safe-page {
+    padding-top: max(2rem, env(safe-area-inset-top));
+    padding-right: max(1.5rem, env(safe-area-inset-right));
+    padding-bottom: max(2rem, env(safe-area-inset-bottom));
+    padding-left: max(1.5rem, env(safe-area-inset-left));
+  }
+
   @media (min-width: 640px) {
     .chrome-nw {
       top: max(2rem, env(safe-area-inset-top));

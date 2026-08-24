@@ -114,7 +114,11 @@ describe('installable offline shell', () => {
     expect(globals).toContain('env(safe-area-inset-top)');
     expect(globals).toMatch(/\.chrome-nw\s*\{[^}]*safe-area-inset-top/s);
     expect(globals).toMatch(/\.chrome-ne\s*\{[^}]*safe-area-inset-top/s);
+    expect(globals).toMatch(/\.safe-page\s*\{[^}]*safe-area-inset-top/s);
     expect(scenes).toMatch(/height:\s*var\(--app-height\)/);
+    expect(readFileSync(join(process.cwd(), 'src/app/profile/page.tsx'), 'utf8')).toContain(
+      'safe-page',
+    );
   });
 
   it('removes production service workers and parlour caches during development', () => {

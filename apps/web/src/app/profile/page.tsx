@@ -46,7 +46,7 @@ export default function ProfilePage() {
   const standings = useMemo(() => headToHead(records), [records]);
 
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-4xl flex-col gap-6 px-6 py-8">
+    <main className="safe-page mx-auto flex min-h-dvh w-full max-w-4xl flex-col gap-6">
       <header className="flex items-center justify-between">
         <Link href="/" className="pill-soft text-sm font-bold text-dusk-100 hover:text-hearth-200">
           ← Back
