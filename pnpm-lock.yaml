@@ -162,6 +162,9 @@ importers:
       '@parlour/engine':
         specifier: workspace:*
         version: link:../engine
+      '@parlour/tricks':
+        specifier: workspace:*
+        version: link:../tricks
     devDependencies:
       tsx:
         specifier: ^4.20.0

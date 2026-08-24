@@ -1,19 +1,55 @@
 import { describe, expect, it } from 'vitest';
 import { defineConfig } from './config';
-import { createSession, replayMatchesLog, replaySession, sessionApply, stateHash } from './runtime';
+import {
+  createSession,
+  replayMatchesLog,
+  replaySession,
+  sessionApply,
+  sessionInject,
+  stateHash,
+} from './runtime';
+import { makeRng } from './rng';
 import {
   Fx,
   stdDeck,
   type AppliedEvent,
   type CardId,
   type ConfigFieldValue,
+  type CreateSessionFn,
   type Flow,
   type GameDef,
   type LegalMove,
+  type MakeRngFn,
   type Move,
+  type ReplaySessionFn,
   type SeatId,
+  type SessionApplyFn,
+  type SessionInjectFn,
+  type StateHashFn,
 } from './types';
 import { addTo, drawFrom, removeFrom, shuffledIds } from './zones';
+
+// --- runtime/contract equivalence -------------------------------------------
+// types.ts pins the engine's public signatures. These used to be
+// `export declare function` declarations, which TypeScript never checked
+// against the real implementations — the contract and the runtime could drift
+// apart silently and nothing failed. The assignments below are the check:
+// if a signature in types.ts stops matching its implementation, `pnpm
+// type-check` fails here. They are type-level only and compile to nothing.
+
+const _createSessionMatchesContract: CreateSessionFn = createSession;
+const _sessionApplyMatchesContract: SessionApplyFn = sessionApply;
+const _sessionInjectMatchesContract: SessionInjectFn = sessionInject;
+const _replaySessionMatchesContract: ReplaySessionFn = replaySession;
+const _stateHashMatchesContract: StateHashFn = stateHash;
+const _makeRngMatchesContract: MakeRngFn = makeRng;
+
+void _createSessionMatchesContract;
+void _sessionApplyMatchesContract;
+void _sessionInjectMatchesContract;
+void _replaySessionMatchesContract;
+void _stateHashMatchesContract;
+void _makeRngMatchesContract;
 
 // --- mini game fixture -----------------------------------------------------
 

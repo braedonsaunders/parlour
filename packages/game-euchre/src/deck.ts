@@ -7,6 +7,7 @@ import {
   type DeckDef,
   type HandOrder,
 } from '@parlour/engine';
+import { openTrick, playToTrick, resolveTrickWinner, type TrickRules } from '@parlour/tricks';
 
 /** The neutral partnership map for a four-seat euchre table: 0/2 vs 1/3. */
 const TABLE_TEAMS = pairedTeams(4);
@@ -106,21 +107,52 @@ export function trickStrength(card: CardId, trump: EuchreSuit, ledSuit: EuchreSu
   return effectiveSuit(card, trump) === ledSuit ? ordinaryOrdinal(rank) : null;
 }
 
+/**
+ * Rank used when two cards compete inside the SAME effective suit.
+ *
+ * `resolveTrickWinner` only ever compares ranks within one suit, so the bowers
+ * just need to sit above ordinary trump: right bower > left bower > A > K > Q >
+ * 10 > 9. Trump-beats-led is the resolver's job, not this function's — which is
+ * why there is no `+6` offset here and there is one in `trickStrength`.
+ */
+function trickRank(card: CardId, trump: EuchreSuit): number {
+  const nominal = suitLetterOf(card);
+  const rank = rankOf(card);
+  if (nominal === null || rank === null) return -Infinity;
+  if (nominal === trump && rank === 11) return 13;
+  if (nominal === leftBowerSuit(trump) && rank === 11) return 12;
+  return ordinaryOrdinal(rank);
+}
+
+/**
+ * Euchre as a `@parlour/tricks` rule set. The left bower is exactly the case
+ * that package's `effectiveSuit` hook exists for, so trick resolution is the
+ * shared implementation rather than a euchre-private copy of it.
+ */
+export function euchreTrickRules(trump: EuchreSuit): TrickRules {
+  return {
+    suitOf: (card) => suitLetterOf(card),
+    effectiveSuit: (card) => effectiveSuit(card, trump),
+    rankOf: (card) => trickRank(card, trump),
+    trumpSuit: trump,
+  };
+}
+
 /** Winner seat of a completed trick, given plays in table order. */
 export function trickWinner(
   plays: readonly { seat: number; card: CardId }[],
   trump: EuchreSuit,
 ): number {
   if (plays.length === 0) throw new Error('trickWinner: no plays');
-  const led = effectiveSuit(plays[0]!.card, trump);
-  if (led === null) throw new Error('trickWinner: lead card is not a real card');
-  let best = plays[0]!;
-  for (const play of plays.slice(1)) {
-    const challenger = trickStrength(play.card, trump, led);
-    const champion = trickStrength(best.card, trump, led);
-    if (challenger !== null && challenger > (champion ?? -1)) best = play;
+  const rules = euchreTrickRules(trump);
+  if (effectiveSuit(plays[0]!.card, trump) === null) {
+    throw new Error('trickWinner: lead card is not a real card');
   }
-  return best.seat;
+  let trick = openTrick(plays[0]!.seat);
+  for (const play of plays) trick = playToTrick(trick, play.seat, play.card, rules);
+  const winner = resolveTrickWinner(trick, rules);
+  if (winner === null) throw new Error('trickWinner: no play could win the trick');
+  return winner;
 }
 
 /** Team index of a seat at a four-seat euchre table: seats 0/2 vs 1/3. */

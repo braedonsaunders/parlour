@@ -16,6 +16,7 @@ import {
   type RuleError,
   type SeatId,
 } from '@parlour/engine';
+import { followError } from '@parlour/tricks';
 import { euchreConfig, type EuchreRules } from './config';
 import {
   DECK_SIZE,
@@ -23,6 +24,7 @@ import {
   EUCHRE_SUITS,
   euchreDeck,
   effectiveSuit,
+  euchreTrickRules,
   HAND_SIZE,
   KITTY_SIZE,
   suitLetterOf,
@@ -367,9 +369,11 @@ function followViolation(state: EuchreState, seat: SeatId, card: CardId): RuleEr
   const led = currentLedSuit(state);
   const trump = state.trump;
   if (!led || !trump) return null;
-  if (effectiveSuit(card, trump) === led) return null;
-  const mustFollow = hand(state, seat).some((held) => effectiveSuit(held, trump) === led);
-  return mustFollow
+  const violation = followError(
+    { ledSuit: led, hand: hand(state, seat), card },
+    euchreTrickRules(trump),
+  );
+  return violation
     ? err('must-follow-suit', `you hold ${EUCHRE_SUIT_NAMES[led]} — you must follow`)
     : null;
 }

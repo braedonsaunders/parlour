@@ -565,7 +565,6 @@ export interface GameSession<S, C extends RuleValues = RuleValues> {
   deckOrder?: readonly CardId[];
 }
 
-export declare function stateHash(state: unknown): string;
 export interface SessionOptions<C extends RuleValues> {
   seed: number;
   config: C;
@@ -576,29 +575,44 @@ export interface SessionOptions<C extends RuleValues> {
   deckOrder?: readonly CardId[];
 }
 
-export declare function createSession<S, C extends RuleValues>(
+/**
+ * Runtime signatures, pinned as types instead of `declare function`.
+ *
+ * These were ambient declarations, which meant nothing checked them against
+ * runtime.ts/rng.ts — the two could drift silently, and importing one straight
+ * from this module handed back a binding with no implementation behind it.
+ * As types they are inert at runtime, and runtime.test.ts asserts each
+ * implementation is assignable to its contract, so drift is now a type error.
+ */
+export type StateHashFn = (state: unknown) => string;
+
+export type MakeRngFn = (seed: number) => Rng;
+
+export type CreateSessionFn = <S, C extends RuleValues>(
   def: GameDef<S, C>,
   opts: SessionOptions<C>,
-): GameSession<S, C>;
-export declare function sessionApply<S, C extends RuleValues>(
+) => GameSession<S, C>;
+
+export type SessionApplyFn = <S, C extends RuleValues>(
   def: GameDef<S, C>,
   session: GameSession<S, C>,
   seat: SeatId,
   moveId: string,
   payload?: unknown,
   meta?: ApplyMeta,
-): ApplyOutcome<S, C>;
-export declare function sessionInject<S, C extends RuleValues>(
+) => ApplyOutcome<S, C>;
+
+export type SessionInjectFn = <S, C extends RuleValues>(
   def: GameDef<S, C>,
   session: GameSession<S, C>,
   moveId: string,
   payload?: unknown,
   meta?: ApplyMeta,
-): ApplyOutcome<S, C>;
-export declare function replaySession<S, C extends RuleValues>(
+) => ApplyOutcome<S, C>;
+
+export type ReplaySessionFn = <S, C extends RuleValues>(
   def: GameDef<S, C>,
   seed: number,
   log: readonly AppliedEvent[],
   opts?: { config?: C; seats?: number; veiled?: boolean; deckOrder?: readonly CardId[] },
-): GameSession<S, C>;
-export declare function makeRng(seed: number): Rng;
+) => GameSession<S, C>;

@@ -32,8 +32,10 @@ export interface TrickRules {
   /**
    * Suit the card counts as for winning purposes. Defaults to `suitOf`; Euchre
    * style left-bower remaps hook in here without touching call sites.
+   * `null` means "not a real card" and can never win a trick, matching
+   * `suitOf`'s contract.
    */
-  effectiveSuit?(card: CardId): string;
+  effectiveSuit?(card: CardId): string | null;
   /** Trump suit for winner resolution; null/undefined means no trump. */
   trumpSuit?: string | null;
 }
@@ -73,12 +75,27 @@ export function playToTrick(trick: Trick, seat: SeatId, card: CardId, rules: Tri
   return {
     ...trick,
     plays,
-    ledSuit: trick.ledSuit ?? rules.suitOf(card),
+    // Effective, not printed: leading the left bower leads TRUMP.
+    ledSuit: trick.ledSuit ?? effectiveSuitOf(card, rules),
   };
 }
 
+/**
+ * Suit a card counts as. Games with bower-style remaps supply `effectiveSuit`;
+ * everyone else falls through to `suitOf`, so this is a no-op for them.
+ */
+function effectiveSuitOf(card: CardId, rules: TrickRules): string | null {
+  return rules.effectiveSuit ? rules.effectiveSuit(card) : rules.suitOf(card);
+}
+
+/**
+ * Follow-suit and winner resolution both read the EFFECTIVE suit. They must:
+ * in Euchre the left bower follows trump, not its printed suit, so a hand
+ * holding only the left bower is not void in trump. Using `suitOf` here would
+ * let that hand renege — the remap hook exists precisely to prevent it.
+ */
 export function hasSuit(cards: readonly CardId[], rules: TrickRules, suit: string): boolean {
-  return cards.some((card) => rules.suitOf(card) === suit);
+  return cards.some((card) => effectiveSuitOf(card, rules) === suit);
 }
 
 export interface FollowContext {
@@ -92,7 +109,7 @@ export interface FollowContext {
  * Void hands may play anything — suit-specific bans belong to games.
  */
 export function followError(ctx: FollowContext, rules: TrickRules): string | null {
-  if (rules.suitOf(ctx.card) === ctx.ledSuit) return null;
+  if (effectiveSuitOf(ctx.card, rules) === ctx.ledSuit) return null;
   return hasSuit(ctx.hand, rules, ctx.ledSuit) ? 'must-follow-suit' : null;
 }
 
@@ -103,11 +120,7 @@ export function legalFollows(
   rules: TrickRules,
 ): CardId[] {
   if (!hasSuit(hand, rules, ledSuit)) return [...hand];
-  return hand.filter((card) => rules.suitOf(card) === ledSuit);
-}
-
-function effectiveSuitOf(card: CardId, rules: TrickRules): string | null {
-  return rules.effectiveSuit ? rules.effectiveSuit(card) : rules.suitOf(card);
+  return hand.filter((card) => effectiveSuitOf(card, rules) === ledSuit);
 }
 
 /**

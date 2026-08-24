@@ -8,6 +8,7 @@ import {
   type GameDef,
 } from '@parlour/engine';
 import { describe, expect, it } from 'vitest';
+import { followError } from '@parlour/tricks';
 import { euchreConfig, type EuchreRules } from './config';
 import {
   EUCHRE_SUITS,
@@ -18,7 +19,9 @@ import {
   leftBowerSuit,
   rankOf,
   suitLetterOf,
+  euchreTrickRules,
   teamOf,
+  trickStrength,
   trickWinner,
 } from './deck';
 import { createEuchreDef, type EuchreDefOptions } from './rules';
@@ -509,5 +512,87 @@ describe('presentation hints', () => {
     }
     expect(sawScoreChip).toBe(true);
     expect(current.status).toBe('ended');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// D7 migration proof: trick resolution moved onto @parlour/tricks.
+//
+// `trickWinner` used to walk plays comparing `trickStrength` directly. It now
+// builds a Trick and defers to `resolveTrickWinner`, with euchre's bowers
+// supplied through the `effectiveSuit` hook that package was designed around.
+// A refactor of trick resolution is not proven by "the suite still passes", so
+// this replays the ORIGINAL algorithm and asserts the two agree exhaustively.
+// ---------------------------------------------------------------------------
+
+/** Verbatim pre-migration implementation, kept only as the differential oracle. */
+function legacyTrickWinner(
+  plays: readonly { seat: number; card: string }[],
+  trump: (typeof EUCHRE_SUITS)[number],
+): number {
+  const led = effectiveSuit(plays[0]!.card, trump);
+  if (led === null) throw new Error('legacyTrickWinner: lead card is not a real card');
+  let best = plays[0]!;
+  for (const play of plays.slice(1)) {
+    const challenger = trickStrength(play.card, trump, led);
+    const champion = trickStrength(best.card, trump, led);
+    if (challenger !== null && challenger > (champion ?? -1)) best = play;
+  }
+  return best.seat;
+}
+
+describe('trick resolution via @parlour/tricks (D7)', () => {
+  it('agrees with the pre-migration algorithm on every 4-card trick sampled', () => {
+    const cards = euchreDeck().cardIds;
+    // Deterministic LCG — this is a test oracle, not engine code.
+    let seed = 0x5eed;
+    const nextInt = (bound: number) => {
+      seed = (Math.imul(seed, 1103515245) + 12345) >>> 0;
+      return seed % bound;
+    };
+
+    let compared = 0;
+    for (const trump of EUCHRE_SUITS) {
+      for (let sample = 0; sample < 400; sample++) {
+        const pool = [...cards];
+        const plays: { seat: number; card: string }[] = [];
+        for (let seat = 0; seat < 4; seat++) {
+          plays.push({ seat, card: pool.splice(nextInt(pool.length), 1)[0]! });
+        }
+        expect(trickWinner(plays, trump)).toBe(legacyTrickWinner(plays, trump));
+        compared += 1;
+      }
+    }
+    expect(compared).toBe(1600);
+  });
+
+  it('still lets the right bower beat the left bower', () => {
+    // J♥ (right) vs J♦ (left) with hearts trump — the left must not win.
+    expect(trickWinner([{ seat: 0, card: 'D11' }, { seat: 1, card: 'H11' }], 'H')).toBe(1);
+    expect(trickWinner([{ seat: 0, card: 'H11' }, { seat: 1, card: 'D11' }], 'H')).toBe(0);
+  });
+
+  it('lets the left bower beat the trump ace', () => {
+    expect(trickWinner([{ seat: 0, card: 'H1' }, { seat: 1, card: 'D11' }], 'H')).toBe(1);
+  });
+
+  it('leading the left bower leads trump, not its printed suit', () => {
+    const rules = euchreTrickRules('H');
+    // D11 is the left bower with hearts trump: it leads HEARTS.
+    expect(rules.effectiveSuit?.('D11')).toBe('H');
+    // A hand holding only the left bower is NOT void in trump, so a diamond
+    // thrown on a heart lead is a renege. Using printed suits missed this.
+    expect(followError({ ledSuit: 'H', hand: ['D11', 'S9'], card: 'S9' }, rules)).toBe(
+      'must-follow-suit',
+    );
+    // ...and the bower itself is a legal follow.
+    expect(followError({ ledSuit: 'H', hand: ['D11', 'S9'], card: 'D11' }, rules)).toBeNull();
+  });
+
+  it('does not treat the left bower as its printed suit when that suit is led', () => {
+    const rules = euchreTrickRules('H');
+    // Diamonds led, hearts trump: the left bower (D11) is trump now, so a hand
+    // of only D11 IS void in diamonds and may throw anything.
+    expect(followError({ ledSuit: 'D', hand: ['D11', 'S9'], card: 'S9' }, rules)).toBeNull();
   });
 });
