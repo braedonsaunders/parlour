@@ -159,9 +159,10 @@ describe('resolveTrickWinner', () => {
   });
 
   it('honors effectiveSuit remaps before comparing', () => {
-    // Euchre-flavored: J♦ counts as a heart (left bower) under a heart trump.
+    // Euchre-flavored: J♦ counts as a heart AND outranks them (left bower).
     const euchreish: TrickRules = {
       ...std,
+      rankOf: (card) => (card === 'D11' ? 14 : std.rankOf(card)),
       effectiveSuit: (card) => (card === 'D11' ? 'hearts' : (std.suitOf(card) as string)),
       trumpSuit: 'hearts',
     };

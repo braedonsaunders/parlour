@@ -51,7 +51,9 @@ export function useFxAnimation(
           cue.type === 'deal' ||
           cue.type === 'flip' ||
           cue.type === 'draw' ||
-          cue.type === 'discard'
+          cue.type === 'discard' ||
+          cue.type === 'trick-play' ||
+          cue.type === 'transfer'
         ) {
           const from = zonePoint(cue.from, root, bounds);
           const to = zonePoint(cue.to, root, bounds);

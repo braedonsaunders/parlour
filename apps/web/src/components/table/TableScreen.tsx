@@ -444,5 +444,8 @@ function Cue({
     );
   }
 
-  return <span data-fx-cue={cue.id} data-seat-burst={cue.seat} className={styles.turnPop} />;
+  if (cue.type === 'turn') {
+    return <span data-fx-cue={cue.id} data-seat-burst={cue.seat} className={styles.turnPop} />;
+  }
+  return null;
 }

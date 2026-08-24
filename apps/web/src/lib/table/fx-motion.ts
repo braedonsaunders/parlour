@@ -33,6 +33,16 @@ export type FxCue =
       to: 'discard';
       seat: number;
     })
+  | (BaseCue & {
+      type: 'trick-play';
+      card: string;
+      seat: number;
+      index: number;
+      from: `hand:${number}`;
+      to: `seat:${number}`;
+    })
+  | (BaseCue & { type: 'trick-collect'; seat: number; count: number })
+  | (BaseCue & { type: 'transfer'; card: string; from: Zone; to: Zone })
   | (BaseCue & { type: 'knock'; seat: number })
   | (BaseCue & { type: 'blitz'; seat: number; handValue: number })
   | (BaseCue & { type: 'showdown'; seat: number; handValue: number })
@@ -173,6 +183,65 @@ function cueFor(event: FxEvent, index: number): FxCue | null {
         type: 'turn',
         seat: numberField(event, 'seat'),
         durationMs: FX_TIMING.settleMs * 3,
+      };
+    // Trick-taking vocabulary (@parlour/tricks) — shared by Hearts and friends.
+    case 'tricks.play': {
+      const playSeat = numberField(event, 'seat');
+      return {
+        ...base,
+        type: 'trick-play',
+        card: stringField(event, 'card'),
+        seat: playSeat,
+        index: numberField(event, 'index'),
+        from: `hand:${playSeat}`,
+        to: `seat:${playSeat}`,
+        durationMs: FX_TIMING.cardFlightMs + FX_TIMING.settleMs,
+      };
+    }
+    case 'tricks.collect':
+      return {
+        ...base,
+        type: 'trick-collect',
+        seat: numberField(event, 'seat'),
+        count: numberField(event, 'count'),
+        durationMs: FX_TIMING.showdownMs,
+      };
+    // A card passing between hands (secret passes): same flight shape as a
+    // deal, but the zones name the two hands involved.
+    case 'hearts.transfer': {
+      const from = zoneField(event, 'from');
+      const to = zoneField(event, 'to');
+      return {
+        ...base,
+        type: 'transfer',
+        card: stringField(event, 'card'),
+        from,
+        to,
+        durationMs: FX_TIMING.cardFlightMs,
+      };
+    }
+    // Hearts moments ride the shared burst vocabulary.
+    case 'hearts.moon':
+      return {
+        ...base,
+        type: 'blitz',
+        seat: numberField(event, 'seat'),
+        handValue: 26,
+        durationMs: FX_TIMING.blitzMs,
+      };
+    case 'hearts.queen':
+      return {
+        ...base,
+        type: 'knock',
+        seat: numberField(event, 'seat'),
+        durationMs: FX_TIMING.knockMs,
+      };
+    case 'hearts.broken':
+      return {
+        ...base,
+        type: 'turn',
+        seat: numberField(event, 'seat'),
+        durationMs: FX_TIMING.settleMs * 4,
       };
     default:
       return null;

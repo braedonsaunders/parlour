@@ -14,6 +14,12 @@ import {
   type WildpileState,
 } from '@parlour/game-wildpile';
 import {
+  heartsConfigSchema,
+  heartsGame,
+  type HeartsRules,
+  type HeartsState,
+} from '@parlour/game-hearts';
+import {
   EngineAuthority,
   P2PTransport,
   type AppliedPacket,
@@ -35,7 +41,7 @@ import {
 import { NostrSignaling, type RoomAnnouncement } from '@/lib/multiplayer/NostrSignaling';
 import { validateRoomCode } from '@/lib/rooms/code';
 
-export type MultiplayerGameId = 'blitz' | 'wildpile';
+export type MultiplayerGameId = 'blitz' | 'wildpile' | 'hearts';
 
 /** What the room badge shows about privacy — see lib/multiplayer/veil. */
 export type MultiplayerSecurity = {
@@ -56,7 +62,9 @@ export type MultiplayerSecurity = {
   paused: string | null;
 };
 export type MultiplayerGameSession =
-  GameSession<BlitzState, BlitzConfig> | GameSession<WildpileState, WildpileRules>;
+  | GameSession<BlitzState, BlitzConfig>
+  | GameSession<WildpileState, WildpileRules>
+  | GameSession<HeartsState, HeartsRules>;
 
 export type MultiplayerProfile = {
   name: string;
@@ -649,6 +657,14 @@ export function wildMultiplayerSession(
 ): GameSession<WildpileState, WildpileRules> | null {
   return snapshot.gameId === 'wildpile'
     ? (snapshot.session as GameSession<WildpileState, WildpileRules> | null)
+    : null;
+}
+
+export function heartsMultiplayerSession(
+  snapshot: MultiplayerRoomSnapshot,
+): GameSession<HeartsState, HeartsRules> | null {
+  return snapshot.gameId === 'hearts'
+    ? (snapshot.session as GameSession<HeartsState, HeartsRules> | null)
     : null;
 }
 

@@ -16,6 +16,7 @@
   "dependencies": {
     "@parlour/engine": "workspace:*",
     "@parlour/game-blitz": "workspace:*",
+    "@parlour/game-hearts": "workspace:*",
     "@parlour/game-wildpile": "workspace:*",
     "gsap": "^3.13.0",
     "howler": "^2.2.4",

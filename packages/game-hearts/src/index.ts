@@ -24,6 +24,7 @@ export {
   reconstructHands,
 } from './audit';
 export { heartsHowToPlay } from './howto';
+export { heartsCatalog } from './catalog';
 export {
   easyBot,
   mediumBot,
