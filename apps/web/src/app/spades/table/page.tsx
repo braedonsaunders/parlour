@@ -7,6 +7,7 @@ import { SpadesTableScreen } from '@/components/table/spades/SpadesTableScreen';
 import { SpadesTransport, type SpadesSnapshot } from '@/lib/solo/SpadesTransport';
 import { spadesModeForRules } from '@/lib/spades/modes';
 import { spadesTableView, type SpadesTableView } from '@/lib/spades/view';
+import { winningTeamOf } from '@/lib/solo/seating';
 import { useSoloTable } from '@/lib/table/useSoloTable';
 import {
   leaveRoom,
@@ -148,7 +149,7 @@ function ActiveMultiplayerSpadesTable({ room }: { room: MultiplayerRoomSession }
         isBot: player.bot,
       })),
       session,
-      matchWinnerTeam: matchWinnerTeamOf(session),
+      matchWinnerTeam: winningTeamOf(session),
     },
     legal,
     localSeat,
@@ -170,12 +171,4 @@ function ActiveMultiplayerSpadesTable({ room }: { room: MultiplayerRoomSession }
       }}
     />
   );
-}
-
-function matchWinnerTeamOf(session: {
-  result: { rankings: readonly { seat: number; rank: number }[] } | null;
-}): 0 | 1 | null {
-  if (!session.result) return null;
-  const rankOne = session.result.rankings.find((rank) => rank.rank === 1);
-  return rankOne ? ((rankOne.seat % 2) as 0 | 1) : null;
 }

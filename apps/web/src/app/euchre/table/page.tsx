@@ -8,6 +8,7 @@ import { EuchreTableScreen } from '@/components/table/euchre/EuchreTableScreen';
 import { EuchreTransport, type EuchreSnapshot } from '@/lib/solo/EuchreTransport';
 import { euchreModeForRules } from '@/lib/euchre/modes';
 import { euchreTableView, type EuchreTableView } from '@/lib/euchre/view';
+import { winningTeamOf } from '@/lib/solo/seating';
 import { useSoloTable } from '@/lib/table/useSoloTable';
 import {
   leaveRoom,
@@ -143,7 +144,7 @@ function ActiveMultiplayerEuchreTable({ room }: { room: MultiplayerRoomSession }
         isBot: player.bot,
       })),
       session,
-      matchWinnerTeam: matchWinnerTeamOf(session),
+      matchWinnerTeam: winningTeamOf(session),
     },
     legal,
     localSeat,
@@ -167,12 +168,4 @@ function ActiveMultiplayerEuchreTable({ room }: { room: MultiplayerRoomSession }
       }}
     />
   );
-}
-
-function matchWinnerTeamOf(session: {
-  result: { rankings: readonly { seat: number; rank: number }[] } | null;
-}): 0 | 1 | null {
-  if (!session.result) return null;
-  const rankOne = session.result.rankings.find((rank) => rank.rank === 1);
-  return rankOne ? ((rankOne.seat % 2) as 0 | 1) : null;
 }
