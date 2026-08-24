@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest';
 import type { GameCatalogEntry } from '@parlour/engine';
 import { GAMES } from '@/lib/games/shelf';
 import { ES_GAMES } from './es';
+import { FR_GAMES } from './fr';
+import { PT_GAMES } from './pt';
+import { ZH_GAMES } from './zh';
 import { localizeGame } from './localize';
 import type { GameCopy } from './types';
 
@@ -22,6 +25,9 @@ import type { GameCopy } from './types';
 
 const LOCALES: readonly { id: string; book: Record<string, GameCopy> }[] = [
   { id: 'es', book: ES_GAMES as Record<string, GameCopy> },
+  { id: 'fr', book: FR_GAMES as Record<string, GameCopy> },
+  { id: 'pt', book: PT_GAMES as Record<string, GameCopy> },
+  { id: 'zh', book: ZH_GAMES as Record<string, GameCopy> },
 ];
 
 /**

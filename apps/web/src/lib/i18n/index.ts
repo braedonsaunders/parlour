@@ -5,6 +5,9 @@ import { useLocaleStore } from '@/stores/locale';
 import { DEFAULT_LOCALE, LOCALE_META, type Locale } from './locales';
 import { en, type MessageKey, type Messages, type PluralKey } from './messages/en';
 import { es } from './messages/es';
+import { fr } from './messages/fr';
+import { pt } from './messages/pt';
+import { zh } from './messages/zh';
 
 export type { Locale } from './locales';
 export { LOCALES, LOCALE_META, DEFAULT_LOCALE, isLocale, preferredLocale } from './locales';
@@ -19,7 +22,7 @@ export type { MessageKey, Messages, PluralKey } from './messages/en';
  * plane. The catalogues are a few kilobytes of strings each; the whole set
  * costs less than one card texture.
  */
-const CATALOGUES: Readonly<Record<Locale, Messages>> = { en, es };
+const CATALOGUES: Readonly<Record<Locale, Messages>> = { en, es, fr, pt, zh };
 
 const PLACEHOLDER = /\{(\w+)\}/g;
 

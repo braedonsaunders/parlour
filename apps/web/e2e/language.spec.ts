@@ -97,3 +97,72 @@ test('the shelf and its rules sheet speak the chosen language', async ({ page })
   await expect(page.getByTestId('game-hearts')).toContainText('Corazones');
   await expect(page.getByPlaceholder('Buscar juegos…')).toBeVisible();
 });
+
+test('offers every language it ships, in that language', async ({ page }) => {
+  await page.goto('/');
+  await page.getByTestId('language-button').click();
+  // Each option is labelled in its own language — someone looking for their
+  // own is looking for the word they would write, not the English for it.
+  for (const [id, native] of [
+    ['en', 'English'],
+    ['es', 'Español'],
+    ['fr', 'Français'],
+    ['pt', 'Português'],
+    ['zh', '简体中文'],
+  ] as const) {
+    await expect(page.getByTestId(`language-option-${id}`)).toContainText(native);
+  }
+});
+
+test.describe('Simplified Chinese', () => {
+  test('translates the chrome and the games, and sets a Han lang tag', async ({ page }) => {
+    await page.goto('/');
+    await page.getByTestId('language-button').click();
+    await page.getByTestId('language-option-zh').click();
+
+    await expect(page.getByTestId('play')).toHaveText('开玩');
+    // zh-Hans, not bare zh: the tag is what a screen reader and the browser's
+    // line-breaker read, and Han script needs the script subtag.
+    await expect(page.locator('html')).toHaveAttribute('lang', 'zh-Hans');
+
+    await page.goto('/games/');
+    await expect(page.getByTestId('game-hearts')).toContainText('红心大战');
+  });
+
+  /**
+   * Chinese is denser than English and the shelf tile is a fixed box, so the
+   * fact chips are the first thing that would overflow. This is the check that
+   * the copy was written to the layout rather than only to the dictionary.
+   */
+  test('keeps the shelf tiles from overflowing', async ({ page }) => {
+    await page.goto('/');
+    await page.getByTestId('language-button').click();
+    await page.getByTestId('language-option-zh').click();
+    await page.goto('/games/');
+
+    const tile = page.getByTestId('game-hearts');
+    await expect(tile).toBeVisible();
+    const overflow = await tile.evaluate((el) => ({
+      x: el.scrollWidth - el.clientWidth,
+      y: el.scrollHeight - el.clientHeight,
+    }));
+    expect(overflow.x, 'shelf tile overflows horizontally in Chinese').toBeLessThanOrEqual(1);
+    expect(overflow.y, 'shelf tile overflows vertically in Chinese').toBeLessThanOrEqual(1);
+  });
+});
+
+test('French and Portuguese reach both the chrome and the games', async ({ page }) => {
+  await page.goto('/');
+  await page.getByTestId('language-button').click();
+  await page.getByTestId('language-option-fr').click();
+  await expect(page.getByTestId('play')).toHaveText('Jouer');
+  await page.goto('/games/');
+  await expect(page.getByTestId('game-hearts')).toContainText('Cœurs');
+
+  await page.goto('/');
+  await page.getByTestId('language-button').click();
+  await page.getByTestId('language-option-pt').click();
+  await expect(page.getByTestId('play')).toHaveText('Jogar');
+  await page.goto('/games/');
+  await expect(page.getByTestId('game-hearts')).toContainText('Copas');
+});

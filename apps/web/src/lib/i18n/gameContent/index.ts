@@ -6,6 +6,9 @@ import { GAMES, getGame } from '@/lib/games/shelf';
 import { useLocaleStore } from '@/stores/locale';
 import type { Locale } from '../locales';
 import { ES_GAMES } from './es';
+import { FR_GAMES } from './fr';
+import { PT_GAMES } from './pt';
+import { ZH_GAMES } from './zh';
 import { localizeGame, localizeModeList, localizeSchema } from './localize';
 import type { GameCopyBook } from './types';
 import type { LocalizableMode } from './localize';
@@ -28,6 +31,9 @@ export {
  */
 export const GAME_COPY: Readonly<Partial<Record<Locale, GameCopyBook>>> = {
   es: ES_GAMES,
+  fr: FR_GAMES,
+  pt: PT_GAMES,
+  zh: ZH_GAMES,
 };
 
 export function gameCopyFor(locale: Locale): GameCopyBook | undefined {

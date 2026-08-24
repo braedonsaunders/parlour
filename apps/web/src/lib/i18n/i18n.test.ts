@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { interpolate, interpolateParts, translatorFor } from './index';
-import { LOCALES, LOCALE_META, preferredLocale, isLocale } from './locales';
-import { en } from './messages/en';
+import { LOCALES, LOCALE_META, preferredLocale, isLocale, type Locale } from './locales';
+import { en, type Messages } from './messages/en';
 import { es } from './messages/es';
+import { fr } from './messages/fr';
+import { pt } from './messages/pt';
+import { zh } from './messages/zh';
 
-const CATALOGUES = { en, es } as const;
+const CATALOGUES: Readonly<Record<Locale, Messages>> = { en, es, fr, pt, zh };
 const PLACEHOLDER = /\{(\w+)\}/g;
 
 function placeholdersOf(template: string): string[] {
@@ -16,19 +19,48 @@ describe('catalogue completeness', () => {
   // half of the same promise: a key present but left as the English string is
   // something the compiler cannot see and a player very much can.
   it.each(LOCALES)('%s has every key English has', (locale) => {
-    const catalogue = CATALOGUES[locale] as Record<string, string>;
+    const catalogue = CATALOGUES[locale] as unknown as Record<string, string>;
     const missing = Object.keys(en).filter((key) => !(key in catalogue));
     expect(missing).toEqual([]);
   });
 
   it.each(LOCALES)('%s has no keys English does not', (locale) => {
-    const catalogue = CATALOGUES[locale] as Record<string, string>;
+    const catalogue = CATALOGUES[locale] as unknown as Record<string, string>;
     const extra = Object.keys(catalogue).filter((key) => !(key in en));
     expect(extra).toEqual([]);
   });
 
+  /**
+   * Words that are the same in English and the target language — a brand, a
+   * loanword, a number. Everything else has to differ, which is what stops a
+   * catalogue that was stubbed from English being mistaken for a finished one.
+   */
+  const SHARED_WITH_ENGLISH: Readonly<Record<string, readonly string[]>> = {
+    es: ['Casino', 'Blitz', 'Blitzes'],
+    fr: ['Casino', 'Blitz', 'Profile', 'Options'],
+    pt: ['Casino', 'Blitz'],
+    zh: [],
+  };
+
+  it.each(LOCALES.filter((locale) => locale !== 'en'))(
+    '%s is actually translated, not copied from English',
+    (locale) => {
+      const catalogue = CATALOGUES[locale] as unknown as Record<string, string>;
+      const shared = new Set(SHARED_WITH_ENGLISH[locale] ?? []);
+      const untranslated = Object.entries(en)
+        .filter(([key, english]) => {
+          if (shared.has(english)) return false;
+          // Very short strings can legitimately coincide; a sentence cannot.
+          if (english.trim().length < 6) return false;
+          return catalogue[key] === english;
+        })
+        .map(([key]) => key);
+      expect(untranslated).toEqual([]);
+    },
+  );
+
   it.each(LOCALES)('%s has no empty messages', (locale) => {
-    const catalogue = CATALOGUES[locale] as Record<string, string>;
+    const catalogue = CATALOGUES[locale] as unknown as Record<string, string>;
     const blank = Object.entries(catalogue)
       .filter(([, value]) => value.trim().length === 0)
       .map(([key]) => key);
@@ -43,7 +75,7 @@ describe('catalogue completeness', () => {
   it.each(LOCALES.filter((locale) => locale !== 'en'))(
     '%s uses exactly the placeholders English does',
     (locale) => {
-      const catalogue = CATALOGUES[locale] as Record<string, string>;
+      const catalogue = CATALOGUES[locale] as unknown as Record<string, string>;
       const mismatched = Object.entries(en)
         .filter(([key, english]) => {
           const translated = catalogue[key] ?? '';
@@ -62,7 +94,7 @@ describe('catalogue completeness', () => {
     );
     expect(pluralBases.size).toBeGreaterThan(0);
     for (const locale of LOCALES) {
-      const catalogue = CATALOGUES[locale] as Record<string, string>;
+      const catalogue = CATALOGUES[locale] as unknown as Record<string, string>;
       for (const base of pluralBases) {
         expect(catalogue[`${base}_one`], `${locale}:${base}_one`).toBeTruthy();
         expect(catalogue[`${base}_other`], `${locale}:${base}_other`).toBeTruthy();
@@ -75,7 +107,9 @@ describe('catalogue completeness', () => {
       const meta = LOCALE_META[locale];
       expect(meta.id).toBe(locale);
       expect(meta.nativeName.length).toBeGreaterThan(0);
-      expect(meta.short).toMatch(/^[A-Z]{2}$/);
+      // Short enough for the compact button, in whatever script its readers use.
+      expect(meta.short.length).toBeGreaterThan(0);
+      expect(meta.short.length).toBeLessThanOrEqual(3);
     }
   });
 });
@@ -145,11 +179,11 @@ describe('preferredLocale', () => {
   });
 
   it('takes the first language it actually offers', () => {
-    expect(preferredLocale(['de', 'fr', 'es'])).toBe('es');
+    expect(preferredLocale(['sv', 'da', 'fr'])).toBe('fr');
   });
 
   it('falls back when nothing matches', () => {
-    expect(preferredLocale(['de', 'fr'])).toBe('en');
+    expect(preferredLocale(['sv', 'da'])).toBe('en');
     expect(preferredLocale(undefined)).toBe('en');
   });
 });

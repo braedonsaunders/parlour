@@ -8,7 +8,7 @@
  * glance cannot afford a settings panel that switches language halfway down.
  */
 
-export const LOCALES = ['en', 'es'] as const;
+export const LOCALES = ['en', 'es', 'fr', 'pt', 'zh'] as const;
 
 export type Locale = (typeof LOCALES)[number];
 
@@ -20,7 +20,10 @@ export interface LocaleMeta {
   nativeName: string;
   /** The language's name in English, for the accessible label. */
   englishName: string;
-  /** Two-letter badge shown on the compact home-screen button. */
+  /**
+   * Short badge for the compact home-screen button. Latin languages use two
+   * letters; a language whose readers do not read Latin uses its own script.
+   */
   short: string;
   dir: 'ltr' | 'rtl';
   /**
@@ -46,6 +49,35 @@ export const LOCALE_META: Readonly<Record<Locale, LocaleMeta>> = {
     short: 'ES',
     dir: 'ltr',
     tag: 'es',
+  },
+  fr: {
+    id: 'fr',
+    nativeName: 'Français',
+    englishName: 'French',
+    short: 'FR',
+    dir: 'ltr',
+    tag: 'fr',
+  },
+  pt: {
+    id: 'pt',
+    nativeName: 'Português',
+    englishName: 'Portuguese',
+    short: 'PT',
+    dir: 'ltr',
+    // Brazilian, which is the larger audience and the variant the copy is
+    // written in. A European-Portuguese split would be a separate locale
+    // rather than a retune of this one.
+    tag: 'pt-BR',
+  },
+  zh: {
+    id: 'zh',
+    nativeName: '简体中文',
+    englishName: 'Simplified Chinese',
+    // Two Han characters rather than a Latin abbreviation: the compact button
+    // shows this, and "ZH" means nothing to the reader it is for.
+    short: '中文',
+    dir: 'ltr',
+    tag: 'zh-Hans',
   },
 };
 
