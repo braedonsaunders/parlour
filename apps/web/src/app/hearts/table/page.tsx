@@ -2,14 +2,13 @@
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { useRouter } from 'next/navigation';
-import { isActingSeat, type FxEvent } from '@parlour/engine';
+import { isActingSeat } from '@parlour/engine';
 import type { HeartsModeId } from '@/lib/hearts/modes';
 import { heartsModeForRules } from '@/lib/hearts/modes';
 import { heartsTableView } from '@/lib/hearts/view';
-import { delayUntilFxSettles } from '@/lib/table/fx-motion';
+import { useSoloTable } from '@/lib/table/useSoloTable';
 import {
   HeartsTransport,
-  type HeartsDispatch,
   type HeartsSnapshot,
 } from '@/lib/solo/HeartsTransport';
 import { botKey, buildMatchRecord, friendKey, useHistoryStore } from '@/stores/history';
@@ -23,10 +22,11 @@ import {
 import {
   clearActiveMultiplayerSession,
   getActiveMultiplayerSession,
-  heartsMultiplayerSession,
+  multiplayerSession,
   subscribeActiveMultiplayerSession,
   type MultiplayerRoomSession,
 } from '../../_multiplayer/roomSession';
+import type { HeartsRules, HeartsState } from '@parlour/game-hearts';
 
 export default function HeartsTablePage() {
   const multiplayer = useSyncExternalStore(
@@ -74,40 +74,13 @@ function ActiveSoloHeartsTable({ transport }: { transport: HeartsTransport }) {
   const recordResult = useProfileStore((state) => state.recordResult);
   const recordMatch = useHistoryStore((state) => state.recordMatch);
   const reportedMatch = useRef<HeartsTransport | null>(null);
-  const [snapshot, setSnapshot] = useState(() => transport.getSnapshot());
-  const [fx, setFx] = useState<readonly FxEvent[]>(() => snapshot.hand.setupFx ?? []);
-  const [fxKey, setFxKey] = useState(0);
-  const [error, setError] = useState<string | null>(null);
-
-  const accept = useCallback((outcome: HeartsDispatch) => {
-    if (outcome.rejected) {
-      setError(outcome.rejected.message);
-      return;
-    }
-    setError(null);
-    setSnapshot(outcome.snapshot);
-    setFx(outcome.fx.length > 0 ? outcome.fx : (outcome.snapshot.hand.setupFx ?? []));
-    setFxKey((key) => key + 1);
-  }, []);
-
-  const dispatch = useCallback(
-    (move: string, payload?: unknown) => accept(transport.dispatch(move, payload)),
-    [accept, transport],
-  );
-
-  // Bot seats decide at a humane pace; the pass wall resolves seat by seat.
-  useEffect(() => {
-    if (transport.humanPending()) return;
-    const delay = delayUntilFxSettles(BOT_THINK_MS, fx);
-    const timer = window.setTimeout(() => {
-      try {
-        accept(transport.playBotTurn());
-      } catch (caught) {
-        setError(caught instanceof Error ? caught.message : 'The bot lost the thread.');
-      }
-    }, delay);
-    return () => window.clearTimeout(timer);
-  }, [accept, fx, snapshot, transport]);
+  const botPaceMs = useCallback((_current: HeartsSnapshot) => BOT_THINK_MS, []);
+  const { snapshot, fx, fxKey, error, dispatch, accept } = useSoloTable(transport, {
+    round: (current) => current.hand,
+    botPaceMs,
+    fxFor: (outcome) =>
+      outcome.fx.length > 0 ? outcome.fx : (outcome.snapshot.hand.setupFx ?? []),
+  });
 
   useEffect(() => {
     if (
@@ -199,7 +172,7 @@ function ActiveMultiplayerHeartsTable({ room }: { room: MultiplayerRoomSession }
   const reportedMatch = useRef(false);
   const [localError, setLocalError] = useState<string | null>(null);
   const snapshot = useSyncExternalStore(room.subscribe, room.getSnapshot, room.getSnapshot);
-  const session = heartsMultiplayerSession(snapshot);
+  const session = multiplayerSession<HeartsState, HeartsRules>(snapshot, 'hearts');
   const localSeat = snapshot.localSeat;
 
   const dispatch = useCallback(

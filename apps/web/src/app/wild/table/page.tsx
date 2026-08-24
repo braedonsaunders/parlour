@@ -2,11 +2,15 @@
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { useRouter } from 'next/navigation';
-import { type FxEvent } from '@parlour/engine';
-import type { WildpileColor } from '@parlour/game-wildpile';
+import {
+  wildpileDiscardAllCards,
+  type WildpileColor,
+  type WildpileRules,
+  type WildpileState,
+} from '@parlour/game-wildpile';
 import { WildTableScreen } from '@/components/table/wild/WildTableScreen';
-import { delayUntilFxSettles } from '@/lib/table/fx-motion';
-import { WildTransport, type WildDispatch, type WildSnapshot } from '@/lib/solo/WildTransport';
+import { useSoloTable } from '@/lib/table/useSoloTable';
+import { WildTransport, type WildSnapshot } from '@/lib/solo/WildTransport';
 import { wildModeForRules } from '@/lib/wild/modes';
 import { wildTableView } from '@/lib/wild/view';
 import { botKey, buildMatchRecord, friendKey, useHistoryStore } from '@/stores/history';
@@ -17,7 +21,7 @@ import {
   clearActiveMultiplayerSession,
   getActiveMultiplayerSession,
   subscribeActiveMultiplayerSession,
-  wildMultiplayerSession,
+  multiplayerSession,
   type MultiplayerRoomSession,
 } from '../../_multiplayer/roomSession';
 
@@ -73,13 +77,13 @@ function ActiveMultiplayerWildTable({ room }: { room: MultiplayerRoomSession }) 
   const snapshot = useSyncExternalStore(room.subscribe, room.getSnapshot, room.getSnapshot);
   const reportedMatch = useRef(false);
   const [localError, setLocalError] = useState<string | null>(null);
-  const session = wildMultiplayerSession(snapshot);
+  const session = multiplayerSession<WildpileState, WildpileRules>(snapshot, 'wildpile');
   const localSeat = snapshot.localSeat;
 
   const dispatch = useCallback(
-    (move: string, payload?: unknown) => {
+    (move: string, payload?: unknown, reveals?: readonly string[]) => {
       try {
-        room.send(move, payload);
+        room.send(move, payload, reveals);
         setLocalError(null);
       } catch (error) {
         setLocalError(error instanceof Error ? error.message : 'The move could not be sent.');
@@ -168,6 +172,10 @@ function ActiveMultiplayerWildTable({ room }: { room: MultiplayerRoomSession }) 
     session,
     matchWinner: session.result?.winner ?? null,
   };
+  const playCard = (card: string) => {
+    const cards = session.state.hands[localSeat] ?? [];
+    dispatch('playCard', { card }, wildpileDiscardAllCards(cards, card));
+  };
 
   return (
     <WildTableScreen
@@ -176,7 +184,7 @@ function ActiveMultiplayerWildTable({ room }: { room: MultiplayerRoomSession }) 
       fxKey={snapshot.fxKey}
       busy={!isLocalTurn}
       error={localError ?? snapshot.error}
-      onPlay={(card) => dispatch('playCard', { card })}
+      onPlay={playCard}
       onDraw={() => dispatch('draw')}
       onChooseColor={(color: WildpileColor) => dispatch('chooseColor', { color })}
       onDeclineJump={() => dispatch('declineJump')}
@@ -200,54 +208,15 @@ function ActiveWildTable({ transport }: { transport: WildTransport }) {
   const recordResult = useProfileStore((state) => state.recordResult);
   const recordMatch = useHistoryStore((state) => state.recordMatch);
   const reportedMatch = useRef<WildTransport | null>(null);
-  const [snapshot, setSnapshot] = useState(() => transport.getSnapshot());
-  const [fx, setFx] = useState<readonly FxEvent[]>(() => snapshot.session.setupFx ?? []);
-  const [fxKey, setFxKey] = useState(0);
-  const [error, setError] = useState<string | null>(null);
-
-  const accept = useCallback((outcome: WildDispatch) => {
-    if (outcome.rejected) {
-      setError(outcome.rejected.message);
-      return;
-    }
-    setError(null);
-    setSnapshot(outcome.snapshot);
-    setFx(outcome.fx);
-    setFxKey((key) => key + 1);
-  }, []);
-
-  const dispatch = useCallback(
-    (move: string, payload?: unknown) => accept(transport.dispatch(move, payload)),
-    [accept, transport],
+  const botPaceMs = useCallback(
+    (current: WildSnapshot) =>
+      current.session.phase.phase === 'play' ? 480 + (current.session.phase.actor ?? 0) * 90 : 240,
+    [],
   );
-
-  useEffect(() => {
-    if (snapshot.session.status !== 'playing' || snapshot.session.phase.actor === 0) return;
-    const botSeat = snapshot.session.phase.actor;
-    if (botSeat === null) return;
-    // Interrupt/color decisions read as reflexes; regular turns keep the human pace.
-    const pace = snapshot.session.phase.phase === 'play' ? 480 + botSeat * 90 : 240;
-    // Never act over the top of the previous burst. A stacked pickup takes over
-    // a second to land, and cutting it off is what makes the table feel like it
-    // dumped cards on you rather than dealt them.
-    const delay = delayUntilFxSettles(pace, fx);
-    const timer = window.setTimeout(() => {
-      try {
-        accept(transport.playBotTurn());
-      } catch (caught) {
-        setError(caught instanceof Error ? caught.message : 'The bot lost the thread.');
-      }
-    }, delay);
-    return () => window.clearTimeout(timer);
-  }, [
-    accept,
-    fx,
-    snapshot.session.log.length,
-    snapshot.session.phase.actor,
-    snapshot.session.phase.phase,
-    snapshot.session.status,
-    transport,
-  ]);
+  const { snapshot, fx, fxKey, error, dispatch } = useSoloTable(transport, {
+    round: (current) => current.session,
+    botPaceMs,
+  });
 
   useEffect(() => {
     if (snapshot.matchWinner === null || reportedMatch.current === transport) return;

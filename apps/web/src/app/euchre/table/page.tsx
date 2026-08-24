@@ -2,28 +2,28 @@
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { useRouter } from 'next/navigation';
-import { type FxEvent, type LegalMove } from '@parlour/engine';
+import { type LegalMove } from '@parlour/engine';
 import type { EuchreSuit } from '@parlour/game-euchre';
 import { EuchreTableScreen } from '@/components/table/euchre/EuchreTableScreen';
 import {
   EuchreTransport,
-  type EuchreDispatch,
   type EuchreSnapshot,
 } from '@/lib/solo/EuchreTransport';
 import { euchreModeForRules } from '@/lib/euchre/modes';
 import { euchreTableView, type EuchreTableView } from '@/lib/euchre/view';
-import { delayUntilFxSettles } from '@/lib/table/fx-motion';
+import { useSoloTable } from '@/lib/table/useSoloTable';
 import { botKey, buildMatchRecord, friendKey, useHistoryStore } from '@/stores/history';
 import { useMatchFlowStore } from '@/stores/matchFlow';
 import { useProfileStore } from '@/stores/profile';
 import { useEuchreSetupStore } from '@/stores/euchreSetup';
 import {
   clearActiveMultiplayerSession,
-  euchreMultiplayerSession,
+  multiplayerSession,
   getActiveMultiplayerSession,
   subscribeActiveMultiplayerSession,
   type MultiplayerRoomSession,
 } from '../../_multiplayer/roomSession';
+import type { EuchreRules, EuchreState } from '@parlour/game-euchre';
 
 export default function EuchreTablePage() {
   const multiplayer = useSyncExternalStore(
@@ -71,51 +71,17 @@ function ActiveSoloEuchreTable({ transport }: { transport: EuchreTransport }) {
   const recordResult = useProfileStore((state) => state.recordResult);
   const recordMatch = useHistoryStore((state) => state.recordMatch);
   const reportedMatch = useRef<EuchreTransport | null>(null);
-  const [snapshot, setSnapshot] = useState(() => transport.getSnapshot());
-  const [fx, setFx] = useState<readonly FxEvent[]>(() => snapshot.session.setupFx ?? []);
-  const [fxKey, setFxKey] = useState(0);
-  const [error, setError] = useState<string | null>(null);
-
-  const accept = useCallback((outcome: EuchreDispatch) => {
-    if (outcome.rejected) {
-      setError(outcome.rejected.message);
-      return;
-    }
-    setError(null);
-    setSnapshot(outcome.snapshot);
-    setFx(outcome.fx);
-    setFxKey((key) => key + 1);
-  }, []);
-
-  const dispatch = useCallback(
-    (move: string, payload?: unknown) => accept(transport.dispatch(move, payload)),
-    [accept, transport],
+  const botPaceMs = useCallback(
+    (current: EuchreSnapshot) =>
+      current.session.state.stage === 'playing'
+        ? 480 + (current.session.phase.actor ?? 0) * 90
+        : 320,
+    [],
   );
-
-  useEffect(() => {
-    if (snapshot.session.status !== 'playing') return;
-    const botSeat = snapshot.session.phase.actor;
-    if (botSeat === null || botSeat === 0) return;
-    // bidding decisions read as conversation; trick play keeps a human beat
-    const pace = snapshot.session.state.stage === 'playing' ? 480 + botSeat * 90 : 320;
-    const delay = delayUntilFxSettles(pace, fx);
-    const timer = window.setTimeout(() => {
-      try {
-        accept(transport.playBotTurn());
-      } catch (caught) {
-        setError(caught instanceof Error ? caught.message : 'The bot lost the thread.');
-      }
-    }, delay);
-    return () => window.clearTimeout(timer);
-  }, [
-    accept,
-    fx,
-    snapshot.session.log.length,
-    snapshot.session.phase.actor,
-    snapshot.session.state.stage,
-    snapshot.session.status,
-    transport,
-  ]);
+  const { snapshot, fx, fxKey, error, dispatch } = useSoloTable(transport, {
+    round: (current) => current.session,
+    botPaceMs,
+  });
 
   useEffect(() => {
     if (snapshot.matchWinnerTeam === null || reportedMatch.current === transport) return;
@@ -192,7 +158,7 @@ function ActiveMultiplayerEuchreTable({ room }: { room: MultiplayerRoomSession }
   const snapshot = useSyncExternalStore(room.subscribe, room.getSnapshot, room.getSnapshot);
   const reportedMatch = useRef(false);
   const [localError, setLocalError] = useState<string | null>(null);
-  const session = euchreMultiplayerSession(snapshot);
+  const session = multiplayerSession<EuchreState, EuchreRules>(snapshot, 'euchre');
   const localSeat = snapshot.localSeat;
 
   const dispatch = useCallback(

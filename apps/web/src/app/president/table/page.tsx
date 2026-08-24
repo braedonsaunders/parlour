@@ -2,17 +2,15 @@
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { useRouter } from 'next/navigation';
-import { type FxEvent } from '@parlour/engine';
-import type { PresidentRules } from '@parlour/game-president';
+import type { GameSession } from '@parlour/engine';
 import { PresidentTableScreen } from '@/components/table/president/PresidentTableScreen';
 import {
   PresidentTransport,
-  type PresidentDispatch,
   type PresidentSnapshot,
 } from '@/lib/solo/PresidentTransport';
 import { presidentModeForRules } from '@/lib/president/modes';
 import { presidentTableView } from '@/lib/president/view';
-import { delayUntilFxSettles } from '@/lib/table/fx-motion';
+import { useSoloTable } from '@/lib/table/useSoloTable';
 import { botKey, buildMatchRecord, friendKey, useHistoryStore } from '@/stores/history';
 import { useMatchFlowStore } from '@/stores/matchFlow';
 import { useProfileStore } from '@/stores/profile';
@@ -21,9 +19,10 @@ import {
   clearActiveMultiplayerSession,
   getActiveMultiplayerSession,
   subscribeActiveMultiplayerSession,
-  presidentMultiplayerSession,
+  multiplayerSession,
   type MultiplayerRoomSession,
 } from '../../_multiplayer/roomSession';
+import type { PresidentRules, PresidentState } from '@parlour/game-president';
 
 export default function PresidentTablePage() {
   const multiplayer = useSyncExternalStore(
@@ -73,7 +72,7 @@ function ActiveMultiplayerPresidentTable({ room }: { room: MultiplayerRoomSessio
   const snapshot = useSyncExternalStore(room.subscribe, room.getSnapshot, room.getSnapshot);
   const reportedMatch = useRef(false);
   const [localError, setLocalError] = useState<string | null>(null);
-  const session = presidentMultiplayerSession(snapshot);
+  const session = multiplayerSession<PresidentState, PresidentRules>(snapshot, 'president');
   const localSeat = snapshot.localSeat;
 
   const dispatch = useCallback(
@@ -198,7 +197,7 @@ function ActiveMultiplayerPresidentTable({ room }: { room: MultiplayerRoomSessio
 }
 
 function pickExchangeMove(
-  session: NonNullable<ReturnType<typeof presidentMultiplayerSession>>,
+  session: GameSession<PresidentState, PresidentRules>,
   seat: number,
 ): string {
   if ((session.phase.actors ?? []).includes(seat) && session.phase.phase === 'exchange-give') {
@@ -214,51 +213,17 @@ function ActivePresidentTable({ transport }: { transport: PresidentTransport }) 
   const recordResult = useProfileStore((state) => state.recordResult);
   const recordMatch = useHistoryStore((state) => state.recordMatch);
   const reportedMatch = useRef<PresidentTransport | null>(null);
-  const [snapshot, setSnapshot] = useState(() => transport.getSnapshot());
-  const [fx, setFx] = useState<readonly FxEvent[]>(() => snapshot.session.setupFx ?? []);
-  const [fxKey, setFxKey] = useState(0);
-  const [error, setError] = useState<string | null>(null);
 
-  const accept = useCallback((outcome: PresidentDispatch) => {
-    if (outcome.rejected) {
-      setError(outcome.rejected.message);
-      return;
-    }
-    setError(null);
-    setSnapshot(outcome.snapshot);
-    setFx(outcome.fx);
-    setFxKey((key) => key + 1);
-  }, []);
-
-  const dispatch = useCallback(
-    (move: string, payload?: unknown) => accept(transport.dispatch(move, payload)),
-    [accept, transport],
+  // Exchange decisions read as deliberation; regular turns keep the human pace.
+  const botPaceMs = useCallback(
+    (current: PresidentSnapshot) =>
+      current.session.phase.phase === 'play' ? 520 + (current.session.phase.actor ?? 0) * 80 : 420,
+    [],
   );
-
-  useEffect(() => {
-    if (snapshot.session.status !== 'playing' || snapshot.session.phase.actor === 0) return;
-    const botSeat = snapshot.session.phase.actor;
-    if (botSeat === null) return;
-    // Exchange decisions read as deliberation; regular turns keep the human pace.
-    const pace = snapshot.session.phase.phase === 'play' ? 520 + botSeat * 80 : 420;
-    const delay = delayUntilFxSettles(pace, fx);
-    const timer = window.setTimeout(() => {
-      try {
-        accept(transport.playBotTurn());
-      } catch (caught) {
-        setError(caught instanceof Error ? caught.message : 'The bot lost the thread.');
-      }
-    }, delay);
-    return () => window.clearTimeout(timer);
-  }, [
-    accept,
-    fx,
-    snapshot.session.log.length,
-    snapshot.session.phase.actor,
-    snapshot.session.phase.phase,
-    snapshot.session.status,
-    transport,
-  ]);
+  const { snapshot, fx, fxKey, error, dispatch } = useSoloTable(transport, {
+    round: (current) => current.session,
+    botPaceMs,
+  });
 
   useEffect(() => {
     if (snapshot.matchWinner === null || reportedMatch.current === transport) return;

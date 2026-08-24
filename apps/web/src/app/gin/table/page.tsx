@@ -2,12 +2,11 @@
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { useRouter } from 'next/navigation';
-import { type FxEvent } from '@parlour/engine';
 import type { GinModeId } from '@/lib/gin/modes';
 import { GinTableScreen } from '@/components/table/gin/GinTableScreen';
-import { GinTransport, type GinDispatch, type GinSnapshot } from '@/lib/solo/GinTransport';
+import { GinTransport, type GinSnapshot } from '@/lib/solo/GinTransport';
 import { ginTableView } from '@/lib/gin/view';
-import { delayUntilFxSettles } from '@/lib/table/fx-motion';
+import { useSoloTable } from '@/lib/table/useSoloTable';
 import { botKey, buildMatchRecord, friendKey, useHistoryStore } from '@/stores/history';
 import { useMatchFlowStore } from '@/stores/matchFlow';
 import { useProfileStore } from '@/stores/profile';
@@ -16,9 +15,10 @@ import {
   clearActiveMultiplayerSession,
   getActiveMultiplayerSession,
   subscribeActiveMultiplayerSession,
-  ginMultiplayerSession,
+  multiplayerSession,
   type MultiplayerRoomSession,
 } from '../../_multiplayer/roomSession';
+import type { GinConfig, GinMatchState } from '@parlour/game-gin';
 
 export default function GinTablePage() {
   const multiplayer = useSyncExternalStore(
@@ -64,53 +64,15 @@ function SoloGinTable({ transport }: { transport: GinTransport }) {
   const recordResult = useProfileStore((state) => state.recordResult);
   const recordMatch = useHistoryStore((state) => state.recordMatch);
   const reportedMatch = useRef<GinTransport | null>(null);
-  const [snapshot, setSnapshot] = useState(() => transport.getSnapshot());
-  const [fx, setFx] = useState<readonly FxEvent[]>(() => snapshot.session.setupFx ?? []);
-  const [fxKey, setFxKey] = useState(0);
-  const [error, setError] = useState<string | null>(null);
-
-  const accept = useCallback((outcome: GinDispatch) => {
-    if (outcome.rejected) {
-      setError(outcome.rejected.message);
-      return;
-    }
-    setError(null);
-    setSnapshot(outcome.snapshot);
-    setFx(outcome.fx);
-    setFxKey((key) => key + 1);
-  }, []);
-
-  const dispatch = useCallback(
-    (move: string, payload?: unknown) => accept(transport.dispatch(move, payload)),
-    [accept, transport],
+  const botPaceMs = useCallback(
+    (current: GinSnapshot) =>
+      current.session.state.folded && current.session.phase.phase === 'hand-end' ? 420 : 520,
+    [],
   );
-
-  useEffect(() => {
-    if (snapshot.session.status !== 'playing') return;
-    const actor = snapshot.session.phase.actor;
-    if (actor === null || actor === 0) return;
-    // the ready window reads as a reflex; in-hand decisions keep human pace
-    const pace =
-      snapshot.session.state.folded && snapshot.session.phase.phase === 'hand-end' ? 420 : 520;
-    const delay = delayUntilFxSettles(pace, fx);
-    const timer = window.setTimeout(() => {
-      try {
-        accept(transport.playBotTurn());
-      } catch (caught) {
-        setError(caught instanceof Error ? caught.message : 'The bot lost the thread.');
-      }
-    }, delay);
-    return () => window.clearTimeout(timer);
-  }, [
-    accept,
-    fx,
-    snapshot.session.log.length,
-    snapshot.session.phase.actor,
-    snapshot.session.phase.phase,
-    snapshot.session.state.folded,
-    snapshot.session.status,
-    transport,
-  ]);
+  const { snapshot, fx, fxKey, error, dispatch } = useSoloTable(transport, {
+    round: (current) => current.session,
+    botPaceMs,
+  });
 
   useEffect(() => {
     if (snapshot.matchWinner === null || reportedMatch.current === transport) return;
@@ -177,7 +139,7 @@ function ActiveMultiplayerGinTable({ room }: { room: MultiplayerRoomSession }) {
   const snapshot = useSyncExternalStore(room.subscribe, room.getSnapshot, room.getSnapshot);
   const reportedMatch = useRef(false);
   const [localError, setLocalError] = useState<string | null>(null);
-  const session = ginMultiplayerSession(snapshot);
+  const session = multiplayerSession<GinMatchState, GinConfig>(snapshot, 'gin');
   const localSeat = snapshot.localSeat;
 
   const dispatch = useCallback(

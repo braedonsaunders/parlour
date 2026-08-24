@@ -255,17 +255,28 @@ export class MultiplayerRoomSession {
     }
   }
 
-  async join(code: string): Promise<RoomHandle> {
+  /**
+   * Joins a room by code.
+   *
+   * A four-character code is a 20-bit PUBLIC locator, not an authenticator:
+   * anyone who learns it can answer to it, so resolving by code alone is
+   * last-writer-wins. `expectedHost` is the host-binding capability carried by
+   * a share link — when present it is forwarded to BOTH the directory lookup
+   * and the transport, so a hijacker who republishes the same code with a later
+   * timestamp is refused at two independent layers. Typed codes have no such
+   * capability and stay best-effort.
+   */
+  async join(code: string, expectedHost?: string): Promise<RoomHandle> {
     this.update({ connection: 'connecting' });
     const verdict = validateRoomCode(code);
     if (!verdict.ok) throw new Error('Room codes use four unambiguous letters or digits');
     const signaling = this.dependencies.signaling ?? new NostrSignaling();
     let announcement: RoomAnnouncement | null = null;
     try {
-      announcement = await signaling.resolve(verdict.code);
+      announcement = await signaling.resolve(verdict.code, expectedHost);
       const settings = resolveRoomSettings(announcement.settings);
       this.prepare(settings, signaling);
-      const room = await this.transport!.join(verdict.code, announcement);
+      const room = await this.transport!.join(verdict.code, announcement, expectedHost);
       const assignedSeat = this.transport!.seatForPeerId(room.peerId);
       const knownSeats = this.snapshot.seats.filter(
         (seat) => seat.seat !== 0 && seat.seat !== assignedSeat,
@@ -943,68 +954,20 @@ function randomSeed(): number {
   return bytes[0]! | 0;
 }
 
-export function blitzMultiplayerSession(
+/**
+ * Narrows the active room's session to a game's own types.
+ *
+ * This replaces eight exported functions that were the same function with the
+ * game id and the type arguments swapped — pure factory tax: adding a game
+ * meant adding a ninth copy. The cast is unavoidable (the room holds one
+ * session for whichever game is seated) but the id check in front of it is
+ * what makes the cast sound, and that check is now written once.
+ */
+export function multiplayerSession<S, C extends RuleValues>(
   snapshot: MultiplayerRoomSnapshot,
-): GameSession<BlitzState, BlitzConfig> | null {
-  return snapshot.gameId === 'blitz'
-    ? (snapshot.session as GameSession<BlitzState, BlitzConfig> | null)
-    : null;
-}
-
-export function ratscrewMultiplayerSession(
-  snapshot: MultiplayerRoomSnapshot,
-): GameSession<RatscrewState, RatscrewConfig> | null {
-  return snapshot.gameId === 'ratscrew'
-    ? (snapshot.session as GameSession<RatscrewState, RatscrewConfig> | null)
-    : null;
-}
-
-export function ginMultiplayerSession(
-  snapshot: MultiplayerRoomSnapshot,
-): GameSession<GinMatchState, GinConfig> | null {
-  return snapshot.gameId === 'gin'
-    ? (snapshot.session as GameSession<GinMatchState, GinConfig> | null)
-    : null;
-}
-
-export function wildMultiplayerSession(
-  snapshot: MultiplayerRoomSnapshot,
-): GameSession<WildpileState, WildpileRules> | null {
-  return snapshot.gameId === 'wildpile'
-    ? (snapshot.session as GameSession<WildpileState, WildpileRules> | null)
-    : null;
-}
-
-export function euchreMultiplayerSession(
-  snapshot: MultiplayerRoomSnapshot,
-): GameSession<EuchreState, EuchreRules> | null {
-  return snapshot.gameId === 'euchre'
-    ? (snapshot.session as GameSession<EuchreState, EuchreRules> | null)
-    : null;
-}
-
-export function cribbageMultiplayerSession(
-  snapshot: MultiplayerRoomSnapshot,
-): GameSession<CribbageState, CribbageConfig> | null {
-  return snapshot.gameId === 'cribbage'
-    ? (snapshot.session as GameSession<CribbageState, CribbageConfig> | null)
-    : null;
-}
-
-export function heartsMultiplayerSession(
-  snapshot: MultiplayerRoomSnapshot,
-): GameSession<HeartsState, HeartsRules> | null {
-  return snapshot.gameId === 'hearts'
-    ? (snapshot.session as GameSession<HeartsState, HeartsRules> | null)
-    : null;
-}
-
-export function presidentMultiplayerSession(
-  snapshot: MultiplayerRoomSnapshot,
-): GameSession<PresidentState, PresidentRules> | null {
-  return snapshot.gameId === 'president'
-    ? (snapshot.session as GameSession<PresidentState, PresidentRules> | null)
-    : null;
+  gameId: string,
+): GameSession<S, C> | null {
+  return snapshot.gameId === gameId ? (snapshot.session as GameSession<S, C> | null) : null;
 }
 
 function stateHolds(state: unknown, handle: string): boolean {

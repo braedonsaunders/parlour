@@ -6,43 +6,75 @@ import {
   makeRng,
   stateHash,
 } from '@parlour/engine';
-import { cribbageConfigSchema } from '@parlour/game-cribbage';
-import { createEuchreDef, euchreConfig, tierBot } from '@parlour/game-euchre';
-import { ginConfigSchema } from '@parlour/game-gin';
-import { presidentConfig } from '@parlour/game-president';
-import { ratscrewConfigSchema, type RatscrewState } from '@parlour/game-ratscrew';
-import { wildpileConfig } from '@parlour/game-wildpile';
+import { type BlitzConfig, type BlitzState } from '@parlour/game-blitz';
+import {
+  cribbageConfigSchema,
+  type CribbageConfig,
+  type CribbageState,
+} from '@parlour/game-cribbage';
+import {
+  createEuchreDef,
+  euchreConfig,
+  tierBot,
+  type EuchreRules,
+  type EuchreState,
+} from '@parlour/game-euchre';
+import { ginConfigSchema, type GinConfig, type GinMatchState } from '@parlour/game-gin';
+import { presidentConfig, type PresidentRules, type PresidentState } from '@parlour/game-president';
+import {
+  ratscrewConfigSchema,
+  type RatscrewConfig,
+  type RatscrewState,
+} from '@parlour/game-ratscrew';
+import { wildpileConfig, type WildpileRules, type WildpileState } from '@parlour/game-wildpile';
 import { afterEach, describe, expect, it } from 'vitest';
 import { EngineAuthority } from '@/lib/multiplayer';
 import { NostrSignaling, type SignalPayload } from '@/lib/multiplayer/NostrSignaling';
 import type { RoomSettings } from '@/lib/multiplayer/types';
-import {
-  blitzMultiplayerSession,
-  cribbageMultiplayerSession,
-  euchreMultiplayerSession,
-  ginMultiplayerSession,
-  MultiplayerRoomSession,
-  presidentMultiplayerSession,
-  ratscrewMultiplayerSession,
-  wildMultiplayerSession,
-} from './roomSession';
+import { multiplayerSession, MultiplayerRoomSession } from './roomSession';
 
 type SignalHandler = (sender: string, signal: SignalPayload) => void;
+
+/**
+ * A real Nostr pubkey is 32 bytes of hex, and host-bound invites validate that
+ * shape before pinning it. The fixture names its seats for readability, so map
+ * each label to a deterministic well-formed key: the mock then feeds the same
+ * kind of input production does, instead of a short string that only passes
+ * because nothing was checking.
+ */
+function mockPubkey(label: string): string {
+  let hash = 2166136261 >>> 0;
+  let out = '';
+  for (let chunk = 0; chunk < 8; chunk++) {
+    for (const char of `${label}:${chunk}`) {
+      hash ^= char.charCodeAt(0);
+      hash = Math.imul(hash, 16777619);
+    }
+    out += (hash >>> 0).toString(16).padStart(8, '0');
+  }
+  return out;
+}
 
 class MockSignalingBroker {
   readonly rooms = new Map<string, { hostPubkey: string; settings: RoomSettings }>();
   readonly handlers = new Map<string, Map<string, SignalHandler>>();
 
-  signaling(publicKey: string): NostrSignaling {
+  signaling(label: string): NostrSignaling {
     const broker = this;
+    const publicKey = mockPubkey(label);
     return {
       publicKey,
       async announce(code: string, settings: RoomSettings) {
         broker.rooms.set(code, { hostPubkey: publicKey, settings });
       },
-      async resolve(code: string) {
+      async resolve(code: string, expectedHost?: string) {
         const room = broker.rooms.get(code);
         if (!room) throw new Error('Room not found');
+        // Mirrors the real signaling contract: a host-bound invite refuses an
+        // announcement authored by anyone but the pinned host.
+        if (expectedHost !== undefined && room.hostPubkey !== expectedHost) {
+          throw new Error('Room host does not match this invite');
+        }
         return room;
       },
       subscribe(code: string, callback: SignalHandler) {
@@ -161,6 +193,49 @@ describe('multiplayer route composition', () => {
 
   afterEach(() => sessions.splice(0).forEach((session) => session.close()));
 
+  // D3 seam: a share link carries a host-binding capability because a 4-char
+  // code is a public locator, not an authenticator. roomSession must forward it
+  // to the directory lookup AND the transport, so a squatter who republishes
+  // the same code cannot answer for a link-borne join.
+  it('forwards a share link host pin to signaling and refuses a mismatched host', async () => {
+    const broker = new MockSignalingBroker();
+    const rtc = new MockRtcNetwork();
+    const hostSignaling = broker.signaling('pin-host-peer');
+    const host = new MultiplayerRoomSession(
+      { name: 'Host', avatarId: 'ember', profileId: 'pin-host-profile' },
+      { signaling: hostSignaling, peerConnection: rtc.factory('pin-host'), seed: 11 },
+    );
+    const guest = new MultiplayerRoomSession(
+      { name: 'Guest', avatarId: 'cobalt', profileId: 'pin-guest-profile' },
+      {
+        signaling: broker.signaling('pin-guest-peer'),
+        peerConnection: rtc.factory('pin-guest'),
+        seed: 12,
+      },
+    );
+    sessions.push(host, guest);
+
+    const room = await host.create({ seats: 2 });
+
+    // Wrong pin: an impostor's key must not resolve this room.
+    await expect(guest.join(room.code, mockPubkey('impostor-peer'))).rejects.toThrow(
+      /host does not match/i,
+    );
+
+    // Right pin: the genuine host key still joins.
+    const rejoin = new MultiplayerRoomSession(
+      { name: 'Guest', avatarId: 'cobalt', profileId: 'pin-guest-profile' },
+      {
+        signaling: broker.signaling('pin-guest2-peer'),
+        peerConnection: rtc.factory('pin-guest2'),
+        seed: 13,
+      },
+    );
+    sessions.push(rejoin);
+    await rejoin.join(room.code, hostSignaling.publicKey);
+    await eventually(() => expect(rejoin.getSnapshot().localSeat).toBe(1));
+  });
+
   it('creates and joins through browser transport, then applies the same move on both peers', async () => {
     const broker = new MockSignalingBroker();
     const rtc = new MockRtcNetwork();
@@ -235,8 +310,14 @@ describe('multiplayer route composition', () => {
         expect(guest.getSnapshot().security.ceremony.ready).toBe(true);
         expect(host.getSnapshot().stage).toBe('table');
         expect(guest.getSnapshot().stage).toBe('table');
-        const hostState = blitzMultiplayerSession(host.getSnapshot())!.state;
-        const guestState = blitzMultiplayerSession(guest.getSnapshot())!.state;
+        const hostState = multiplayerSession<BlitzState, BlitzConfig>(
+          host.getSnapshot(),
+          'blitz',
+        )!.state;
+        const guestState = multiplayerSession<BlitzState, BlitzConfig>(
+          guest.getSnapshot(),
+          'blitz',
+        )!.state;
         expect(hostState.hands[0]!.some(isVeilHandle)).toBe(false);
         expect(hostState.hands[1]!.every(isVeilHandle)).toBe(true);
         expect(guestState.hands[1]!.some(isVeilHandle)).toBe(false);
@@ -284,18 +365,31 @@ describe('multiplayer route composition', () => {
       jumpIn: true,
     });
 
-    const hostSession = wildMultiplayerSession(host.getSnapshot());
+    const hostSession = multiplayerSession<WildpileState, WildpileRules>(
+      host.getSnapshot(),
+      'wildpile',
+    );
     expect(hostSession).not.toBeNull();
     const move = hostSession!.def.flow.legalMoves(hostSession!.state, hostSession!.phase)[0];
     expect(move).toBeDefined();
     host.send(move!.id, move!.payload);
 
     await eventually(() => {
-      expect(wildMultiplayerSession(host.getSnapshot())?.log).toHaveLength(1);
-      expect(wildMultiplayerSession(guest.getSnapshot())?.log).toHaveLength(1);
+      expect(
+        multiplayerSession<WildpileState, WildpileRules>(host.getSnapshot(), 'wildpile')?.log,
+      ).toHaveLength(1);
+      expect(
+        multiplayerSession<WildpileState, WildpileRules>(guest.getSnapshot(), 'wildpile')?.log,
+      ).toHaveLength(1);
     });
-    expect(stateHash(wildMultiplayerSession(guest.getSnapshot())?.state)).toBe(
-      stateHash(wildMultiplayerSession(host.getSnapshot())?.state),
+    expect(
+      stateHash(
+        multiplayerSession<WildpileState, WildpileRules>(guest.getSnapshot(), 'wildpile')?.state,
+      ),
+    ).toBe(
+      stateHash(
+        multiplayerSession<WildpileState, WildpileRules>(host.getSnapshot(), 'wildpile')?.state,
+      ),
     );
   });
 
@@ -328,15 +422,19 @@ describe('multiplayer route composition', () => {
     await guest.join(room.code);
     await eventually(() => expect(guest.getSnapshot().localSeat).toBe(1));
     expect(host.getSnapshot()).toMatchObject({ gameId: 'ratscrew' });
-    expect(ratscrewMultiplayerSession(guest.getSnapshot())).not.toBeNull();
+    expect(
+      multiplayerSession<RatscrewState, RatscrewConfig>(guest.getSnapshot(), 'ratscrew'),
+    ).not.toBeNull();
 
     // Drive a slice of real play: flips until a window opens, then both seats
     // slam at once — arrival order on the authority decides the winner.
-    const stateOf = (session: ReturnType<typeof ratscrewMultiplayerSession>) =>
-      session!.state as RatscrewState;
+    const stateOf = (session: { state: unknown } | null) => session!.state as RatscrewState;
     let windowsSeen = 0;
     for (let step = 0; step < 60; step++) {
-      const hostSession = ratscrewMultiplayerSession(host.getSnapshot())!;
+      const hostSession = multiplayerSession<RatscrewState, RatscrewConfig>(
+        host.getSnapshot(),
+        'ratscrew',
+      )!;
       if (hostSession.status !== 'playing') break;
       const state = stateOf(hostSession);
       if (state.window) {
@@ -345,23 +443,41 @@ describe('multiplayer route composition', () => {
         host.send('slap');
         guest.send('slap');
         await eventually(() => {
-          expect(ratscrewMultiplayerSession(host.getSnapshot())?.state.window).toBeNull();
-          expect(ratscrewMultiplayerSession(guest.getSnapshot())?.state.window).toBeNull();
+          expect(
+            multiplayerSession<RatscrewState, RatscrewConfig>(host.getSnapshot(), 'ratscrew')?.state
+              .window,
+          ).toBeNull();
+          expect(
+            multiplayerSession<RatscrewState, RatscrewConfig>(guest.getSnapshot(), 'ratscrew')
+              ?.state.window,
+          ).toBeNull();
         });
       } else {
-        const before = ratscrewMultiplayerSession(host.getSnapshot())!.log.length;
+        const before = multiplayerSession<RatscrewState, RatscrewConfig>(
+          host.getSnapshot(),
+          'ratscrew',
+        )!.log.length;
         const turn = state.turn;
         (turn === 0 ? host : guest).send('flip');
         await eventually(() => {
-          const h = ratscrewMultiplayerSession(host.getSnapshot())!;
-          const g = ratscrewMultiplayerSession(guest.getSnapshot())!;
+          const h = multiplayerSession<RatscrewState, RatscrewConfig>(
+            host.getSnapshot(),
+            'ratscrew',
+          )!;
+          const g = multiplayerSession<RatscrewState, RatscrewConfig>(
+            guest.getSnapshot(),
+            'ratscrew',
+          )!;
           expect(h.log.length).toBeGreaterThan(before);
           expect(g.log.length).toBe(h.log.length);
         });
       }
       // every authority event replays identically on the guest
       // (`ts` is transport wall-clock garnish and never part of state)
-      const settledHost = ratscrewMultiplayerSession(host.getSnapshot())!;
+      const settledHost = multiplayerSession<RatscrewState, RatscrewConfig>(
+        host.getSnapshot(),
+        'ratscrew',
+      )!;
       const strip = (log: typeof settledHost.log) =>
         log.map(({ seq, seat, move, payload, atMs, hash, automatic, injected }) => ({
           seq,
@@ -373,15 +489,23 @@ describe('multiplayer route composition', () => {
           automatic,
           injected,
         }));
-      expect(strip(ratscrewMultiplayerSession(guest.getSnapshot())!.log)).toEqual(
-        strip(settledHost.log),
-      );
+      expect(
+        strip(
+          multiplayerSession<RatscrewState, RatscrewConfig>(guest.getSnapshot(), 'ratscrew')!.log,
+        ),
+      ).toEqual(strip(settledHost.log));
     }
     expect(windowsSeen).toBeGreaterThan(0);
 
     // final authority identity across every flip, slap and auto-resolved event
-    const hostFinal = ratscrewMultiplayerSession(host.getSnapshot())!;
-    const guestFinal = ratscrewMultiplayerSession(guest.getSnapshot())!;
+    const hostFinal = multiplayerSession<RatscrewState, RatscrewConfig>(
+      host.getSnapshot(),
+      'ratscrew',
+    )!;
+    const guestFinal = multiplayerSession<RatscrewState, RatscrewConfig>(
+      guest.getSnapshot(),
+      'ratscrew',
+    )!;
     expect(guestFinal.log.map((event) => event.hash)).toEqual(
       hostFinal.log.map((event) => event.hash),
     );
@@ -428,23 +552,31 @@ describe('multiplayer route composition', () => {
 
     // euchre opens with seat 1 (the guest) deciding left of the dealer
     const def = createEuchreDef();
-    const before = euchreMultiplayerSession(host.getSnapshot())!;
+    const before = multiplayerSession<EuchreState, EuchreRules>(host.getSnapshot(), 'euchre')!;
     const legal = def.flow.legalMoves(before.state, before.phase);
     expect(legal.length).toBeGreaterThan(0);
     guest.send(legal[0]!.id, legal[0]!.payload);
 
     await eventually(() => {
-      const hostLog = euchreMultiplayerSession(host.getSnapshot())?.log ?? [];
-      const guestLog = euchreMultiplayerSession(guest.getSnapshot())?.log ?? [];
+      const hostLog =
+        multiplayerSession<EuchreState, EuchreRules>(host.getSnapshot(), 'euchre')?.log ?? [];
+      const guestLog =
+        multiplayerSession<EuchreState, EuchreRules>(guest.getSnapshot(), 'euchre')?.log ?? [];
       expect(guestLog.length).toBe(hostLog.length);
       expect(guestLog.length).toBeGreaterThan(0);
-      expect(stateHash(euchreMultiplayerSession(guest.getSnapshot())?.state)).toBe(
-        stateHash(euchreMultiplayerSession(host.getSnapshot())?.state),
+      expect(
+        stateHash(
+          multiplayerSession<EuchreState, EuchreRules>(guest.getSnapshot(), 'euchre')?.state,
+        ),
+      ).toBe(
+        stateHash(
+          multiplayerSession<EuchreState, EuchreRules>(host.getSnapshot(), 'euchre')?.state,
+        ),
       );
     });
 
     // the host answers for its own seat and the pair stay hash-identical
-    const afterGuest = euchreMultiplayerSession(host.getSnapshot())!;
+    const afterGuest = multiplayerSession<EuchreState, EuchreRules>(host.getSnapshot(), 'euchre')!;
     const hostLegal =
       afterGuest.status === 'playing' && afterGuest.phase.actor === 0
         ? def.flow.legalMoves(afterGuest.state, afterGuest.phase)
@@ -452,11 +584,19 @@ describe('multiplayer route composition', () => {
     if (hostLegal.length > 0) {
       host.send(hostLegal[0]!.id, hostLegal[0]!.payload);
       await eventually(() => {
-        expect(euchreMultiplayerSession(guest.getSnapshot())?.log.length).toBe(
-          euchreMultiplayerSession(host.getSnapshot())?.log.length,
+        expect(
+          multiplayerSession<EuchreState, EuchreRules>(guest.getSnapshot(), 'euchre')?.log.length,
+        ).toBe(
+          multiplayerSession<EuchreState, EuchreRules>(host.getSnapshot(), 'euchre')?.log.length,
         );
-        expect(stateHash(euchreMultiplayerSession(guest.getSnapshot())?.state)).toBe(
-          stateHash(euchreMultiplayerSession(host.getSnapshot())?.state),
+        expect(
+          stateHash(
+            multiplayerSession<EuchreState, EuchreRules>(guest.getSnapshot(), 'euchre')?.state,
+          ),
+        ).toBe(
+          stateHash(
+            multiplayerSession<EuchreState, EuchreRules>(host.getSnapshot(), 'euchre')?.state,
+          ),
         );
       });
     }
@@ -549,25 +689,31 @@ describe('multiplayer route composition', () => {
 
     expect(host.getSnapshot()).toMatchObject({ gameId: 'gin' });
     expect(guest.getSnapshot()).toMatchObject({ gameId: 'gin' });
-    expect(ginMultiplayerSession(guest.getSnapshot())?.state.scores).toEqual([0, 0]);
+    expect(
+      multiplayerSession<GinMatchState, GinConfig>(guest.getSnapshot(), 'gin')?.state.scores,
+    ).toEqual([0, 0]);
 
     // drive real decisions: the non-dealer (guest) declines first, the host
     // follows; the forced stock draw for the leader lands automatically in
     // the settle loop
     guest.send('option.pass');
     await eventually(() => {
-      expect(ginMultiplayerSession(guest.getSnapshot())?.log.length).toBeGreaterThan(0);
+      expect(
+        multiplayerSession<GinMatchState, GinConfig>(guest.getSnapshot(), 'gin')?.log.length,
+      ).toBeGreaterThan(0);
     });
     host.send('option.pass');
     await eventually(() => {
-      expect(ginMultiplayerSession(guest.getSnapshot())?.log.length).toBeGreaterThanOrEqual(3);
-      expect(ginMultiplayerSession(host.getSnapshot())?.log.length).toBe(
-        ginMultiplayerSession(guest.getSnapshot())?.log.length,
-      );
+      expect(
+        multiplayerSession<GinMatchState, GinConfig>(guest.getSnapshot(), 'gin')?.log.length,
+      ).toBeGreaterThanOrEqual(3);
+      expect(
+        multiplayerSession<GinMatchState, GinConfig>(host.getSnapshot(), 'gin')?.log.length,
+      ).toBe(multiplayerSession<GinMatchState, GinConfig>(guest.getSnapshot(), 'gin')?.log.length);
     });
 
     // the leader (seat 1) throws one back, then the host draws from stock
-    const leaderSession = ginMultiplayerSession(host.getSnapshot())!;
+    const leaderSession = multiplayerSession<GinMatchState, GinConfig>(host.getSnapshot(), 'gin')!;
     const throwMove = leaderSession.def.flow.legalMovesFor!(
       leaderSession.state,
       leaderSession.phase,
@@ -576,23 +722,31 @@ describe('multiplayer route composition', () => {
     expect(throwMove).toBeDefined();
     guest.send(throwMove!.id, throwMove!.payload);
     await eventually(() => {
-      expect(ginMultiplayerSession(guest.getSnapshot())?.phase.phase).toBe('turn');
+      expect(
+        multiplayerSession<GinMatchState, GinConfig>(guest.getSnapshot(), 'gin')?.phase.phase,
+      ).toBe('turn');
     });
 
-    const afterThrow = ginMultiplayerSession(host.getSnapshot())!;
+    const afterThrow = multiplayerSession<GinMatchState, GinConfig>(host.getSnapshot(), 'gin')!;
     const draw = afterThrow.def.flow.legalMovesFor!(afterThrow.state, afterThrow.phase, 0).find(
       (move) => move.id === 'draw.stock',
     );
     host.send(draw!.id);
 
     await eventually(() => {
-      expect(ginMultiplayerSession(host.getSnapshot())?.phase.phase).toBe('act');
+      expect(
+        multiplayerSession<GinMatchState, GinConfig>(host.getSnapshot(), 'gin')?.phase.phase,
+      ).toBe('act');
     });
-    expect(stateHash(ginMultiplayerSession(guest.getSnapshot())?.state)).toBe(
-      stateHash(ginMultiplayerSession(host.getSnapshot())?.state),
+    expect(
+      stateHash(multiplayerSession<GinMatchState, GinConfig>(guest.getSnapshot(), 'gin')?.state),
+    ).toBe(
+      stateHash(multiplayerSession<GinMatchState, GinConfig>(host.getSnapshot(), 'gin')?.state),
     );
-    expect(ginMultiplayerSession(guest.getSnapshot())?.lastAppliedHash).toBe(
-      ginMultiplayerSession(host.getSnapshot())?.lastAppliedHash,
+    expect(
+      multiplayerSession<GinMatchState, GinConfig>(guest.getSnapshot(), 'gin')?.lastAppliedHash,
+    ).toBe(
+      multiplayerSession<GinMatchState, GinConfig>(host.getSnapshot(), 'gin')?.lastAppliedHash,
     );
   });
 
@@ -625,18 +779,23 @@ describe('multiplayer route composition', () => {
 
     host.send('draw.stock');
     await eventually(() =>
-      expect(blitzMultiplayerSession(host.getSnapshot())?.log).toHaveLength(1),
+      expect(
+        multiplayerSession<BlitzState, BlitzConfig>(host.getSnapshot(), 'blitz')?.log,
+      ).toHaveLength(1),
     );
-    const drawn = blitzMultiplayerSession(host.getSnapshot())!;
+    const drawn = multiplayerSession<BlitzState, BlitzConfig>(host.getSnapshot(), 'blitz')!;
     const discard = drawn.def.flow
       .legalMoves(drawn.state, drawn.phase)
       .find((move) => move.id === 'discard');
     expect(discard).toBeDefined();
     host.send(discard!.id, discard!.payload);
     await eventually(() =>
-      expect(blitzMultiplayerSession(host.getSnapshot())?.phase.actor).toBe(1),
+      expect(
+        multiplayerSession<BlitzState, BlitzConfig>(host.getSnapshot(), 'blitz')?.phase.actor,
+      ).toBe(1),
     );
-    const beforeDrop = blitzMultiplayerSession(host.getSnapshot())!.log.length;
+    const beforeDrop = multiplayerSession<BlitzState, BlitzConfig>(host.getSnapshot(), 'blitz')!.log
+      .length;
 
     guest.close();
     await eventually(
@@ -645,7 +804,9 @@ describe('multiplayer route composition', () => {
           connected: false,
           bot: true,
         });
-        expect(blitzMultiplayerSession(host.getSnapshot())!.log.length).toBeGreaterThan(beforeDrop);
+        expect(
+          multiplayerSession<BlitzState, BlitzConfig>(host.getSnapshot(), 'blitz')!.log.length,
+        ).toBeGreaterThan(beforeDrop);
       },
       100,
       10,
@@ -705,17 +866,27 @@ describe('multiplayer route composition', () => {
     await guest.join(room.code);
     await eventually(() => expect(guest.getSnapshot().localSeat).toBe(1));
 
-    const hostRound = cribbageMultiplayerSession(host.getSnapshot())!;
+    const hostRound = multiplayerSession<CribbageState, CribbageConfig>(
+      host.getSnapshot(),
+      'cribbage',
+    )!;
     const hostDiscard = hostRound.def.flow.legalMovesFor!(hostRound.state, hostRound.phase, 0).find(
       (move) => move.id === 'crib.discard',
     )!;
     host.send(hostDiscard.id, hostDiscard.payload);
     await eventually(() => {
-      expect(cribbageMultiplayerSession(host.getSnapshot())?.log).toHaveLength(1);
-      expect(cribbageMultiplayerSession(guest.getSnapshot())?.log).toHaveLength(1);
+      expect(
+        multiplayerSession<CribbageState, CribbageConfig>(host.getSnapshot(), 'cribbage')?.log,
+      ).toHaveLength(1);
+      expect(
+        multiplayerSession<CribbageState, CribbageConfig>(guest.getSnapshot(), 'cribbage')?.log,
+      ).toHaveLength(1);
     });
 
-    const guestRound = cribbageMultiplayerSession(guest.getSnapshot())!;
+    const guestRound = multiplayerSession<CribbageState, CribbageConfig>(
+      guest.getSnapshot(),
+      'cribbage',
+    )!;
     const guestDiscard = guestRound.def.flow.legalMovesFor!(
       guestRound.state,
       guestRound.phase,
@@ -723,12 +894,22 @@ describe('multiplayer route composition', () => {
     ).find((move) => move.id === 'crib.discard')!;
     guest.send(guestDiscard.id, guestDiscard.payload);
     await eventually(() => {
-      expect(cribbageMultiplayerSession(host.getSnapshot())?.log).toHaveLength(2);
-      expect(cribbageMultiplayerSession(guest.getSnapshot())?.log).toHaveLength(2);
+      expect(
+        multiplayerSession<CribbageState, CribbageConfig>(host.getSnapshot(), 'cribbage')?.log,
+      ).toHaveLength(2);
+      expect(
+        multiplayerSession<CribbageState, CribbageConfig>(guest.getSnapshot(), 'cribbage')?.log,
+      ).toHaveLength(2);
     });
 
-    const hostSession = cribbageMultiplayerSession(host.getSnapshot())!;
-    const guestSession = cribbageMultiplayerSession(guest.getSnapshot())!;
+    const hostSession = multiplayerSession<CribbageState, CribbageConfig>(
+      host.getSnapshot(),
+      'cribbage',
+    )!;
+    const guestSession = multiplayerSession<CribbageState, CribbageConfig>(
+      guest.getSnapshot(),
+      'cribbage',
+    )!;
     expect(guestSession.log).toEqual(hostSession.log);
     expect(stateHash(guestSession.state)).toBe(stateHash(hostSession.state));
   });
@@ -790,14 +971,20 @@ describe('president rooms on the shared stack', () => {
     });
 
     expect(host.session.getSnapshot()).toMatchObject({ gameId: 'president' });
-    expect(presidentMultiplayerSession(host.session.getSnapshot())!.state.hands.flat().length).toBe(
-      52,
-    );
+    expect(
+      multiplayerSession<PresidentState, PresidentRules>(
+        host.session.getSnapshot(),
+        'president',
+      )!.state.hands.flat().length,
+    ).toBe(52);
 
     // Drive real turns through the mesh; after every event every peer must
     // hold the same log length AND the same state hash.
     for (let step = 0; step < 14; step++) {
-      const hostSession = presidentMultiplayerSession(host.session.getSnapshot());
+      const hostSession = multiplayerSession<PresidentState, PresidentRules>(
+        host.session.getSnapshot(),
+        'president',
+      );
       expect(hostSession).not.toBeNull();
       if (hostSession!.status !== 'playing') break;
       const baseline = hostSession!.log.length;
@@ -811,22 +998,37 @@ describe('president rooms on the shared stack', () => {
 
       await eventually(() => {
         const lengths = peers.map(
-          (peer) => presidentMultiplayerSession(peer.session.getSnapshot())!.log.length,
+          (peer) =>
+            multiplayerSession<PresidentState, PresidentRules>(
+              peer.session.getSnapshot(),
+              'president',
+            )!.log.length,
         );
         expect(Math.min(...lengths)).toBeGreaterThan(baseline);
         expect(new Set(lengths).size).toBe(1);
       });
       const hashes = peers.map((peer) =>
-        stateHash(presidentMultiplayerSession(peer.session.getSnapshot())!.state),
+        stateHash(
+          multiplayerSession<PresidentState, PresidentRules>(
+            peer.session.getSnapshot(),
+            'president',
+          )!.state,
+        ),
       );
       expect(new Set(hashes).size).toBe(1);
     }
 
     // The guests replay the authority log from the announced seed — the whole
     // replayed log must hash-match the host's event for event.
-    const hostLog = presidentMultiplayerSession(host.session.getSnapshot())!.log;
+    const hostLog = multiplayerSession<PresidentState, PresidentRules>(
+      host.session.getSnapshot(),
+      'president',
+    )!.log;
     for (const peer of peers.slice(1)) {
-      const guestLog = presidentMultiplayerSession(peer.session.getSnapshot())!.log;
+      const guestLog = multiplayerSession<PresidentState, PresidentRules>(
+        peer.session.getSnapshot(),
+        'president',
+      )!.log;
       expect(guestLog.length).toBe(hostLog.length);
       for (let i = 0; i < hostLog.length; i++) {
         expect(guestLog[i]!.hash).toBe(hostLog[i]!.hash);

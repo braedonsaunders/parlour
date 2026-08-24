@@ -12,13 +12,14 @@ import { useMatchFlowStore } from '@/stores/matchFlow';
 import { useProfileStore } from '@/stores/profile';
 import { useSetupStore } from '@/stores/setup';
 import {
-  blitzMultiplayerSession,
+  multiplayerSession,
   clearActiveMultiplayerSession,
   getActiveMultiplayerSession,
   subscribeActiveMultiplayerSession,
   type MultiplayerRoomSession,
   type MultiplayerRoomSnapshot,
 } from '../_multiplayer/roomSession';
+import type { BlitzConfig, BlitzState } from '@parlour/game-blitz';
 
 export default function TablePage() {
   const multiplayer = useSyncExternalStore(
@@ -82,7 +83,7 @@ function ActiveMultiplayerTable({ room }: { room: MultiplayerRoomSession }) {
   );
 
   const view = multiplayerTableView(snapshot);
-  const session = blitzMultiplayerSession(snapshot);
+  const session = multiplayerSession<BlitzState, BlitzConfig>(snapshot, 'blitz');
   const busy =
     !session ||
     snapshot.localSeat === null ||
@@ -90,7 +91,7 @@ function ActiveMultiplayerTable({ room }: { room: MultiplayerRoomSession }) {
     !isActingSeat(session.phase, snapshot.localSeat);
 
   useEffect(() => {
-    const session = blitzMultiplayerSession(snapshot);
+    const session = multiplayerSession<BlitzState, BlitzConfig>(snapshot, 'blitz');
     const localSeat = snapshot.localSeat;
     const result = session?.result;
     if (!session || session.status !== 'ended' || !result || localSeat === null) return;
@@ -159,7 +160,7 @@ function ActiveMultiplayerTable({ room }: { room: MultiplayerRoomSession }) {
 }
 
 function multiplayerTableView(snapshot: MultiplayerRoomSnapshot): TableView | null {
-  const session = blitzMultiplayerSession(snapshot);
+  const session = multiplayerSession<BlitzState, BlitzConfig>(snapshot, 'blitz');
   const localSeat = snapshot.localSeat;
   if (!session || localSeat === null) return null;
   const isLocalTurn = session.status === 'playing' && isActingSeat(session.phase, localSeat);

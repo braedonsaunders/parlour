@@ -2,24 +2,24 @@
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { useRouter } from 'next/navigation';
-import { type FxEvent, type MatchResult } from '@parlour/engine';
-import type { CribbageConfig } from '@parlour/game-cribbage';
+import { type MatchResult } from '@parlour/engine';
 import { CribbageTableScreen } from '@/components/table/cribbage/CribbageTableScreen';
 import { cribbageModeForRules } from '@/lib/cribbage/modes';
 import { cribbageTableView, type CribbageSnapshotLike } from '@/lib/cribbage/view';
-import { CribbageTransport, type CribbageDispatch } from '@/lib/solo/CribbageTransport';
-import { delayUntilFxSettles } from '@/lib/table/fx-motion';
+import { CribbageTransport } from '@/lib/solo/CribbageTransport';
+import { useSoloTable } from '@/lib/table/useSoloTable';
 import { botKey, buildMatchRecord, friendKey, useHistoryStore } from '@/stores/history';
 import { useMatchFlowStore } from '@/stores/matchFlow';
 import { useProfileStore } from '@/stores/profile';
 import { cribbageRulesFor, useCribbageSetupStore } from '@/stores/cribbageSetup';
 import {
   clearActiveMultiplayerSession,
-  cribbageMultiplayerSession,
+  multiplayerSession,
   getActiveMultiplayerSession,
   subscribeActiveMultiplayerSession,
   type MultiplayerRoomSession,
 } from '../../_multiplayer/roomSession';
+import type { CribbageConfig, CribbageState } from '@parlour/game-cribbage';
 
 export default function CribbageTablePage() {
   const multiplayer = useSyncExternalStore(
@@ -67,29 +67,11 @@ function ActiveSoloTable({ transport }: { transport: CribbageTransport }) {
   const recordResult = useProfileStore((state) => state.recordResult);
   const recordMatch = useHistoryStore((state) => state.recordMatch);
   const reported = useRef(false);
-  const [snapshot, setSnapshot] = useState(() => transport.getSnapshot());
-  const [fx, setFx] = useState<readonly FxEvent[]>(() => snapshot.match.round.setupFx ?? []);
-  const [fxKey, setFxKey] = useState(0);
-  const [error, setError] = useState<string | null>(null);
-
-  const accept = useCallback((outcome: CribbageDispatch) => {
-    if (outcome.rejected) {
-      setError(outcome.rejected.message);
-      return;
-    }
-    setError(null);
-    setSnapshot(outcome.snapshot);
-    setFx(outcome.fx);
-    setFxKey((key) => key + 1);
-  }, []);
-
-  useEffect(() => {
-    if (snapshot.match.status !== 'playing' || transport.humanCanAct() || !transport.botCanAct())
-      return;
-    const waitMs = delayUntilFxSettles(420, fx);
-    const timer = window.setTimeout(() => accept(transport.playBotTurn()), waitMs);
-    return () => window.clearTimeout(timer);
-  }, [accept, fx, snapshot, transport]);
+  const botPaceMs = useCallback((_current: ReturnType<CribbageTransport['getSnapshot']>) => 420, []);
+  const { snapshot, fx, fxKey, error, dispatch } = useSoloTable(transport, {
+    round: (current) => current.match.round,
+    botPaceMs,
+  });
 
   useEffect(() => {
     const result = snapshot.match.result;
@@ -123,7 +105,6 @@ function ActiveSoloTable({ transport }: { transport: CribbageTransport }) {
 
   const legal = transport.legalMoves(0);
   const view = cribbageTableView(snapshot, legal, 0);
-  const dispatch = (move: string, payload?: unknown) => accept(transport.dispatch(move, payload));
   return (
     <CribbageTableScreen
       view={view}
@@ -150,7 +131,7 @@ function MultiplayerTable({ room }: { room: MultiplayerRoomSession }) {
   const snapshot = useSyncExternalStore(room.subscribe, room.getSnapshot, room.getSnapshot);
   const reported = useRef(false);
   const [localError, setLocalError] = useState<string | null>(null);
-  const session = cribbageMultiplayerSession(snapshot);
+  const session = multiplayerSession<CribbageState, CribbageConfig>(snapshot, 'cribbage');
   const localSeat = snapshot.localSeat;
 
   const dispatch = useCallback(

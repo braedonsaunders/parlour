@@ -15,10 +15,11 @@ import { useRatscrewSetupStore, ratscrewRulesFor } from '@/stores/ratscrewSetup'
 import {
   clearActiveMultiplayerSession,
   getActiveMultiplayerSession,
-  ratscrewMultiplayerSession,
+  multiplayerSession,
   subscribeActiveMultiplayerSession,
   type MultiplayerRoomSession,
 } from '../../_multiplayer/roomSession';
+import type { RatscrewConfig, RatscrewState } from '@parlour/game-ratscrew';
 
 export default function RatscrewTablePage() {
   const multiplayer = useSyncExternalStore(
@@ -168,7 +169,7 @@ function ActiveMultiplayerRatscrewTable({ room }: { room: MultiplayerRoomSession
   const armedClose = useRef<string | null>(null);
   const closeTimer = useRef<number | null>(null);
   const [localError, setLocalError] = useState<string | null>(null);
-  const session = ratscrewMultiplayerSession(snapshot);
+  const session = multiplayerSession<RatscrewState, RatscrewConfig>(snapshot, 'ratscrew');
   const localSeat = snapshot.localSeat;
 
   const dispatch = useCallback(
