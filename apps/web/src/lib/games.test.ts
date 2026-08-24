@@ -21,6 +21,7 @@ describe('game shelf catalog', () => {
       'spades',
       'ohhell',
       'spite',
+      'scopa',
       'klondike',
       'hearts',
       'gin',
@@ -50,7 +51,7 @@ describe('game shelf catalog', () => {
      * to be shelved is listed here, and a game that lost its route by accident
      * still fails.
      */
-    const SHELVED = new Set(['spite']);
+    const SHELVED = new Set(['spite', 'scopa']);
     for (const game of GAMES) {
       if (SHELVED.has(game.id)) {
         expect(game.href, `${game.id} is shelved`).toBeNull();

@@ -26,6 +26,7 @@
     "@parlour/game-ohhell": "workspace:*",
     "@parlour/game-president": "workspace:*",
     "@parlour/game-ratscrew": "workspace:*",
+    "@parlour/game-scopa": "workspace:*",
     "@parlour/game-spades": "workspace:*",
     "@parlour/game-spite": "workspace:*",
     "@parlour/game-wildpile": "workspace:*",
