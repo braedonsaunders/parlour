@@ -283,41 +283,42 @@ describe('multiplayer route composition', () => {
     );
   });
 
-  // The point of the collaborative deal: the player who opens the table no
-  // longer decides the deck. Both rooms below are opened by a host with the
-  // same seed, so if the host's number still chose the shuffle they would deal
-  // identically.
-  it('deals from every seat’s share rather than the host’s own number', async () => {
+  // The point of the collaborative deal: the player who opens the table does
+  // not decide the deck. Both rooms below are opened by a host with the same
+  // seed, so if the host's number still chose the shuffle they would deal
+  // identically. Spades is the subject because its pack has no veil block, so
+  // its rooms run in the open — a veiled room gets this from the ceremony.
+  it('deals an open room from every seat’s share, not the host’s number', async () => {
     async function dealtSeed(tag: string): Promise<number | undefined> {
       const broker = new MockSignalingBroker();
       const rtc = new MockRtcNetwork();
-      const host = new MultiplayerRoomSession(
-        { name: 'Host', avatarId: 'ember', profileId: `${tag}-host` },
-        {
-          signaling: broker.signaling(`${tag}-host-peer`),
-          peerConnection: rtc.factory(`${tag}-host`),
-          seed: 1234,
-        },
+      const peers = Array.from(
+        { length: 4 },
+        (_, seat) =>
+          new MultiplayerRoomSession(
+            { name: `P${seat}`, avatarId: 'ember', profileId: `${tag}-${seat}` },
+            {
+              signaling: broker.signaling(`${tag}-peer-${seat}`),
+              peerConnection: rtc.factory(`${tag}-rtc-${seat}`),
+              seed: 1234,
+            },
+          ),
       );
-      const guest = new MultiplayerRoomSession(
-        { name: 'Guest', avatarId: 'cobalt', profileId: `${tag}-guest` },
-        {
-          signaling: broker.signaling(`${tag}-guest-peer`),
-          peerConnection: rtc.factory(`${tag}-guest`),
-          seed: 1234,
-        },
-      );
-      sessions.push(host, guest);
-      const room = await host.create({ seats: 2 });
-      await guest.join(room.code);
-      await eventually(() => expect(guest.getSnapshot().localSeat).toBe(1));
+      sessions.push(...peers);
+      const host = peers[0]!;
+      const room = await host.create({ gameId: 'spades', seats: 4 });
+      for (let seat = 1; seat < 4; seat++) {
+        await peers[seat]!.join(room.code);
+        await eventually(() => expect(peers[seat]!.getSnapshot().localSeat).toBe(seat), 200, 5);
+      }
       await host.start();
-      // Both peers play the deal the shares agreed on, and neither complains.
-      await eventually(() =>
-        expect(guest.getSnapshot().session?.seed).toBe(host.getSnapshot().session?.seed),
+      // Every peer plays the deal the shares agreed on, and none complains.
+      await eventually(
+        () => expect(peers[3]!.getSnapshot().session?.seed).toBe(host.getSnapshot().session?.seed),
+        200,
+        5,
       );
-      expect(host.getSnapshot().error).toBeNull();
-      expect(guest.getSnapshot().error).toBeNull();
+      for (const peer of peers) expect(peer.getSnapshot().error).toBeNull();
       return host.getSnapshot().session?.seed;
     }
 
@@ -330,7 +331,7 @@ describe('multiplayer route composition', () => {
       expect(seed).toBeGreaterThanOrEqual(0);
       expect(seed).toBeLessThanOrEqual(0xffff_ffff);
     }
-  });
+  }, 120_000);
 
   // Regression: room seeds came off `Uint32Array` through `| 0`, so half of
   // them were negative — and the wire bounds a snapshot seed to 0…0xffffffff.
@@ -425,7 +426,7 @@ describe('multiplayer route composition', () => {
     );
     sessions.push(host, guest);
 
-    const room = await host.create({ seats: 2, security: 'veil' });
+    const room = await host.create({ seats: 2 });
     await guest.join(room.code);
     await eventually(() => {
       expect(host.getSnapshot().seats).toHaveLength(2);
@@ -490,7 +491,7 @@ describe('multiplayer route composition', () => {
     );
     sessions.push(host, guest);
 
-    const room = await host.create({ seats: 2, security: 'veil' });
+    const room = await host.create({ seats: 2 });
     await guest.join(room.code);
     await eventually(() => expect(guest.getSnapshot().localSeat).toBe(1));
     await host.start();
@@ -981,32 +982,48 @@ describe('multiplayer route composition', () => {
     );
   });
 
-  it('forces a dropped seat into bot takeover, plays its turn, and lets the profile reclaim it', async () => {
+  /**
+   * The seat that does *not* come back.
+   *
+   * A dropped seat is held open first, because a player who reconnects rebuilds
+   * their own layer and nobody's hand is opened. Only once they stay gone does
+   * the table recover the seat out of other seats' shares — which needs three
+   * seats or more to have an honest threshold, and is reported as the privacy
+   * loss it is. The grace window is shortened here; in a room it is 45 seconds.
+   */
+  it('holds a dropped seat, then recovers it into bot takeover and lets the profile reclaim it', async () => {
     const broker = new MockSignalingBroker();
     const rtc = new MockRtcNetwork();
-    const host = new MultiplayerRoomSession(
-      { name: 'Host', avatarId: 'ember', profileId: 'takeover-host' },
-      {
-        signaling: broker.signaling('takeover-host-peer'),
-        peerConnection: rtc.factory('takeover-host'),
-        seed: 121,
-        heartbeatIntervalMs: 10,
-        heartbeatTimeoutMs: 60,
-      },
+    const peers = Array.from(
+      { length: 4 },
+      (_, seat) =>
+        new MultiplayerRoomSession(
+          { name: `P${seat}`, avatarId: 'ember', profileId: `takeover-${seat}` },
+          {
+            signaling: broker.signaling(`takeover-peer-${seat}`),
+            peerConnection: rtc.factory(`takeover-rtc-${seat}`),
+            seed: 121 + seat,
+            heartbeatIntervalMs: 20,
+            heartbeatTimeoutMs: 2_000,
+            reconnectGraceMs: 50,
+          },
+        ),
     );
-    const guest = new MultiplayerRoomSession(
-      { name: 'Guest', avatarId: 'mint', profileId: 'takeover-guest' },
-      {
-        signaling: broker.signaling('takeover-guest-peer'),
-        peerConnection: rtc.factory('takeover-guest'),
-        seed: 7,
-      },
-    );
-    sessions.push(host, guest);
+    sessions.push(...peers);
+    const host = peers[0]!;
+    const guest = peers[1]!;
 
-    const room = await host.create({ seats: 2 });
-    await guest.join(room.code);
-    await eventually(() => expect(guest.getSnapshot().localSeat).toBe(1));
+    const room = await host.create({ seats: 4 });
+    for (let seat = 1; seat < 4; seat++) {
+      await peers[seat]!.join(room.code);
+      await eventually(() => expect(peers[seat]!.getSnapshot().localSeat).toBe(seat), 200, 5);
+    }
+    await host.start();
+    await eventually(
+      () => expect(host.getSnapshot().security.ceremony.ready).toBe(true),
+      1_000,
+      10,
+    );
 
     host.send('draw.stock');
     await eventually(() =>
@@ -1035,18 +1052,26 @@ describe('multiplayer route composition', () => {
           connected: false,
           bot: true,
         });
+        // Recovered only after the hold expired, and named for it: the seat's
+        // cards are readable from here on and the badge does not hide that.
+        expect(host.getSnapshot().security.recoveredSeats).toContain(1);
+        expect(host.getSnapshot().security.paused).toBeNull();
+        // The round is playable again — the log is intact and the table is not
+        // stuck on a layer nobody holds. Whether a takeover bot has *played* by
+        // now is timing, so it is not asserted here; botSeats covers the choice
+        // and veil/recovery.test.ts covers rebuilding the layer.
         expect(
           multiplayerSession<BlitzState, BlitzConfig>(host.getSnapshot(), 'blitz')!.log.length,
-        ).toBeGreaterThan(beforeDrop);
+        ).toBeGreaterThanOrEqual(beforeDrop);
       },
-      100,
+      1_500,
       10,
     );
 
     const rejoined = new MultiplayerRoomSession(
-      { name: 'Guest', avatarId: 'mint', profileId: 'takeover-guest' },
+      { name: 'P1', avatarId: 'ember', profileId: 'takeover-1' },
       {
-        signaling: broker.signaling('takeover-guest-rejoined'),
+        signaling: broker.signaling('takeover-rejoined'),
         peerConnection: rtc.factory('takeover-rejoined'),
         seed: 9,
       },
@@ -1058,14 +1083,14 @@ describe('multiplayer route composition', () => {
         expect(host.getSnapshot().seats.find((seat) => seat.seat === 1)).toMatchObject({
           connected: true,
           bot: false,
-          profileId: 'takeover-guest',
+          profileId: 'takeover-1',
         });
         expect(rejoined.getSnapshot().localSeat).toBe(1);
       },
-      100,
+      400,
       10,
     );
-  });
+  }, 120_000);
 
   it('runs a two-seat Cribbage room with replay-identical discard actions', async () => {
     const broker = new MockSignalingBroker();
@@ -1396,15 +1421,10 @@ describe('spades rooms on the shared stack', () => {
 
   // Engine v1 Veil is gone. Saying so out loud beats quietly downgrading a
   // player who explicitly asked for cryptographic play.
-  it('refuses a veiled spades room in plain words instead of silently opening it', async () => {
-    const host = new MultiplayerRoomSession(
-      { name: 'Host', avatarId: 'ember', profileId: 'spades-veil' },
-      { seed: 3 },
-    );
-    sessions.push(host);
-    await expect(host.create({ gameId: 'spades', seats: 4, security: 'veil' })).rejects.toThrow(
-      /veiled Spades is not available/,
-    );
+  // Nobody asks for a tier any more, so there is nothing to refuse: a game
+  // without a veil block simply runs in the open, and the badge says so.
+  it('runs spades in the open because its pack has no veil block', () => {
+    expect(createSpadesDef().veil).toBeUndefined();
   });
 
   it('resolves an open spades room as open, with the pack defaults filled in', async () => {

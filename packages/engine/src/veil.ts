@@ -357,6 +357,23 @@ export interface VeilSupport {
  */
 export const VEILED_REDEAL_PENDING = 'no-veiled-deck';
 
+/**
+ * The payload a veiled redeal carries: the deck a ceremony just produced.
+ *
+ * Shared so that every multi-deal game agrees on the shape, and so the deck
+ * lands in the event log where replay can find it — a hand dealt from a deck
+ * that only the dealer knew would not replay anywhere else.
+ */
+export interface VeiledDealPayload {
+  deckOrder: CardId[];
+}
+
+export function isVeiledDealPayload(payload: unknown): payload is VeiledDealPayload {
+  if (payload === null || typeof payload !== 'object') return false;
+  const order = (payload as { deckOrder?: unknown }).deckOrder;
+  return Array.isArray(order) && order.length > 0 && order.every((id) => typeof id === 'string');
+}
+
 /** Ceiling on public setup openings, so a malformed game cannot open the deck. */
 export const MAX_PUBLIC_SETUP_OPENS = 16;
 

@@ -30,7 +30,7 @@ export default function CreateCribbageRoomPage() {
     sessionRef.current = next;
     setSession(next);
     void next
-      .create({ gameId: 'cribbage', seats: 2, config: JSON.parse(rulesKey), security: 'open' })
+      .create({ gameId: 'cribbage', seats: 2, config: JSON.parse(rulesKey) })
       .then(() => activateMultiplayerSession(next))
       .catch(() => undefined);
   }, [avatarId, name, rulesKey]);

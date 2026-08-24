@@ -170,6 +170,8 @@ type SessionDependencies = {
   seed?: number;
   heartbeatIntervalMs?: number;
   heartbeatTimeoutMs?: number;
+  /** how long a veiled round holds a dropped seat open before recovering it */
+  reconnectGraceMs?: number;
 };
 
 type Listener = () => void;
@@ -196,16 +198,14 @@ type SessionAuthority = AuthorityAdapter & {
   getSession(): MultiplayerGameSession;
 };
 
+/**
+ * Opening a room takes no privacy tier, because nobody is asked for one.
+ * {@link tierFor} derives it from the game the room is for.
+ */
 type CreateRoomOptions = {
   seats: number;
   gameId?: MultiplayerGameId;
   config?: RuleValues;
-  /**
-   * `open` (the default) is fast and gives every peer the whole game state.
-   * `veil` hides hands from every peer at the cost of a shuffle ceremony and a
-   * real disconnect trade-off.
-   */
-  security?: RoomSecurity;
 };
 
 function securityFor(
@@ -291,7 +291,6 @@ export class MultiplayerRoomSession {
       gameId: options.gameId ?? 'blitz',
       seats: options.seats,
       config: options.config ?? {},
-      security: options.security ?? 'open',
     });
     this.prepare(settings);
     try {
@@ -882,6 +881,12 @@ export class MultiplayerRoomSession {
    */
   private awaitReturnThenRecover(seat: number): void {
     if (this.pendingReturns.has(seat)) return;
+    // Marked gone now, recovered later. A seat only offers its share of a
+    // missing layer for a seat it agrees has gone, so if each peer waited out
+    // its own hold before agreeing, whoever asked first would be asking peers
+    // that had not noticed yet and would collect nothing. Noticing is driven by
+    // presence, which every peer sees; the hold only delays acting on it.
+    this.veil?.room.markSeatLost(seat);
     this.update({
       security: {
         ...this.snapshot.security,
@@ -891,7 +896,7 @@ export class MultiplayerRoomSession {
     const timer = setTimeout(() => {
       this.pendingReturns.delete(seat);
       void this.recoverLostSeat(seat);
-    }, RECONNECT_GRACE_MS);
+    }, this.dependencies.reconnectGraceMs ?? RECONNECT_GRACE_MS);
     this.pendingReturns.set(seat, timer);
   }
 
@@ -1404,12 +1409,26 @@ async function waitForVeilKeys(room: VeilRoom): Promise<void> {
   throw new Error('the shuffle ceremony stalled — a seat never published its key');
 }
 
+/**
+ * The strongest tier a game can honestly run — derived, never requested.
+ *
+ * Nobody chooses this. A pack that ships a `veil` block can hide hands, so its
+ * rooms do; one that cannot plays in the open with the collaborative deal, and
+ * the badge says which is in force. Deriving it from the game rather than
+ * reading it off the announcement also means a joining peer computes the same
+ * answer as the host from the same game id, so a forged announcement cannot
+ * talk a room down into the open tier.
+ */
+function tierFor(settings: RoomSettings): RoomSecurity {
+  return gameDefFor(settings).veil ? 'veil' : 'open';
+}
+
 function resolveRoomSettings(settings: RoomSettings): RoomSettings {
   if (!hasValidSeatCount(settings.gameId, settings.seats)) {
     const { min, max } = seatRangeFor(settings.gameId);
     throw new Error(`rooms require ${min}–${max} seats for ${settings.gameId}`);
   }
-  const security: RoomSecurity = settings.security === 'veil' ? 'veil' : 'open';
+  const security = tierFor(settings);
   if (settings.gameId === 'blitz') {
     return {
       gameId: 'blitz',
@@ -1444,9 +1463,6 @@ function resolveRoomSettings(settings: RoomSettings): RoomSettings {
   }
   if (settings.gameId === 'cribbage') {
     if (settings.seats !== 2) throw new Error('Cribbage rooms require exactly two seats');
-    if (security === 'veil') {
-      throw new Error('Cribbage friend rooms use open replay until multi-deal re-veiling ships');
-    }
     const config = cribbageConfigSchema.resolve(settings.config as Partial<CribbageConfig>);
     return {
       gameId: 'cribbage',
@@ -1455,7 +1471,7 @@ function resolveRoomSettings(settings: RoomSettings): RoomSettings {
       // Play is deliberately solo until room snapshots carry MatchSession
       // round logs, so never let a forged announcement imply best-of-three.
       config: { ...config, gamesToWin: 1 },
-      security: 'open',
+      security,
     };
   }
   if (settings.gameId === 'hearts') {
@@ -1484,17 +1500,11 @@ function resolveRoomSettings(settings: RoomSettings): RoomSettings {
   }
   if (settings.gameId === 'spades') {
     if (settings.seats !== 4) throw new Error('Spades rooms require exactly four seats');
-    if (security === 'veil') {
-      // Say so out loud rather than quietly downgrading. Advertising a
-      // cryptographic tier the engine no longer backs would be a lie told to
-      // the one person relying on it.
-      throw new Error('Spades friend rooms use open replay — veiled Spades is not available');
-    }
     return {
       gameId: 'spades',
       seats: 4,
       config: spadesConfig.resolve(settings.config as Partial<SpadesRules>),
-      security: 'open',
+      security,
     };
   }
   throw new Error(`unsupported room game: ${settings.gameId}`);

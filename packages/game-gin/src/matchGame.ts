@@ -1,7 +1,7 @@
 import {
+  isVeiledDealPayload,
   VEILED_REDEAL_PENDING,
   type BotPolicy,
-  type CardId,
   type FlowAdvance,
   type GameDef,
   type Move,
@@ -28,13 +28,6 @@ import type { GinMatchState, GinState } from './state';
  * the move requires one rather than falling back to the session rng. It used to
  * refuse to deal at all while veiled, so a private match ended after one hand.
  */
-
-/** The deck a veiled redeal must carry: handles the room's ceremony produced. */
-function isDeckOrder(payload: unknown): payload is { deckOrder: CardId[] } {
-  if (payload === null || typeof payload !== 'object') return false;
-  const order = (payload as { deckOrder?: unknown }).deckOrder;
-  return Array.isArray(order) && order.length > 0 && order.every((id) => typeof id === 'string');
-}
 
 /** Hand-level moves re-exposed verbatim by the match def. */
 const HAND_MOVES = [
@@ -121,7 +114,7 @@ export function createGinMatchDef(
         if (!allReadied(state)) {
           return { code: 'awaiting-ready', message: 'the table has not readied up' };
         }
-        if (!isDeckOrder(payload)) {
+        if (!isVeiledDealPayload(payload)) {
           return {
             code: VEILED_REDEAL_PENDING,
             message: 'a veiled hand needs its own shuffled deck',
@@ -138,7 +131,7 @@ export function createGinMatchDef(
           rng: ctx.rng,
           fx: ctx.fx,
           veiled: state.veiled,
-          deckOrder: isDeckOrder(payload) ? payload.deckOrder : undefined,
+          deckOrder: isVeiledDealPayload(payload) ? payload.deckOrder : undefined,
         },
         ((state.dealer + 1) % state.seats) as SeatId,
       );
