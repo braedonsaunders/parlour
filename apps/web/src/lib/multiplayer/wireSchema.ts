@@ -16,8 +16,13 @@ const MAX_WIRE_BYTES = 512_000;
 const MAX_ID_LENGTH = 128;
 const MAX_LABEL_LENGTH = 128;
 const MAX_HASH_LENGTH = 256;
-const MAX_PEERS = 4;
-const MAX_SEATS = 4;
+const MAX_PEERS = 8;
+/**
+ * Wire-level seat ceiling for every game — the shared table shell supports up
+ * to eight chairs (President's full ring). Per-game capacity lives in
+ * lib/rooms/seatRange; this bound only keeps hostile packets sane.
+ */
+const MAX_SEATS = 8;
 const MAX_APPLIED_EVENTS = 64;
 const MAX_SNAPSHOT_EVENTS = 4_096;
 const MAX_FX_EVENTS = 256;

@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { GAMES, getGame, isGameId } from './games';
 
 describe('game shelf catalog', () => {
-  it('leads with blitz and keeps wild on deck (spec §11)', () => {
-    expect(GAMES.map((g) => g.id)).toEqual(['blitz', 'wild']);
+  it('leads with blitz and keeps the shelf growing', () => {
+    expect(GAMES.map((g) => g.id)).toEqual(['blitz', 'wild', 'president']);
   });
 
   it('every game carries complete presentation data', () => {
@@ -21,6 +21,7 @@ describe('game shelf catalog', () => {
   it('both games are playable and route to their setup screens (M5 exit)', () => {
     expect(getGame('blitz').href).toBe('/play');
     expect(getGame('wild').href).toBe('/wild');
+    expect(getGame('president').href).toBe('/president');
   });
 
   it('getGame resolves known ids and throws on unknown ones', () => {

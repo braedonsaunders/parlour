@@ -1,6 +1,6 @@
-export type GameId = 'blitz' | 'wild';
+export type GameId = 'blitz' | 'wild' | 'president';
 
-export type GamePreviewKind = 'blitz-fan' | 'wild-fan';
+export type GamePreviewKind = 'blitz-fan' | 'wild-fan' | 'president-fan';
 
 export interface GameDef {
   id: GameId;
@@ -46,6 +46,19 @@ export const GAMES: readonly GameDef[] = [
     shade: '#7c2c3e',
     preview: 'wild-fan',
     href: '/wild',
+  },
+  {
+    id: 'president',
+    name: 'President',
+    subtitle: 'the climbing game',
+    tagline: 'Climb to the crown',
+    description:
+      'Top the pile, dump your hand first, and rise from Scum to President. Up to eight seats, crowns and stings included.',
+    facts: ['4–8 players', 'roles & trading', 'solo or friends'],
+    accent: '#d9a441',
+    shade: '#8a5c14',
+    preview: 'president-fan',
+    href: '/president',
   },
 ];
 

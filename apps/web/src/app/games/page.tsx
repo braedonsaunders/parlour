@@ -98,6 +98,13 @@ function Preview({ kind }: { kind: GamePreviewKind }) {
           <span className={gameStyles.wildCard}>+4</span>
         </>
       )}
+      {kind === 'president-fan' && (
+        <>
+          <span className={gameStyles.presCard}>3</span>
+          <span className={gameStyles.presCard}>♛</span>
+          <span className={gameStyles.presCard}>2</span>
+        </>
+      )}
     </span>
   );
 }

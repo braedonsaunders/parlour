@@ -1,4 +1,5 @@
 import { createRoomCode, roomJoinUrl, validateRoomCode } from '../rooms/code';
+import { seatRangeFor } from '../rooms/seatRange';
 import { NostrSignaling, type RoomAnnouncement, type SignalPayload } from './NostrSignaling';
 import { HEARTBEAT_INTERVAL_MS, MultiplayerState, validatePresenceSnapshot } from './resilience';
 import { validateEmote } from './emotes';
@@ -106,7 +107,10 @@ export class P2PTransport implements Transport {
 
   async create(settings: RoomSettings): Promise<RoomHandle> {
     this.assertOpen();
-    if (settings.seats < 2 || settings.seats > 4) throw new Error('rooms require 2–4 seats');
+    const { min, max } = seatRangeFor(settings.gameId);
+    if (!Number.isInteger(settings.seats) || settings.seats < min || settings.seats > max) {
+      throw new Error(`rooms require ${min}–${max} seats for ${settings.gameId}`);
+    }
     const code = createRoomCode(this.randomBytes);
     await this.signaling.announce(code, settings);
     this.startRoom(code, this.signaling.publicKey);

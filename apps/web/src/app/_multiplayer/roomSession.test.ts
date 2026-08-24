@@ -1,9 +1,14 @@
 import { applyPreset, stateHash } from '@parlour/engine';
+import { presidentConfig, type PresidentRules } from '@parlour/game-president';
 import { wildpileConfig } from '@parlour/game-wildpile';
 import { afterEach, describe, expect, it } from 'vitest';
 import { NostrSignaling, type SignalPayload } from '@/lib/multiplayer/NostrSignaling';
 import type { RoomSettings } from '@/lib/multiplayer/types';
-import { MultiplayerRoomSession, wildMultiplayerSession } from './roomSession';
+import {
+  MultiplayerRoomSession,
+  presidentMultiplayerSession,
+  wildMultiplayerSession,
+} from './roomSession';
 
 type SignalHandler = (sender: string, signal: SignalPayload) => void;
 
@@ -225,5 +230,96 @@ describe('multiplayer route composition', () => {
     expect(stateHash(wildMultiplayerSession(guest.getSnapshot())?.state)).toBe(
       stateHash(wildMultiplayerSession(host.getSnapshot())?.state),
     );
+  });
+});
+
+describe('president rooms on the shared stack', () => {
+  const sessions: MultiplayerRoomSession[] = [];
+
+  afterEach(() => sessions.splice(0).forEach((session) => session.close()));
+
+  it('routes a five-seat president room and keeps host/guest hashes identical across moves', async () => {
+    const broker = new MockSignalingBroker();
+    const rtc = new MockRtcNetwork();
+    const host = new MultiplayerRoomSession(
+      { name: 'Host', avatarId: 'ember', profileId: 'president-host' },
+      {
+        signaling: broker.signaling('president-host-peer'),
+        peerConnection: rtc.factory('host'),
+        seed: 4242,
+      },
+    );
+    const guest = new MultiplayerRoomSession(
+      { name: 'Guest', avatarId: 'juniper', profileId: 'president-guest' },
+      {
+        signaling: broker.signaling('president-guest-peer'),
+        peerConnection: rtc.factory('guest'),
+        seed: 7,
+      },
+    );
+    sessions.push(host, guest);
+
+    const room = await host.create({
+      gameId: 'president',
+      seats: 5,
+      config: applyPreset(presidentConfig, 'classic') as Partial<PresidentRules>,
+    });
+    await guest.join(room.code);
+    await eventually(() => expect(guest.getSnapshot().localSeat).toBe(1));
+
+    expect(host.getSnapshot()).toMatchObject({ gameId: 'president' });
+    expect(guest.getSnapshot()).toMatchObject({ gameId: 'president' });
+    expect(guest.getSnapshot().settings?.config).toMatchObject({ twoClears: true, trading: true });
+
+    // Drive a dozen real turns through the mesh; after every event both peers
+    // must hold the same log length AND the same state hash.
+    for (let step = 0; step < 12; step++) {
+      const hostSession = presidentMultiplayerSession(host.getSnapshot());
+      expect(hostSession).not.toBeNull();
+      if (hostSession!.status !== 'playing') break;
+      const actor = hostSession!.phase.actor;
+      expect(actor).not.toBeNull();
+      const legal =
+        hostSession!.def.flow.legalMovesFor?.(hostSession!.state, hostSession!.phase, actor!) ??
+        [];
+      expect(legal.length).toBeGreaterThan(0);
+      const move = legal[0]!;
+      (actor === 0 ? host : guest).send(move.id, move.payload);
+
+      await eventually(() => {
+        expect(presidentMultiplayerSession(host.getSnapshot())!.log.length).toBe(
+          presidentMultiplayerSession(guest.getSnapshot())!.log.length + 0,
+        );
+        expect(
+          presidentMultiplayerSession(host.getSnapshot())!.log.length,
+        ).toBeGreaterThan(step);
+      });
+      expect(stateHash(presidentMultiplayerSession(guest.getSnapshot())!.state)).toBe(
+        stateHash(presidentMultiplayerSession(host.getSnapshot())!.state),
+      );
+    }
+
+    // The guest replays the authority log from the announced seed — the whole
+    // replayed log must hash-match the host's event for event.
+    const hostLog = presidentMultiplayerSession(host.getSnapshot())!.log;
+    const guestLog = presidentMultiplayerSession(guest.getSnapshot())!.log;
+    expect(guestLog.length).toBe(hostLog.length);
+    for (let i = 0; i < hostLog.length; i++) {
+      expect(guestLog[i]!.hash).toBe(hostLog[i]!.hash);
+    }
+  });
+
+  it('rejects seat counts outside the president ring before any transport exists', async () => {
+    const broker = new MockSignalingBroker();
+    const rtc = new MockRtcNetwork();
+    const host = new MultiplayerRoomSession(
+      { name: 'Host', avatarId: 'ember', profileId: 'president-cap' },
+      { signaling: broker.signaling('cap-peer'), peerConnection: rtc.factory('host'), seed: 1 },
+    );
+    sessions.push(host);
+    await expect(host.create({ gameId: 'president', seats: 3 })).rejects.toThrow(/4–8 seats/);
+    await expect(host.create({ gameId: 'president', seats: 9 })).rejects.toThrow(/4–8 seats/);
+    // blitz keeps its own 2–4 ring
+    await expect(host.create({ gameId: 'blitz', seats: 6 })).rejects.toThrow(/2–4 seats/);
   });
 });
