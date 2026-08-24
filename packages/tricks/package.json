@@ -1,0 +1,21 @@
+{
+  "name": "@parlour/tricks",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "tsc --noEmit",
+    "lint": "eslint src --ext .ts",
+    "type-check": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@parlour/engine": "workspace:*"
+  },
+  "devDependencies": {
+    "vitest": "^4.0.18"
+  }
+}
