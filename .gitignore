@@ -18,10 +18,9 @@ progress.md
 research/
 docs/*.md
 docs/music/
-# shipped engine + game code cites this spec by path, so it stays public
-!docs/VEILED-DECK-PROTOCOL.md
-!docs/NEXT-GAME-SHORTLIST.md
-!docs/REVIEW-CONSENSUS.md
+# Acceptance notes, specs and roadmaps are working notes and stay local; the
+# contributor guide is the one doc written for someone outside the repo.
+!docs/ADDING-A-GAME.md
 apps/web/public/audio/README.md
 packages/*/README.md
 
