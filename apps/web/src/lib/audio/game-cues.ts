@@ -1,6 +1,28 @@
 import type { FxEvent } from '@parlour/engine';
 import type { SoundCue } from './cues';
 
+export function klondikeCuesForFx(fx: readonly FxEvent[]): SoundCue[] {
+  return fx.flatMap((event) => {
+    const atMs = Math.max(0, event.at ?? 0);
+    switch (event.kind) {
+      case 'klondike.stock-draw':
+        return [{ id: 'klondike.draw', atMs }];
+      case 'klondike.stock-recycle':
+        return [{ id: 'klondike.recycle', atMs }];
+      case 'klondike.cards-move':
+        return [{ id: 'klondike.move', atMs }];
+      case 'klondike.tableau-flip':
+        return [{ id: 'klondike.flip', atMs }];
+      case 'klondike.foundation-build':
+        return [{ id: 'klondike.foundation', atMs }];
+      case 'klondike.win':
+        return [{ id: 'klondike.win', atMs }];
+      default:
+        return [];
+    }
+  });
+}
+
 export function heartsCuesForFx(fx: readonly FxEvent[]): SoundCue[] {
   const hasSharedTrickCollect = fx.some((event) => event.kind === 'tricks.collect');
 

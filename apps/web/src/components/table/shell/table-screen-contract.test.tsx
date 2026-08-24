@@ -6,16 +6,20 @@ import type { CribbageTableView } from '@/lib/cribbage/view';
 import type { EuchreTableView } from '@/lib/euchre/view';
 import type { GinTableView } from '@/lib/gin/view';
 import type { HeartsTableView } from '@/lib/hearts/view';
+import { rulesForKlondikeMode } from '@/lib/klondike/modes';
+import { klondikeTableView, type KlondikeTableView } from '@/lib/klondike/view';
 import type { PresidentTableView } from '@/lib/president/view';
 import type { RatscrewTableView } from '@/lib/ratscrew/view';
 import type { SpadesTableView } from '@/lib/spades/view';
 import type { WildTableView } from '@/lib/wild/view';
+import { KlondikeTransport } from '@/lib/solo/KlondikeTransport';
 import tableStyles from '@/styles/table.module.css';
 import { TableScreen, type TableView } from '../TableScreen';
 import { CribbageTableScreen } from '../cribbage/CribbageTableScreen';
 import { EuchreTableScreen } from '../euchre/EuchreTableScreen';
 import { GinTableScreen } from '../gin/GinTableScreen';
 import { HeartsTableScreen } from '../hearts/HeartsTableScreen';
+import { KlondikeTableScreen } from '../klondike/KlondikeTableScreen';
 import { PresidentTableScreen } from '../president/PresidentTableScreen';
 import { RatscrewTableScreen } from '../ratscrew/RatscrewTableScreen';
 import { SpadesTableScreen } from '../spades/SpadesTableScreen';
@@ -41,6 +45,9 @@ type ScreenCase = {
   loadingCopy: string;
   /** Whether the root publishes `data-deal-state`. */
   dealState: boolean;
+  /** Solitaire presents seven columns rather than a shared hand rail. */
+  handRail?: boolean;
+  dealFx?: readonly FxEvent[];
   /** The `game` field its render_game_to_text surface reports. */
   gameText: string;
 };
@@ -134,6 +141,18 @@ const HEARTS_VIEW: HeartsTableView = {
   playableCards: ['C2'],
   handPoints: [0, 0, 0, 0],
 };
+
+const KLONDIKE_TRANSPORT = new KlondikeTransport({
+  mode: 'daily',
+  dailyKey: '2026-08-24',
+  seed: 31,
+  rules: rulesForKlondikeMode('daily'),
+});
+const KLONDIKE_VIEW: KlondikeTableView = klondikeTableView(
+  KLONDIKE_TRANSPORT.getSnapshot(),
+  KLONDIKE_TRANSPORT.legalMoves(),
+);
+const KLONDIKE_DEAL_FX = KLONDIKE_TRANSPORT.getSnapshot().session.setupFx ?? [];
 
 const CRIBBAGE_VIEW: CribbageTableView = {
   players: [
@@ -436,6 +455,20 @@ const SCREENS: readonly ScreenCase[] = [
     gameText: 'spades',
   },
   {
+    name: 'klondike',
+    Screen: KlondikeTableScreen as ComponentType<never>,
+    view: KLONDIKE_VIEW,
+    eyebrow: 'Klondike',
+    playfield: 'Klondike table',
+    feltMark: 'K',
+    errorHeadline: 'The solitaire table lost the thread.',
+    loadingCopy: 'Laying out seven columns…',
+    dealState: true,
+    handRail: false,
+    dealFx: KLONDIKE_DEAL_FX,
+    gameText: 'klondike',
+  },
+  {
     name: 'gin',
     Screen: GinTableScreen as ComponentType<never>,
     view: GIN_VIEW,
@@ -564,13 +597,14 @@ describe('table shell contract across every shipped screen', () => {
   it.each(SCREENS.map((entry) => [entry.name, entry] as const))(
     '%s tracks the deal on the root and the hand rail together',
     (_name, entry) => {
-      const dealFx: FxEvent[] = [
+      const defaultDealFx: FxEvent[] = [
         {
           kind: Fx.DealCard,
           payload: { card: 'S1', from: 'stock', to: 'hand:0', dur: 220 },
           at: 0,
         },
       ];
+      const dealFx = entry.dealFx ?? defaultDealFx;
       render(entry, { view: entry.view, fx: dealFx, fxKey: 'deal' });
 
       const main = container.querySelector<HTMLElement>('main[data-table-screen]')!;
@@ -584,6 +618,10 @@ describe('table shell contract across every shipped screen', () => {
       }
 
       expect(main.getAttribute('data-deal-state')).toBe('dealing');
+      if (entry.handRail === false) {
+        expect(rail).toBeNull();
+        return;
+      }
       // The rail and the root must agree — they read the same presentation.
       expect(rail!.getAttribute('data-deal-state')).toBe('dealing');
     },

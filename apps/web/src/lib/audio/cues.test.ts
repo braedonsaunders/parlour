@@ -277,6 +277,29 @@ describe('fx-driven table audio', () => {
     ]);
   });
 
+  it('maps Klondike draw, move, flip, foundation, recycle, and win moments', () => {
+    expect(
+      soundCuesForFx(
+        [
+          { kind: 'klondike.stock-draw', payload: {}, at: 0 },
+          { kind: 'klondike.cards-move', payload: {}, at: 20 },
+          { kind: 'klondike.tableau-flip', payload: {}, at: 40 },
+          { kind: 'klondike.foundation-build', payload: {}, at: 60 },
+          { kind: 'klondike.stock-recycle', payload: {}, at: 80 },
+          { kind: 'klondike.win', payload: {}, at: 100 },
+        ],
+        'klondike',
+      ),
+    ).toEqual([
+      { id: 'klondike.draw', atMs: 0 },
+      { id: 'klondike.move', atMs: 20 },
+      { id: 'klondike.flip', atMs: 40 },
+      { id: 'klondike.foundation', atMs: 60 },
+      { id: 'klondike.recycle', atMs: 80 },
+      { id: 'klondike.win', atMs: 100 },
+    ]);
+  });
+
   it('plays the Blitz knock immediately and leaves later celebration sounds choreographed', () => {
     expect(
       soundCuesForFx(

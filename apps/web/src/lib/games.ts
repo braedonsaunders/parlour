@@ -4,6 +4,7 @@ import { cribbageCatalog } from '@parlour/game-cribbage';
 import { euchreCatalog } from '@parlour/game-euchre';
 import { ginCatalog } from '@parlour/game-gin';
 import { heartsCatalog } from '@parlour/game-hearts';
+import { klondikeCatalog } from '@parlour/game-klondike';
 import { presidentCatalog } from '@parlour/game-president';
 import { wildpileCatalog } from '@parlour/game-wildpile';
 import { ratscrewCatalog } from '@parlour/game-ratscrew';
@@ -38,7 +39,16 @@ function shelfEntry<C extends RuleValues>(entry: GameCatalogEntry<C>): GameCatal
  * silently orphan someone's results rather than fail the build.
  */
 export type GameId =
-  'blitz' | 'cribbage' | 'wild' | 'ratscrew' | 'euchre' | 'hearts' | 'gin' | 'president' | 'spades';
+  | 'blitz'
+  | 'cribbage'
+  | 'wild'
+  | 'ratscrew'
+  | 'euchre'
+  | 'hearts'
+  | 'gin'
+  | 'president'
+  | 'spades'
+  | 'klondike';
 
 const SHELF: readonly GameCatalogEntry[] = [
   shelfEntry(blitzCatalog),
@@ -47,6 +57,7 @@ const SHELF: readonly GameCatalogEntry[] = [
   shelfEntry(ratscrewCatalog),
   shelfEntry(euchreCatalog),
   shelfEntry(spadesCatalog),
+  shelfEntry(klondikeCatalog),
   shelfEntry(heartsCatalog),
   shelfEntry(ginCatalog),
   shelfEntry(presidentCatalog),

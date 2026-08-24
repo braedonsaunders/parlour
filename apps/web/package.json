@@ -22,6 +22,7 @@
     "@parlour/game-euchre": "workspace:*",
     "@parlour/game-gin": "workspace:*",
     "@parlour/game-hearts": "workspace:*",
+    "@parlour/game-klondike": "workspace:*",
     "@parlour/game-president": "workspace:*",
     "@parlour/game-ratscrew": "workspace:*",
     "@parlour/game-spades": "workspace:*",

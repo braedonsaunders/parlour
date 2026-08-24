@@ -6,6 +6,7 @@ import {
   euchreCuesForFx,
   ginCuesForFx,
   heartsCuesForFx,
+  klondikeCuesForFx,
   presidentCuesForFx,
   ratscrewCuesForFx,
   spadesCuesForFx,
@@ -99,6 +100,15 @@ export const SPADES_SFX = {
   contractMade: 'spades.contract-made',
   bagPenalty: 'spades.bag-penalty',
   scoreChime: 'spades.score-chime',
+} as const;
+
+export const KLONDIKE_SFX = {
+  draw: 'klondike.draw',
+  recycle: 'klondike.recycle',
+  move: 'klondike.move',
+  flip: 'klondike.flip',
+  foundation: 'klondike.foundation',
+  win: 'klondike.win',
 } as const;
 
 export const GIN_SFX = {
@@ -246,6 +256,20 @@ export const SPADES_SFX_PACK: SfxPack = {
   cuesForFx: spadesCuesForFx,
 };
 
+export const KLONDIKE_SFX_PACK: SfxPack = {
+  id: 'klondike',
+  label: 'Klondike',
+  sounds: [
+    sound(KLONDIKE_SFX.draw, '/audio/sfx/card-draw-stock.mp3', 0.74, 3, 70),
+    sound(KLONDIKE_SFX.recycle, '/audio/sfx/stock-shuffle.mp3', 0.72, 1, 400),
+    sound(KLONDIKE_SFX.move, '/audio/sfx/card-discard-flight.mp3', 0.68, 4, 45),
+    sound(KLONDIKE_SFX.flip, '/audio/sfx/card-flip.mp3', 0.78, 3, 60),
+    sound(KLONDIKE_SFX.foundation, '/audio/sfx/euchre-score-chime.mp3', 0.62, 4, 60),
+    sound(KLONDIKE_SFX.win, '/audio/sfx/win-celebration.mp3', 0.88, 1, 1_000),
+  ],
+  cuesForFx: klondikeCuesForFx,
+};
+
 export const GIN_SFX_PACK: SfxPack = {
   id: 'gin',
   label: 'Gin Rummy',
@@ -314,6 +338,7 @@ for (const pack of [
   HEARTS_SFX_PACK,
   EUCHRE_SFX_PACK,
   SPADES_SFX_PACK,
+  KLONDIKE_SFX_PACK,
   GIN_SFX_PACK,
   CRIBBAGE_SFX_PACK,
   RATSCREW_SFX_PACK,

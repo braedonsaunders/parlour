@@ -62,6 +62,9 @@ importers:
       '@parlour/game-hearts':
         specifier: workspace:*
         version: link:../../packages/game-hearts
+      '@parlour/game-klondike':
+        specifier: workspace:*
+        version: link:../../packages/game-klondike
       '@parlour/game-president':
         specifier: workspace:*
         version: link:../../packages/game-president

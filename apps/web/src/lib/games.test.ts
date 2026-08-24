@@ -3,6 +3,7 @@ import { cribbageCatalog } from '@parlour/game-cribbage';
 import { euchreCatalog } from '@parlour/game-euchre';
 import { heartsCatalog } from '@parlour/game-hearts';
 import { ginCatalog } from '@parlour/game-gin';
+import { klondikeCatalog } from '@parlour/game-klondike';
 import { presidentCatalog } from '@parlour/game-president';
 import { ratscrewCatalog } from '@parlour/game-ratscrew';
 import { wildpileCatalog } from '@parlour/game-wildpile';
@@ -18,6 +19,7 @@ describe('game shelf catalog', () => {
       'ratscrew',
       'euchre',
       'spades',
+      'klondike',
       'hearts',
       'gin',
       'president',
@@ -48,6 +50,7 @@ describe('game shelf catalog', () => {
     expect(getGame('hearts').href).toBe('/hearts');
     expect(getGame('gin').href).toBe('/gin');
     expect(getGame('president').href).toBe('/president');
+    expect(getGame('klondike').href).toBe('/klondike');
   });
 
   it('getGame resolves known ids and throws on unknown ones', () => {
@@ -71,6 +74,7 @@ describe('game shelf catalog', () => {
     expect(getGame('hearts')).toBe(heartsCatalog);
     expect(getGame('gin')).toBe(ginCatalog);
     expect(getGame('president')).toBe(presidentCatalog);
+    expect(getGame('klondike')).toBe(klondikeCatalog);
   });
 
   it('gives every shelved game what the picker screens need', () => {
