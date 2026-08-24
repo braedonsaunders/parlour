@@ -603,7 +603,7 @@ function replenish(state: WildpileState, ctx: MoveCtx): WildpileState {
   ctx.fx.emit(Fx.ShuffleStock, {});
   return {
     ...state,
-    stock: ctx.rng.shuffle(recyclable),
+    stock: ctx.recycle ? [...ctx.recycle.issue] : ctx.rng.shuffle(recyclable),
     discard: top ? [top] : [],
   };
 }
@@ -676,7 +676,7 @@ function drawCards(
 }
 
 const draw: Move<WildpileState> = {
-  validate(state, seat) {
+  validate(state, seat, _payload, ctx) {
     if (state.interrupt || state.awaitingColor !== null || state.awaitingSwap !== null) {
       return error('draw-unavailable', 'draw is unavailable during this decision');
     }
@@ -684,7 +684,12 @@ const draw: Move<WildpileState> = {
     // Recycling a face-up discard into the stock would make every remaining
     // draw readable by the whole table, so a veiled room has to re-veil it
     // through a fresh shuffle ceremony first.
-    if (state.veiled && state.stock.length === 0 && state.discard.slice(1).some(isRealCard)) {
+    if (
+      state.veiled &&
+      state.stock.length === 0 &&
+      state.discard.slice(1).some(isRealCard) &&
+      !ctx?.recycle
+    ) {
       return error(
         'stock-not-reveiled',
         'the discard pile must be re-veiled before it becomes the stock',

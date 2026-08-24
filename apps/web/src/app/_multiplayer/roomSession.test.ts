@@ -1,9 +1,13 @@
-import { applyPreset, stateHash } from '@parlour/engine';
+import { applyPreset, isVeilHandle, stateHash } from '@parlour/engine';
 import { wildpileConfig } from '@parlour/game-wildpile';
 import { afterEach, describe, expect, it } from 'vitest';
 import { NostrSignaling, type SignalPayload } from '@/lib/multiplayer/NostrSignaling';
 import type { RoomSettings } from '@/lib/multiplayer/types';
-import { MultiplayerRoomSession, wildMultiplayerSession } from './roomSession';
+import {
+  blitzMultiplayerSession,
+  MultiplayerRoomSession,
+  wildMultiplayerSession,
+} from './roomSession';
 
 type SignalHandler = (sender: string, signal: SignalPayload) => void;
 
@@ -122,13 +126,13 @@ class MockPeerConnection {
   }
 }
 
-async function eventually(assertion: () => void) {
-  for (let attempt = 0; attempt < 40; attempt++) {
+async function eventually(assertion: () => void, attempts = 40, delayMs = 0) {
+  for (let attempt = 0; attempt < attempts; attempt++) {
     try {
       assertion();
       return;
     } catch {
-      await new Promise((resolve) => setTimeout(resolve, 0));
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
     }
   }
   assertion();
@@ -179,6 +183,52 @@ describe('multiplayer route composition', () => {
     );
   });
 
+  it('runs the live Veil ceremony with each peer in its assigned seat', async () => {
+    const broker = new MockSignalingBroker();
+    const rtc = new MockRtcNetwork();
+    const host = new MultiplayerRoomSession(
+      { name: 'Host', avatarId: 'ember', profileId: 'veil-host' },
+      {
+        signaling: broker.signaling('veil-host-peer'),
+        peerConnection: rtc.factory('veil-host'),
+        seed: 44,
+      },
+    );
+    const guest = new MultiplayerRoomSession(
+      { name: 'Guest', avatarId: 'mint', profileId: 'veil-guest' },
+      {
+        signaling: broker.signaling('veil-guest-peer'),
+        peerConnection: rtc.factory('veil-guest'),
+        seed: 8,
+      },
+    );
+    sessions.push(host, guest);
+
+    const room = await host.create({ seats: 2, security: 'veil' });
+    await guest.join(room.code);
+    await eventually(() => {
+      expect(host.getSnapshot().seats).toHaveLength(2);
+      expect(guest.getSnapshot().localSeat).toBe(1);
+    });
+    await host.start();
+    await eventually(
+      () => {
+        expect(host.getSnapshot().security.ceremony.ready).toBe(true);
+        expect(guest.getSnapshot().security.ceremony.ready).toBe(true);
+        expect(host.getSnapshot().stage).toBe('table');
+        expect(guest.getSnapshot().stage).toBe('table');
+        const hostState = blitzMultiplayerSession(host.getSnapshot())!.state;
+        const guestState = blitzMultiplayerSession(guest.getSnapshot())!.state;
+        expect(hostState.hands[0]!.some(isVeilHandle)).toBe(false);
+        expect(hostState.hands[1]!.every(isVeilHandle)).toBe(true);
+        expect(guestState.hands[1]!.some(isVeilHandle)).toBe(false);
+        expect(guestState.hands[0]!.every(isVeilHandle)).toBe(true);
+      },
+      1_000,
+      10,
+    );
+  }, 120_000);
+
   it('discovers a Wild room and keeps its action-card state synchronized', async () => {
     const broker = new MockSignalingBroker();
     const rtc = new MockRtcNetwork();
@@ -210,7 +260,11 @@ describe('multiplayer route composition', () => {
 
     expect(host.getSnapshot()).toMatchObject({ gameId: 'wildpile' });
     expect(guest.getSnapshot()).toMatchObject({ gameId: 'wildpile' });
-    expect(guest.getSnapshot().settings?.config).toMatchObject({ stackDrawTwo: true, stackDrawFour: true, jumpIn: true });
+    expect(guest.getSnapshot().settings?.config).toMatchObject({
+      stackDrawTwo: true,
+      stackDrawFour: true,
+      jumpIn: true,
+    });
 
     const hostSession = wildMultiplayerSession(host.getSnapshot());
     expect(hostSession).not.toBeNull();
@@ -224,6 +278,85 @@ describe('multiplayer route composition', () => {
     });
     expect(stateHash(wildMultiplayerSession(guest.getSnapshot())?.state)).toBe(
       stateHash(wildMultiplayerSession(host.getSnapshot())?.state),
+    );
+  });
+
+  it('forces a dropped seat into bot takeover, plays its turn, and lets the profile reclaim it', async () => {
+    const broker = new MockSignalingBroker();
+    const rtc = new MockRtcNetwork();
+    const host = new MultiplayerRoomSession(
+      { name: 'Host', avatarId: 'ember', profileId: 'takeover-host' },
+      {
+        signaling: broker.signaling('takeover-host-peer'),
+        peerConnection: rtc.factory('takeover-host'),
+        seed: 121,
+        heartbeatIntervalMs: 10,
+        heartbeatTimeoutMs: 60,
+      },
+    );
+    const guest = new MultiplayerRoomSession(
+      { name: 'Guest', avatarId: 'mint', profileId: 'takeover-guest' },
+      {
+        signaling: broker.signaling('takeover-guest-peer'),
+        peerConnection: rtc.factory('takeover-guest'),
+        seed: 7,
+      },
+    );
+    sessions.push(host, guest);
+
+    const room = await host.create({ seats: 2 });
+    await guest.join(room.code);
+    await eventually(() => expect(guest.getSnapshot().localSeat).toBe(1));
+
+    host.send('draw.stock');
+    await eventually(() =>
+      expect(blitzMultiplayerSession(host.getSnapshot())?.log).toHaveLength(1),
+    );
+    const drawn = blitzMultiplayerSession(host.getSnapshot())!;
+    const discard = drawn.def.flow
+      .legalMoves(drawn.state, drawn.phase)
+      .find((move) => move.id === 'discard');
+    expect(discard).toBeDefined();
+    host.send(discard!.id, discard!.payload);
+    await eventually(() =>
+      expect(blitzMultiplayerSession(host.getSnapshot())?.phase.actor).toBe(1),
+    );
+    const beforeDrop = blitzMultiplayerSession(host.getSnapshot())!.log.length;
+
+    guest.close();
+    await eventually(
+      () => {
+        expect(host.getSnapshot().seats.find((seat) => seat.seat === 1)).toMatchObject({
+          connected: false,
+          bot: true,
+        });
+        expect(blitzMultiplayerSession(host.getSnapshot())!.log.length).toBeGreaterThan(beforeDrop);
+      },
+      100,
+      10,
+    );
+
+    const rejoined = new MultiplayerRoomSession(
+      { name: 'Guest', avatarId: 'mint', profileId: 'takeover-guest' },
+      {
+        signaling: broker.signaling('takeover-guest-rejoined'),
+        peerConnection: rtc.factory('takeover-rejoined'),
+        seed: 9,
+      },
+    );
+    sessions.push(rejoined);
+    await rejoined.join(room.code);
+    await eventually(
+      () => {
+        expect(host.getSnapshot().seats.find((seat) => seat.seat === 1)).toMatchObject({
+          connected: true,
+          bot: false,
+          profileId: 'takeover-guest',
+        });
+        expect(rejoined.getSnapshot().localSeat).toBe(1);
+      },
+      100,
+      10,
     );
   });
 });
