@@ -391,6 +391,85 @@ export interface HowToPlayDoc {
 }
 
 // ---------------------------------------------------------------------------
+// Shelf catalog (the app's game picker and mode picker are generated from this)
+// ---------------------------------------------------------------------------
+
+/**
+ * One card face in a tile's artwork. Packs describe the art; the app draws it,
+ * so a new game needs no changes to the picker to look like itself.
+ */
+export interface GameArtCard {
+  /** Short face text — "A♠", "+4", "31". */
+  label: string;
+  /** Gradient stops for a loud card. Omit to draw the muted paper card. */
+  tint?: readonly [string, string];
+}
+
+/** A selectable way to play a game: a config preset plus how it is sold. */
+export interface GameMode {
+  id: string;
+  name: string;
+  tagline: string;
+  description: string;
+  /** Short param lines shown on the tile. */
+  facts: readonly string[];
+  accent: string;
+  shade: string;
+  /**
+   * Config preset applied when the mode is chosen. Omit when a mode is a match
+   * *format* rather than a rule set — Blitz's formats and its house-rule
+   * presets are orthogonal, so its modes carry none.
+   */
+  preset?: string;
+  /** Faces previewed on the mode tile. */
+  art?: readonly GameArtCard[];
+  /**
+   * Names a bespoke tile illustration instead of a card fan. The app draws the
+   * motifs it knows and falls back to `art`, so a pack can reach for a richer
+   * picture without the picker having to know which game asked for it.
+   */
+  motif?: string;
+}
+
+/**
+ * A game pack's entry on the parlour shelf. Everything the picker screens
+ * render comes from here, so adding a game is adding one of these and one line
+ * to the app's registry — no picker code changes.
+ */
+export interface GameCatalogEntry<C extends RuleValues = RuleValues> {
+  /**
+   * Shelf id — the app's routing and match-history vocabulary. Stable forever
+   * once shipped, because saved matches are keyed on it.
+   */
+  id: string;
+  /** The pack's `GameDef.id`, used to open a table. Often the same as `id`. */
+  gameId: string;
+  name: string;
+  /** Trailing qualifier on the shelf, e.g. "the 31 game". */
+  subtitle: string;
+  tagline: string;
+  description: string;
+  facts: readonly string[];
+  accent: string;
+  shade: string;
+  /** Cards fanned on the shelf tile. */
+  art: readonly GameArtCard[];
+  /** Route the shelf sends players to; null keeps the game "coming soon". */
+  href: string | null;
+  howToPlay: HowToPlayDoc;
+  modes: readonly GameMode[];
+  /** Seat counts the table supports, in the order the picker offers them. */
+  seats: readonly number[];
+  /** Drives the generated rule-settings panel. */
+  configSchema: ConfigSchema<C>;
+}
+
+/** The config preset a mode selects, or null to take the schema defaults. */
+export function modePreset(mode: GameMode): string | null {
+  return mode.preset ?? null;
+}
+
+// ---------------------------------------------------------------------------
 // Game definition
 // ---------------------------------------------------------------------------
 

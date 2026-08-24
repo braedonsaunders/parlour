@@ -189,3 +189,15 @@ export function buildFxTimeline(events: readonly FxEvent[]): FxCue[] {
     .filter((cue): cue is FxCue => cue !== null)
     .sort((a, b) => a.startMs - b.startMs);
 }
+
+/**
+ * When the last cue in a burst finishes. Tables use this to hold the next actor
+ * until the current one's cards have actually landed — otherwise a long burst
+ * (a stacked pickup, say) is cut off mid-flight by the following move.
+ */
+export function fxTimelineDurationMs(events: readonly FxEvent[]): number {
+  return buildFxTimeline(events).reduce(
+    (longest, cue) => Math.max(longest, cue.startMs + cue.durationMs),
+    0,
+  );
+}

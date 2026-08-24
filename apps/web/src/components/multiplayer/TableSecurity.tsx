@@ -106,6 +106,29 @@ export function SecurityBadge({ security }: { security: MultiplayerSecurity }) {
       {security.tier === 'veil' ? (
         <p className="text-xs text-dusk-100/60">{security.recovery.disclosure}</p>
       ) : null}
+      {security.recoveredSeats.length > 0 ? (
+        <p className="text-xs text-hearth-200" data-testid="table-security-recovered">
+          {seatList(security.recoveredSeats)} disconnected and{' '}
+          {security.recoveredSeats.length === 1 ? 'their hand was' : 'their hands were'} reopened so
+          the round could continue. {security.recoveredSeats.length === 1 ? 'It is' : 'They are'} no
+          longer private.
+        </p>
+      ) : null}
+      {security.paused ? (
+        <p
+          className="text-xs font-bold text-hearth-200"
+          role="status"
+          data-testid="table-security-paused"
+        >
+          {security.paused}
+        </p>
+      ) : null}
     </div>
   );
+}
+
+function seatList(seats: readonly number[]): string {
+  const names = seats.map((seat) => `Seat ${seat + 1}`);
+  if (names.length === 1) return names[0] as string;
+  return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
 }

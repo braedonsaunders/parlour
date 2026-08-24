@@ -11,6 +11,7 @@ export {
 } from './hand';
 export { blitzSeat, createBlitzDef, HAND_SIZE } from './rules';
 export { blitzHowToPlay } from './howto';
+export { blitzCatalog } from './catalog';
 export {
   createBlitzLivesMatchDef,
   createBlitzTimedMatchDef,

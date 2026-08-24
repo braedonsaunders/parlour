@@ -1,5 +1,5 @@
 import type { FxEvent, LegalMove } from '@parlour/engine';
-import type { WildpileColor } from '@parlour/game-wildpile';
+import { CHALLENGE_PENALTY, type WildpileColor } from '@parlour/game-wildpile';
 import { getWildMode, type WildModeId } from '@/lib/wild/modes';
 import type { WildSnapshot } from '@/lib/solo/WildTransport';
 
@@ -34,12 +34,22 @@ export interface WildTableView {
   lastCardArmed: boolean;
   /** Card the local seat just drew and may still play, if any. */
   drawnCard: string | null;
+  /** An open Draw Four the local seat may call a bluff, or null. */
+  challenge: {
+    accused: number;
+    accusedName: string;
+    /** Cards riding on the answer, before the penalty for a bad call. */
+    amount: number;
+    /** What a failed challenge would cost instead. */
+    penalty: number;
+  } | null;
   legal: {
     playCards: readonly string[];
     draw: boolean;
     declineJump: boolean;
     chooseColor: boolean;
     callLastCard: boolean;
+    challengeDrawFour: boolean;
     /** Decline the card you just drew. Absent when the table forces the play. */
     pass: boolean;
     /** Seats whose hand the local seat may take. */
@@ -102,12 +112,14 @@ export function wildTableView(
     decision: isLocalTurn ? localDecision(session.phase.phase) : null,
     lastCardArmed: state.calledLastCard[localSeat] ?? false,
     drawnCard: state.turn === localSeat ? state.drawnCard : null,
+    challenge: challengeView(snapshot, localSeat),
     legal: {
       playCards,
       draw: offered.some((move) => move.id === 'draw'),
       declineJump: offered.some((move) => move.id === 'declineJump'),
       chooseColor: offered.some((move) => move.id === 'chooseColor'),
       callLastCard: offered.some((move) => move.id === 'callLastCard'),
+      challengeDrawFour: offered.some((move) => move.id === 'challengeDrawFour'),
       pass: offered.some((move) => move.id === 'pass'),
       swapTargets: offered.flatMap((move) =>
         move.id === 'chooseTarget' && payloadSeat(move) !== null ? [payloadSeat(move)!] : [],
@@ -116,8 +128,29 @@ export function wildTableView(
   };
 }
 
+function challengeView(snapshot: WildSnapshot, localSeat: number): WildTableView['challenge'] {
+  const open = snapshot.session.state.challenge;
+  if (!open || open.challenger !== localSeat) return null;
+  const accused = snapshot.players.find((player) => player.seat === open.accused);
+  return {
+    accused: open.accused,
+    accusedName: accused?.name ?? `Seat ${open.accused}`,
+    amount: open.amount,
+    penalty: open.amount + CHALLENGE_PENALTY,
+  };
+}
+
 export type WildAnnouncementKind =
-  'caught' | 'skip' | 'reverse' | 'draw-stack' | 'last-card' | 'swap' | 'rotate' | 'shuffle-hands';
+  | 'caught'
+  | 'skip'
+  | 'reverse'
+  | 'draw-stack'
+  | 'last-card'
+  | 'swap'
+  | 'rotate'
+  | 'shuffle-hands'
+  | 'challenge-won'
+  | 'challenge-lost';
 
 export interface WildAnnouncement {
   id: string;
@@ -133,6 +166,8 @@ export interface WildAnnouncement {
 
 /** Fixed order so a burst that skips *and* catches someone reads top-down. */
 const ANNOUNCEMENT_ORDER: readonly WildAnnouncementKind[] = [
+  'challenge-won',
+  'challenge-lost',
   'reverse',
   'skip',
   'draw-stack',
@@ -161,7 +196,10 @@ export function wildAnnouncements(
 
   const calls = fx.flatMap((event, index): WildAnnouncement[] => {
     const atMs = Math.max(0, event.at ?? 0);
-    const seat = numberField(event, 'seat');
+    const seat =
+      event.kind === 'wildpile.challenge'
+        ? numberField(event, 'challenger')
+        : numberField(event, 'seat');
     const base = { id: `${index}:${event.kind}`, atMs, seat };
     switch (event.kind) {
       case 'wildpile.skip':
@@ -187,6 +225,24 @@ export function wildAnnouncements(
         const amount = numberField(event, 'amount') ?? 0;
         return [
           { ...base, kind: 'draw-stack', seat: null, text: `+${amount}`, detail: 'Pick it up' },
+        ];
+      }
+      case 'wildpile.challenge': {
+        const upheld = boolField(event, 'upheld') === true;
+        const accused = numberField(event, 'accused');
+        const amount = numberField(event, 'amount') ?? 0;
+        const color = stringField(event, 'color');
+        return [
+          {
+            ...base,
+            kind: upheld ? 'challenge-won' : 'challenge-lost',
+            // The loser wears the stamp: the accusation is about who pays.
+            seat: upheld ? accused : seat,
+            text: upheld ? 'Bluff called' : 'Bad call',
+            detail: upheld
+              ? `${nameOf(accused)} had ${color} — takes ${amount}`
+              : `Nothing in ${color}. ${nameOf(seat)} takes ${amount}`,
+          },
         ];
       }
       case 'wildpile.swap': {
@@ -247,6 +303,23 @@ export function wildAnnouncements(
   return calls.sort(
     (a, b) => ANNOUNCEMENT_ORDER.indexOf(a.kind) - ANNOUNCEMENT_ORDER.indexOf(b.kind),
   );
+}
+
+function boolField(event: FxEvent, field: string): boolean | null {
+  const value = payloadOf(event)?.[field];
+  return typeof value === 'boolean' ? value : null;
+}
+
+function stringField(event: FxEvent, field: string): string | null {
+  const value = payloadOf(event)?.[field];
+  return typeof value === 'string' ? value : null;
+}
+
+function payloadOf(event: FxEvent): Record<string, unknown> | null {
+  if (typeof event.payload !== 'object' || event.payload === null || Array.isArray(event.payload)) {
+    return null;
+  }
+  return event.payload as Record<string, unknown>;
 }
 
 function numberField(event: FxEvent, field: string): number | null {

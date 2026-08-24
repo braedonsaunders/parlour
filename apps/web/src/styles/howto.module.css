@@ -1,0 +1,192 @@
+/* How-to-play sheet. Content comes verbatim from each game pack's
+   `howToPlay` doc, so nothing here is game specific. */
+
+.trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  border: 2px solid rgba(255, 246, 228, 0.4);
+  border-radius: 999px;
+  background: rgba(9, 20, 26, 0.82);
+  color: #f3e7d4;
+  font-family: var(--font-display), sans-serif;
+  font-weight: 800;
+  cursor: pointer;
+  transition:
+    transform 140ms var(--ease-pop),
+    border-color 140ms ease;
+}
+
+.trigger:hover,
+.trigger:focus-visible {
+  transform: translateY(-2px);
+  border-color: rgba(255, 246, 228, 0.9);
+  outline: none;
+}
+
+.pill {
+  padding: 0.4rem 0.9rem;
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+}
+
+/* Sits in the corner of a game or mode tile without swallowing its click. */
+.chip {
+  width: 1.9rem;
+  height: 1.9rem;
+  padding: 0;
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: max(1rem, env(safe-area-inset-top)) 1rem max(1rem, env(safe-area-inset-bottom));
+  background: rgba(4, 10, 14, 0.72);
+  backdrop-filter: blur(4px);
+}
+
+.sheet {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  width: min(34rem, 100%);
+  max-height: min(44rem, 100%);
+  padding: 0;
+  overflow: hidden;
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.1rem 1.2rem 0.85rem;
+  border-bottom: 1px solid rgba(255, 244, 223, 0.12);
+}
+
+.eyebrow {
+  display: block;
+  color: rgba(214, 226, 232, 0.6);
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.header h2 {
+  margin: 0.15rem 0 0;
+  font-family: var(--font-display), sans-serif;
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: #fff3dc;
+}
+
+.subtitle {
+  margin: 0.15rem 0 0;
+  color: rgba(214, 226, 232, 0.7);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.close {
+  flex: none;
+  width: 2.2rem;
+  height: 2.2rem;
+  border: 2px solid rgba(255, 246, 228, 0.3);
+  border-radius: 999px;
+  background: rgba(9, 20, 26, 0.7);
+  color: #f3e7d4;
+  font-size: 0.85rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.close:hover,
+.close:focus-visible {
+  border-color: rgba(255, 246, 228, 0.85);
+  outline: none;
+}
+
+.body {
+  display: grid;
+  gap: 1.1rem;
+  padding: 1.1rem 1.2rem 1.4rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.summary {
+  margin: 0;
+  color: #f3e7d4;
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.objective {
+  padding: 0.75rem 0.9rem;
+  border: 2px solid rgba(226, 147, 73, 0.45);
+  border-radius: 0.9rem;
+  background: rgba(226, 147, 73, 0.1);
+}
+
+.section h3,
+.objective h3 {
+  margin: 0 0 0.3rem;
+  color: rgba(214, 226, 232, 0.66);
+  font-size: 0.64rem;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.section p,
+.objective p {
+  margin: 0 0 0.5rem;
+  color: rgba(243, 231, 212, 0.88);
+  font-size: 0.84rem;
+  line-height: 1.5;
+}
+
+.section p:last-child,
+.objective p:last-child {
+  margin-bottom: 0;
+}
+
+.bullets {
+  display: grid;
+  gap: 0.4rem;
+  margin: 0.45rem 0 0;
+}
+
+.bullets > div {
+  display: grid;
+  grid-template-columns: minmax(6rem, 8.5rem) 1fr;
+  gap: 0.7rem;
+  align-items: baseline;
+}
+
+.bullets dt {
+  font-family: var(--font-display), sans-serif;
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: #ffd7a8;
+}
+
+.bullets dd {
+  margin: 0;
+  color: rgba(243, 231, 212, 0.82);
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+@media (max-width: 30rem) {
+  .bullets > div {
+    grid-template-columns: 1fr;
+    gap: 0.1rem;
+  }
+}

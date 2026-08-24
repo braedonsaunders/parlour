@@ -46,6 +46,14 @@ export type MultiplayerSecurity = {
   recovery: RecoveryPolicy;
   /** ceremony layers laid so far, of `seats` */
   ceremony: { laid: number; seats: number; ready: boolean };
+  /**
+   * Seats whose layer this client rebuilt after they disconnected. Their cards
+   * are readable from here on, so the badge names them rather than letting the
+   * loss pass quietly.
+   */
+  recoveredSeats: readonly number[];
+  /** set when a seat left and its layer cannot be recovered — the round stops */
+  paused: string | null;
 };
 export type MultiplayerGameSession =
   GameSession<BlitzState, BlitzConfig> | GameSession<WildpileState, WildpileRules>;
@@ -115,6 +123,8 @@ function securityFor(
     detail: summary.detail,
     recovery: recoveryPolicyFor(seats),
     ceremony: { laid: 0, seats, ready: tier === 'open' },
+    recoveredSeats: [],
+    paused: null,
   };
 }
 
@@ -320,6 +330,10 @@ export class MultiplayerRoomSession {
     if (!this.transport || this.snapshot.localSeat === null) {
       throw new Error('your seat is not connected');
     }
+    // A paused veiled round means a seat's cards cannot be reopened at all.
+    // Letting moves through anyway would print "paused" while the table kept
+    // playing into a board nobody can finish scoring.
+    if (this.snapshot.security.paused) throw new Error(this.snapshot.security.paused);
     this.transport.send({
       id: `${this.profile.profileId}:${this.sequence++}`,
       seat: this.snapshot.localSeat,
@@ -393,6 +407,38 @@ export class MultiplayerRoomSession {
         }
       }),
     );
+  }
+
+  /**
+   * Rebuilds a departed seat's layer so the round can continue.
+   *
+   * This is the one moment Veil trades privacy for playability, so it is never
+   * silent: the seat is named in the badge afterwards. When the room's policy
+   * has no honest threshold — two seats — the round pauses instead, and the
+   * message says exactly why rather than blaming the network.
+   */
+  private async recoverLostSeat(seat: number): Promise<void> {
+    const veil = this.veil;
+    if (!veil || seat === this.snapshot.localSeat) return;
+    veil.room.markSeatLost(seat);
+    // Every epoch, not just the opening deal: a recycled stock has its own
+    // layer, and leaving that one sealed would wedge the round just as surely.
+    const epochs = veil.session.liveEpochs();
+    const results = await Promise.all(epochs.map((epoch) => veil.room.recoverSeat(seat, epoch)));
+    const recovered = results.length > 0 && results.every(Boolean);
+    this.update({
+      security: {
+        ...this.snapshot.security,
+        recoveredSeats: veil.room.recoveredSeats(),
+        paused: recovered
+          ? null
+          : veil.session.recovery.mode === 'none'
+            ? `Seat ${seat} left. ${veil.session.recovery.disclosure}`
+            : `Seat ${seat} left and not enough players are here to reopen their cards. ` +
+              `The round is paused until ${veil.session.recovery.threshold} of them are back.`,
+      },
+    });
+    if (recovered) void this.openMyHandles();
   }
 
   /** Re-presents the authority's state now that this seat knows more faces. */
@@ -497,6 +543,7 @@ export class MultiplayerRoomSession {
     }
     if (presence.kind === 'peer.joined' || presence.kind === 'seat.reclaimed') {
       const isLocal = presence.peerId === this.snapshot.room?.peerId;
+      this.veil?.room.markSeatPresent(presence.seat);
       const existing = this.snapshot.seats.filter((seat) => seat.seat !== presence.seat);
       const joined: MultiplayerSeat = isLocal
         ? { ...this.profile, seat: presence.seat, connected: true, bot: false }
@@ -526,6 +573,9 @@ export class MultiplayerRoomSession {
           seat.seat === presence.seat ? { ...seat, connected: false, bot: true } : seat,
         ),
       });
+      // A veiled room cannot keep dealing while a departed seat's layer is
+      // missing, so ask the room to rebuild it — or say plainly that it cannot.
+      if (this.veil) void this.recoverLostSeat(presence.seat);
     }
   }
 

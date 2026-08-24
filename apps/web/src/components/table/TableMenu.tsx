@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import type { HowToPlayDoc } from '@parlour/engine';
+import { HowToPlayButton } from '@/components/HowToPlay';
 import { useAudioManager, useAudioStore } from '@/stores/audio';
 import { SCENE_IDS, SCENE_LABELS, useSceneStore, type SceneId } from '@/stores/scene';
 import {
@@ -20,13 +22,15 @@ const SCENE_ICONS: Record<SceneId, string> = {
 };
 
 export type TableMenuProps = {
+  /** The running game's instructions, so rules stay reachable mid-match. */
+  howToPlay?: { doc: HowToPlayDoc; title: string; subtitle?: string };
   open: boolean;
   onClose: () => void;
   /** Fired only after the player confirms leaving the match. */
   onQuit: () => void;
 };
 
-export function TableMenu({ open, onClose, onQuit }: TableMenuProps) {
+export function TableMenu({ open, onClose, onQuit, howToPlay }: TableMenuProps) {
   const dropEffects = useTableFxStore((state) => state.dropEffects);
   const setDropEffects = useTableFxStore((state) => state.setDropEffects);
   const [confirmingQuit, setConfirmingQuit] = useState(false);
@@ -171,6 +175,14 @@ export function TableMenu({ open, onClose, onQuit }: TableMenuProps) {
               <MusicControls />
             </section>
             <div className={styles.menuActions}>
+              {howToPlay && (
+                <HowToPlayButton
+                  doc={howToPlay.doc}
+                  title={howToPlay.title}
+                  subtitle={howToPlay.subtitle}
+                  className={styles.menuHelp}
+                />
+              )}
               <button type="button" className="btn-fat" autoFocus onClick={onClose}>
                 Back to the table
               </button>

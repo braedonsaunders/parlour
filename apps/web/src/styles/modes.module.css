@@ -313,3 +313,155 @@
     opacity: 0;
   }
 }
+
+/* --- app-like screen fit -------------------------------------------------- */
+
+/* Opt-in: turns a setup page into a fixed app frame — header, flexible
+   carousel, footer — instead of a document that scrolls a hair past the fold.
+   Nothing here changes the plain carousel used by the game shelf. */
+.fitScreen {
+  height: 100dvh;
+  min-height: min(480px, 100dvh);
+  overflow: hidden;
+}
+
+.fitHeader {
+  flex: none;
+  padding-top: max(1.25rem, env(safe-area-inset-top));
+}
+
+.fitCarousel {
+  flex: 1 1 auto;
+  min-height: 0;
+  align-items: center;
+  padding-block: 0.85rem;
+}
+
+/* Whatever sits directly in the carousel carries the height cap. If a page
+   wraps its tile — for a help chip or a ribbon — the wrapper passes the cap
+   through instead of swallowing it. */
+.fitCarousel > * {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  max-height: 100%;
+}
+
+.fitCarousel > * > .tile {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.fitCarousel .tile {
+  display: flex;
+  flex-direction: column;
+  max-height: 100%;
+  /* Belt and braces: whatever chrome a page adds, the card clips instead of
+     handing the carousel a few pixels of vertical scroll. */
+  overflow: hidden;
+}
+
+/* The artwork is the only piece allowed to give up height, so the copy stays
+   whole on short viewports. */
+.fitCarousel .preview {
+  flex: 0 1 7.5rem;
+  height: auto;
+  min-height: 3.25rem;
+}
+
+/* Everything below the artwork holds its size and clamps instead of shrinking,
+   so a short viewport never leaves a half-cut line of copy on the card. */
+.fitCarousel .tagline,
+.fitCarousel .modeName,
+.fitCarousel .facts {
+  flex: none;
+}
+
+.fitCarousel .description {
+  flex: none;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+}
+
+.fitFooter {
+  flex: none;
+  gap: 0.75rem;
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+}
+
+/* Short handsets and phones in landscape: tighten the frame rather than push
+   the footer off the fold. */
+@media (max-height: 720px) {
+  .fitCarousel {
+    /* Still has to clear the selected tile's lift-and-scale, or the carousel
+       picks up a couple of pixels of vertical scroll. */
+    padding-block: 0.75rem;
+  }
+
+  .fitCarousel .tile {
+    padding: 0.75rem 1rem 0.85rem;
+  }
+
+  .fitCarousel .preview {
+    min-height: 2.25rem;
+    margin-bottom: 0.6rem;
+  }
+
+  .fitCarousel .modeName {
+    font-size: 1.4rem;
+  }
+
+  .fitCarousel .description {
+    margin-top: 0.5rem;
+    -webkit-line-clamp: 2;
+  }
+
+  .fitFooter {
+    gap: 0.5rem;
+  }
+}
+
+/* Below this the card can no longer hold both the fact pills and a readable
+   blurb, and the blurb is the one that says something. */
+@media (max-height: 700px) {
+  .fitCarousel .facts {
+    display: none;
+  }
+}
+
+/* Landscape phones: only the artwork and the mode's name survive — the setup
+   controls are what the screen is for. */
+@media (max-height: 520px) {
+  .fitCarousel .tile {
+    padding: 0.6rem 0.9rem 0.7rem;
+  }
+
+  .fitCarousel .preview {
+    min-height: 2rem;
+    margin-bottom: 0.45rem;
+  }
+
+  .fitCarousel .tagline {
+    font-size: 0.72rem;
+  }
+
+  .fitCarousel .modeName {
+    font-size: 1.15rem;
+  }
+
+  .fitCarousel .facts,
+  .fitCarousel .description,
+  .fitHint {
+    display: none;
+  }
+
+  .fitFooter :global(.panel-soft) {
+    padding: 0.6rem 0.9rem;
+  }
+
+  .fitFooter :global(.btn-fat) {
+    padding-block: 0.5rem;
+  }
+}

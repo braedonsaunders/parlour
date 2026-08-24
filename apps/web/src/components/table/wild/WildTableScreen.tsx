@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type RefObject } from 'react';
 import { type FxEvent } from '@parlour/engine';
-import { WILDPILE_COLORS, type WildpileColor } from '@parlour/game-wildpile';
+import { WILDPILE_COLORS, wildpileHowToPlay, type WildpileColor } from '@parlour/game-wildpile';
 import { AnimatePresence, motion } from 'motion/react';
 import { getAvatar } from '@/lib/avatars';
 import { WILDPILE_SFX_PACK } from '@/lib/audio/sfx';
@@ -17,6 +17,7 @@ import {
   type WildSeatView,
   type WildTableView,
 } from '@/lib/wild/view';
+import { useWildPickupCount, wildPickup, type WildPickup } from '@/lib/wild/pickup';
 import { WILD_DROP_EFFECTS } from '@/lib/wild/drop-effects';
 import { CardDropFx } from '../CardDropFx';
 import { discardRotation, useFxAnimation, useTableAudio } from '../fx-animation';
@@ -47,6 +48,7 @@ export type WildTableScreenProps = {
   onCallLastCard?: () => void;
   onChooseTarget?: (seat: number) => void;
   onPass?: () => void;
+  onChallengeDrawFour?: () => void;
   /** Fired only after the player confirms quitting from the shared table menu. */
   onQuit?: () => void;
 };
@@ -57,6 +59,14 @@ export function WildTableScreen(props: WildTableScreenProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const deal = useDealPresentation(props.fx, props.fxKey);
   useTableAudio(props.fx, props.fxKey, WILDPILE_SFX_PACK.id);
+
+  // Pickups are counted out card by card so a stacked penalty reads as it
+  // arrives instead of appearing in the hand all at once.
+  const pickup = useMemo(
+    () => (deal.dealing ? null : wildPickup(props.fx)),
+    [deal.dealing, props.fx],
+  );
+  const pickupCount = useWildPickupCount(pickup, props.fxKey);
 
   // The pile has no clock, so the tense cue rides Wild's five-minute pace and
   // comes in for the closing minute; it releases when the hand is over.
@@ -160,6 +170,7 @@ export function WildTableScreen(props: WildTableScreenProps) {
           rootRef={rootRef}
         />
         <CardDropFx fx={props.fx} fxKey={props.fxKey} packId={WILD_DROP_EFFECTS.id} />
+        <PickupCounter pickup={pickup} count={pickupCount} players={view.players} />
         <Announcer calls={calls} fxKey={props.fxKey} />
         {view.decision === 'jump-in' && !localBusy && (
           <div className={`${wildStyles.jumpBanner} panel-soft`} role="alertdialog">
@@ -174,6 +185,13 @@ export function WildTableScreen(props: WildTableScreenProps) {
         )}
         {view.decision === 'choose-target' && !localBusy && (
           <SwapChooser view={view} onChooseTarget={props.onChooseTarget} />
+        )}
+        {view.challenge && view.legal.challengeDrawFour && !localBusy && (
+          <ChallengePrompt
+            challenge={view.challenge}
+            onChallenge={props.onChallengeDrawFour}
+            onAccept={props.onDraw}
+          />
         )}
       </section>
 
@@ -229,6 +247,7 @@ export function WildTableScreen(props: WildTableScreenProps) {
       <TableMenu
         open={menuOpen}
         onClose={() => setMenuOpen(false)}
+        howToPlay={{ doc: wildpileHowToPlay, title: 'Wild', subtitle: view.phaseLabel }}
         onQuit={() => {
           setMenuOpen(false);
           props.onQuit?.();
@@ -506,6 +525,125 @@ function ColorChooser({ onChooseColor }: { onChooseColor?: (color: WildpileColor
         </span>
       </motion.div>
     </div>
+  );
+}
+
+/**
+ * Counts a penalty out loud. Big stacked pickups used to arrive as a silent
+ * jump in someone's card count; this holds the table on the number while the
+ * cards fly, so a +10 is something that happens *to* you rather than to the HUD.
+ */
+function PickupCounter({
+  pickup,
+  count,
+  players,
+}: {
+  pickup: WildPickup | null;
+  count: { taken: number; left: number } | null;
+  players: readonly WildSeatView[];
+}) {
+  const target = players.find((player) => player.seat === pickup?.seat);
+  const mine = target?.isLocal ?? false;
+
+  return (
+    <div
+      className={wildStyles.pickupLayer}
+      aria-live="assertive"
+      data-testid="wild-pickup"
+      data-active={count ? 'true' : 'false'}
+      data-taken={count?.taken}
+    >
+      <AnimatePresence>
+        {pickup && count && (
+          <motion.div
+            key={`${pickup.seat}:${pickup.amount}`}
+            className={wildStyles.pickup}
+            data-reason={pickup.reason}
+            data-mine={mine || undefined}
+            initial={{ opacity: 0, scale: 0.6, y: -10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.8, y: 8 }}
+            transition={{ duration: 0.24, ease: [0.34, 1.56, 0.64, 1] }}
+          >
+            <span className={wildStyles.pickupWho}>
+              {mine ? 'You pick up' : `${target?.name ?? 'They'} pick up`}
+            </span>
+            {/* Keyed on the running total so each card that lands punches the
+                number rather than quietly replacing it. */}
+            <motion.strong
+              key={count.taken}
+              className={wildStyles.pickupCount}
+              initial={{ scale: 1.6, opacity: 0.4 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ duration: 0.2, ease: [0.34, 1.56, 0.64, 1] }}
+            >
+              +{pickup.amount}
+            </motion.strong>
+            <span className={wildStyles.pickupTrack} aria-hidden="true">
+              {Array.from({ length: pickup.amount }, (_, index) => (
+                <i key={index} data-landed={index < count.taken || undefined} />
+              ))}
+            </span>
+            <small className={wildStyles.pickupProgress}>
+              {count.left > 0 ? `${count.taken} of ${pickup.amount}` : PICKUP_DONE[pickup.reason]}
+            </small>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+const PICKUP_DONE: Record<WildPickup['reason'], string> = {
+  penalty: 'Turn lost',
+  caught: 'No call made',
+  challenge: 'Challenge settled',
+};
+
+/** The Draw Four window: take the pile, or say they had the colour all along. */
+function ChallengePrompt({
+  challenge,
+  onChallenge,
+  onAccept,
+}: {
+  challenge: NonNullable<WildTableView['challenge']>;
+  onChallenge?: () => void;
+  onAccept?: () => void;
+}) {
+  return (
+    <motion.div
+      className={`${wildStyles.challengePrompt} panel-soft`}
+      role="alertdialog"
+      aria-label="Challenge the Draw Four?"
+      data-testid="challenge-prompt"
+      initial={{ opacity: 0, y: 16, scale: 0.94 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ duration: 0.26, ease: [0.34, 1.56, 0.64, 1] }}
+    >
+      <strong>{challenge.accusedName} played a Draw Four</strong>
+      <small>
+        They can only play it holding nothing in the old colour. Call it and they take{' '}
+        {challenge.amount} — be wrong and you take {challenge.penalty}.
+      </small>
+      <div className={wildStyles.challengeActions}>
+        <button
+          type="button"
+          className={`btn-fat ${wildStyles.challengeButton}`}
+          data-testid="challenge-draw-four"
+          onClick={onChallenge}
+        >
+          Call the bluff
+        </button>
+        <button
+          type="button"
+          className="btn-fat btn-fat--ghost"
+          data-testid="accept-draw-four"
+          onClick={onAccept}
+        >
+          Take +{challenge.amount}
+        </button>
+      </div>
+    </motion.div>
   );
 }
 
