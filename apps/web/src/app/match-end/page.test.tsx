@@ -80,6 +80,13 @@ describe('match end screen', () => {
     expect(container.querySelector('[data-testid="match-rivalry"]')).toBeNull();
   });
 
+  it('keeps play-again in flow so tall podiums are not covered', () => {
+    play('m1', 1_000, 1);
+    render();
+    const again = container.querySelector('[data-testid="play-again"]');
+    expect(again?.parentElement?.className).not.toMatch(/fixed/);
+  });
+
   it('shows the running series once the same players go again', () => {
     play('m1', 1_000, 1);
     play('m2', 2_000, 1);

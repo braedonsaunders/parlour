@@ -48,7 +48,7 @@ export default function MatchEndPage() {
   }, [fallbackRoute, playAgainHandler, router]);
 
   return (
-    <main className="flex min-h-dvh flex-col items-center justify-center">
+    <main className="flex min-h-dvh flex-col items-center justify-safe-center overflow-y-auto">
       {snapshot ? (
         <>
           <MatchPodium snapshot={snapshot}>
@@ -60,7 +60,7 @@ export default function MatchEndPage() {
               />
             )}
           </MatchPodium>
-          <div className="fixed bottom-8 left-0 right-0 z-10 flex justify-center gap-3">
+          <div className="relative z-10 flex justify-center gap-3 px-4 pb-[max(2rem,env(safe-area-inset-bottom))]">
             <button
               type="button"
               onClick={playAgain}

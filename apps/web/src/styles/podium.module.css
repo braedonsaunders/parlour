@@ -5,8 +5,7 @@
   align-items: center;
   justify-content: center;
   gap: 2rem;
-  /* the page centres this column; bottom room keeps the fixed buttons clear */
-  padding: 3rem 1.5rem 7.5rem;
+  padding: 2.5rem 1.5rem 1.25rem;
 }
 
 .headline {
@@ -33,6 +32,8 @@
   align-items: stretch;
   justify-content: center;
   gap: 1rem;
+  /* Room for the rank pills that hang off the top of each plaque. */
+  padding-top: 1.15rem;
 }
 
 .plaque {
@@ -42,7 +43,6 @@
   flex-direction: column;
   align-items: center;
   gap: 0.55rem;
-  overflow: hidden;
   padding: 1.5rem 1rem 1rem;
   border-radius: var(--radius-fat);
   border: 2px solid rgba(175, 218, 228, 0.22);
@@ -117,6 +117,8 @@
 .coinField {
   position: absolute;
   inset: 0;
+  overflow: hidden;
+  border-radius: inherit;
   pointer-events: none;
 }
 
