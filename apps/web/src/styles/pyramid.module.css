@@ -1,7 +1,10 @@
 .screen {
   --py-select: #ffc46a;
   --py-fresh: #7ee0b0;
-  --py-card: clamp(3.1rem, 8vw, 4.6rem);
+  --py-gap: 0.22rem;
+  --py-card: clamp(2.15rem, 7vw, 3.55rem);
+  --py-card-h: calc(var(--py-card) * 1.4);
+  --py-step: calc(var(--py-card-h) * 0.36);
 }
 
 .playfield {
@@ -29,20 +32,31 @@
 .board {
   position: absolute;
   z-index: 5;
-  inset: clamp(5.35rem, 11vh, 6.5rem) max(0.7rem, env(safe-area-inset-right))
-    max(4.7rem, calc(env(safe-area-inset-bottom) + 4rem)) max(0.7rem, env(safe-area-inset-left));
+  inset: clamp(5.1rem, 10vh, 6.2rem) max(0.55rem, env(safe-area-inset-right))
+    max(6.1rem, calc(env(safe-area-inset-bottom) + 5.4rem)) max(0.55rem, env(safe-area-inset-left));
   display: grid;
-  grid-template-rows: auto 1fr;
-  gap: clamp(0.45rem, 1.6vh, 0.9rem);
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 0.45rem;
   max-width: 46rem;
   margin-inline: auto;
+  overflow: hidden;
+  container-type: size;
+  /* 7 overlapped rows + locked stock row: 4.16 card-heights + ~1.8rem chrome. */
+  --py-card: min(4.6rem, calc((100cqw - 6 * var(--py-gap)) / 7), calc((100cqh - 2.6rem) / 6.15));
+  --py-card-h: calc(var(--py-card) * 1.4);
+  --py-step: calc(var(--py-card-h) * 0.34);
 }
 
 .topRow {
   display: flex;
   justify-content: center;
+  align-items: start;
+  flex-shrink: 0;
   gap: clamp(1.4rem, 4vw, 2.4rem);
-  min-height: calc(var(--py-card) * 1.4 + 1.3rem);
+  height: calc(var(--py-card-h) + 1.35rem);
+  min-height: calc(var(--py-card-h) + 1.35rem);
+  max-height: calc(var(--py-card-h) + 1.35rem);
+  overflow: hidden;
 }
 
 .pileWrap {
@@ -54,10 +68,16 @@
 .pileButton {
   position: relative;
   display: block;
+  box-sizing: border-box;
   width: var(--py-card);
-  aspect-ratio: 5 / 7;
+  height: var(--py-card-h);
+  min-width: var(--py-card);
+  min-height: var(--py-card-h);
+  max-width: var(--py-card);
+  max-height: var(--py-card-h);
   padding: 0;
   border: 0;
+  overflow: visible;
   background: transparent;
 }
 
@@ -73,9 +93,16 @@ button.pileButton,
   height: 100%;
 }
 
-.pileButton [data-card-chassis],
-.pyramidCard [data-card-chassis] {
+.board .pileButton [data-card-chassis],
+.board .pyramidCard [data-card-chassis] {
+  display: block;
+  box-sizing: border-box;
   width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  max-width: none;
+  aspect-ratio: auto;
   transition:
     filter var(--dur-feedback) var(--ease-settle),
     opacity var(--dur-feedback) var(--ease-settle);
@@ -86,8 +113,14 @@ button.pileButton,
   filter: drop-shadow(0 0 12px rgba(255, 196, 106, 0.9));
 }
 
+.pyramidCard[data-free] > [data-card-chassis] {
+  filter: none;
+}
+
 .pyramidCard[data-playable='true'] > [data-card-chassis],
-.pileButton[data-selected] > [data-card-chassis] {
+.pyramidCard[data-selected] > [data-card-chassis],
+.pileButton[data-playable='true'] [data-card-chassis],
+.pileButton[data-selected] [data-card-chassis] {
   box-shadow:
     0 0 0 3px var(--py-select),
     0 0 22px rgba(255, 196, 106, 0.45);
@@ -103,16 +136,15 @@ button.pileButton,
 .emptySlot {
   display: grid;
   place-items: center;
+  box-sizing: border-box;
   width: 100%;
   height: 100%;
-  min-width: 2.4rem;
-  min-height: 2.4rem;
   border: 0.17rem dashed rgba(255, 241, 213, 0.28);
   border-radius: 0.72rem;
   background: rgba(42, 16, 12, 0.28);
   color: rgba(255, 234, 198, 0.45);
   font:
-    800 clamp(1.5rem, 4vw, 2.5rem)/1 var(--font-display),
+    800 clamp(1.1rem, 3vw, 1.8rem) / 1 var(--font-display),
     sans-serif;
 }
 
@@ -143,31 +175,40 @@ button.pileButton,
 }
 
 .pyramid {
-  display: grid;
-  align-content: start;
-  justify-items: center;
-  gap: clamp(0.18rem, 0.8vh, 0.42rem);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
   min-height: 0;
+  height: 100%;
+  padding-bottom: 0.2rem;
+  overflow: hidden;
 }
 
 .row {
   display: flex;
   justify-content: center;
-  gap: clamp(0.18rem, 1vw, 0.42rem);
+  gap: var(--py-gap);
+  margin-top: calc(var(--py-step) - var(--py-card-h));
+}
+
+.row:first-child {
+  margin-top: 0;
 }
 
 .pyramidCard,
 .cardSlot,
 .emptySlot {
   width: var(--py-card);
-  aspect-ratio: 5 / 7;
+  height: var(--py-card-h);
   padding: 0;
   border: 0;
   background: transparent;
 }
 
-.pyramidCard:disabled {
-  opacity: 0.72;
+.pyramidCard :global(button.card:not(:disabled):hover) {
+  transform: none;
 }
 
 .actions {
@@ -200,7 +241,7 @@ button.pileButton,
   position: absolute;
   z-index: 24;
   left: 50%;
-  bottom: max(4.4rem, calc(env(safe-area-inset-bottom) + 3.8rem));
+  top: clamp(4.7rem, 9vh, 5.8rem);
   max-width: min(34rem, calc(100vw - 2rem));
   translate: -50% 0;
   padding: 0.48rem 0.85rem;
@@ -261,12 +302,12 @@ button.pileButton,
 
 @media (orientation: landscape) and (max-height: 560px) {
   .screen {
-    --py-card: clamp(2.4rem, 5.4vw, 3.1rem);
+    --py-card: clamp(2.1rem, 5vw, 2.9rem);
   }
 
   .board {
-    inset: 3.55rem 0.75rem 3.6rem;
-    gap: 0.28rem;
+    inset: 3.4rem 0.65rem 4.7rem;
+    gap: 0.22rem;
   }
 
   .titlePill {

@@ -101,6 +101,75 @@ describe('PyramidTableScreen', () => {
     expect(container.querySelector('[data-testid="pyramid-daily"]')).toBeNull();
   });
 
+  it('lights the stock when the opening tableau has no pair', () => {
+    let view: PyramidTableView | undefined;
+    for (let seed = 1; seed <= 200 && !view; seed++) {
+      const next = table(seed, 'classic').view;
+      const live = next.legal.some(
+        (move) => move.id === 'pyramid.pair' || move.id === 'pyramid.remove',
+      );
+      if (!live && next.legal.some((move) => move.id === 'stock.draw')) view = next;
+    }
+    expect(view).toBeDefined();
+    render(view!);
+    expect(
+      container.querySelector('[data-testid="pyramid-stock"]')?.getAttribute('data-playable'),
+    ).toBe('true');
+  });
+
+  it('keeps the bottom row free so the opening cards can be tapped', () => {
+    const { view } = table();
+    render(view);
+    const bottoms = container.querySelectorAll('[data-testid^="pyramid-card-6-"]');
+    expect(bottoms).toHaveLength(7);
+    for (const slot of bottoms) {
+      expect(slot.hasAttribute('data-free')).toBe(true);
+      expect(slot.querySelector('button')?.disabled).toBe(false);
+    }
+  });
+
+  it('pairs two free cards in two taps', () => {
+    let chosen:
+      | { view: PyramidTableView; a: { row: number; col: number }; b: { row: number; col: number } }
+      | undefined;
+    for (let seed = 1; seed <= 80 && !chosen; seed++) {
+      const { view } = table(seed);
+      const move = view.legal.find((legal) => {
+        if (legal.id !== 'pyramid.pair') return false;
+        const payload = legal.payload as { a?: unknown; b?: unknown };
+        return (
+          typeof payload.a === 'object' &&
+          payload.a !== null &&
+          typeof payload.b === 'object' &&
+          payload.b !== null
+        );
+      });
+      const payload = move?.payload as
+        { a?: { row: number; col: number }; b?: { row: number; col: number } } | undefined;
+      if (payload?.a && payload.b) chosen = { view, a: payload.a, b: payload.b };
+    }
+    expect(chosen).toBeDefined();
+    const onDispatch = vi.fn();
+    render(chosen!.view, { onDispatch });
+    act(() =>
+      container
+        .querySelector<HTMLElement>(
+          `[data-testid="pyramid-card-${chosen!.a.row}-${chosen!.a.col}"]`,
+        )
+        ?.querySelector('button')
+        ?.click(),
+    );
+    act(() =>
+      container
+        .querySelector<HTMLElement>(
+          `[data-testid="pyramid-card-${chosen!.b.row}-${chosen!.b.col}"]`,
+        )
+        ?.querySelector('button')
+        ?.click(),
+    );
+    expect(onDispatch).toHaveBeenCalledWith('pyramid.pair', { a: chosen!.a, b: chosen!.b });
+  });
+
   it('shows a public hint and clears it with Escape', () => {
     const { view } = table();
     render(view);

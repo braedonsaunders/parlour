@@ -1,6 +1,6 @@
 import type { LegalMove } from '@parlour/engine';
 import { describe, expect, it } from 'vitest';
-import { clickSource, type PyramidTableView } from './view';
+import { clickSource, partnersOf, type PyramidTableView } from './view';
 
 function view(legal: readonly LegalMove[]): PyramidTableView {
   return {
@@ -59,5 +59,17 @@ describe('Pyramid table view', () => {
       selection: null,
       move: null,
     });
+  });
+
+  it('names the waste as a partner of a selected pyramid card', () => {
+    const legal = [
+      {
+        id: 'pyramid.pair',
+        payload: { a: { row: 6, col: 0 }, b: 'waste' },
+      },
+    ] satisfies LegalMove[];
+    expect(partnersOf(view(legal), { row: 6, col: 0 })).toEqual(['waste']);
+    expect(partnersOf(view(legal), 'waste')).toEqual([{ row: 6, col: 0 }]);
+    expect(partnersOf(view(legal), { row: 6, col: 2 })).toEqual([]);
   });
 });

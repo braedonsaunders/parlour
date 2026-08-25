@@ -25,6 +25,7 @@ import {
   clickSource,
   describeHint,
   freeSources,
+  partnersOf,
   sameSelection,
   sourceOfMove,
   targetOfMove,
@@ -166,7 +167,10 @@ function ReadyPyramidTable({
   const hintText = showHint ? describeHint(view.hint) : null;
   const hintSource = showHint && view.hint ? sourceOfMove(view.hint.move) : null;
   const hintTarget = showHint && view.hint ? targetOfMove(view.hint.move) : null;
-  const playable = useMemo(() => freeSources(view), [view]);
+  const armed = useMemo(
+    () => (selection ? partnersOf(view, selection) : freeSources(view)),
+    [selection, view],
+  );
   const ready = !busy && !deal.dealing && view.stage === 'playing';
   const stockMove =
     view.legal.find((move) => move.id === 'stock.draw') ??
@@ -214,6 +218,7 @@ function ReadyPyramidTable({
                 data-zone="stock"
                 data-zone-face
                 data-hint={hintSource === 'stock' || undefined}
+                data-playable={!selection && armed.length === 0 && stockMove ? 'true' : undefined}
                 data-testid="pyramid-stock"
                 onClick={() => stockMove && onDispatch?.(stockMove.id, stockMove.payload)}
                 disabled={!ready || !stockMove}
@@ -224,7 +229,7 @@ function ReadyPyramidTable({
                 }
               >
                 {view.stockCount > 0 ? (
-                  <PlayingCard faceDown />
+                  <PlayingCard faceDown compact />
                 ) : (
                   <span className={styles.emptyPile}>·</span>
                 )}
@@ -239,6 +244,7 @@ function ReadyPyramidTable({
                 data-zone-face
                 data-hint={hintSource === 'waste' || hintTarget === 'waste' || undefined}
                 data-selected={selection === 'waste' || undefined}
+                data-playable={armed.some((source) => source === 'waste') ? 'true' : undefined}
                 data-testid="pyramid-waste"
                 onClick={() => choose('waste')}
                 disabled={!ready || view.waste.length === 0}
@@ -251,7 +257,7 @@ function ReadyPyramidTable({
                       justDrawn !== null && justDrawn === view.waste.at(-1) ? '' : undefined
                     }
                   >
-                    <PlayingCard card={view.waste.at(-1)} disabled />
+                    <PlayingCard card={view.waste.at(-1)} compact disabled />
                   </div>
                 ) : (
                   <span className={styles.emptyPile} aria-label="Empty waste">
@@ -265,7 +271,12 @@ function ReadyPyramidTable({
 
           <div className={styles.pyramid} aria-label="Pyramid">
             {view.pyramid.map((row, rowIndex) => (
-              <div key={rowIndex} className={styles.row} data-testid={`pyramid-row-${rowIndex}`}>
+              <div
+                key={rowIndex}
+                className={styles.row}
+                style={{ zIndex: rowIndex }}
+                data-testid={`pyramid-row-${rowIndex}`}
+              >
                 {row.map((card, col) => {
                   const visible = col < (deal.visibleByRow[rowIndex] ?? row.length);
                   if (!visible) {
@@ -282,27 +293,30 @@ function ReadyPyramidTable({
                   }
                   const source = { row: rowIndex, col };
                   const free = isFree(view.pyramid, rowIndex, col);
-                  const live =
-                    free && playable.some((candidate) => sameSelection(candidate, source));
+                  const live = free && armed.some((candidate) => sameSelection(candidate, source));
                   const selected = sameSelection(selection, source);
                   const zone = zoneOfSource(source);
                   return (
-                    <button
+                    <div
                       key={`${card}:${rowIndex}:${col}`}
-                      type="button"
                       className={styles.pyramidCard}
                       data-zone={zone}
                       data-zone-face={free || undefined}
                       data-card={card}
+                      data-free={free || undefined}
                       data-playable={live ? 'true' : undefined}
                       data-selected={selected || undefined}
                       data-hint={hintSource === zone || hintTarget === zone || undefined}
                       data-testid={`pyramid-card-${rowIndex}-${col}`}
-                      onClick={() => choose(source)}
-                      disabled={!ready || !free}
                     >
-                      <PlayingCard card={card} disabled={!ready || !free} actionLabel="Pair" />
-                    </button>
+                      <PlayingCard
+                        card={card}
+                        compact
+                        onClick={ready && free ? () => choose(source) : undefined}
+                        disabled={!ready || !free}
+                        actionLabel="Pair"
+                      />
+                    </div>
                   );
                 })}
               </div>

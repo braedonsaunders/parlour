@@ -149,3 +149,19 @@ export function freeSources(view: PyramidTableView): readonly PyramidSource[] {
     return [];
   });
 }
+
+/** Cards that complete a pair with the current selection. */
+export function partnersOf(
+  view: PyramidTableView,
+  selected: PyramidSelection | null,
+): readonly PyramidSource[] {
+  if (!selected) return [];
+  return view.legal.flatMap((move) => {
+    if (move.id !== 'pyramid.pair') return [];
+    const payload = move.payload as { a?: PyramidSource; b?: PyramidSource } | undefined;
+    if (!payload?.a || !payload.b) return [];
+    if (sameSelection(selected, payload.a)) return [payload.b];
+    if (sameSelection(selected, payload.b)) return [payload.a];
+    return [];
+  });
+}
