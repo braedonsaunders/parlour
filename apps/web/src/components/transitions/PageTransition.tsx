@@ -53,8 +53,8 @@ export function PageTransition({
   const pathname = usePathname();
   const route = normalizePath(routeProp ?? pathname ?? '/');
   // Derived during render rather than in an effect: an effect would leave one
-  // frame of the new page fully drawn before the animation could start it at
-  // zero opacity, which reads as a flash.
+  // frame of the new page at rest before the animation could start it offset,
+  // which reads as a pop.
   const [entered, setEntered] = useState<Entered>({
     route,
     settled: false,

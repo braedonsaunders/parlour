@@ -17,9 +17,8 @@ import { useT } from '@/lib/i18n';
 const EASE_POP = [0.34, 1.56, 0.64, 1] as const;
 
 const rise = {
-  hidden: { opacity: 0, y: 26, scale: 0.96 },
+  hidden: { y: 26, scale: 0.96 },
   shown: (delay: number) => ({
-    opacity: 1,
     y: 0,
     scale: 1,
     transition: { delay, duration: 0.24, ease: EASE_POP },
