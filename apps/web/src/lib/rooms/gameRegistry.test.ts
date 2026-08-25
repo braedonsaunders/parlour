@@ -24,6 +24,7 @@ describe('room game registry', () => {
     // Solitaire is single-seat and deliberately has no room at all; it must be
     // refused here rather than quietly seated at a Blitz table.
     expect(() => roomGame('klondike')).toThrow(/unsupported room game: klondike/);
+    expect(() => roomGame('golf')).toThrow(/unsupported room game: golf/);
     expect(findRoomGame('bridge')).toBeNull();
     expect(findRoomGame(null)).toBeNull();
     expect(findRoomGame(undefined)).toBeNull();

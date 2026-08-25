@@ -26,6 +26,7 @@
     "@parlour/game-eights": "workspace:*",
     "@parlour/game-euchre": "workspace:*",
     "@parlour/game-gin": "workspace:*",
+    "@parlour/game-golf": "workspace:*",
     "@parlour/game-hearts": "workspace:*",
     "@parlour/game-klondike": "workspace:*",
     "@parlour/game-ohhell": "workspace:*",

@@ -12,6 +12,7 @@ import { pokerZh } from './poker';
 import { ohhellZh } from './ohhell';
 import { scopaZh } from './scopa';
 import { spiteZh } from './spite';
+import { golfZh } from './golf';
 import { klondikeZh } from './klondike';
 import { eightsZh } from './eights';
 
@@ -31,5 +32,6 @@ export const ZH_GAMES: GameCopyBook = {
   scopa: scopaZh,
   spite: spiteZh,
   klondike: klondikeZh,
+  golf: golfZh,
   eights: eightsZh,
 };

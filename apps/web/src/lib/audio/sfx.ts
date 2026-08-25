@@ -7,6 +7,7 @@ import {
   euchreCuesForFx,
   ginCuesForFx,
   heartsCuesForFx,
+  golfCuesForFx,
   klondikeCuesForFx,
   presidentCuesForFx,
   ratscrewCuesForFx,
@@ -117,6 +118,13 @@ export const POKER_SFX = {
   award: 'poker.award',
   bust: 'poker.bust',
   blindsUp: 'poker.blinds-up',
+} as const;
+
+export const GOLF_SFX = {
+  draw: 'golf.draw',
+  move: 'golf.move',
+  holeOut: 'golf.hole-out',
+  win: 'golf.win',
 } as const;
 
 export const KLONDIKE_SFX = {
@@ -371,6 +379,18 @@ export const SCOPA_SFX_PACK: SfxPack = {
   cuesForFx: scopaCuesForFx,
 };
 
+export const GOLF_SFX_PACK: SfxPack = {
+  id: 'golf',
+  label: 'Golf',
+  sounds: [
+    sound(GOLF_SFX.draw, '/audio/sfx/card-draw-stock.mp3', 0.74, 3, 70),
+    sound(GOLF_SFX.move, '/audio/sfx/card-discard-flight.mp3', 0.68, 4, 45),
+    sound(GOLF_SFX.holeOut, '/audio/sfx/euchre-score-chime.mp3', 0.72, 1, 400),
+    sound(GOLF_SFX.win, '/audio/sfx/win-celebration.mp3', 0.88, 1, 1_000),
+  ],
+  cuesForFx: golfCuesForFx,
+};
+
 export const KLONDIKE_SFX_PACK: SfxPack = {
   id: 'klondike',
   label: 'Klondike',
@@ -485,6 +505,7 @@ for (const pack of [
   OHHELL_SFX_PACK,
   SPITE_SFX_PACK,
   SCOPA_SFX_PACK,
+  GOLF_SFX_PACK,
   KLONDIKE_SFX_PACK,
   GIN_SFX_PACK,
   CRIBBAGE_SFX_PACK,

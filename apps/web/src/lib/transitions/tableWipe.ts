@@ -8,6 +8,7 @@
 export const TABLE_WIPE_ROUTES: readonly (readonly [route: string, gameId: string])[] = [
   ['/table', 'blitz'],
   ['/klondike/table', 'klondike'],
+  ['/golf/table', 'golf'],
   ['/cribbage/table', 'cribbage'],
   ['/wild/table', 'wild'],
   ['/eights/table', 'eights'],

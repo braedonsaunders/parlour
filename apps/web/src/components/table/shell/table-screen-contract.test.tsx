@@ -7,12 +7,15 @@ import type { EightsTableView } from '@/lib/eights/view';
 import type { EuchreTableView } from '@/lib/euchre/view';
 import type { GinTableView } from '@/lib/gin/view';
 import type { HeartsTableView } from '@/lib/hearts/view';
+import { rulesForGolfMode } from '@/lib/golf/modes';
+import { golfTableView, type GolfTableView } from '@/lib/golf/view';
 import { rulesForKlondikeMode } from '@/lib/klondike/modes';
 import { klondikeTableView, type KlondikeTableView } from '@/lib/klondike/view';
 import type { PresidentTableView } from '@/lib/president/view';
 import type { RatscrewTableView } from '@/lib/ratscrew/view';
 import type { SpadesTableView } from '@/lib/spades/view';
 import type { WildTableView } from '@/lib/wild/view';
+import { GolfTransport } from '@/lib/solo/GolfTransport';
 import { KlondikeTransport } from '@/lib/solo/KlondikeTransport';
 import tableStyles from '@/styles/table.module.css';
 import { TableScreen, type TableView } from '../TableScreen';
@@ -21,6 +24,7 @@ import { EightsTableScreen } from '../eights/EightsTableScreen';
 import { EuchreTableScreen } from '../euchre/EuchreTableScreen';
 import { GinTableScreen } from '../gin/GinTableScreen';
 import { HeartsTableScreen } from '../hearts/HeartsTableScreen';
+import { GolfTableScreen } from '../golf/GolfTableScreen';
 import { KlondikeTableScreen } from '../klondike/KlondikeTableScreen';
 import { PresidentTableScreen } from '../president/PresidentTableScreen';
 import { RatscrewTableScreen } from '../ratscrew/RatscrewTableScreen';
@@ -155,6 +159,18 @@ const KLONDIKE_VIEW: KlondikeTableView = klondikeTableView(
   KLONDIKE_TRANSPORT.legalMoves(),
 );
 const KLONDIKE_DEAL_FX = KLONDIKE_TRANSPORT.getSnapshot().session.setupFx ?? [];
+
+const GOLF_TRANSPORT = new GolfTransport({
+  mode: 'daily',
+  dailyKey: '2026-08-24',
+  seed: 31,
+  rules: rulesForGolfMode('daily'),
+});
+const GOLF_VIEW: GolfTableView = golfTableView(
+  GOLF_TRANSPORT.getSnapshot(),
+  GOLF_TRANSPORT.legalMoves(),
+);
+const GOLF_DEAL_FX = GOLF_TRANSPORT.getSnapshot().session.setupFx ?? [];
 
 const CRIBBAGE_VIEW: CribbageTableView = {
   players: [
@@ -505,6 +521,20 @@ const SCREENS: readonly ScreenCase[] = [
     handRail: false,
     dealFx: KLONDIKE_DEAL_FX,
     gameText: 'klondike',
+  },
+  {
+    name: 'golf',
+    Screen: GolfTableScreen as ComponentType<never>,
+    view: GOLF_VIEW,
+    eyebrow: 'Golf',
+    playfield: 'Golf table',
+    feltMark: 'G',
+    errorHeadline: 'The golf table lost the thread.',
+    loadingCopy: 'Laying out seven columns…',
+    dealState: true,
+    handRail: false,
+    dealFx: GOLF_DEAL_FX,
+    gameText: 'golf',
   },
   {
     name: 'gin',

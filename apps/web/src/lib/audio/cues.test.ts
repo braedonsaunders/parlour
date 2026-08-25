@@ -277,6 +277,25 @@ describe('fx-driven table audio', () => {
     ]);
   });
 
+  it('maps Golf draw, move, hole-out, and win moments', () => {
+    expect(
+      soundCuesForFx(
+        [
+          { kind: 'golf.stock-draw', payload: {}, at: 0 },
+          { kind: 'golf.cards-move', payload: {}, at: 20 },
+          { kind: 'golf.hole-out', payload: {}, at: 40 },
+          { kind: 'golf.win', payload: {}, at: 60 },
+        ],
+        'golf',
+      ),
+    ).toEqual([
+      { id: 'golf.draw', atMs: 0 },
+      { id: 'golf.move', atMs: 20 },
+      { id: 'golf.hole-out', atMs: 40 },
+      { id: 'golf.win', atMs: 60 },
+    ]);
+  });
+
   it('maps Klondike draw, move, flip, foundation, recycle, and win moments', () => {
     expect(
       soundCuesForFx(

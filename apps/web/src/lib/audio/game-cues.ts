@@ -1,6 +1,24 @@
 import type { FxEvent } from '@parlour/engine';
 import type { SoundCue } from './cues';
 
+export function golfCuesForFx(fx: readonly FxEvent[]): SoundCue[] {
+  return fx.flatMap((event) => {
+    const atMs = Math.max(0, event.at ?? 0);
+    switch (event.kind) {
+      case 'golf.stock-draw':
+        return [{ id: 'golf.draw', atMs }];
+      case 'golf.cards-move':
+        return [{ id: 'golf.move', atMs }];
+      case 'golf.hole-out':
+        return [{ id: 'golf.hole-out', atMs }];
+      case 'golf.win':
+        return [{ id: 'golf.win', atMs }];
+      default:
+        return [];
+    }
+  });
+}
+
 export function klondikeCuesForFx(fx: readonly FxEvent[]): SoundCue[] {
   return fx.flatMap((event) => {
     const atMs = Math.max(0, event.at ?? 0);

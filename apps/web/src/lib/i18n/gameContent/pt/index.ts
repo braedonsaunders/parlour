@@ -12,6 +12,7 @@ import { pokerPt } from './poker';
 import { ohhellPt } from './ohhell';
 import { scopaPt } from './scopa';
 import { spitePt } from './spite';
+import { golfPt } from './golf';
 import { klondikePt } from './klondike';
 import { eightsPt } from './eights';
 
@@ -31,5 +32,6 @@ export const PT_GAMES: GameCopyBook = {
   scopa: scopaPt,
   spite: spitePt,
   klondike: klondikePt,
+  golf: golfPt,
   eights: eightsPt,
 };

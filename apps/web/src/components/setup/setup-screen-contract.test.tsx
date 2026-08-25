@@ -8,6 +8,7 @@ import EightsSetupPage from '@/app/eights/page';
 import EuchreSetupPage from '@/app/euchre/page';
 import GinSetupPage from '@/app/gin/page';
 import HeartsSetupPage from '@/app/hearts/page';
+import GolfSetupPage from '@/app/golf/page';
 import KlondikeSetupPage from '@/app/klondike/page';
 import OhHellSetupPage from '@/app/ohhell/page';
 import PokerSetupPage from '@/app/poker/page';
@@ -44,6 +45,7 @@ const SETUP_PAGES: readonly [string, ComponentType][] = [
   ['Euchre', EuchreSetupPage],
   ['Gin', GinSetupPage],
   ['Hearts', HeartsSetupPage],
+  ['Golf', GolfSetupPage],
   ['Klondike', KlondikeSetupPage],
   ['Oh Hell', OhHellSetupPage],
   ['Poker', PokerSetupPage],

@@ -43,6 +43,8 @@ const SHARED_WORDS = new Set(
     'Scopa',
     'Wild',
     'Klondike',
+    'Golf',
+    'Fairway',
     'Cribbage',
     'Euchre',
     'Gin',

@@ -12,6 +12,7 @@ import { pokerEs } from './poker';
 import { ohhellEs } from './ohhell';
 import { scopaEs } from './scopa';
 import { spiteEs } from './spite';
+import { golfEs } from './golf';
 import { klondikeEs } from './klondike';
 import { eightsEs } from './eights';
 
@@ -38,5 +39,6 @@ export const ES_GAMES: GameCopyBook = {
   scopa: scopaEs,
   spite: spiteEs,
   klondike: klondikeEs,
+  golf: golfEs,
   eights: eightsEs,
 };
