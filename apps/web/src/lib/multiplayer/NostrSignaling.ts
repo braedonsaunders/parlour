@@ -10,17 +10,54 @@ import {
 } from 'nostr-tools';
 import type { RoomSettings } from './types';
 
-const ROOM_KIND = 21088;
-const SIGNAL_KIND = 21089;
+/**
+ * Addressable room directory (NIP-01 30000–39999).
+ *
+ * Kind 21088 used to look "ephemeral" in the spec sense, and public relays now
+ * treat it that way: they ACK the publish, then drop the event. Guests resolve
+ * rooms with `querySync`, which only sees stored events, so a directory kind
+ * that is not stored cannot be joined. 31288 keeps the old 288 suffix and is
+ * replaceable per host+`d` (the room code), which is the shape a 4-hour table
+ * actually needs.
+ */
+export const ROOM_ANNOUNCEMENT_KIND = 31288;
+export const SIGNAL_KIND = 21089;
 const ROOM_TTL_SECONDS = 60 * 60 * 4;
 const MIN_RELAY_QUORUM = 3;
-const DEFAULT_RELAYS = [
+
+/**
+ * Relays that still accept anonymous writes of parlour's kinds.
+ *
+ * The previous list (damus / nos.lol / nostr.band / wine / primal) no longer
+ * reaches a write quorum: several no longer accept connections, and wine is
+ * paid. Creating a room requires three successful publishes, so a list of five
+ * with one writer looks like "the app is broken" on every host — Vercel and
+ * `next dev` alike, because the browser talks to these relays directly.
+ *
+ * `NEXT_PUBLIC_PARLOUR_RELAYS` replaces this list at bundle time (comma-
+ * separated `wss://` urls), the same way TURN is overridden.
+ */
+export const DEFAULT_RELAYS = [
+  'wss://relay.primal.net',
+  'wss://relay.snort.social',
+  'wss://offchain.pub',
+  'wss://nostr.mom',
+  'wss://nostr-pub.wellorder.net',
+  'wss://nostr.oxtr.dev',
+  'wss://relay.nostr.net',
+  'wss://relay.mostr.pub',
+  'wss://relay.nostr.wirednet.jp',
   'wss://relay.damus.io',
   'wss://nos.lol',
-  'wss://relay.nostr.band',
-  'wss://nostr.wine',
-  'wss://relay.primal.net',
 ] as const;
+
+export function relaysFromEnv(value: string | undefined): string[] | undefined {
+  const urls = (value ?? '')
+    .split(',')
+    .map((url) => url.trim())
+    .filter((url) => url.length > 0);
+  return urls.length > 0 ? urls : undefined;
+}
 
 type Subscription = { close(): void };
 
@@ -88,7 +125,11 @@ export class NostrSignaling {
   private readonly now: () => number;
 
   constructor(options: SignalingOptions = {}) {
-    this.relays = [...(options.relays ?? DEFAULT_RELAYS)];
+    this.relays = [
+      ...(options.relays ??
+        relaysFromEnv(process.env.NEXT_PUBLIC_PARLOUR_RELAYS) ??
+        DEFAULT_RELAYS),
+    ];
     this.pool = options.pool ?? new SimplePool({ enablePing: true, enableReconnect: true });
     this.secretKey = options.secretKey ?? generateSecretKey();
     this.publicKey = getPublicKey(this.secretKey);
@@ -113,7 +154,7 @@ export class NostrSignaling {
     const createdAt = Math.floor(this.now() / 1_000);
     const event = finalizeEvent(
       {
-        kind: ROOM_KIND,
+        kind: ROOM_ANNOUNCEMENT_KIND,
         created_at: createdAt,
         tags: [
           ['d', code],
@@ -136,7 +177,7 @@ export class NostrSignaling {
     const events = await this.pool.querySync(
       this.relays,
       {
-        kinds: [ROOM_KIND],
+        kinds: [ROOM_ANNOUNCEMENT_KIND],
         '#d': [code],
         ...(expectedHost ? { authors: [expectedHost] } : {}),
         limit: 10,

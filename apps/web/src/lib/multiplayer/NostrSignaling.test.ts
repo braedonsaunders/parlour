@@ -7,7 +7,13 @@ import {
   type Filter,
 } from 'nostr-tools';
 import { describe, expect, it } from 'vitest';
-import { NostrSignaling, type RelayPool } from './NostrSignaling';
+import {
+  DEFAULT_RELAYS,
+  NostrSignaling,
+  ROOM_ANNOUNCEMENT_KIND,
+  relaysFromEnv,
+  type RelayPool,
+} from './NostrSignaling';
 
 function fakePool(
   failing = new Set<string>(),
@@ -72,7 +78,7 @@ describe('Nostr signaling', () => {
     const announcement = (secretKey: Uint8Array, createdAt: number) =>
       finalizeEvent(
         {
-          kind: 21088,
+          kind: ROOM_ANNOUNCEMENT_KIND,
           created_at: createdAt,
           tags: [
             ['d', 'AB2Z'],
@@ -93,7 +99,11 @@ describe('Nostr signaling', () => {
     });
 
     await expect(signaling.resolve('AB2Z', hostPubkey)).resolves.toMatchObject({ hostPubkey });
-    expect(pool.queries[0]).toMatchObject({ authors: [hostPubkey], '#d': ['AB2Z'] });
+    expect(pool.queries[0]).toMatchObject({
+      authors: [hostPubkey],
+      '#d': ['AB2Z'],
+      kinds: [ROOM_ANNOUNCEMENT_KIND],
+    });
   });
 
   it('rejects a relay result that violates the expected-host filter', async () => {
@@ -101,7 +111,7 @@ describe('Nostr signaling', () => {
     const attackerKey = generateSecretKey();
     const attacker = finalizeEvent(
       {
-        kind: 21088,
+        kind: ROOM_ANNOUNCEMENT_KIND,
         created_at: 1000,
         tags: [
           ['d', 'AB2Z'],
@@ -128,7 +138,7 @@ describe('Nostr signaling', () => {
     const signed = (createdAt: number, content: string) =>
       finalizeEvent(
         {
-          kind: 21088,
+          kind: ROOM_ANNOUNCEMENT_KIND,
           created_at: createdAt,
           tags: [
             ['d', 'AB2Z'],
@@ -151,5 +161,32 @@ describe('Nostr signaling', () => {
       hostPubkey,
       settings: { gameId: 'blitz', seats: 4 },
     });
+  });
+
+  it('announces rooms as stored addressable events, not ephemeral kind 21088', async () => {
+    const pool = fakePool();
+    const signaling = new NostrSignaling({
+      relays: ['wss://one.test', 'wss://two.test', 'wss://three.test'],
+      pool,
+    });
+    await signaling.announce('AB2Z', { gameId: 'blitz', seats: 4, config: {} });
+    expect(pool.events[0]?.kind).toBe(ROOM_ANNOUNCEMENT_KIND);
+    expect(ROOM_ANNOUNCEMENT_KIND).toBeGreaterThanOrEqual(30_000);
+    expect(ROOM_ANNOUNCEMENT_KIND).toBeLessThan(40_000);
+  });
+
+  it('ships a write-capable relay list and does not count a paid relay as healthy', () => {
+    expect(DEFAULT_RELAYS.length).toBeGreaterThanOrEqual(8);
+    expect(DEFAULT_RELAYS.some((url) => url.includes('nostr.wine'))).toBe(false);
+    expect(DEFAULT_RELAYS).toContain('wss://relay.primal.net');
+  });
+
+  it('reads a comma-separated relay override', () => {
+    expect(relaysFromEnv(' wss://a.example , wss://b.example ')).toEqual([
+      'wss://a.example',
+      'wss://b.example',
+    ]);
+    expect(relaysFromEnv('')).toBeUndefined();
+    expect(relaysFromEnv(undefined)).toBeUndefined();
   });
 });
