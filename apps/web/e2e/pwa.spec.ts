@@ -32,11 +32,19 @@ test('the service worker is served and registers', async ({ page, browserName })
   test.skip(browserName === 'webkit', 'WebKit blocks service workers on plain http origins');
 
   await page.goto('/');
-  const registered = await page.evaluate(async () => {
-    if (!('serviceWorker' in navigator)) return false;
-    const registration = await navigator.serviceWorker.getRegistration();
-    return Boolean(registration);
-  });
+  // Registration is asynchronous, so sampling it once on the frame after
+  // navigation is a race the worker loses as the precache grows — this asked
+  // whether it had registered *yet*, not whether it registers. The sibling
+  // test below always waited; this one now does too.
+  const registered = await page
+    .waitForFunction(
+      async () =>
+        'serviceWorker' in navigator && Boolean(await navigator.serviceWorker.getRegistration()),
+      null,
+      { timeout: 20_000 },
+    )
+    .then(() => true)
+    .catch(() => false);
   expect(registered).toBe(true);
 });
 
