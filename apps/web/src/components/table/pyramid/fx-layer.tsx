@@ -123,33 +123,7 @@ function planFlights(fx: readonly FxEvent[]): Flight[] {
         },
       ];
     }
-    if (
-      (event.kind !== 'pyramid.pair' && event.kind !== 'pyramid.remove') ||
-      !Array.isArray(payload.cards)
-    ) {
-      return [];
-    }
-    const dest = typeof payload.to === 'string' ? payload.to : 'waste';
-    return payload.cards.flatMap((card, cardIndex) => {
-      if (typeof card !== 'string') return [];
-      const origin =
-        typeof payload.from === 'string'
-          ? payload.from
-          : Array.isArray(payload.from)
-            ? String(payload.from[cardIndex] ?? dest)
-            : dest;
-      return [
-        {
-          id: `${eventIndex}:${event.kind}:${cardIndex}`,
-          card,
-          faceDown: false,
-          from: origin,
-          to: dest,
-          startMs: Math.max(0, event.at ?? 0) + cardIndex * 24,
-          durationMs: typeof payload.dur === 'number' ? payload.dur : 200,
-        },
-      ];
-    });
+    return [];
   });
 }
 

@@ -80,6 +80,12 @@ export function clickSource(
   });
   if (remove) return { selection: null, move: remove };
 
+  // Waste is the live target: tap the matching pyramid card to play it up.
+  if (source !== 'waste' && !selected) {
+    const ontoWaste = pairWithWaste(view, source);
+    if (ontoWaste) return { selection: null, move: ontoWaste };
+  }
+
   if (sameSelection(selected, source)) return { selection: null, move: null };
 
   if (selected) {
@@ -148,6 +154,22 @@ export function freeSources(view: PyramidTableView): readonly PyramidSource[] {
     }
     return [];
   });
+}
+
+function pairWithWaste(view: PyramidTableView, source: PyramidSource): LegalMove | null {
+  const partners = partnersOf(view, source);
+  if (partners.length !== 1 || partners[0] !== 'waste') return null;
+  return (
+    view.legal.find((move) => {
+      if (move.id !== 'pyramid.pair') return false;
+      const payload = move.payload as { a?: PyramidSource; b?: PyramidSource } | undefined;
+      if (!payload?.a || !payload.b) return false;
+      return (
+        (sameSelection(payload.a, source) && payload.b === 'waste') ||
+        (sameSelection(payload.b, source) && payload.a === 'waste')
+      );
+    }) ?? null
+  );
 }
 
 /** Cards that complete a pair with the current selection. */

@@ -93,6 +93,10 @@ button.pileButton,
   height: 100%;
 }
 
+.pileButton[data-zone='waste'] [data-card-chassis] {
+  filter: none;
+}
+
 .board .pileButton [data-card-chassis],
 .board .pyramidCard [data-card-chassis] {
   display: block;
@@ -117,6 +121,12 @@ button.pileButton,
   filter: none;
 }
 
+.board [data-just-drawn] > [data-card-chassis] {
+  box-shadow:
+    0 0 0 3px var(--py-fresh),
+    0 0 22px rgba(126, 224, 176, 0.5);
+}
+
 .pyramidCard[data-playable='true'] > [data-card-chassis],
 .pyramidCard[data-selected] > [data-card-chassis],
 .pileButton[data-playable='true'] [data-card-chassis],
@@ -124,12 +134,6 @@ button.pileButton,
   box-shadow:
     0 0 0 3px var(--py-select),
     0 0 22px rgba(255, 196, 106, 0.45);
-}
-
-.board [data-just-drawn] > [data-card-chassis] {
-  box-shadow:
-    0 0 0 3px var(--py-fresh),
-    0 0 22px rgba(126, 224, 176, 0.5);
 }
 
 .emptyPile,

@@ -85,6 +85,19 @@ describe('Pyramid moves', () => {
     expect(outcome.rejected).toBeUndefined();
     expect(outcome.session.state.waste).toEqual([]);
     expect(outcome.session.state.pyramid[6]![0]).toBeNull();
+    expect(outcome.fx).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: 'card.fly',
+          payload: expect.objectContaining({
+            card: 'S10',
+            from: 'pyramid:6:0',
+            to: 'waste',
+          }),
+        }),
+      ]),
+    );
+    expect(outcome.fx.filter((event) => event.kind === 'card.fly')).toHaveLength(1);
   });
 
   it('refuses a covered card, a non-13 pair, and two waste sources', () => {

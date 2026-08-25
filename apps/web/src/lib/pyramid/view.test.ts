@@ -39,7 +39,7 @@ describe('Pyramid table view', () => {
     });
   });
 
-  it('selects a free card, then completes a pair or deselects', () => {
+  it('plays a pyramid card onto the waste in one tap', () => {
     const legal = [
       {
         id: 'pyramid.pair',
@@ -48,10 +48,32 @@ describe('Pyramid table view', () => {
     ] satisfies LegalMove[];
     const table = view(legal);
     expect(clickSource(table, null, { row: 6, col: 0 })).toEqual({
+      selection: null,
+      move: legal[0],
+    });
+    expect(clickSource(table, null, 'waste')).toEqual({
+      selection: 'waste',
+      move: null,
+    });
+    expect(clickSource(table, 'waste', { row: 6, col: 0 })).toEqual({
+      selection: null,
+      move: legal[0],
+    });
+  });
+
+  it('selects a free card, then completes a pair or deselects', () => {
+    const legal = [
+      {
+        id: 'pyramid.pair',
+        payload: { a: { row: 6, col: 0 }, b: { row: 6, col: 2 } },
+      },
+    ] satisfies LegalMove[];
+    const table = view(legal);
+    expect(clickSource(table, null, { row: 6, col: 0 })).toEqual({
       selection: { row: 6, col: 0 },
       move: null,
     });
-    expect(clickSource(table, { row: 6, col: 0 }, 'waste')).toEqual({
+    expect(clickSource(table, { row: 6, col: 0 }, { row: 6, col: 2 })).toEqual({
       selection: null,
       move: legal[0],
     });

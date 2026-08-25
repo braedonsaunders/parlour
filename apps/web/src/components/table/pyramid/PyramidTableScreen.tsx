@@ -257,7 +257,7 @@ function ReadyPyramidTable({
                       justDrawn !== null && justDrawn === view.waste.at(-1) ? '' : undefined
                     }
                   >
-                    <PlayingCard card={view.waste.at(-1)} compact disabled />
+                    <PlayingCard card={view.waste.at(-1)} compact />
                   </div>
                 ) : (
                   <span className={styles.emptyPile} aria-label="Empty waste">

@@ -226,22 +226,37 @@ const pairCards: Move<PyramidState> = {
     const input = pairPayload(payload) as PairPayload;
     const first = takeCard(state, input.a);
     const second = takeCard({ ...state, pyramid: first.pyramid, waste: first.waste }, input.b);
+    const aZone = zoneOf(input.a);
+    const bZone = zoneOf(input.b);
     ctx.fx.emit(PyramidFx.Pair, {
       cards: [first.card, second.card],
-      from: [zoneOf(input.a), zoneOf(input.b)],
+      from: [aZone, bZone],
+      to: input.a === 'waste' || input.b === 'waste' ? 'waste' : bZone,
     });
-    ctx.fx.emit(Fx.DealCard, {
-      card: first.card,
-      from: zoneOf(input.a),
-      to: 'out',
-      faceDown: false,
-      dur: 200,
-    });
-    ctx.fx.emit(
-      Fx.DealCard,
-      { card: second.card, from: zoneOf(input.b), to: 'out', faceDown: false, dur: 200 },
-      40,
-    );
+    if (input.a === 'waste' || input.b === 'waste') {
+      const fromPyramid = input.a === 'waste' ? input.b : input.a;
+      const pyramidCard = input.a === 'waste' ? second.card : first.card;
+      ctx.fx.emit(Fx.DealCard, {
+        card: pyramidCard,
+        from: zoneOf(fromPyramid),
+        to: 'waste',
+        faceDown: false,
+        dur: 200,
+      });
+    } else {
+      ctx.fx.emit(Fx.DealCard, {
+        card: first.card,
+        from: aZone,
+        to: bZone,
+        faceDown: false,
+        dur: 200,
+      });
+      ctx.fx.emit(
+        Fx.DealCard,
+        { card: second.card, from: bZone, to: aZone, faceDown: false, dur: 200 },
+        40,
+      );
+    }
     return acceptedAction({ ...state, pyramid: second.pyramid, waste: second.waste }, ctx);
   },
 };
@@ -262,14 +277,17 @@ const removeKing: Move<PyramidState> = {
   apply(state, _seat, payload, ctx) {
     const input = removePayload(payload) as RemovePayload;
     const next = takeCard(state, input.from);
-    ctx.fx.emit(PyramidFx.Remove, { card: next.card, from: zoneOf(input.from) });
-    ctx.fx.emit(Fx.DealCard, {
-      card: next.card,
-      from: zoneOf(input.from),
-      to: 'out',
-      faceDown: false,
-      dur: 200,
-    });
+    const from = zoneOf(input.from);
+    ctx.fx.emit(PyramidFx.Remove, { card: next.card, from });
+    if (input.from !== 'waste') {
+      ctx.fx.emit(Fx.DealCard, {
+        card: next.card,
+        from,
+        to: 'waste',
+        faceDown: false,
+        dur: 200,
+      });
+    }
     return acceptedAction({ ...state, pyramid: next.pyramid, waste: next.waste }, ctx);
   },
 };

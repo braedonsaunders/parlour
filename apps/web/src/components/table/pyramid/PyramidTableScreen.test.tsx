@@ -117,6 +117,29 @@ describe('PyramidTableScreen', () => {
     ).toBe('true');
   });
 
+  it('keeps the waste face live and plays a matching pyramid card in one tap', () => {
+    const { view } = table();
+    const onDispatch = vi.fn();
+    render(
+      {
+        ...view,
+        waste: ['C3'],
+        legal: [{ id: 'pyramid.pair', payload: { a: { row: 6, col: 0 }, b: 'waste' } }],
+      },
+      { onDispatch },
+    );
+    expect(
+      container.querySelector('[data-testid="pyramid-waste"] [data-card-chassis]')?.className,
+    ).not.toMatch(/Disabled|disabled/);
+    act(() =>
+      container
+        .querySelector<HTMLElement>('[data-testid="pyramid-card-6-0"]')
+        ?.querySelector('button')
+        ?.click(),
+    );
+    expect(onDispatch).toHaveBeenCalledWith('pyramid.pair', { a: { row: 6, col: 0 }, b: 'waste' });
+  });
+
   it('keeps the bottom row free so the opening cards can be tapped', () => {
     const { view } = table();
     render(view);
