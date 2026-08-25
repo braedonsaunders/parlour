@@ -51,6 +51,21 @@ describe('Klondike setup', () => {
     expect(router.push).toHaveBeenCalledWith('/klondike/table');
   });
 
+  it('parks the winnable-only thumb on the left when off', async () => {
+    const thumbClass = () =>
+      container.querySelector('[data-testid="klondike-winnable-only"] [aria-hidden="true"] > span')
+        ?.className ?? '';
+
+    expect(thumbClass()).toMatch(/left-0\.5/);
+    expect(thumbClass()).toMatch(/translate-x-0(?!\.|\d)/);
+    expect(thumbClass()).not.toMatch(/translate-x-4/);
+
+    await act(async () => click('klondike-winnable-only'));
+
+    expect(thumbClass()).toMatch(/left-0\.5/);
+    expect(thumbClass()).toMatch(/translate-x-4/);
+  });
+
   it('owns the dead-deal caveat only while winnable-only is off', async () => {
     expect(container.textContent).toMatch(/one table in five cannot be cleared/i);
 

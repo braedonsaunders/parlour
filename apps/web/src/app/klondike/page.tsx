@@ -136,13 +136,13 @@ function WinnableToggle({
       >
         <span
           aria-hidden="true"
-          className={`relative h-5 w-9 shrink-0 rounded-full transition-colors duration-150 ${
+          className={`relative block h-5 w-9 shrink-0 rounded-full transition-colors duration-150 ${
             checked ? 'bg-hearth-400/70' : 'bg-dusk-200/25'
           }`}
         >
           <span
-            className={`absolute top-0.5 h-4 w-4 rounded-full bg-hearth-50 transition-transform duration-150 ease-pop ${
-              checked ? 'translate-x-[1.15rem]' : 'translate-x-0.5'
+            className={`absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-hearth-50 transition-transform duration-150 ease-pop ${
+              checked ? 'translate-x-4' : 'translate-x-0'
             }`}
           />
         </span>
