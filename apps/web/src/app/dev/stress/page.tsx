@@ -124,6 +124,25 @@ export interface BenchResult {
   calibrationMs: number;
   /** `meanMs / calibrationMs`: the score, in units of machine rather than milliseconds. */
   score: number;
+  /** Counted rather than timed; null unless `scripts/census-work.js` was installed. */
+  work: WorkCensusReading | null;
+}
+
+/**
+ * The counting harness in `scripts/census-work.js`, if it was installed before
+ * the app booted. Timing on a loaded machine proved unreadable — an A/B of two
+ * identical builds reported one 13% slower — so the counts are the primary
+ * evidence and the milliseconds are a sanity check.
+ */
+interface WorkCensusReading {
+  total: Record<string, number>;
+  perBurst: Record<string, number>;
+  bursts: number;
+}
+
+interface WorkCensus {
+  arm(): void;
+  read(bursts: number): WorkCensusReading;
 }
 
 /**
@@ -178,7 +197,10 @@ function runBench(
   // Yardstick either side of the run, so a machine that speeds up or slows down
   // during the sample is caught rather than averaged into the result.
   const calibrationBefore = calibrate();
+  const census = (window as unknown as { __workCensus?: WorkCensus }).__workCensus;
   for (let index = 0; index < warmup + bursts; index += 1) {
+    // Armed after warmup so first-render work is not charged to the average.
+    if (index === warmup) census?.arm();
     const next = rig.next();
     const startedAt = performance.now();
     flushSync(() => apply(next));
@@ -190,6 +212,7 @@ function runBench(
     layout += laidOutAt - flushedAt;
     timings.push(laidOutAt - startedAt);
   }
+  const work = census?.read(bursts) ?? null;
   const render = renderMs.current;
   const calibrationMs = (calibrationBefore + calibrate()) / 2;
   const sorted = [...timings].sort((left, right) => left - right);
@@ -212,5 +235,6 @@ function runBench(
     // The median, not the mean: one garbage collection in three hundred bursts
     // moves a mean by more than most of the changes being weighed.
     score: round(at(0.5) / calibrationMs),
+    work,
   };
 }

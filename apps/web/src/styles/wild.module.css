@@ -484,15 +484,17 @@
 
 .pickupLayer {
   position: absolute;
-  inset: 0;
+  left: 50%;
+  bottom: 24%;
   z-index: 27;
   display: grid;
-  /* Below the piles, not over them: the stock is where the cards are coming
-     from, so covering it hides the very thing being counted. */
-  align-items: end;
   justify-items: center;
-  padding-bottom: 24%;
+  translate: -50% 0;
   pointer-events: none;
+}
+
+.pickupLayer:not(:has(.pickup)) {
+  display: none;
 }
 
 .pickup {
@@ -633,7 +635,13 @@
 
 /* --- draw + last-card affordances ----------------------------------------- */
 
-.stockPile[data-can-draw='true'] {
+.stockPile[data-can-draw='true']::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 0.72rem;
+  box-shadow: 0 0 14px rgba(255, 205, 130, 0.75);
+  pointer-events: none;
   animation: stockBeckon 1.6s ease-in-out infinite;
 }
 
@@ -661,8 +669,18 @@
    The call to protect your last card is green — that is the design, not a
    coin toss. */
 .lastCardButton.lastCardButton {
+  position: relative;
   background: linear-gradient(180deg, #6fc98d, #357a54);
   border-color: rgba(220, 255, 232, 0.75);
+}
+
+.lastCardButton.lastCardButton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: 0 0 0 0.75rem rgba(140, 235, 175, 0.55);
+  pointer-events: none;
   animation: lastCardPulse 0.9s ease-in-out infinite;
 }
 
@@ -872,41 +890,72 @@
   animation: turnClockUrgent 700ms ease-in-out infinite;
 }
 
+.turnClock[data-warning]::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 5px rgba(255, 113, 95, 0.12),
+    0 0 20px rgba(255, 113, 95, 0.45);
+  pointer-events: none;
+  animation: turnClockUrgentGlow 700ms ease-in-out infinite;
+}
+
 @keyframes stockBeckon {
   0%,
   100% {
-    filter: drop-shadow(0 0 0 rgba(255, 205, 130, 0));
+    opacity: 0;
   }
   50% {
-    filter: drop-shadow(0 0 14px rgba(255, 205, 130, 0.75));
+    opacity: 1;
   }
 }
 
 @keyframes lastCardPulse {
-  0%,
-  100% {
-    box-shadow: 0 0 0 0 rgba(140, 235, 175, 0.55);
+  0% {
+    opacity: 0.55;
+    transform: scale(0.92);
   }
   70% {
-    box-shadow: 0 0 0 0.75rem rgba(140, 235, 175, 0);
+    opacity: 0;
+    transform: scale(1.15);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.15);
   }
 }
 
 @keyframes turnClockUrgent {
   50% {
     scale: 1.08;
-    box-shadow:
-      0 0 0 5px rgba(255, 113, 95, 0.12),
-      0 0 20px rgba(255, 113, 95, 0.45);
+  }
+}
+
+@keyframes turnClockUrgentGlow {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  50% {
+    opacity: 1;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .stockPile[data-can-draw='true'],
-  .lastCardButton,
+  .stockPile[data-can-draw='true']::after,
+  .lastCardButton.lastCardButton::after,
   .pickup[data-mine],
-  .turnClock[data-warning] {
+  .turnClock[data-warning],
+  .turnClock[data-warning]::after {
     animation: none;
+  }
+
+  .stockPile[data-can-draw='true']::after,
+  .lastCardButton.lastCardButton::after,
+  .turnClock[data-warning]::after {
+    opacity: 0;
   }
 
   .turnClockProgress {

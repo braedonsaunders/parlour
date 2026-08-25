@@ -35,8 +35,7 @@ export function useSpadesFxAnimation(
   useEffect(() => {
     const root = rootRef.current;
     if (!root || cues.length === 0) return;
-    const reduced =
-      forceReduced || prefersCalmMotion();
+    const reduced = forceReduced || prefersCalmMotion();
     if (reduced) {
       // Calm motion has to mean no waiting, not merely no travel. Flashing each
       // cue in place still held the timeline open for the cue's full duration —

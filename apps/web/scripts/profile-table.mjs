@@ -183,10 +183,14 @@ if (process.env.PERF_UNDER) {
       children.set(key, entry);
     }
   }
-  console.log(`\n  inside "${needle}…"  —  ${total.toFixed(0)}ms inclusive, ${own.toFixed(0)}ms its own code`);
+  console.log(
+    `\n  inside "${needle}…"  —  ${total.toFixed(0)}ms inclusive, ${own.toFixed(0)}ms its own code`,
+  );
   console.log(`  ${'-'.repeat(96)}`);
   for (const [, entry] of [...children.entries()].sort((a, b) => b[1].ms - a[1].ms).slice(0, 14)) {
-    console.log(`  ${entry.ms.toFixed(1).padStart(7)}  ${entry.node.callFrame.functionName || '(anonymous)'}`);
+    console.log(
+      `  ${entry.ms.toFixed(1).padStart(7)}  ${entry.node.callFrame.functionName || '(anonymous)'}`,
+    );
     const snippet = await snippetAt(entry.node.callFrame.url, entry.node.callFrame.columnNumber);
     if (snippet) console.log(`            ${snippet.slice(0, 88)}`);
   }

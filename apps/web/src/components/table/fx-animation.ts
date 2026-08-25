@@ -8,6 +8,7 @@ import { soundCuesForFx, soundDefsForSfxPack } from '@/lib/audio/sfx';
 import { calculateFanStep } from '@/components/table/HandRail';
 import { prefersCalmMotion } from '@/lib/table/calm-motion';
 import { FX_TIMING, type FxCue, type Zone } from '@/lib/table/fx-motion';
+import { cancelWaapiAnimations, isCardFlightCue, playCardFlight } from '@/lib/table/waapi-flight';
 import styles from '@/styles/table.module.css';
 
 /**
@@ -47,8 +48,7 @@ export function useFxAnimation(
   useEffect(() => {
     const root = rootRef.current;
     if (!root || cues.length === 0) return;
-    const reduced =
-      forceReduced || prefersCalmMotion();
+    const reduced = forceReduced || prefersCalmMotion();
 
     if (reduced) {
       // Calm motion has to mean no waiting, not merely no travel. Flashing each
@@ -79,6 +79,7 @@ export function useFxAnimation(
     // pickup flies from the same stock pile — so each is measured once.
     const cache: FlightCache = { zones: new Map(), faceWidths: new Map() };
 
+    const flights: Animation[] = [];
     const context = gsap.context(() => {
       const timeline = gsap.timeline();
       // Planning a cue measures the table (bounding boxes, computed transforms,
@@ -92,16 +93,8 @@ export function useFxAnimation(
         const element = elements.get(cue.id);
         if (!element) continue;
         const start = cue.startMs / 1000;
-        if (
-          cue.type === 'deal' ||
-          cue.type === 'flip' ||
-          cue.type === 'draw' ||
-          cue.type === 'discard' ||
-          cue.type === 'trick-play' ||
-          cue.type === 'transfer' ||
-          cue.type === 'layoff'
-        ) {
-          const cueCard = 'card' in cue ? cue.card : undefined;
+        if (isCardFlightCue(cue)) {
+          const cueCard = cue.card;
           // Only live pickups/transfers seat into a fan slot. Deal flights have
           // to stay zone-to-zone — the destination card is not in the rail yet,
           // and the opening deal runs before the table has a stable layout.
@@ -132,7 +125,6 @@ export function useFxAnimation(
           const distance = Math.hypot(dx, dy);
           const arcHeight = Math.min(118, Math.max(38, distance * 0.18));
           const arcPeak = Math.min(from.y, to.y) - arcHeight;
-          const apexAt = start + flightDuration * 0.48;
           const landingRotation =
             to.handoff && to.rotate !== undefined
               ? to.rotate
@@ -143,132 +135,29 @@ export function useFxAnimation(
                   : direction * 2;
           const landingScale = to.scale ?? 1;
           angleWrites.push([element, `${Math.atan2(dy, dx)}rad`]);
-          timeline
-            .set(element, { x: from.x, y: from.y, autoAlpha: 1 }, start)
-            .set(
-              card,
+          // Card flights are transform/opacity only, so WAAPI can run them on
+          // the compositor. Handoffs still seat into the waiting fan slot and
+          // fade the flyer after the real card is already underneath it.
+          flights.push(
+            ...playCardFlight(
+              { element, card, trail, glint },
               {
-                rotate: direction * -7,
-                rotateY: cue.type === 'flip' ? -88 : 0,
-                scale: 1,
-                scaleX: 1,
-                scaleY: 1,
+                startMs: cue.startMs,
+                flightDuration,
+                settleDuration,
+                fromX: from.x,
+                fromY: from.y,
+                toX: to.x,
+                toY: to.y,
+                arcPeak,
+                takeoffRotate: direction * -7,
+                landingRotation,
+                landingScale,
+                handoff: Boolean(to.handoff),
+                flip: cue.type === 'flip',
               },
-              start,
-            )
-            .to(
-              element,
-              {
-                x: to.x,
-                duration: flightDuration,
-                ease: 'power2.inOut',
-              },
-              start,
-            )
-            .to(element, { y: arcPeak, duration: flightDuration * 0.48, ease: 'power2.out' }, start)
-            .to(
-              element,
-              {
-                y: to.y,
-                duration: flightDuration * 0.52,
-                ease: to.handoff ? 'power2.inOut' : 'power2.in',
-              },
-              apexAt,
-            )
-            .to(
-              card,
-              {
-                rotate: landingRotation,
-                scale: landingScale,
-                duration: flightDuration,
-                ease: 'sine.inOut',
-              },
-              start,
-            )
-            .fromTo(
-              trail,
-              { autoAlpha: 0 },
-              { autoAlpha: 0.92, duration: Math.min(0.07, flightDuration * 0.35) },
-              start,
-            )
-            .to(
-              trail,
-              { autoAlpha: 0, duration: Math.min(0.1, flightDuration * 0.45) },
-              start + flightDuration * 0.58,
-            );
-          if (to.handoff) {
-            // Seat into the waiting fan slot, then fade the flyer after the
-            // real card is already underneath it — one card, not a collision.
-            timeline
-              .to(
-                card,
-                {
-                  scale: landingScale * 1.08,
-                  duration: settleDuration * 0.4,
-                  ease: 'power2.out',
-                },
-                start + flightDuration,
-              )
-              .to(
-                card,
-                {
-                  scale: landingScale,
-                  duration: settleDuration * 0.6,
-                  ease: 'power2.inOut',
-                },
-                start + flightDuration + settleDuration * 0.4,
-              )
-              .to(
-                element,
-                { autoAlpha: 0, duration: settleDuration * 0.55, ease: 'power2.in' },
-                start + flightDuration + settleDuration * 0.45,
-              );
-          } else {
-            timeline
-              .fromTo(
-                glint,
-                { autoAlpha: 0, scale: 0.45 },
-                {
-                  autoAlpha: 0.9,
-                  scale: 2.4,
-                  duration: settleDuration,
-                  ease: 'power2.out',
-                },
-                start + flightDuration,
-              )
-              .to(
-                card,
-                {
-                  scaleX: 1.035,
-                  scaleY: 0.965,
-                  duration: settleDuration * 0.42,
-                  ease: 'power2.in',
-                },
-                start + flightDuration,
-              )
-              .to(
-                card,
-                {
-                  scaleX: 1,
-                  scaleY: 1,
-                  duration: settleDuration * 0.58,
-                  ease: 'back.out(2.2)',
-                },
-                start + flightDuration + settleDuration * 0.42,
-              )
-              .set(element, { autoAlpha: 0 }, start + flightDuration + settleDuration);
-          }
-          if (cue.type === 'flip') {
-            timeline.to(
-              card,
-              {
-                rotateY: 0,
-                duration: flightDuration * 0.5,
-                ease: 'back.out(1.7)',
-              },
-              start + flightDuration * 0.45,
-            );
-          }
+            ),
+          );
         } else if (cue.type === 'knock' || cue.type === 'blitz' || cue.type === 'gin-burst') {
           timeline
             .fromTo(
@@ -318,7 +207,10 @@ export function useFxAnimation(
         element.style.setProperty('--flight-angle', angle);
       }
     }, root);
-    return () => context.revert();
+    return () => {
+      cancelWaapiAnimations(flights);
+      context.revert();
+    };
   }, [cues, rootRef, key, forceReduced]);
 }
 

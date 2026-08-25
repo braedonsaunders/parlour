@@ -18,7 +18,7 @@ const DOC: HowToPlayDoc = {
 describe('HowToPlay', () => {
   let container: HTMLDivElement;
   let root: Root;
-  const overlay = () => document.querySelector('[data-testid="how-to-play"]');
+  const overlay = () => document.querySelector<HTMLElement>('[data-testid="how-to-play"]');
 
   beforeEach(() => {
     container = document.createElement('div');
@@ -73,7 +73,7 @@ describe('HowToPlay', () => {
     );
     expect(onClose).toHaveBeenCalledTimes(1);
 
-    act(() => overlay()?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+    act(() => overlay()?.click());
     expect(onClose).toHaveBeenCalledTimes(2);
 
     act(() => void window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })));

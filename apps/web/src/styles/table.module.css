@@ -62,6 +62,11 @@
   justify-items: center;
   width: clamp(7rem, 12vw, 10rem);
   opacity: 0.95;
+  /* Kept, even though a still seat does not need promoting. Dropping it saved
+     six layers at most — Motion promotes the plate anyway for its turn scale —
+     and it changed how the overlapping opponent fan rasterised, which measured
+     as a visible difference across the whole upper arc. Not a trade worth
+     making; the layer win is elsewhere. */
   will-change: transform;
 }
 
@@ -217,7 +222,9 @@
   margin-inline: -1.16rem;
   transform: rotate(var(--card-rotation));
   transform-origin: 50% 135%;
-  animation: dealtCardSettle 240ms var(--ease-pop) both;
+  /* `backwards` covers the first frame; `both`/`forwards` would keep every
+     opponent card composited for the life of the table after a 240ms deal-in. */
+  animation: dealtCardSettle 240ms var(--ease-pop) backwards;
 }
 
 .seat1 .opponentCards {
@@ -383,7 +390,7 @@
 }
 
 .localHand[data-deal-state='complete'] .handTrack {
-  animation: dealFanBloom 360ms var(--ease-pop) both;
+  animation: dealFanBloom 360ms var(--ease-pop) backwards;
 }
 
 .ownerStatusRail {
@@ -575,7 +582,6 @@
   transition:
     transform 140ms var(--ease-pop),
     filter 140ms ease;
-  backface-visibility: hidden;
 }
 
 button.card {
@@ -685,13 +691,16 @@ button.card:not(:disabled):hover {
   z-index: 2;
   display: block;
   line-height: 0;
-  filter: drop-shadow(0 16px 18px rgba(3, 11, 15, 0.48));
   perspective: 800px;
   transform-style: preserve-3d;
   will-change: transform;
 }
 .flightCardVisual .card {
   transition: none;
+  box-shadow:
+    0 16px 18px rgba(3, 11, 15, 0.48),
+    0 10px 20px -8px rgba(3, 11, 15, 0.75),
+    inset 0 0 0 1px rgba(92, 48, 25, 0.18);
 }
 .cardTrail {
   position: absolute;

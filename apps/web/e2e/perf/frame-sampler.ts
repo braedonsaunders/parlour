@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { resolve } from 'node:path';
 import type { Page } from '@playwright/test';
 
 /**
@@ -34,10 +34,10 @@ export interface FrameStats {
   bursts: number | null;
 }
 
-const SAMPLER = readFileSync(
-  fileURLToPath(new URL('../../scripts/perf-sampler.js', import.meta.url)),
-  'utf8',
-);
+// Resolved from the config's directory rather than `import.meta.url`: Playwright
+// loads specs through a CommonJS transform, where `import.meta` is a syntax
+// error, and the runner's working directory is always the config's own folder.
+const SAMPLER = readFileSync(resolve(process.cwd(), 'scripts/perf-sampler.js'), 'utf8');
 
 /** Installs the sampler and starts it. Call before the work you want measured. */
 export async function startSampling(page: Page): Promise<void> {

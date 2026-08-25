@@ -37,8 +37,7 @@ export function KlondikeFxLayer({
   useEffect(() => {
     const root = rootRef.current;
     if (!root || flights.length === 0) return;
-    const calm =
-      reduced || prefersCalmMotion();
+    const calm = reduced || prefersCalmMotion();
     const context = gsap.context(() => {
       if (calm) {
         for (const flight of flights) {

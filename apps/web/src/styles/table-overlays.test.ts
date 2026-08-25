@@ -138,3 +138,62 @@ describe('table menu on a phone', () => {
     expect(rules).toMatch(/\.menuActions\s*\{[^}]*flex-direction:\s*row;/);
   });
 });
+
+describe('table compositor diet', () => {
+  const dropFx = readStyles('drop-fx');
+
+  it('does not promote every card with backface-visibility', () => {
+    expect(declarationsFor(table, '.card')).not.toMatch(/backface-visibility/);
+  });
+
+  /**
+   * The seat plate keeps its `will-change`, and that is deliberate.
+   *
+   * Dropping it looked like free money — a still seat does not need a layer —
+   * but it was measured both ways. It removed at most six layers, because
+   * Motion promotes the plate anyway for the scale it plays on a turn change,
+   * and against that it changed how the overlapping opponent fan rasterised:
+   * a screenshot diff of the settled table moved by 1.9% of its pixels across
+   * the whole upper arc. The look is not for sale at that price.
+   */
+  it('keeps the seat plate promoted, because un-promoting it moved the fan', () => {
+    expect(declarationsFor(table, '.seat')).toMatch(/will-change:\s*transform/);
+  });
+
+  it('drops the opponent deal-in fill so settled fans are not kept composited', () => {
+    expect(table).toMatch(
+      /\.opponentCards > \* \{[^}]*animation:\s*dealtCardSettle 240ms var\(--ease-pop\) backwards;/,
+    );
+    expect(table).not.toMatch(/dealtCardSettle[^;]*\bboth\b/);
+    expect(table).toMatch(
+      /\.localHand\[data-deal-state='complete'\] \.handTrack \{[^}]*animation:\s*dealFanBloom 360ms var\(--ease-pop\) backwards;/,
+    );
+    expect(table).not.toMatch(/dealFanBloom[^;]*\bboth\b/);
+  });
+
+  it('hides an empty pickup overlay instead of holding a full-viewport layer', () => {
+    expect(wild).toMatch(/\.pickupLayer:not\(:has\(\.pickup\)\)\s*\{[^}]*display:\s*none;/);
+    expect(declarationsFor(wild, '.pickupLayer')).not.toMatch(/inset:\s*0/);
+  });
+
+  it('anchors drop flourishes at the pile instead of a full-viewport grouping layer', () => {
+    expect(declarationsFor(dropFx, '.layer')).not.toMatch(/inset:\s*0/);
+    expect(declarationsFor(dropFx, '.layer')).toMatch(/left:\s*50%;/);
+    expect(declarationsFor(dropFx, '.layer')).toMatch(/top:\s*46%;/);
+  });
+
+  it('pulses stock, last-card, and the urgent clock with opacity or scale, not filter', () => {
+    expect(wild).toMatch(/@keyframes stockBeckon\s*\{[^}]*opacity:\s*0;/);
+    expect(wild).not.toMatch(/@keyframes stockBeckon\s*\{[^}]*filter:/);
+    expect(wild).toMatch(/@keyframes lastCardPulse\s*\{[^}]*transform:\s*scale/);
+    expect(wild).not.toMatch(/@keyframes lastCardPulse\s*\{[^}]*box-shadow:/);
+    expect(wild).toMatch(/@keyframes turnClockUrgent\s*\{[^}]*scale:\s*1\.08;/);
+    expect(wild).not.toMatch(/@keyframes turnClockUrgent\s*\{[^}]*box-shadow:/);
+    expect(wild).not.toMatch(/@keyframes turnClockUrgent\s*\{[^}]*filter:/);
+  });
+
+  it('does not filter a flying card every frame', () => {
+    expect(declarationsFor(table, '.flightCardVisual')).not.toMatch(/filter:/);
+    expect(declarationsFor(table, '.flightCardVisual .card')).toMatch(/box-shadow:/);
+  });
+});

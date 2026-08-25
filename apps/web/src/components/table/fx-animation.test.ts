@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { cancelWaapiAnimations, isCardFlightCue, playCardFlight } from '@/lib/table/waapi-flight';
 import { flightPoint, zonePoint } from './fx-animation';
 
 function fakeRect(left: number, top: number, width: number, height: number): DOMRect {
@@ -134,5 +135,52 @@ describe('flightPoint', () => {
       x: 80,
       y: 400,
     });
+  });
+});
+
+describe('useFxAnimation flight driver', () => {
+  it('treats deal/flip/draw/discard/trick-play/transfer/layoff as compositor flights', () => {
+    expect(isCardFlightCue({ type: 'draw' } as never)).toBe(true);
+    expect(isCardFlightCue({ type: 'knock' } as never)).toBe(false);
+  });
+
+  it('plays a measured flight through WAAPI and cancels it cleanly', () => {
+    const cancel = vi.fn();
+    const flyer = document.createElement('div');
+    flyer.dataset.fxCue = '0:card.deal';
+    const card = document.createElement('span');
+    card.dataset.flightCard = '';
+    const trail = document.createElement('i');
+    trail.className = 'cardTrail';
+    const glint = document.createElement('i');
+    glint.className = 'cardGlint';
+    flyer.append(trail, card, glint);
+    for (const node of [flyer, card, trail, glint]) {
+      node.animate = (() => ({ cancel })) as unknown as typeof node.animate;
+    }
+
+    const from = zonePoint('stock', flyer, fakeRect(0, 0, 1000, 1000));
+    const animations = playCardFlight(
+      { element: flyer, card, trail, glint },
+      {
+        startMs: 0,
+        flightDuration: 0.22,
+        settleDuration: 0.08,
+        fromX: from.x,
+        fromY: from.y,
+        toX: 500,
+        toY: 820,
+        arcPeak: 200,
+        takeoffRotate: -7,
+        landingRotation: 2,
+        landingScale: 1,
+        handoff: false,
+        flip: false,
+      },
+    );
+    expect(animations.length).toBeGreaterThan(0);
+    cancelWaapiAnimations(animations);
+    expect(cancel).toHaveBeenCalledTimes(animations.length);
+    expect(flyer.getAttribute('style')).toBeNull();
   });
 });

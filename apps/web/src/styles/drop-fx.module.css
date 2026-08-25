@@ -3,15 +3,16 @@
 
 .layer {
   position: absolute;
-  inset: 0;
+  left: 50%;
+  top: 46%;
   z-index: 12;
   pointer-events: none;
 }
 
 .burst {
   position: absolute;
-  left: 50%;
-  top: 46%;
+  left: 0;
+  top: 0;
   display: grid;
   place-items: center;
   width: 9rem;

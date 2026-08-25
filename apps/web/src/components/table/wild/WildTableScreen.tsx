@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { memo, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { orderedHand, type FxEvent } from '@parlour/engine';
 import {
   WILDPILE_COLORS,
@@ -14,7 +14,14 @@ import { WILDPILE_SFX_PACK } from '@/lib/audio/sfx';
 import { useMatchTension } from '@/lib/audio/tension';
 import { useMusicMood } from '@/stores/audio';
 import { ArrivalProvider, useAdmittedHand } from '@/lib/table/arrival-presentation';
-import { type DealPresentation, useDealPresentation } from '@/lib/table/deal-presentation';
+import {
+  DealProvider,
+  useDealPhase,
+  useDealPiles,
+  useDealStore,
+  useDealVisibleCards,
+  useDealVisibleCount,
+} from '@/lib/table/deal-presentation';
 import { type FxCue } from '@/lib/table/fx-motion';
 import {
   wildAnnouncements,
@@ -85,19 +92,28 @@ export type WildTableScreenProps = {
 };
 
 export function WildTableScreen(props: WildTableScreenProps) {
+  return (
+    <DealProvider fx={props.fx} fxKey={props.fxKey}>
+      <WildTableScreenView {...props} />
+    </DealProvider>
+  );
+}
+
+function WildTableScreenView(props: WildTableScreenProps) {
   const { view, error } = props;
   const rootRef = useRef<HTMLElement>(null);
   const menu = useTableMenu(props.onQuit);
-  const deal = useDealPresentation(props.fx, props.fxKey);
+  const deal = useDealPhase();
+  const dealStore = useDealStore();
   useTableAudio(props.fx, props.fxKey, WILDPILE_SFX_PACK.id);
 
   // Pickups are counted out card by card so a stacked penalty reads as it
-  // arrives instead of appearing in the hand all at once.
+  // arrives instead of appearing in the hand all at once. The running total
+  // lives on PickupCounter so those ticks never re-render the table.
   const pickup = useMemo(
     () => (deal.dealing ? null : wildPickup(props.fx)),
     [deal.dealing, props.fx],
   );
-  const pickupCount = useWildPickupCount(pickup, props.fxKey);
 
   // Real Wild tables use the authority deadline. The fallback keeps isolated
   // story/tests musical even when they render the screen without a transport.
@@ -122,26 +138,32 @@ export function WildTableScreen(props: WildTableScreenProps) {
     [deal.dealing, props.fx, view],
   );
 
-  useGameTextSurface(() => ({
-    game: 'wild',
-    status: error ? 'error' : view ? (deal.dealing ? 'dealing' : 'ready') : 'loading',
-    error,
-    localSeat: view?.localSeat ?? null,
-    activeSeat: view?.activeSeat ?? null,
-    decision: view?.decision ?? null,
-    // Read when the surface is asked for, not kept in state.
-    matchRemainingSeconds:
-      props.matchEndsAt === undefined
-        ? null
-        : Math.ceil(Math.max(0, props.matchEndsAt - Date.now()) / 1_000),
-    turnDurationSeconds: props.turnDurationMs === undefined ? null : props.turnDurationMs / 1_000,
-    stockCount: view ? view.stockCount + deal.pendingStockCards : null,
-    discardTop: view && deal.discardReady ? view.discard.at(-1) : null,
-    hand: view
-      ? orderedHand(deal.visibleCards(view.hand, view.localSeat), wildpileCatalog.handOrder)
-      : [],
-    playableCards: deal.dealing ? [] : (view?.legal.playCards ?? []),
-  }));
+  useGameTextSurface(() => {
+    const presentation = dealStore.getPresentation();
+    return {
+      game: 'wild',
+      status: error ? 'error' : view ? (presentation.dealing ? 'dealing' : 'ready') : 'loading',
+      error,
+      localSeat: view?.localSeat ?? null,
+      activeSeat: view?.activeSeat ?? null,
+      decision: view?.decision ?? null,
+      // Read when the surface is asked for, not kept in state.
+      matchRemainingSeconds:
+        props.matchEndsAt === undefined
+          ? null
+          : Math.ceil(Math.max(0, props.matchEndsAt - Date.now()) / 1_000),
+      turnDurationSeconds: props.turnDurationMs === undefined ? null : props.turnDurationMs / 1_000,
+      stockCount: view ? view.stockCount + presentation.pendingStockCards : null,
+      discardTop: view && presentation.discardReady ? view.discard.at(-1) : null,
+      hand: view
+        ? orderedHand(
+            presentation.visibleCards(view.hand, view.localSeat),
+            wildpileCatalog.handOrder,
+          )
+        : [],
+      playableCards: presentation.dealing ? [] : (view?.legal.playCards ?? []),
+    };
+  });
 
   if (error) {
     return <TableErrorScreen headline="The table lost the thread." message={error} />;
@@ -168,7 +190,6 @@ export function WildTableScreen(props: WildTableScreenProps) {
               player={player}
               position={tablePosition(player.seat, view.localSeat, view.players.length)}
               active={view.activeSeat === player.seat}
-              displayCount={deal.visibleCount(player.seat, player.handCount)}
               stamp={seatStamp(calls, player.seat)}
             />
           ))}
@@ -176,7 +197,7 @@ export function WildTableScreen(props: WildTableScreenProps) {
           {finalMinute && props.matchEndsAt !== undefined && (
             <LiveStandings players={view.players} endsAt={props.matchEndsAt} />
           )}
-          <Piles view={view} busy={localBusy} onDraw={props.onDraw} deal={deal} />
+          <Piles view={view} busy={localBusy} onDraw={props.onDraw} />
           {props.turnDurationMs !== undefined && view.activeSeat !== null && (
             <TurnClock
               key={props.turnClockKey}
@@ -184,7 +205,7 @@ export function WildTableScreen(props: WildTableScreenProps) {
               mine={view.activeSeat === view.localSeat}
             />
           )}
-          <LocalHand view={view} busy={localBusy} onPlay={props.onPlay} deal={deal} />
+          <LocalHand view={view} busy={localBusy} onPlay={props.onPlay} />
           <TableFxLayer
             fx={props.fx}
             fxKey={props.fxKey}
@@ -192,7 +213,7 @@ export function WildTableScreen(props: WildTableScreenProps) {
             renderCue={(cue) => <Cue cue={cue} localSeat={view.localSeat} />}
           />
           <CardDropFx fx={props.fx} fxKey={props.fxKey} packId={WILD_DROP_EFFECTS.id} />
-          <PickupCounter pickup={pickup} count={pickupCount} players={view.players} />
+          <PickupCounter pickup={pickup} fxKey={props.fxKey} players={view.players} />
           <Announcer calls={calls} fxKey={props.fxKey} />
           {view.decision === 'jump-in' && !localBusy && (
             <div className={`${wildStyles.jumpBanner} panel-soft`} role="alertdialog">
@@ -423,19 +444,18 @@ function seatStamp(calls: readonly WildAnnouncement[], seat: number): WildAnnoun
   return calls.find((call) => call.seat === seat) ?? null;
 }
 
-function Seat({
+const Seat = memo(function Seat({
   player,
   position,
   active,
-  displayCount,
   stamp,
 }: {
   player: WildSeatView;
   position: number;
   active: boolean;
-  displayCount: number;
   stamp: WildAnnouncement | null;
 }) {
+  const displayCount = useDealVisibleCount(player.seat, player.handCount);
   const avatar = getAvatar(player.avatarId);
   const style = { '--seat-accent': avatar.accent, '--seat-shade': avatar.shade } as CSSProperties;
 
@@ -484,7 +504,7 @@ function Seat({
       </AnimatePresence>
     </motion.div>
   );
-}
+});
 
 /** Viewer-relative table geometry; engine seat ids stay untouched for moves and FX. */
 function tablePosition(seat: number, localSeat: number, playerCount: number): number {
@@ -566,13 +586,12 @@ function Piles({
   view,
   busy,
   onDraw,
-  deal,
 }: {
   view: WildTableView;
   busy: boolean;
   onDraw?: () => void;
-  deal: DealPresentation;
 }) {
+  const deal = useDealPiles();
   const visibleDiscard = [...(deal.discardReady ? view.discard : [])].reverse();
   const stockCount = view.stockCount + deal.pendingStockCards;
   return (
@@ -613,17 +632,14 @@ function LocalHand({
   view,
   busy,
   onPlay,
-  deal,
 }: {
   view: WildTableView;
   busy: boolean;
   onPlay?: (card: string) => void;
-  deal: DealPresentation;
 }) {
-  const plannedHand = orderedHand(
-    deal.visibleCards(view.hand, view.localSeat),
-    wildpileCatalog.handOrder,
-  );
+  const deal = useDealPhase();
+  const revealed = useDealVisibleCards(view.hand, view.localSeat);
+  const plannedHand = orderedHand(revealed, wildpileCatalog.handOrder);
   const visibleHand = useAdmittedHand(plannedHand);
   const canChoose = view.legal.playCards.length > 0 && !busy;
   const showLegality = !busy && view.decision !== null && view.decision !== 'choose-color';
@@ -702,13 +718,14 @@ function ColorChooser({ onChooseColor }: { onChooseColor?: (color: WildpileColor
  */
 function PickupCounter({
   pickup,
-  count,
+  fxKey,
   players,
 }: {
   pickup: WildPickup | null;
-  count: { taken: number; left: number } | null;
+  fxKey: string | number;
   players: readonly WildSeatView[];
 }) {
+  const count = useWildPickupCount(pickup, fxKey);
   const target = players.find((player) => player.seat === pickup?.seat);
   const mine = target?.isLocal ?? false;
 
