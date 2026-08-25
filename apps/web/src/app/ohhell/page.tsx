@@ -13,6 +13,8 @@ import {
 } from '@/components/setup';
 import { OHHELL_MODES } from '@/lib/ohhell/modes';
 import { getGameMode } from '@/lib/games';
+import { useT } from '@/lib/i18n';
+import { useLocalizedGame, useLocalizedModes } from '@/lib/i18n/gameContent';
 import { useOhHellSetupStore } from '@/stores/ohhellSetup';
 
 const SEAT_OPTIONS = Array.from(
@@ -29,6 +31,9 @@ export default function OhHellSetupPage() {
   const setBotTier = useOhHellSetupStore((s) => s.setBotTier);
   const setSeats = useOhHellSetupStore((s) => s.setSeats);
   const [starting, setStarting] = useState(false);
+  const t = useT();
+  const shelfEntry = useLocalizedGame('ohhell');
+  const modes = useLocalizedModes('ohhell', OHHELL_MODES);
 
   const startSolo = () => {
     if (starting) return;
@@ -38,10 +43,9 @@ export default function OhHellSetupPage() {
 
   return (
     <GameSetupScreen
-      title="Oh Hell"
-      eyebrow="pick your table"
-      modes={OHHELL_MODES}
-      modesLabel="House rules"
+      title={shelfEntry.name}
+      eyebrow="setup.eyebrow.pickTable"
+      modes={modes}
       selected={mode}
       onSelect={(id) => setMode(id as typeof mode)}
       renderArt={(def) => <GameArt cards={getGameMode('ohhell', def.id).art} />}
@@ -51,7 +55,7 @@ export default function OhHellSetupPage() {
           options={SEAT_OPTIONS}
           value={seats}
           onChange={setSeats}
-          hint={`you plus ${seats - 1} others — the hand size changes every round`}
+          hint={t.count('setup.youPlusOthersHand', seats - 1)}
         />
         <BotDifficultyPicker value={botTier} onChange={setBotTier} />
       </SetupPanel>
@@ -60,13 +64,13 @@ export default function OhHellSetupPage() {
         busy={starting}
         actions={[
           {
-            label: 'Play solo',
-            busyLabel: 'Cutting for the deal…',
+            label: t('setup.playSolo'),
+            busyLabel: t('setup.busy.cuttingDeal'),
             onClick: startSolo,
             testId: 'deal-me-in',
           },
         ]}
-        note="Bid exactly what you will take. Friend rooms for Oh Hell are not open yet."
+        note={t('setup.note.ohhell')}
       />
     </GameSetupScreen>
   );

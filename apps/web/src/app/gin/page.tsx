@@ -2,7 +2,6 @@
 
 import { useWipeRouter } from '@/hooks/useWipeRouter';
 import { useState } from 'react';
-import { ginHowToPlay } from '@parlour/game-gin';
 import { RuleSettings } from '@/components/settings/RuleSettings';
 import {
   BotDifficultyPicker,
@@ -12,6 +11,8 @@ import {
   SetupPanel,
 } from '@/components/setup';
 import { getGame } from '@/lib/games';
+import { useT } from '@/lib/i18n';
+import { useLocalizedGame, useLocalizedModes, useLocalizedSchema } from '@/lib/i18n/gameContent';
 import { GIN_MODES, type GinModeDef } from '@/lib/gin/modes';
 import { useGinSetupStore, ginRulesFor } from '@/stores/ginSetup';
 import styles from '@/styles/modes.module.css';
@@ -46,6 +47,10 @@ export default function GinSetupPage() {
   const setRule = useGinSetupStore((s) => s.setRule);
   const resetRules = useGinSetupStore((s) => s.resetRules);
   const [starting, setStarting] = useState(false);
+  const t = useT();
+  const shelfEntry = useLocalizedGame('gin');
+  const modes = useLocalizedModes('gin', GIN_MODES);
+  const schema = useLocalizedSchema('gin', getGame('gin').configSchema);
   const values = ginRulesFor(mode, overrides);
 
   const startSolo = () => {
@@ -56,46 +61,46 @@ export default function GinSetupPage() {
 
   return (
     <GameSetupScreen
-      title="Gin"
-      eyebrow="pick your table"
-      help={{ doc: ginHowToPlay, subtitle: 'the rummy classic' }}
-      modes={GIN_MODES}
-      modesLabel="Match rules"
+      title={shelfEntry.name}
+      eyebrow="setup.eyebrow.pickTable"
+      help={{ doc: shelfEntry.howToPlay, subtitle: shelfEntry.subtitle }}
+      modes={modes}
+      modesLabel="setup.matchRules"
       selected={mode}
       onSelect={(id) => setMode(id as typeof mode)}
       renderArt={(def) => <GinPreview def={def} />}
     >
       <SetupPanel>
-        <SetupFact label="Seats" value="2 — head to head" hint="you + one bot" />
+        <SetupFact label={t('setup.seats')} value={t('setup.ginSeats')} hint={t('setup.ginHint')} />
         <BotDifficultyPicker value={botTier} onChange={setBotTier} />
       </SetupPanel>
 
       <RuleSettings
-        schema={getGame('gin').configSchema as never}
+        schema={schema as never}
         values={values as never}
         onChange={(key, value) => setRule(key, value as never)}
         onReset={resetRules}
-        label="House rules"
+        label={t('setup.houseRules')}
       />
 
       <SetupActions
         busy={starting}
         actions={[
           {
-            label: 'Play solo',
-            busyLabel: 'Shuffling up…',
+            label: t('setup.playSolo'),
+            busyLabel: t('setup.busy.shuffling'),
             onClick: startSolo,
             testId: 'deal-me-in',
           },
           {
-            label: 'Create friend room',
+            label: t('setup.createFriendRoom'),
             tone: 'teal',
             onClick: () => router.push('/gin/create'),
             testId: 'create-gin-room',
           },
-          { label: 'Join with a code', tone: 'ghost', href: '/join' },
+          { label: t('setup.joinWithCode'), tone: 'ghost', href: '/join' },
         ]}
-        note="Friend rooms use the same four-character codes and live replay sync as every parlour table."
+        note={t('setup.note.friendRoomsGin')}
       />
     </GameSetupScreen>
   );

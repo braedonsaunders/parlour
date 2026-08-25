@@ -13,6 +13,8 @@ import {
 } from '@/components/setup';
 import { POKER_MODES } from '@/lib/poker/modes';
 import { getGameMode } from '@/lib/games';
+import { useT } from '@/lib/i18n';
+import { useLocalizedGame, useLocalizedModes } from '@/lib/i18n/gameContent';
 import { usePokerSetupStore } from '@/stores/pokerSetup';
 
 const SEAT_OPTIONS = Array.from(
@@ -29,6 +31,9 @@ export default function PokerSetupPage() {
   const setBotTier = usePokerSetupStore((s) => s.setBotTier);
   const setSeats = usePokerSetupStore((s) => s.setSeats);
   const [starting, setStarting] = useState(false);
+  const t = useT();
+  const shelfEntry = useLocalizedGame('poker');
+  const modes = useLocalizedModes('poker', POKER_MODES);
 
   const startSolo = () => {
     if (starting) return;
@@ -38,10 +43,9 @@ export default function PokerSetupPage() {
 
   return (
     <GameSetupScreen
-      title="Poker"
-      eyebrow="pick your table"
-      modes={POKER_MODES}
-      modesLabel="House rules"
+      title={shelfEntry.name}
+      eyebrow="setup.eyebrow.pickTable"
+      modes={modes}
       selected={mode}
       onSelect={(id) => setMode(id as typeof mode)}
       renderArt={(def) => <GameArt cards={getGameMode('poker', def.id).art} />}
@@ -51,7 +55,7 @@ export default function PokerSetupPage() {
           options={SEAT_OPTIONS}
           value={seats}
           onChange={setSeats}
-          hint={`you plus ${seats - 1} ${seats === 2 ? 'opponent' : 'opponents'} — last stack standing wins`}
+          hint={t.count('setup.youPlusOpponents', seats - 1)}
         />
         <BotDifficultyPicker value={botTier} onChange={setBotTier} />
       </SetupPanel>
@@ -60,20 +64,20 @@ export default function PokerSetupPage() {
         busy={starting}
         actions={[
           {
-            label: 'Play solo',
-            busyLabel: 'Shuffling up…',
+            label: t('setup.playSolo'),
+            busyLabel: t('setup.busy.shuffling'),
             onClick: startSolo,
             testId: 'deal-me-in',
           },
           {
-            label: 'Create friend room',
+            label: t('setup.createFriendRoom'),
             tone: 'teal',
             onClick: () => router.push('/poker/create'),
             testId: 'create-poker-room',
           },
-          { label: 'Join with a code', tone: 'ghost', href: '/join' },
+          { label: t('setup.joinWithCode'), tone: 'ghost', href: '/join' },
         ]}
-        note="Chips are scorekeeping — there is nothing to buy and nothing to cash out."
+        note={t('setup.note.poker')}
       />
     </GameSetupScreen>
   );

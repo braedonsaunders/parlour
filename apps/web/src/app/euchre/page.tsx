@@ -12,6 +12,8 @@ import {
 } from '@/components/setup';
 import { EUCHRE_MODES } from '@/lib/euchre/modes';
 import { getGameMode } from '@/lib/games';
+import { useT } from '@/lib/i18n';
+import { useLocalizedGame, useLocalizedModes } from '@/lib/i18n/gameContent';
 import { useEuchreSetupStore } from '@/stores/euchreSetup';
 
 export default function EuchreSetupPage() {
@@ -21,6 +23,9 @@ export default function EuchreSetupPage() {
   const setMode = useEuchreSetupStore((s) => s.setMode);
   const setBotTier = useEuchreSetupStore((s) => s.setBotTier);
   const [starting, setStarting] = useState(false);
+  const t = useT();
+  const shelfEntry = useLocalizedGame('euchre');
+  const modes = useLocalizedModes('euchre', EUCHRE_MODES);
 
   const startSolo = () => {
     if (starting) return;
@@ -30,19 +35,18 @@ export default function EuchreSetupPage() {
 
   return (
     <GameSetupScreen
-      title="Euchre"
-      eyebrow="pick your table"
-      modes={EUCHRE_MODES}
-      modesLabel="House rules"
+      title={shelfEntry.name}
+      eyebrow="setup.eyebrow.pickTable"
+      modes={modes}
       selected={mode}
       onSelect={(id) => setMode(id as typeof mode)}
       renderArt={(def) => <GameArt cards={getGameMode('euchre', def.id).art} />}
     >
       <SetupPanel>
         <SetupFact
-          label="Seats"
-          value="4 players · two partnerships"
-          hint="you + a bot partner across from you, two bot opponents flanking — or bring three friends"
+          label={t('setup.seats')}
+          value={t('setup.partnershipsValue')}
+          hint={t('setup.partnershipsHint')}
         />
         <BotDifficultyPicker value={botTier} onChange={setBotTier} />
       </SetupPanel>
@@ -51,20 +55,20 @@ export default function EuchreSetupPage() {
         busy={starting}
         actions={[
           {
-            label: 'Play solo',
-            busyLabel: 'Shuffling up…',
+            label: t('setup.playSolo'),
+            busyLabel: t('setup.busy.shuffling'),
             onClick: startSolo,
             testId: 'deal-me-in',
           },
           {
-            label: 'Create friend room',
+            label: t('setup.createFriendRoom'),
             tone: 'teal',
             onClick: () => router.push('/euchre/create'),
             testId: 'create-euchre-room',
           },
-          { label: 'Join with a code', tone: 'ghost', href: '/join' },
+          { label: t('setup.joinWithCode'), tone: 'ghost', href: '/join' },
         ]}
-        note="Friend rooms use the same four-character codes, live replay sync, and reconnect flow as every parlour table."
+        note={t('setup.note.friendRooms')}
       />
     </GameSetupScreen>
   );

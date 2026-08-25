@@ -1,6 +1,7 @@
 import { act, createElement, type ComponentType } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { useLocaleStore } from '@/stores/locale';
 import modeStyles from '@/styles/modes.module.css';
 import BlitzSetupPage from '@/app/play/page';
 import CribbageSetupPage from '@/app/cribbage/page';
@@ -70,6 +71,7 @@ describe('setup screen contract across every shipped game', () => {
   afterEach(() => {
     act(() => root.unmount());
     container.remove();
+    useLocaleStore.setState({ locale: 'en', chosen: false });
   });
 
   const render = (Page: ComponentType) => act(() => root.render(createElement(Page)));
@@ -118,6 +120,22 @@ describe('setup screen contract across every shipped game', () => {
     expect(carousel.querySelectorAll(`.${modeStyles.tile}`).length).toBe(
       carousel.querySelectorAll('[role="radio"]').length,
     );
+  });
+
+  it('overlays the player language on the mode tiles, not just the shelf', () => {
+    useLocaleStore.setState({ locale: 'es', chosen: true });
+
+    render(BlitzSetupPage);
+    expect(container.textContent).toContain('Clásico');
+    expect(container.textContent).toContain('elige tu modo');
+    expect(container.querySelector('a[href="/games"]')?.textContent).toBe('← Juegos');
+
+    act(() => root.unmount());
+    root = createRoot(container);
+    render(SpadesSetupPage);
+    expect(container.textContent).toContain('Rápida');
+    expect(container.textContent).toContain('Bazas limpias');
+    expect(container.textContent).not.toContain('Clean Books');
   });
 
   it.each(SETUP_PAGES)('%s marks exactly one mode as chosen', (_name, Page) => {

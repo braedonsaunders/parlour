@@ -2,6 +2,7 @@
 
 import { useId, useMemo, useState } from 'react';
 import type { ConfigField, ConfigFieldValue, ConfigSchema, RuleValues } from '@parlour/engine';
+import { useT } from '@/lib/i18n';
 import styles from '@/styles/rules.module.css';
 
 export type RuleSettingsProps<C extends RuleValues> = {
@@ -28,10 +29,13 @@ export function RuleSettings<C extends RuleValues>({
   onChange,
   onReset,
   defaultOpen = false,
-  label = 'Advanced options',
+  label,
 }: RuleSettingsProps<C>) {
+  const t = useT();
+  const heading = label ?? t('setup.advancedOptions');
   const [open, setOpen] = useState(defaultOpen);
   const panelId = useId();
+  const fallbackGroup = t('setup.rules');
 
   const { basic, advanced } = useMemo(() => split(schema.fields), [schema.fields]);
   const changed = schema.fields.filter((field) => values[field.key] !== field.default).length;
@@ -48,10 +52,10 @@ export function RuleSettings<C extends RuleValues>({
         onClick={() => setOpen((current) => !current)}
       >
         <span>
-          {label}
+          {heading}
           {changed > 0 && (
             <em className={styles.changed} data-testid="rules-changed">
-              {changed} changed
+              {t.count('setup.changed', changed)}
             </em>
           )}
         </span>
@@ -62,7 +66,7 @@ export function RuleSettings<C extends RuleValues>({
 
       {open && (
         <div id={panelId} className={styles.body}>
-          {groupsOf(basic).map(([group, fields]) => (
+          {groupsOf(basic, fallbackGroup).map(([group, fields]) => (
             <FieldGroup
               key={group}
               heading={group}
@@ -73,10 +77,8 @@ export function RuleSettings<C extends RuleValues>({
           ))}
           {advanced.length > 0 && (
             <>
-              <p className={styles.houseNote}>
-                House rules — these change how the game plays, not just how long it runs.
-              </p>
-              {groupsOf(advanced).map(([group, fields]) => (
+              <p className={styles.houseNote}>{t('setup.houseRulesNote')}</p>
+              {groupsOf(advanced, fallbackGroup).map(([group, fields]) => (
                 <FieldGroup
                   key={group}
                   heading={group}
@@ -89,7 +91,7 @@ export function RuleSettings<C extends RuleValues>({
           )}
           {onReset && (
             <button type="button" className={styles.reset} onClick={onReset}>
-              Reset to table default
+              {t('setup.resetDefault')}
             </button>
           )}
         </div>
@@ -106,10 +108,13 @@ function split(fields: readonly ConfigField[]) {
 }
 
 /** Preserves declaration order for both the groups and the fields inside them. */
-function groupsOf(fields: readonly ConfigField[]): [string, ConfigField[]][] {
+function groupsOf(
+  fields: readonly ConfigField[],
+  fallbackGroup: string,
+): [string, ConfigField[]][] {
   const groups = new Map<string, ConfigField[]>();
   for (const field of fields) {
-    const key = field.group ?? 'Rules';
+    const key = field.group ?? fallbackGroup;
     groups.set(key, [...(groups.get(key) ?? []), field]);
   }
   return [...groups.entries()];
@@ -145,6 +150,7 @@ function Field({
   value: ConfigFieldValue | undefined;
   onChange: (key: string, value: ConfigFieldValue) => void;
 }) {
+  const t = useT();
   const id = useId();
   const current = value ?? field.default;
 
@@ -171,7 +177,7 @@ function Field({
         <div className={styles.stepper} role="group" aria-label={field.label}>
           <button
             type="button"
-            aria-label={`Decrease ${field.label}`}
+            aria-label={t('setup.decrease', { label: field.label })}
             disabled={Number(current) <= field.min}
             onClick={() => onChange(field.key, Math.max(field.min, Number(current) - 1))}
           >
@@ -180,7 +186,7 @@ function Field({
           <output id={id}>{Number(current)}</output>
           <button
             type="button"
-            aria-label={`Increase ${field.label}`}
+            aria-label={t('setup.increase', { label: field.label })}
             disabled={Number(current) >= field.max}
             onClick={() => onChange(field.key, Math.min(field.max, Number(current) + 1))}
           >

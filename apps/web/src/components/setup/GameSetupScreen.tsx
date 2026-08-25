@@ -6,6 +6,7 @@ import type { GameArtCard, HowToPlayDoc } from '@parlour/engine';
 import { GameArt } from '@/components/GameArt';
 import { HowToPlayButton } from '@/components/HowToPlay';
 import { useCenteredCarousel } from '@/hooks/useCenteredCarousel';
+import { useT, type MessageKey } from '@/lib/i18n';
 import styles from '@/styles/modes.module.css';
 import gameStyles from '@/styles/games.module.css';
 
@@ -51,12 +52,12 @@ export interface GameSetupScreenProps<TMode extends SetupMode> {
   /** The game's name, as the heading and the rules sheet title. */
   title: string;
   /** The second half of the heading — "pick your table", "claim the crown". */
-  eyebrow: string;
+  eyebrow: MessageKey;
   /** The rules sheet. Also hangs a help chip on every mode tile. */
   help?: SetupHelp;
   modes: readonly TMode[];
   /** What the carousel is choosing between, for screen readers. */
-  modesLabel: string;
+  modesLabel?: MessageKey;
   selected: string;
   onSelect(id: string): void;
   /**
@@ -75,13 +76,14 @@ export function GameSetupScreen<TMode extends SetupMode>({
   eyebrow,
   help,
   modes,
-  modesLabel,
+  modesLabel = 'setup.houseRules',
   selected,
   onSelect,
   renderArt,
   modeTestId,
   children,
 }: GameSetupScreenProps<TMode>) {
+  const t = useT();
   const carouselRef = useCenteredCarousel(selected);
 
   return (
@@ -91,12 +93,12 @@ export function GameSetupScreen<TMode extends SetupMode>({
           href="/games"
           className="pill-soft text-sm font-bold text-dusk-100 hover:text-hearth-200"
         >
-          ← Games
+          {t('setup.backToGames')}
         </Link>
         <h1
           className={`${styles.fitHeading} font-display font-extrabold tracking-tight text-hearth-50`}
         >
-          {title} <span className={`${styles.fitEyebrow} text-dusk-100/80`}>· {eyebrow}</span>
+          {title} <span className={`${styles.fitEyebrow} text-dusk-100/80`}>· {t(eyebrow)}</span>
         </h1>
         {help ? (
           <HowToPlayButton doc={help.doc} title={title} subtitle={help.subtitle} />
@@ -109,7 +111,7 @@ export function GameSetupScreen<TMode extends SetupMode>({
         ref={carouselRef}
         className={`${styles.carousel} ${styles.centeredCarousel} ${styles.fitCarousel}`}
         role="radiogroup"
-        aria-label={modesLabel}
+        aria-label={t(modesLabel)}
       >
         {modes.map((mode) => (
           <ModeTile
@@ -125,7 +127,7 @@ export function GameSetupScreen<TMode extends SetupMode>({
         ))}
       </div>
 
-      <section className={styles.fitFooter} aria-label="Table setup">
+      <section className={styles.fitFooter} aria-label={t('setup.tableSetup')}>
         <div className={styles.fitFooterInner}>{children}</div>
       </section>
     </main>

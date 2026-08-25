@@ -12,6 +12,8 @@ import {
 } from '@/components/setup';
 import { SCOPA_MODES } from '@/lib/scopa/modes';
 import { getGameMode } from '@/lib/games';
+import { useT } from '@/lib/i18n';
+import { useLocalizedGame, useLocalizedModes } from '@/lib/i18n/gameContent';
 import { SCOPA_SEAT_OPTIONS, useScopaSetupStore } from '@/stores/scopaSetup';
 
 export default function ScopaSetupPage() {
@@ -23,6 +25,9 @@ export default function ScopaSetupPage() {
   const setBotTier = useScopaSetupStore((s) => s.setBotTier);
   const setSeats = useScopaSetupStore((s) => s.setSeats);
   const [starting, setStarting] = useState(false);
+  const t = useT();
+  const shelfEntry = useLocalizedGame('scopa');
+  const modes = useLocalizedModes('scopa', SCOPA_MODES);
 
   const startSolo = () => {
     if (starting) return;
@@ -32,10 +37,9 @@ export default function ScopaSetupPage() {
 
   return (
     <GameSetupScreen
-      title="Scopa"
-      eyebrow="pick your table"
-      modes={SCOPA_MODES}
-      modesLabel="House rules"
+      title={shelfEntry.name}
+      eyebrow="setup.eyebrow.pickTable"
+      modes={modes}
       selected={mode}
       onSelect={(id) => setMode(id as typeof mode)}
       renderArt={(def) => <GameArt cards={getGameMode('scopa', def.id).art} />}
@@ -47,8 +51,8 @@ export default function ScopaSetupPage() {
           onChange={setSeats}
           hint={
             mode === 'scopone'
-              ? 'Scopone is always four, in partnerships'
-              : `you plus ${seats - 1} others — four and six play as partnerships`
+              ? t('setup.scopaAlwaysFour')
+              : t('setup.scopaOthers', { count: seats - 1 })
           }
         />
         <BotDifficultyPicker value={botTier} onChange={setBotTier} />
@@ -58,13 +62,13 @@ export default function ScopaSetupPage() {
         busy={starting}
         actions={[
           {
-            label: 'Play solo',
-            busyLabel: 'Laying out the table…',
+            label: t('setup.playSolo'),
+            busyLabel: t('setup.busy.layingTable'),
             onClick: startSolo,
             testId: 'deal-me-in',
           },
         ]}
-        note="Clear the table to score a scopa. Friend rooms for Scopa are not open yet."
+        note={t('setup.note.scopa')}
       />
     </GameSetupScreen>
   );

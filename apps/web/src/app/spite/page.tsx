@@ -12,6 +12,8 @@ import {
 } from '@/components/setup';
 import { SPITE_MODES } from '@/lib/spite/modes';
 import { getGameMode } from '@/lib/games';
+import { useT } from '@/lib/i18n';
+import { useLocalizedGame, useLocalizedModes } from '@/lib/i18n/gameContent';
 import { SPITE_SEAT_OPTIONS, useSpiteSetupStore } from '@/stores/spiteSetup';
 
 export default function SpiteSetupPage() {
@@ -23,6 +25,9 @@ export default function SpiteSetupPage() {
   const setBotTier = useSpiteSetupStore((s) => s.setBotTier);
   const setSeats = useSpiteSetupStore((s) => s.setSeats);
   const [starting, setStarting] = useState(false);
+  const t = useT();
+  const shelfEntry = useLocalizedGame('spite');
+  const modes = useLocalizedModes('spite', SPITE_MODES);
 
   const startSolo = () => {
     if (starting) return;
@@ -32,10 +37,9 @@ export default function SpiteSetupPage() {
 
   return (
     <GameSetupScreen
-      title="Spite & Malice"
-      eyebrow="pick your table"
-      modes={SPITE_MODES}
-      modesLabel="House rules"
+      title={shelfEntry.name}
+      eyebrow="setup.eyebrow.pickTable"
+      modes={modes}
       selected={mode}
       onSelect={(id) => setMode(id as typeof mode)}
       renderArt={(def) => <GameArt cards={getGameMode('spite', def.id).art} />}
@@ -45,7 +49,7 @@ export default function SpiteSetupPage() {
           options={[...SPITE_SEAT_OPTIONS]}
           value={seats}
           onChange={setSeats}
-          hint={`you plus ${seats - 1} — first to empty their payoff pile wins`}
+          hint={t('setup.youPlusSpite', { count: seats - 1 })}
         />
         <BotDifficultyPicker value={botTier} onChange={setBotTier} />
       </SetupPanel>
@@ -54,13 +58,13 @@ export default function SpiteSetupPage() {
         busy={starting}
         actions={[
           {
-            label: 'Play solo',
-            busyLabel: 'Stacking the piles…',
+            label: t('setup.playSolo'),
+            busyLabel: t('setup.busy.stackingPiles'),
             onClick: startSolo,
             testId: 'deal-me-in',
           },
         ]}
-        note="Build the centre up from ace to queen. Friend rooms for Spite are not open yet."
+        note={t('setup.note.spite')}
       />
     </GameSetupScreen>
   );

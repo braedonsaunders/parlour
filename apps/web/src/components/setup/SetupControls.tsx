@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import type { ReactNode } from 'react';
+import { useT } from '@/lib/i18n';
 import styles from '@/styles/modes.module.css';
 
 /**
@@ -47,7 +48,7 @@ export function SetupFact({
 
 /** How many chairs to fill, for the games that let a player choose. */
 export function SeatPicker({
-  label = 'Seats',
+  label,
   options,
   value,
   onChange,
@@ -61,10 +62,12 @@ export function SeatPicker({
   hint?: ReactNode;
   disabled?: boolean;
 }) {
+  const t = useT();
+  const heading = label ?? t('setup.seats');
   return (
     <div>
-      <p className="text-xs font-bold uppercase tracking-[0.2em] text-dusk-200">{label}</p>
-      <div className="mt-1.5 flex items-center gap-2" role="group" aria-label={label}>
+      <p className="text-xs font-bold uppercase tracking-[0.2em] text-dusk-200">{heading}</p>
+      <div className="mt-1.5 flex items-center gap-2" role="group" aria-label={heading}>
         {options.map((option) => (
           <button
             key={option}

@@ -37,7 +37,7 @@ export default function GameSelectPage() {
         <div className={gameStyles.heading}>
           <span className={gameStyles.eyebrow}>{t('shelf.heading')}</span>
           <h1 className="font-display text-2xl font-extrabold tracking-tight text-hearth-50">
-            Choose your game
+            {t('shelf.choose')}
           </h1>
         </div>
 
@@ -47,7 +47,7 @@ export default function GameSelectPage() {
           onSubmit={(event) => event.preventDefault()}
         >
           <label htmlFor="game-search" className="sr-only">
-            Search games
+            {t('shelf.searchLabel')}
           </label>
           <svg viewBox="0 0 24 24" aria-hidden="true" className={gameStyles.searchIcon}>
             <circle cx="10.8" cy="10.8" r="6.2" />
@@ -80,11 +80,9 @@ export default function GameSelectPage() {
         <div className={gameStyles.libraryBar}>
           <div>
             <h2 id="game-library-title" className={gameStyles.libraryTitle}>
-              Pick a table
+              {t('shelf.pickTable')}
             </h2>
-            <p className={gameStyles.libraryCopy}>
-              Solo, with bots, or around the room with friends.
-            </p>
+            <p className={gameStyles.libraryCopy}>{t('shelf.libraryCopy')}</p>
           </div>
           <p className={gameStyles.resultCount} role="status" aria-live="polite">
             {resultLabel}
@@ -106,10 +104,10 @@ export default function GameSelectPage() {
             <span className={gameStyles.emptyMark} aria-hidden="true">
               ♣
             </span>
-            <h2>No game on the shelf matches “{query.trim()}”</h2>
+            <h2>{t('shelf.noMatchTitle', { query: query.trim() })}</h2>
             <p>{t('shelf.noMatch')}</p>
             <button type="button" className="pill-soft" onClick={() => setQuery('')}>
-              Show every game
+              {t('shelf.showEvery')}
             </button>
           </div>
         )}

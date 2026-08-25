@@ -3,6 +3,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import type { HowToPlayDoc } from '@parlour/engine';
+import { useT } from '@/lib/i18n';
 import styles from '@/styles/howto.module.css';
 
 export type HowToPlayModalProps = {
@@ -22,6 +23,7 @@ export type HowToPlayModalProps = {
  * no game.
  */
 export function HowToPlayModal({ open, onClose, doc, title, subtitle }: HowToPlayModalProps) {
+  const t = useT();
   useEffect(() => {
     if (!open) return;
     const onKey = (event: KeyboardEvent) => {
@@ -43,7 +45,7 @@ export function HowToPlayModal({ open, onClose, doc, title, subtitle }: HowToPla
       className={styles.overlay}
       role="dialog"
       aria-modal="true"
-      aria-label={`How to play ${title}`}
+      aria-label={t('howto.playTitle', { title })}
       data-testid="how-to-play"
       onClick={onClose}
     >
@@ -54,14 +56,14 @@ export function HowToPlayModal({ open, onClose, doc, title, subtitle }: HowToPla
       >
         <header className={styles.header}>
           <div>
-            <span className={styles.eyebrow}>How to play</span>
+            <span className={styles.eyebrow}>{t('howto.heading')}</span>
             <h2>{title}</h2>
             {subtitle && <p className={styles.subtitle}>{subtitle}</p>}
           </div>
           <button
             type="button"
             className={styles.close}
-            aria-label="Close how to play"
+            aria-label={t('howto.close')}
             data-testid="close-how-to-play"
             onClick={onClose}
             autoFocus
@@ -73,7 +75,7 @@ export function HowToPlayModal({ open, onClose, doc, title, subtitle }: HowToPla
         <div className={styles.body}>
           <p className={styles.summary}>{doc.summary}</p>
           <section className={styles.objective}>
-            <h3>How you win</h3>
+            <h3>{t('howto.objective')}</h3>
             <p>{doc.objective}</p>
           </section>
 
@@ -125,6 +127,7 @@ export function HowToPlayButton({
   className,
   children,
 }: HowToPlayButtonProps) {
+  const t = useT();
   const [open, setOpen] = useState(false);
 
   return (
@@ -133,7 +136,7 @@ export function HowToPlayButton({
         type="button"
         className={[styles.trigger, styles[variant], className].filter(Boolean).join(' ')}
         data-testid={`how-to-play-${title.toLowerCase().replace(/\s+/g, '-')}`}
-        aria-label={`How to play ${title}`}
+        aria-label={t('howto.playTitle', { title })}
         onClick={(event) => {
           // Tiles are buttons themselves; opening the rules must not also pick
           // the game underneath.
@@ -145,7 +148,7 @@ export function HowToPlayButton({
         {children ?? (
           <>
             <span aria-hidden="true">?</span>
-            {variant === 'pill' && 'How to play'}
+            {variant === 'pill' && t('howto.heading')}
           </>
         )}
       </button>

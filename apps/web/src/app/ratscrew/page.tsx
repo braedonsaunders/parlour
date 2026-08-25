@@ -2,8 +2,10 @@
 
 import { useWipeRouter } from '@/hooks/useWipeRouter';
 import { useState } from 'react';
-import { ratscrewConfigSchema, ratscrewHowToPlay } from '@parlour/game-ratscrew';
+import { ratscrewConfigSchema } from '@parlour/game-ratscrew';
 import { getGame } from '@/lib/games';
+import { useT } from '@/lib/i18n';
+import { useLocalizedGame, useLocalizedModes, useLocalizedSchema } from '@/lib/i18n/gameContent';
 import { RuleSettings } from '@/components/settings/RuleSettings';
 import {
   BotDifficultyPicker,
@@ -29,6 +31,10 @@ export default function RatscrewSetupPage() {
   const setRule = useRatscrewSetupStore((s) => s.setRule);
   const resetRules = useRatscrewSetupStore((s) => s.resetRules);
   const [starting, setStarting] = useState(false);
+  const t = useT();
+  const shelfEntry = useLocalizedGame('ratscrew');
+  const modes = useLocalizedModes('ratscrew', RATSCREW_MODES);
+  const schema = useLocalizedSchema('ratscrew', ratscrewConfigSchema);
 
   const startSolo = () => {
     if (starting) return;
@@ -38,11 +44,10 @@ export default function RatscrewSetupPage() {
 
   return (
     <GameSetupScreen
-      title="Rat Screw"
-      eyebrow="hands on the pile"
-      help={{ doc: ratscrewHowToPlay, subtitle: 'the slap game' }}
-      modes={RATSCREW_MODES}
-      modesLabel="House rules"
+      title={shelfEntry.name}
+      eyebrow="setup.eyebrow.handsOnPile"
+      help={{ doc: shelfEntry.howToPlay, subtitle: shelfEntry.subtitle }}
+      modes={modes}
       selected={mode}
       onSelect={(id) => setMode(id as typeof mode)}
     >
@@ -51,37 +56,36 @@ export default function RatscrewSetupPage() {
           options={SEAT_OPTIONS}
           value={seats}
           onChange={setSeats}
-          hint={`you + ${seats - 1} bot${seats > 2 ? 's' : ''} with real reflexes`}
+          hint={t.count('setup.youPlusBotsReflexes', seats - 1)}
         />
         <BotDifficultyPicker value={botTier} onChange={setBotTier} />
       </SetupPanel>
 
       <RuleSettings
-        schema={ratscrewConfigSchema}
+        schema={schema}
         values={ratscrewRulesFor(mode, overrides)}
         onChange={setRule}
         onReset={resetRules}
-        label="Advanced options"
       />
 
       <SetupActions
         busy={starting}
         actions={[
           {
-            label: 'Play solo',
-            busyLabel: 'Shuffling the stacks…',
+            label: t('setup.playSolo'),
+            busyLabel: t('setup.busy.shufflingStacks'),
             onClick: startSolo,
             testId: 'deal-me-in',
           },
           {
-            label: 'Create friend room',
+            label: t('setup.createFriendRoom'),
             tone: 'teal',
             onClick: () => router.push('/ratscrew/create'),
             testId: 'create-ratscrew-room',
           },
-          { label: 'Join with a code', tone: 'ghost', href: '/join' },
+          { label: t('setup.joinWithCode'), tone: 'ghost', href: '/join' },
         ]}
-        note="Slaps race in real time — first palm on the pile takes it. Mis-slaps burn your top card."
+        note={t('setup.note.ratscrew')}
       />
     </GameSetupScreen>
   );

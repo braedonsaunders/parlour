@@ -1,9 +1,10 @@
 'use client';
 
-import { heartsHowToPlay } from '@parlour/game-hearts';
 import { useWipeRouter } from '@/hooks/useWipeRouter';
 import { useState } from 'react';
 import { getGame } from '@/lib/games';
+import { useT } from '@/lib/i18n';
+import { useLocalizedGame, useLocalizedModes, useLocalizedSchema } from '@/lib/i18n/gameContent';
 import { RuleSettings } from '@/components/settings/RuleSettings';
 import {
   BotDifficultyPicker,
@@ -25,6 +26,10 @@ export default function HeartsSetupPage() {
   const setRule = useHeartsSetupStore((s) => s.setRule);
   const resetRules = useHeartsSetupStore((s) => s.resetRules);
   const [starting, setStarting] = useState(false);
+  const t = useT();
+  const shelfEntry = useLocalizedGame('hearts');
+  const modes = useLocalizedModes('hearts', HEARTS_MODES);
+  const schema = useLocalizedSchema('hearts', getGame('hearts').configSchema);
 
   const startSolo = () => {
     if (starting) return;
@@ -34,49 +39,47 @@ export default function HeartsSetupPage() {
 
   return (
     <GameSetupScreen
-      title="Hearts"
-      eyebrow="dodge everything"
-      help={{ doc: heartsHowToPlay, subtitle: 'the evasion game' }}
-      modes={HEARTS_MODES}
-      modesLabel="House rules"
+      title={shelfEntry.name}
+      eyebrow="setup.eyebrow.dodgeEverything"
+      help={{ doc: shelfEntry.howToPlay, subtitle: shelfEntry.subtitle }}
+      modes={modes}
       selected={mode}
       onSelect={(id) => setMode(id as typeof mode)}
     >
       <SetupPanel>
         <SetupFact
-          label="Seats"
-          value="4 players"
-          hint="you + 3 bots in solo · every chair filled for friend rooms"
+          label={t('setup.seats')}
+          value={t('setup.heartsSeats')}
+          hint={t('setup.heartsHint')}
         />
         <BotDifficultyPicker value={botTier} onChange={setBotTier} />
       </SetupPanel>
 
       <RuleSettings
-        schema={getGame('hearts').configSchema}
+        schema={schema}
         values={heartsRulesFor(mode, overrides)}
         onChange={setRule}
         onReset={resetRules}
-        label="Advanced options"
       />
 
       <SetupActions
         busy={starting}
         actions={[
           {
-            label: 'Play solo',
-            busyLabel: 'Shuffling up…',
+            label: t('setup.playSolo'),
+            busyLabel: t('setup.busy.shuffling'),
             onClick: startSolo,
             testId: 'deal-me-in',
           },
           {
-            label: 'Create friend room',
+            label: t('setup.createFriendRoom'),
             tone: 'teal',
             onClick: () => router.push('/hearts/create'),
             testId: 'create-hearts-room',
           },
-          { label: 'Join with a code', tone: 'ghost', href: '/join' },
+          { label: t('setup.joinWithCode'), tone: 'ghost', href: '/join' },
         ]}
-        note="Lowest score wins — dodge the hearts, fear the queen."
+        note={t('setup.note.hearts')}
       />
     </GameSetupScreen>
   );

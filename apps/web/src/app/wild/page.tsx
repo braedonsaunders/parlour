@@ -2,8 +2,10 @@
 
 import { useWipeRouter } from '@/hooks/useWipeRouter';
 import { useState } from 'react';
-import { wildpileConfig, wildpileHowToPlay } from '@parlour/game-wildpile';
+import { wildpileConfig } from '@parlour/game-wildpile';
 import { getGame } from '@/lib/games';
+import { useT } from '@/lib/i18n';
+import { useLocalizedGame, useLocalizedModes, useLocalizedSchema } from '@/lib/i18n/gameContent';
 import { RuleSettings } from '@/components/settings/RuleSettings';
 import {
   BotDifficultyPicker,
@@ -29,6 +31,10 @@ export default function WildSetupPage() {
   const setRule = useWildSetupStore((s) => s.setRule);
   const resetRules = useWildSetupStore((s) => s.resetRules);
   const [starting, setStarting] = useState(false);
+  const t = useT();
+  const shelfEntry = useLocalizedGame('wild');
+  const modes = useLocalizedModes('wild', WILD_MODES);
+  const schema = useLocalizedSchema('wild', wildpileConfig);
 
   const startSolo = () => {
     if (starting) return;
@@ -38,11 +44,10 @@ export default function WildSetupPage() {
 
   return (
     <GameSetupScreen
-      title="Wild"
-      eyebrow="pick your pile"
-      help={{ doc: wildpileHowToPlay, subtitle: 'the shedding game' }}
-      modes={WILD_MODES}
-      modesLabel="House rules"
+      title={shelfEntry.name}
+      eyebrow="setup.eyebrow.pickPile"
+      help={{ doc: shelfEntry.howToPlay, subtitle: shelfEntry.subtitle }}
+      modes={modes}
       selected={mode}
       onSelect={(id) => setMode(id as typeof mode)}
     >
@@ -51,37 +56,36 @@ export default function WildSetupPage() {
           options={SEAT_OPTIONS}
           value={seats}
           onChange={setSeats}
-          hint={`you + ${seats - 1} bot${seats > 2 ? 's' : ''}`}
+          hint={t.count('setup.youPlusBots', seats - 1)}
         />
         <BotDifficultyPicker value={botTier} onChange={setBotTier} />
       </SetupPanel>
 
       <RuleSettings
-        schema={wildpileConfig}
+        schema={schema}
         values={wildRulesFor(mode, overrides)}
         onChange={setRule}
         onReset={resetRules}
-        label="Advanced options"
       />
 
       <SetupActions
         busy={starting}
         actions={[
           {
-            label: 'Play solo',
-            busyLabel: 'Shuffling the pile…',
+            label: t('setup.playSolo'),
+            busyLabel: t('setup.busy.shufflingPile'),
             onClick: startSolo,
             testId: 'deal-me-in',
           },
           {
-            label: 'Create friend room',
+            label: t('setup.createFriendRoom'),
             tone: 'teal',
             onClick: () => router.push('/wild/create'),
             testId: 'create-wild-room',
           },
-          { label: 'Join with a code', tone: 'ghost', href: '/join' },
+          { label: t('setup.joinWithCode'), tone: 'ghost', href: '/join' },
         ]}
-        note="Friend rooms use the same four-character codes, live replay sync, and reconnect flow as Blitz."
+        note={t('setup.note.friendRoomsBlitz')}
       />
     </GameSetupScreen>
   );

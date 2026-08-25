@@ -5,6 +5,8 @@ import { useState } from 'react';
 import { GameArt } from '@/components/GameArt';
 import { GameSetupScreen, SetupActions } from '@/components/setup';
 import { getGameMode } from '@/lib/games';
+import { useT } from '@/lib/i18n';
+import { useLocalizedGame, useLocalizedModes } from '@/lib/i18n/gameContent';
 import { KLONDIKE_MODES, utcDailyKey, type KlondikeModeId } from '@/lib/klondike/modes';
 import { dailyResultFor, dailyStreak, useKlondikeStatsStore } from '@/stores/klondikeStats';
 import { useKlondikeSetupStore } from '@/stores/klondikeSetup';
@@ -21,6 +23,10 @@ export default function KlondikeSetupPage() {
   const stats = useKlondikeStatsStore();
   const today = dailyResultFor(stats.dailyResults, todayKey);
   const streak = dailyStreak(stats.dailyResults, todayKey);
+  const t = useT();
+  const shelfEntry = useLocalizedGame('klondike');
+  const modes = useLocalizedModes('klondike', KLONDIKE_MODES);
+  const selectedMode = modes.find((candidate) => candidate.id === mode);
 
   const start = () => {
     if (starting) return;
@@ -34,10 +40,10 @@ export default function KlondikeSetupPage() {
 
   return (
     <GameSetupScreen
-      title="Klondike"
-      eyebrow="clear the table"
-      modes={KLONDIKE_MODES}
-      modesLabel="Klondike deal"
+      title={shelfEntry.name}
+      eyebrow="setup.eyebrow.clearTable"
+      modes={modes}
+      modesLabel="setup.modes.klondikeDeal"
       selected={mode}
       onSelect={(id) => setMode(id as KlondikeModeId)}
       modeTestId={(def) => `klondike-${def.id}`}
@@ -59,24 +65,28 @@ export default function KlondikeSetupPage() {
           what stands between the deal picker and the button that deals. */}
       <div className="panel-soft p-3.5" data-testid="klondike-daily-status">
         <p className="text-xs font-bold uppercase tracking-[0.2em] text-hearth-200">
-          Today · {todayKey} <span className="text-dusk-200">· {streak} day streak</span>
+          {t('setup.todayDate', { date: todayKey })}{' '}
+          <span className="text-dusk-200">· {t.count('setup.dayStreak', streak)}</span>
         </p>
         <h2 className="mt-1 font-display text-lg font-extrabold text-hearth-50">
-          {today ? 'Daily table cleared' : 'Your daily table is waiting'}
+          {today ? t('setup.klondike.cleared') : t('setup.klondike.waiting')}
         </h2>
         <p className="mt-1 text-xs text-dusk-100/85">
           {today
-            ? `Best: ${today.bestMoves} moves · ${formatTime(today.bestTimeMs)}`
+            ? t('setup.klondike.best', {
+                moves: today.bestMoves,
+                time: formatTime(today.bestTimeMs),
+              })
             : winnableOnly
-              ? 'A deterministic Draw Three deal shared by every player, checked all the way through before it reaches you.'
-              : 'A deterministic Draw Three deal shared by every player, straight off the shuffle — roughly one table in five cannot be cleared.'}
+              ? t('setup.klondike.waitingWinnable')
+              : t('setup.klondike.waitingShuffle')}
         </p>
         <div className="mt-2.5 grid grid-cols-4 gap-2 border-t border-dusk-700/40 pt-2.5 text-center">
-          <Stat label="Deals" value={stats.dealsStarted} />
-          <Stat label="Wins" value={stats.wins} />
-          <Stat label="Best moves" value={stats.bestMoves ?? '—'} />
+          <Stat label={t('setup.klondike.deals')} value={stats.dealsStarted} />
+          <Stat label={t('stats.wins')} value={stats.wins} />
+          <Stat label={t('setup.klondike.bestMoves')} value={stats.bestMoves ?? '—'} />
           <Stat
-            label="Best time"
+            label={t('setup.klondike.bestTime')}
             value={stats.bestTimeMs === null ? '—' : formatTime(stats.bestTimeMs)}
           />
         </div>
@@ -88,13 +98,16 @@ export default function KlondikeSetupPage() {
         busy={starting}
         actions={[
           {
-            label: mode === 'daily' ? "Play today's deal" : `Play ${mode}`,
-            busyLabel: winnableOnly ? 'Finding a winnable deal…' : 'Laying out the cards…',
+            label:
+              mode === 'daily'
+                ? t('setup.playTodayDeal')
+                : t('setup.playMode', { mode: selectedMode?.name ?? mode }),
+            busyLabel: winnableOnly ? t('setup.busy.findingWinnable') : t('setup.busy.layingCards'),
             onClick: start,
             testId: 'start-klondike',
           },
         ]}
-        note="Solo and offline. Undo, hints, and safe auto-finish stay on your device; no account or room code needed."
+        note={t('setup.klondike.note')}
       />
     </GameSetupScreen>
   );
@@ -109,6 +122,7 @@ function WinnableToggle({
   onChange: (checked: boolean) => void;
   disabled: boolean;
 }) {
+  const t = useT();
   return (
     <div className="mx-auto flex max-w-xl flex-col items-center gap-1">
       <button
@@ -132,12 +146,10 @@ function WinnableToggle({
             }`}
           />
         </span>
-        Winnable deals only
+        {t('setup.klondike.winnableOnly')}
       </button>
       <p className="px-4 text-center text-xs text-dusk-200/80">
-        {checked
-          ? 'Every table is solved end to end before it is dealt, so a loss is always yours to take back.'
-          : 'Straight shuffles, dead tables and all — the way Klondike has always dealt.'}
+        {checked ? t('setup.klondike.winnableOn') : t('setup.klondike.winnableOff')}
       </p>
     </div>
   );

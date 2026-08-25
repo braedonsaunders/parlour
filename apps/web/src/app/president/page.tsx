@@ -2,7 +2,7 @@
 
 import { useWipeRouter } from '@/hooks/useWipeRouter';
 import { useState } from 'react';
-import { presidentConfig, presidentHowToPlay } from '@parlour/game-president';
+import { presidentConfig } from '@parlour/game-president';
 import { RuleSettings } from '@/components/settings/RuleSettings';
 import {
   BotDifficultyPicker,
@@ -12,6 +12,8 @@ import {
   SetupPanel,
 } from '@/components/setup';
 import { getGame } from '@/lib/games';
+import { useT } from '@/lib/i18n';
+import { useLocalizedGame, useLocalizedModes, useLocalizedSchema } from '@/lib/i18n/gameContent';
 import { PRESIDENT_MODES } from '@/lib/president/modes';
 import { presidentRulesFor, usePresidentSetupStore } from '@/stores/presidentSetup';
 
@@ -29,6 +31,10 @@ export default function PresidentSetupPage() {
   const setRule = usePresidentSetupStore((s) => s.setRule);
   const resetRules = usePresidentSetupStore((s) => s.resetRules);
   const [starting, setStarting] = useState(false);
+  const t = useT();
+  const shelfEntry = useLocalizedGame('president');
+  const modes = useLocalizedModes('president', PRESIDENT_MODES);
+  const schema = useLocalizedSchema('president', presidentConfig);
 
   const startSolo = () => {
     if (starting) return;
@@ -38,11 +44,11 @@ export default function PresidentSetupPage() {
 
   return (
     <GameSetupScreen
-      title="President"
-      eyebrow="claim the crown"
-      help={{ doc: presidentHowToPlay, subtitle: 'the climbing game' }}
-      modes={PRESIDENT_MODES}
-      modesLabel="Match format"
+      title={shelfEntry.name}
+      eyebrow="setup.eyebrow.claimCrown"
+      help={{ doc: shelfEntry.howToPlay, subtitle: shelfEntry.subtitle }}
+      modes={modes}
+      modesLabel="setup.matchFormat"
       selected={mode}
       onSelect={(id) => setMode(id as typeof mode)}
     >
@@ -51,37 +57,36 @@ export default function PresidentSetupPage() {
           options={SEAT_OPTIONS}
           value={seats}
           onChange={setSeats}
-          hint={`you + ${seats - 1} rivals — the full ladder, crowns included`}
+          hint={t('setup.youPlusPresident', { count: seats - 1 })}
         />
         <BotDifficultyPicker value={botTier} onChange={setBotTier} />
       </SetupPanel>
 
       <RuleSettings
-        schema={presidentConfig}
+        schema={schema}
         values={presidentRulesFor(mode, overrides)}
         onChange={setRule as (key: string, value: string | number | boolean) => void}
         onReset={resetRules}
-        label="Advanced options"
       />
 
       <SetupActions
         busy={starting}
         actions={[
           {
-            label: 'Play solo',
-            busyLabel: 'Cutting the deck…',
+            label: t('setup.playSolo'),
+            busyLabel: t('setup.busy.cuttingDeck'),
             onClick: startSolo,
             testId: 'deal-me-in',
           },
           {
-            label: 'Create friend room',
+            label: t('setup.createFriendRoom'),
             tone: 'teal',
             onClick: () => router.push('/president/create'),
             testId: 'create-president-room',
           },
-          { label: 'Join with a code', tone: 'ghost', href: '/join' },
+          { label: t('setup.joinWithCode'), tone: 'ghost', href: '/join' },
         ]}
-        note="Friend rooms use the same four-character codes, live replay sync, and reconnect flow as every parlour table — with room for up to eight chairs."
+        note={t('setup.note.friendRoomsEight')}
       />
     </GameSetupScreen>
   );

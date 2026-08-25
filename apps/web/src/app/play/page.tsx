@@ -2,7 +2,6 @@
 
 import { useWipeRouter } from '@/hooks/useWipeRouter';
 import { useState } from 'react';
-import { blitzHowToPlay } from '@parlour/game-blitz';
 import {
   BotDifficultyPicker,
   GameSetupScreen,
@@ -11,6 +10,8 @@ import {
   SetupPanel,
 } from '@/components/setup';
 import { getGame } from '@/lib/games';
+import { useT } from '@/lib/i18n';
+import { useLocalizedGame, useLocalizedModes } from '@/lib/i18n/gameContent';
 import { MODES } from '@/lib/modes';
 import { useSetupStore } from '@/stores/setup';
 
@@ -25,6 +26,9 @@ export default function ModeSelectPage() {
   const setSeats = useSetupStore((s) => s.setSeats);
   const setBotTier = useSetupStore((s) => s.setBotTier);
   const [starting, setStarting] = useState(false);
+  const t = useT();
+  const shelfEntry = useLocalizedGame('blitz');
+  const modes = useLocalizedModes('blitz', MODES);
 
   const start = () => {
     if (starting) return;
@@ -34,11 +38,11 @@ export default function ModeSelectPage() {
 
   return (
     <GameSetupScreen
-      title="Blitz"
-      eyebrow="pick your mode"
-      help={{ doc: blitzHowToPlay, subtitle: 'the 31 game' }}
-      modes={MODES}
-      modesLabel="Match format"
+      title={shelfEntry.name}
+      eyebrow="setup.eyebrow.pickMode"
+      help={{ doc: shelfEntry.howToPlay, subtitle: shelfEntry.subtitle }}
+      modes={modes}
+      modesLabel="setup.matchFormat"
       selected={mode}
       onSelect={(id) => setMode(id as typeof mode)}
     >
@@ -47,7 +51,7 @@ export default function ModeSelectPage() {
           options={SEAT_OPTIONS}
           value={seats}
           onChange={setSeats}
-          hint={`you + ${seats - 1} bot${seats > 2 ? 's' : ''}`}
+          hint={t.count('setup.youPlusBots', seats - 1)}
         />
         <BotDifficultyPicker value={botTier} onChange={setBotTier} />
       </SetupPanel>
@@ -56,15 +60,15 @@ export default function ModeSelectPage() {
         busy={starting}
         actions={[
           {
-            label: 'Deal me in',
-            busyLabel: 'Setting the table…',
+            label: t('setup.dealMeIn'),
+            busyLabel: t('setup.busy.settingTable'),
             onClick: start,
             testId: 'deal-me-in',
           },
-          { label: 'Create Room', tone: 'teal', onClick: () => router.push('/create') },
-          { label: 'Join Room', tone: 'ghost', onClick: () => router.push('/join') },
+          { label: t('setup.createRoom'), tone: 'teal', onClick: () => router.push('/create') },
+          { label: t('setup.joinRoom'), tone: 'ghost', onClick: () => router.push('/join') },
         ]}
-        note="Rooms play with friends over a share code — solo deals you in with the bots above."
+        note={t('setup.note.blitzRooms')}
       />
     </GameSetupScreen>
   );

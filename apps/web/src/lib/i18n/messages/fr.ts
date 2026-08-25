@@ -40,10 +40,16 @@ export const fr: Messages = {
 
   // --- game shelf -----------------------------------------------------------
   'shelf.heading': "L'étagère des jeux",
+  'shelf.choose': 'Choisis ton jeu',
   'shelf.search': 'Chercher un jeu…',
+  'shelf.searchLabel': 'Chercher un jeu',
   'shelf.clearSearch': 'Effacer la recherche',
+  'shelf.pickTable': 'Choisis une table',
+  'shelf.libraryCopy': 'En solo, avec des bots, ou autour de la table avec des amis.',
   'shelf.gamesLabel': 'Jeux',
   'shelf.noMatch': 'Essaie un style comme levées, défausse, rami ou bataille.',
+  'shelf.noMatchTitle': 'Aucun jeu de l’étagère ne correspond à « {query} »',
+  'shelf.showEvery': 'Montrer tous les jeux',
   'shelf.moreSoon': "D'autres jeux arrivent bientôt sur l'étagère.",
   'shelf.soon': 'Bientôt',
   'shelf.resultsFound_one': '{count} jeu trouvé',
@@ -121,6 +127,12 @@ export const fr: Messages = {
   'stats.knockSuccess': 'Knock réussis',
   'stats.bestStreak': 'Meilleure série',
 
+  // --- how to play ----------------------------------------------------------
+  'howto.heading': 'Comment jouer',
+  'howto.playTitle': 'Comment jouer à {title}',
+  'howto.close': 'Fermer comment jouer',
+  'howto.objective': 'Comment on gagne',
+
   // --- setup ----------------------------------------------------------------
   'setup.botSkill': 'Niveau des bots',
   'setup.easy': 'Facile',
@@ -129,6 +141,137 @@ export const fr: Messages = {
   'setup.seats': 'Places',
   'setup.seatCount_one': '{count} place',
   'setup.seatCount_other': '{count} places',
+  'setup.backToGames': '← Jeux',
+  'setup.tableSetup': 'Préparer la table',
+  'setup.advancedOptions': 'Options avancées',
+  'setup.houseRules': 'Règles de la maison',
+  'setup.matchFormat': 'Format de partie',
+  'setup.matchRules': 'Règles de la partie',
+  'setup.rules': 'Règles',
+  'setup.table': 'Table',
+  'setup.changed_one': '{count} modification',
+  'setup.changed_other': '{count} modifications',
+  'setup.houseRulesNote':
+    'Règles de la maison — elles changent comment on joue, pas seulement combien de temps ça dure.',
+  'setup.resetDefault': 'Revenir au défaut de la table',
+  'setup.decrease': 'Diminuer {label}',
+  'setup.increase': 'Augmenter {label}',
+  'setup.playSolo': 'Jouer en solo',
+  'setup.createFriendRoom': 'Créer une salle entre amis',
+  'setup.joinWithCode': 'Rejoindre avec un code',
+  'setup.dealMeIn': 'Donne-moi les cartes',
+  'setup.createRoom': 'Créer une salle',
+  'setup.joinRoom': 'Rejoindre une salle',
+  'setup.startSoloMatch': 'Lancer une partie solo',
+  'setup.playMode': 'Jouer {mode}',
+  'setup.playTodayHole': 'Jouer le trou du jour',
+  'setup.playTodayDeal': 'Jouer la donne du jour',
+  'setup.eyebrow.pickMode': 'choisis ton mode',
+  'setup.eyebrow.pickTable': 'choisis ta table',
+  'setup.eyebrow.callSuit': 'annonce la couleur',
+  'setup.eyebrow.playOntoHole': 'joue vers le trou',
+  'setup.eyebrow.clearTable': 'vide la table',
+  'setup.eyebrow.pickPile': 'choisis ta pile',
+  'setup.eyebrow.handsOnPile': 'mains sur la pile',
+  'setup.eyebrow.claimCrown': 'réclame la couronne',
+  'setup.eyebrow.dodgeEverything': 'évite tout',
+  'setup.eyebrow.chooseBoard': 'choisis ton plateau',
+  'setup.modes.golfHole': 'Trou de golf',
+  'setup.modes.klondikeDeal': 'Donne de Klondike',
+  'setup.modes.cribbageFormat': 'Format de cribbage',
+  'setup.busy.settingTable': 'On dresse la table…',
+  'setup.busy.shuffling': 'On mélange…',
+  'setup.busy.shufflingPack': 'On mélange le jeu…',
+  'setup.busy.stackingPiles': 'On empile les tas…',
+  'setup.busy.layingTable': 'On étale la table…',
+  'setup.busy.cuttingDeal': 'On coupe pour la donne…',
+  'setup.busy.shufflingPile': 'On mélange la pile…',
+  'setup.busy.shufflingStacks': 'On mélange les tas…',
+  'setup.busy.cuttingDeck': 'On coupe le jeu…',
+  'setup.busy.settingPegs': 'On place les chevilles…',
+  'setup.busy.findingWinnable': 'On cherche une donne gagnable…',
+  'setup.busy.layingCards': 'On pose les cartes…',
+  'setup.youPlusBots_one': 'toi + {count} bot',
+  'setup.youPlusBots_other': 'toi + {count} bots',
+  'setup.youPlusBotsReflexes_one': 'toi + {count} bot aux vrais réflexes',
+  'setup.youPlusBotsReflexes_other': 'toi + {count} bots aux vrais réflexes',
+  'setup.youPlusOthersHand_one':
+    'toi plus {count} autre — la taille de la main change à chaque manche',
+  'setup.youPlusOthersHand_other':
+    'toi plus {count} autres — la taille de la main change à chaque manche',
+  'setup.youPlusOpponents_one': 'toi plus {count} adversaire — le dernier tas debout gagne',
+  'setup.youPlusOpponents_other': 'toi plus {count} adversaires — le dernier tas debout gagne',
+  'setup.youPlusSpite': 'toi plus {count} — le premier à vider son tas de paiement gagne',
+  'setup.youPlusPresident': 'toi + {count} rivaux — toute l’échelle, couronnes comprises',
+  'setup.scopaAlwaysFour': 'Le scopone se joue toujours à quatre, en équipes',
+  'setup.scopaOthers': 'toi plus {count} autres — à quatre et à six on joue en équipes',
+  'setup.partnershipsValue': '4 joueurs · deux équipes',
+  'setup.partnershipsHint':
+    'toi + un bot partenaire en face, deux bots adverses sur les côtés — ou amène trois amis',
+  'setup.heartsSeats': '4 joueurs',
+  'setup.heartsHint': 'toi + 3 bots en solo · toutes les chaises prises dans une salle entre amis',
+  'setup.ginSeats': '2 — en tête-à-tête',
+  'setup.ginHint': 'toi + un bot',
+  'setup.cribbageSeats': 'Deux places · tu donnes en premier',
+  'setup.cribbageHint': 'le donneur alterne à chaque main',
+  'setup.note.friendRooms':
+    'Les salles entre amis utilisent les mêmes codes à quatre caractères, la même synchro live et le même retour à table que n’importe quelle table du parlour.',
+  'setup.note.friendRoomsGin':
+    'Les salles entre amis utilisent les mêmes codes à quatre caractères et la même synchro live que n’importe quelle table du parlour.',
+  'setup.note.friendRoomsBlitz':
+    'Les salles entre amis utilisent les mêmes codes à quatre caractères, la même synchro live et le même retour à table que Blitz.',
+  'setup.note.friendRoomsEight':
+    'Les salles entre amis utilisent les mêmes codes à quatre caractères, la même synchro live et le même retour à table que n’importe quelle table du parlour — avec de la place pour huit chaises.',
+  'setup.note.blitzRooms':
+    'Les salles se jouent entre amis avec un code à partager — en solo tu t’assieds avec les bots ci-dessus.',
+  'setup.note.hearts': 'Le plus bas score gagne — évite les cœurs, crains la dame.',
+  'setup.note.poker':
+    'Les jetons ne font que compter — il n’y a rien à acheter et rien à encaisser.',
+  'setup.note.ratscrew':
+    'Les tapes se jouent en temps réel — la première paume sur la pile l’emporte. Une fausse tape brûle ta carte du dessus.',
+  'setup.note.ohhell':
+    'Annonce exactement ce que tu vas prendre. Les salles entre amis pour Oh Hell ne sont pas encore ouvertes.',
+  'setup.note.scopa':
+    'Vide la table pour marquer une scopa. Les salles entre amis pour Scopa ne sont pas encore ouvertes.',
+  'setup.note.spite':
+    'Monte le centre de l’as à la dame. Les salles entre amis pour Spite ne sont pas encore ouvertes.',
+  'setup.note.cribbage':
+    'Les salles entre amis partagent le même journal de replay de l’hôte et le même retour à table que le reste de Parlour.',
+  'setup.note.cribbageMatch':
+    'Le match se joue en solo ; les salles entre amis jouent une course complète à 121.',
+  'setup.cribbageRoomsLocked':
+    'Les salles entre amis jouent pour l’instant une course complète à 121',
+  'setup.todayDate': 'Aujourd’hui · {date}',
+  'setup.dayStreak_one': '{count} jour de série',
+  'setup.dayStreak_other': '{count} jours de série',
+  'setup.golf.posted': 'Trou du jour enregistré',
+  'setup.golf.waiting': 'Ton trou du jour t’attend',
+  'setup.golf.best': 'Meilleur : {score} restantes · {time}',
+  'setup.golf.waitingHint':
+    'Un trou Classique déterministe, le même pour tout le monde. Le plus bas reste gagne.',
+  'setup.golf.holes': 'Trous',
+  'setup.golf.clears': 'Vidages',
+  'setup.golf.bestScore': 'Meilleur score',
+  'setup.golf.bestClear': 'Meilleur vidage',
+  'setup.golf.note':
+    'Solo et hors ligne. L’annulation et les indices restent sur ton appareil ; pas de compte ni de code de salle.',
+  'setup.klondike.cleared': 'Table du jour vidée',
+  'setup.klondike.waiting': 'Ta table du jour t’attend',
+  'setup.klondike.best': 'Meilleur : {moves} coups · {time}',
+  'setup.klondike.waitingWinnable':
+    'Une donne Piocher trois déterministe, la même pour tout le monde, vérifiée de bout en bout avant de t’arriver.',
+  'setup.klondike.waitingShuffle':
+    'Une donne Piocher trois déterministe, la même pour tout le monde, tout droit sortie du mélange — à peu près une table sur cinq ne peut pas se vider.',
+  'setup.klondike.deals': 'Donnes',
+  'setup.klondike.bestMoves': 'Meilleurs coups',
+  'setup.klondike.bestTime': 'Meilleur temps',
+  'setup.klondike.winnableOnly': 'Donnes gagnables seulement',
+  'setup.klondike.winnableOn':
+    'Chaque table est résolue de bout en bout avant d’être donnée, donc une défaite est toujours à toi de reprendre.',
+  'setup.klondike.winnableOff':
+    'Mélanges francs, tables mortes comprises — comme Klondike a toujours donné.',
+  'setup.klondike.note':
+    'Solo et hors ligne. L’annulation, les indices et la fin auto sûre restent sur ton appareil ; pas de compte ni de code de salle.',
 
   // --- install --------------------------------------------------------------
   'install.add': 'Ajouter',

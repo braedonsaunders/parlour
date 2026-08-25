@@ -12,6 +12,7 @@ import {
   SetupPanel,
 } from '@/components/setup';
 import { getGame } from '@/lib/games';
+import { useT } from '@/lib/i18n';
 import { useLocalizedGame, useLocalizedModes, useLocalizedSchema } from '@/lib/i18n/gameContent';
 import { EIGHTS_MODES } from '@/lib/eights/modes';
 import { eightsRulesFor, useEightsSetupStore } from '@/stores/eightsSetup';
@@ -30,6 +31,7 @@ export default function EightsSetupPage() {
   const setRule = useEightsSetupStore((s) => s.setRule);
   const resetRules = useEightsSetupStore((s) => s.resetRules);
   const [starting, setStarting] = useState(false);
+  const t = useT();
   // The pack keeps its English; each locale overlays it. See ADDING-A-GAME.md §6.
   const shelfEntry = useLocalizedGame('eights');
   const modes = useLocalizedModes('eights', EIGHTS_MODES);
@@ -43,11 +45,10 @@ export default function EightsSetupPage() {
 
   return (
     <GameSetupScreen
-      title="Crazy Eights"
-      eyebrow="call the suit"
+      title={shelfEntry.name}
+      eyebrow="setup.eyebrow.callSuit"
       help={{ doc: shelfEntry.howToPlay, subtitle: shelfEntry.subtitle }}
       modes={modes}
-      modesLabel="House rules"
       selected={mode}
       onSelect={(id) => setMode(id as typeof mode)}
     >
@@ -56,7 +57,7 @@ export default function EightsSetupPage() {
           options={SEAT_OPTIONS}
           value={seats}
           onChange={setSeats}
-          hint={`you + ${seats - 1} bot${seats > 2 ? 's' : ''}`}
+          hint={t.count('setup.youPlusBots', seats - 1)}
         />
         <BotDifficultyPicker value={botTier} onChange={setBotTier} />
       </SetupPanel>
@@ -66,27 +67,26 @@ export default function EightsSetupPage() {
         values={eightsRulesFor(mode, overrides)}
         onChange={setRule}
         onReset={resetRules}
-        label="Advanced options"
       />
 
       <SetupActions
         busy={starting}
         actions={[
           {
-            label: 'Play solo',
-            busyLabel: 'Shuffling the pack…',
+            label: t('setup.playSolo'),
+            busyLabel: t('setup.busy.shufflingPack'),
             onClick: startSolo,
             testId: 'deal-me-in',
           },
           {
-            label: 'Create friend room',
+            label: t('setup.createFriendRoom'),
             tone: 'teal',
             onClick: () => router.push('/eights/create'),
             testId: 'create-eights-room',
           },
-          { label: 'Join with a code', tone: 'ghost', href: '/join' },
+          { label: t('setup.joinWithCode'), tone: 'ghost', href: '/join' },
         ]}
-        note="Friend rooms use the same four-character codes, live replay sync, and reconnect flow as every parlour table."
+        note={t('setup.note.friendRooms')}
       />
     </GameSetupScreen>
   );
