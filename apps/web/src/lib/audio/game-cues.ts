@@ -41,6 +41,69 @@ export function klondikeCuesForFx(fx: readonly FxEvent[]): SoundCue[] {
   });
 }
 
+export function freecellCuesForFx(fx: readonly FxEvent[]): SoundCue[] {
+  return fx.flatMap((event) => {
+    const atMs = Math.max(0, event.at ?? 0);
+    switch (event.kind) {
+      case 'freecell.cards-move': {
+        const to = (event.payload as { to?: unknown } | undefined)?.to;
+        if (typeof to === 'string' && to.startsWith('cell:')) {
+          return [{ id: 'freecell.park', atMs }];
+        }
+        return [{ id: 'freecell.move', atMs }];
+      }
+      case 'freecell.foundation-build':
+        return [{ id: 'freecell.foundation', atMs }];
+      case 'freecell.win':
+        return [{ id: 'freecell.win', atMs }];
+      default:
+        return [];
+    }
+  });
+}
+
+export function spiderCuesForFx(fx: readonly FxEvent[]): SoundCue[] {
+  return fx.flatMap((event) => {
+    const atMs = Math.max(0, event.at ?? 0);
+    switch (event.kind) {
+      case 'spider.stock-deal':
+        return [{ id: 'spider.deal', atMs }];
+      case 'spider.cards-move':
+        return [{ id: 'spider.move', atMs }];
+      case 'spider.tableau-flip':
+        return [{ id: 'spider.flip', atMs }];
+      case 'spider.suit-clear':
+        return [{ id: 'spider.suit-clear', atMs }];
+      case 'spider.win':
+        return [{ id: 'spider.win', atMs }];
+      default:
+        return [];
+    }
+  });
+}
+
+export function pyramidCuesForFx(fx: readonly FxEvent[]): SoundCue[] {
+  return fx.flatMap((event) => {
+    const atMs = Math.max(0, event.at ?? 0);
+    switch (event.kind) {
+      case 'pyramid.stock-draw':
+        return [{ id: 'pyramid.draw', atMs }];
+      case 'pyramid.stock-recycle':
+        return [{ id: 'pyramid.recycle', atMs }];
+      case 'pyramid.pair':
+        return [{ id: 'pyramid.pair', atMs }];
+      case 'pyramid.remove':
+        return [{ id: 'pyramid.king', atMs }];
+      case 'pyramid.hole-out':
+        return [{ id: 'pyramid.hole-out', atMs }];
+      case 'pyramid.win':
+        return [{ id: 'pyramid.win', atMs }];
+      default:
+        return [];
+    }
+  });
+}
+
 export function heartsCuesForFx(fx: readonly FxEvent[]): SoundCue[] {
   const hasSharedTrickCollect = fx.some((event) => event.kind === 'tricks.collect');
 

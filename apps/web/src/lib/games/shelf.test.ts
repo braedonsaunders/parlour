@@ -3,8 +3,11 @@ import { cribbageCatalog } from '@parlour/game-cribbage';
 import { euchreCatalog } from '@parlour/game-euchre';
 import { heartsCatalog } from '@parlour/game-hearts';
 import { ginCatalog } from '@parlour/game-gin';
+import { freecellCatalog } from '@parlour/game-freecell';
 import { golfCatalog } from '@parlour/game-golf';
 import { klondikeCatalog } from '@parlour/game-klondike';
+import { pyramidCatalog } from '@parlour/game-pyramid';
+import { spiderCatalog } from '@parlour/game-spider';
 import { presidentCatalog } from '@parlour/game-president';
 import { ratscrewCatalog } from '@parlour/game-ratscrew';
 import { wildpileCatalog } from '@parlour/game-wildpile';
@@ -28,6 +31,9 @@ describe('game shelf catalog', () => {
       'spite',
       'klondike',
       'golf',
+      'freecell',
+      'spider',
+      'pyramid',
       'hearts',
       'gin',
       'president',
@@ -74,10 +80,13 @@ describe('game shelf catalog', () => {
     expect(getGame('president').href).toBe('/president');
     expect(getGame('klondike').href).toBe('/klondike');
     expect(getGame('golf').href).toBe('/golf');
+    expect(getGame('freecell').href).toBe('/freecell');
+    expect(getGame('spider').href).toBe('/spider');
+    expect(getGame('pyramid').href).toBe('/pyramid');
   });
 
   it('every multi-seat shelf game has a friend room, and solitaire does not', () => {
-    const SOLO_ONLY = new Set(['klondike', 'golf']);
+    const SOLO_ONLY = new Set(['klondike', 'golf', 'freecell', 'spider', 'pyramid']);
     for (const game of GAMES) {
       if (SOLO_ONLY.has(game.id)) {
         expect(game.seats, game.id).toEqual([1]);
@@ -115,6 +124,9 @@ describe('game shelf catalog', () => {
     expect(getGame('president')).toBe(presidentCatalog);
     expect(getGame('klondike')).toBe(klondikeCatalog);
     expect(getGame('golf')).toBe(golfCatalog);
+    expect(getGame('freecell')).toBe(freecellCatalog);
+    expect(getGame('spider')).toBe(spiderCatalog);
+    expect(getGame('pyramid')).toBe(pyramidCatalog);
   });
 
   it('gives every shelved game what the picker screens need', () => {

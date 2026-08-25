@@ -542,6 +542,60 @@ const sounds = [
     prompt:
       'One restrained dealer time signal for poker blinds increasing: a low warm clockwork tick blooms into a single rounded brass table bell chime with a short clean decay. Calm authority, no melody or alarm.',
   },
+  {
+    name: 'freecell-park',
+    duration: 0.5,
+    outputDuration: 0.28,
+    mono: true,
+    prompt:
+      'One playing card slots neatly into a small wooden FreeCell parking space: short paperboard slide, tiny hollow wood tick, immediate settle. Precise and tactile, no melody.',
+  },
+  {
+    name: 'freecell-home',
+    duration: 0.5,
+    outputDuration: 0.32,
+    mono: true,
+    prompt:
+      'One playing card lands home on a FreeCell foundation pile: crisp paperboard slap into a warm rounded wood-and-glass pluck. Satisfying, compact, designed to stack cleanly.',
+  },
+  {
+    name: 'spider-suit-clear',
+    duration: 0.85,
+    outputDuration: 0.7,
+    tempo: 0.55,
+    prompt:
+      'A completed same-suit King-to-Ace run lifts off a Spider tableau: rising paperboard zipper of thirteen cards, then one bright warm pluck and a short sparkle tail. Celebratory but smaller than match victory.',
+  },
+  {
+    name: 'spider-row-deal',
+    duration: 0.7,
+    outputDuration: 0.5,
+    prompt:
+      'Ten playing cards deal in one quick left-to-right row across felt: a compact paperboard zip-zip-zip ending in a soft collective slap. One dealer action, not a shuffle.',
+  },
+  {
+    name: 'pyramid-pair',
+    duration: 0.55,
+    outputDuration: 0.36,
+    mono: true,
+    prompt:
+      'Two free playing cards snap together and vanish from a pyramid: two quick paperboard ticks that fuse into one warm wooden pop. Clear pair-removed gesture, compact and friendly.',
+  },
+  {
+    name: 'pyramid-king',
+    duration: 0.5,
+    outputDuration: 0.3,
+    mono: true,
+    prompt:
+      'One King lifts off a solitaire pyramid alone: a slightly heavier paperboard peel and a single low warm pluck. Distinct from a two-card pair, decisive and short.',
+  },
+  {
+    name: 'pyramid-hole-out',
+    duration: 0.65,
+    outputDuration: 0.5,
+    prompt:
+      'A leftover-score settle for Pyramid solitaire: remaining cards hush onto felt, then one gentle rounded chime. Good-natured hole-complete, not a victory fanfare.',
+  },
 ];
 
 const masterTargets = {
@@ -617,6 +671,13 @@ const masterTargets = {
   'poker-award': -16,
   'poker-bust': -16,
   'poker-blinds-up': -16,
+  'freecell-park': -18,
+  'freecell-home': -18,
+  'spider-suit-clear': -17,
+  'spider-row-deal': -18,
+  'pyramid-pair': -18,
+  'pyramid-king': -18,
+  'pyramid-hole-out': -18,
 };
 
 function option(name) {

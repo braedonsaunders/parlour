@@ -59,6 +59,9 @@ importers:
       '@parlour/game-euchre':
         specifier: workspace:*
         version: link:../../packages/game-euchre
+      '@parlour/game-freecell':
+        specifier: workspace:*
+        version: link:../../packages/game-freecell
       '@parlour/game-gin':
         specifier: workspace:*
         version: link:../../packages/game-gin
@@ -80,6 +83,9 @@ importers:
       '@parlour/game-president':
         specifier: workspace:*
         version: link:../../packages/game-president
+      '@parlour/game-pyramid':
+        specifier: workspace:*
+        version: link:../../packages/game-pyramid
       '@parlour/game-ratscrew':
         specifier: workspace:*
         version: link:../../packages/game-ratscrew
@@ -89,6 +95,9 @@ importers:
       '@parlour/game-spades':
         specifier: workspace:*
         version: link:../../packages/game-spades
+      '@parlour/game-spider':
+        specifier: workspace:*
+        version: link:../../packages/game-spider
       '@parlour/game-spite':
         specifier: workspace:*
         version: link:../../packages/game-spite
@@ -213,6 +222,16 @@ importers:
         specifier: ^4.0.18
         version: 4.1.11(@types/node@24.13.3)(jsdom@27.4.0(@noble/hashes@2.0.1))(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@1.21.7)(tsx@4.23.12))
 
+  packages/game-freecell:
+    dependencies:
+      '@parlour/engine':
+        specifier: workspace:*
+        version: link:../engine
+    devDependencies:
+      vitest:
+        specifier: ^4.0.18
+        version: 4.1.11(@types/node@24.13.3)(jsdom@27.4.0(@noble/hashes@2.0.1))(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@1.21.7)(tsx@4.23.12))
+
   packages/game-gin:
     dependencies:
       '@parlour/engine':
@@ -301,6 +320,16 @@ importers:
         specifier: ^4.0.18
         version: 4.1.11(@types/node@24.13.3)(jsdom@27.4.0(@noble/hashes@2.0.1))(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@1.21.7)(tsx@4.23.12))
 
+  packages/game-pyramid:
+    dependencies:
+      '@parlour/engine':
+        specifier: workspace:*
+        version: link:../engine
+    devDependencies:
+      vitest:
+        specifier: ^4.0.18
+        version: 4.1.11(@types/node@24.13.3)(jsdom@27.4.0(@noble/hashes@2.0.1))(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@1.21.7)(tsx@4.23.12))
+
   packages/game-ratscrew:
     dependencies:
       '@parlour/engine':
@@ -339,6 +368,16 @@ importers:
       tsx:
         specifier: ^4.20.0
         version: 4.23.12
+      vitest:
+        specifier: ^4.0.18
+        version: 4.1.11(@types/node@24.13.3)(jsdom@27.4.0(@noble/hashes@2.0.1))(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@1.21.7)(tsx@4.23.12))
+
+  packages/game-spider:
+    dependencies:
+      '@parlour/engine':
+        specifier: workspace:*
+        version: link:../engine
+    devDependencies:
       vitest:
         specifier: ^4.0.18
         version: 4.1.11(@types/node@24.13.3)(jsdom@27.4.0(@noble/hashes@2.0.1))(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@1.21.7)(tsx@4.23.12))

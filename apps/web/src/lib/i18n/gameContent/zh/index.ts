@@ -14,6 +14,9 @@ import { scopaZh } from './scopa';
 import { spiteZh } from './spite';
 import { golfZh } from './golf';
 import { klondikeZh } from './klondike';
+import { freecellZh } from './freecell';
+import { spiderZh } from './spider';
+import { pyramidZh } from './pyramid';
 import { eightsZh } from './eights';
 
 /** Simplified Chinese game copy, one file per shelf entry. */
@@ -33,5 +36,8 @@ export const ZH_GAMES: GameCopyBook = {
   spite: spiteZh,
   klondike: klondikeZh,
   golf: golfZh,
+  freecell: freecellZh,
+  spider: spiderZh,
+  pyramid: pyramidZh,
   eights: eightsZh,
 };

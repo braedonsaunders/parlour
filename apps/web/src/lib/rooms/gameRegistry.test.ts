@@ -25,6 +25,9 @@ describe('room game registry', () => {
     // refused here rather than quietly seated at a Blitz table.
     expect(() => roomGame('klondike')).toThrow(/unsupported room game: klondike/);
     expect(() => roomGame('golf')).toThrow(/unsupported room game: golf/);
+    expect(() => roomGame('freecell')).toThrow(/unsupported room game: freecell/);
+    expect(() => roomGame('spider')).toThrow(/unsupported room game: spider/);
+    expect(() => roomGame('pyramid')).toThrow(/unsupported room game: pyramid/);
     expect(() => roomGame('spite')).not.toThrow();
     expect(() => roomGame('scopa')).not.toThrow();
     expect(findRoomGame('bridge')).toBeNull();

@@ -188,8 +188,12 @@ export const en = {
   'setup.eyebrow.claimCrown': 'claim the crown',
   'setup.eyebrow.dodgeEverything': 'dodge everything',
   'setup.eyebrow.chooseBoard': 'choose your board',
+  'setup.eyebrow.pairToThirteen': 'pair to thirteen',
   'setup.modes.golfHole': 'Golf hole',
   'setup.modes.klondikeDeal': 'Klondike deal',
+  'setup.modes.freecellDeal': 'FreeCell deal',
+  'setup.modes.spiderDeal': 'Spider deal',
+  'setup.modes.pyramidDeal': 'Pyramid deal',
   'setup.modes.cribbageFormat': 'Cribbage format',
   'setup.busy.settingTable': 'Setting the table…',
   'setup.busy.shuffling': 'Shuffling up…',
@@ -280,6 +284,37 @@ export const en = {
     'Straight shuffles, dead tables and all — the way Klondike has always dealt.',
   'setup.klondike.note':
     'Solo and offline. Undo, hints, and safe auto-finish stay on your device; no account or room code needed.',
+  'setup.freecell.cleared': 'Daily table cleared',
+  'setup.freecell.waiting': 'Your daily table is waiting',
+  'setup.freecell.best': 'Best: {moves} moves · {time}',
+  'setup.freecell.waitingHint':
+    'A deterministic four-cell deal shared by every player. Park cards, build down in alternating colors, and send every suit home.',
+  'setup.freecell.deals': 'Deals',
+  'setup.freecell.bestMoves': 'Best moves',
+  'setup.freecell.bestTime': 'Best time',
+  'setup.freecell.note':
+    'Solo and offline. Undo, hints, and safe auto-finish stay on your device; no account or room code needed.',
+  'setup.spider.cleared': 'Daily table cleared',
+  'setup.spider.waiting': 'Your daily table is waiting',
+  'setup.spider.best': 'Best: {moves} moves · {time}',
+  'setup.spider.waitingHint':
+    'A deterministic two-suit deal shared by every player. Build down, peel same-suit Kings-to-Aces, and clear all eight runs.',
+  'setup.spider.deals': 'Deals',
+  'setup.spider.bestMoves': 'Best moves',
+  'setup.spider.bestTime': 'Best time',
+  'setup.spider.note':
+    'Solo and offline. Undo and hints stay on your device; no account or room code needed.',
+  'setup.pyramid.posted': 'Daily pyramid posted',
+  'setup.pyramid.waiting': 'Your daily pyramid is waiting',
+  'setup.pyramid.best': 'Best: {score} left · {time}',
+  'setup.pyramid.waitingHint':
+    'A deterministic Classic pyramid shared by every player. Pair ranks that sum to 13. Lower leftover wins.',
+  'setup.pyramid.pyramids': 'Pyramids',
+  'setup.pyramid.clears': 'Clears',
+  'setup.pyramid.bestScore': 'Best score',
+  'setup.pyramid.bestClear': 'Best clear',
+  'setup.pyramid.note':
+    'Solo and offline. Undo and hints stay on your device; no account or room code needed.',
 
   // --- install --------------------------------------------------------------
   'install.add': 'Add',

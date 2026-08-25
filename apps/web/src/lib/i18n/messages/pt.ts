@@ -190,8 +190,12 @@ export const pt: Messages = {
   'setup.eyebrow.claimCrown': 'reclame a coroa',
   'setup.eyebrow.dodgeEverything': 'desvie de tudo',
   'setup.eyebrow.chooseBoard': 'escolha o tabuleiro',
+  'setup.eyebrow.pairToThirteen': 'emparelhe até treze',
   'setup.modes.golfHole': 'Buraco de golfe',
   'setup.modes.klondikeDeal': 'Baralho de Klondike',
+  'setup.modes.freecellDeal': 'Baralho de FreeCell',
+  'setup.modes.spiderDeal': 'Baralho de Spider',
+  'setup.modes.pyramidDeal': 'Baralho de Pirâmide',
   'setup.modes.cribbageFormat': 'Formato de cribbage',
   'setup.busy.settingTable': 'Preparando a mesa…',
   'setup.busy.shuffling': 'Embaralhando…',
@@ -284,6 +288,37 @@ export const pt: Messages = {
     'Embaralhamentos puros, mesas mortas e tudo — do jeito que o Klondike sempre deu as cartas.',
   'setup.klondike.note':
     'Sozinho e offline. Desfazer, dicas e o autoacabamento seguro ficam no seu aparelho; sem conta nem código de sala.',
+  'setup.freecell.cleared': 'Mesa diária limpa',
+  'setup.freecell.waiting': 'Sua mesa diária está esperando',
+  'setup.freecell.best': 'Melhor: {moves} jogadas · {time}',
+  'setup.freecell.waitingHint':
+    'Um baralho de quatro células determinístico, o mesmo para todo mundo. Estacione cartas, desça em cores alternadas e mande cada naipe para casa.',
+  'setup.freecell.deals': 'Baralhos',
+  'setup.freecell.bestMoves': 'Melhores jogadas',
+  'setup.freecell.bestTime': 'Melhor tempo',
+  'setup.freecell.note':
+    'Sozinho e offline. Desfazer, dicas e o autoacabamento seguro ficam no seu aparelho; sem conta nem código de sala.',
+  'setup.spider.cleared': 'Mesa diária limpa',
+  'setup.spider.waiting': 'Sua mesa diária está esperando',
+  'setup.spider.best': 'Melhor: {moves} jogadas · {time}',
+  'setup.spider.waitingHint':
+    'Um baralho de dois naipes determinístico, o mesmo para todo mundo. Desça, tire Reis-a-Ás do mesmo naipe e limpe as oito sequências.',
+  'setup.spider.deals': 'Baralhos',
+  'setup.spider.bestMoves': 'Melhores jogadas',
+  'setup.spider.bestTime': 'Melhor tempo',
+  'setup.spider.note':
+    'Sozinho e offline. Desfazer e dicas ficam no seu aparelho; sem conta nem código de sala.',
+  'setup.pyramid.posted': 'Pirâmide diária registrada',
+  'setup.pyramid.waiting': 'Sua pirâmide diária está esperando',
+  'setup.pyramid.best': 'Melhor: {score} restantes · {time}',
+  'setup.pyramid.waitingHint':
+    'Uma pirâmide Clássica determinística, a mesma para todo mundo. Emparelhe valores que somam 13. Quanto menos sobrar, melhor.',
+  'setup.pyramid.pyramids': 'Pirâmides',
+  'setup.pyramid.clears': 'Limpezas',
+  'setup.pyramid.bestScore': 'Melhor pontuação',
+  'setup.pyramid.bestClear': 'Melhor limpeza',
+  'setup.pyramid.note':
+    'Sozinho e offline. Desfazer e dicas ficam no seu aparelho; sem conta nem código de sala.',
 
   // --- install --------------------------------------------------------------
   'install.add': 'Adicionar',

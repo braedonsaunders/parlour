@@ -179,8 +179,12 @@ export const fr: Messages = {
   'setup.eyebrow.claimCrown': 'réclame la couronne',
   'setup.eyebrow.dodgeEverything': 'évite tout',
   'setup.eyebrow.chooseBoard': 'choisis ton plateau',
+  'setup.eyebrow.pairToThirteen': 'associe jusqu’à treize',
   'setup.modes.golfHole': 'Trou de golf',
   'setup.modes.klondikeDeal': 'Donne de Klondike',
+  'setup.modes.freecellDeal': 'Donne de FreeCell',
+  'setup.modes.spiderDeal': 'Donne de Spider',
+  'setup.modes.pyramidDeal': 'Donne de Pyramide',
   'setup.modes.cribbageFormat': 'Format de cribbage',
   'setup.busy.settingTable': 'On dresse la table…',
   'setup.busy.shuffling': 'On mélange…',
@@ -275,6 +279,37 @@ export const fr: Messages = {
     'Mélanges francs, tables mortes comprises — comme Klondike a toujours donné.',
   'setup.klondike.note':
     'Solo et hors ligne. L’annulation, les indices et la fin auto sûre restent sur ton appareil ; pas de compte ni de code de salle.',
+  'setup.freecell.cleared': 'Table du jour vidée',
+  'setup.freecell.waiting': 'Ta table du jour t’attend',
+  'setup.freecell.best': 'Meilleur : {moves} coups · {time}',
+  'setup.freecell.waitingHint':
+    'Une donne à quatre cellules déterministe, la même pour tout le monde. Gare des cartes, descends en couleurs alternées et renvoie chaque couleur à sa fondation.',
+  'setup.freecell.deals': 'Donnes',
+  'setup.freecell.bestMoves': 'Meilleurs coups',
+  'setup.freecell.bestTime': 'Meilleur temps',
+  'setup.freecell.note':
+    'Solo et hors ligne. L’annulation, les indices et la fin auto sûre restent sur ton appareil ; pas de compte ni de code de salle.',
+  'setup.spider.cleared': 'Table du jour vidée',
+  'setup.spider.waiting': 'Ta table du jour t’attend',
+  'setup.spider.best': 'Meilleur : {moves} coups · {time}',
+  'setup.spider.waitingHint':
+    'Une donne à deux couleurs déterministe, la même pour tout le monde. Descends, retire les Rois-à-As de même couleur et vide les huit suites.',
+  'setup.spider.deals': 'Donnes',
+  'setup.spider.bestMoves': 'Meilleurs coups',
+  'setup.spider.bestTime': 'Meilleur temps',
+  'setup.spider.note':
+    'Solo et hors ligne. L’annulation et les indices restent sur ton appareil ; pas de compte ni de code de salle.',
+  'setup.pyramid.posted': 'Pyramide du jour enregistrée',
+  'setup.pyramid.waiting': 'Ta pyramide du jour t’attend',
+  'setup.pyramid.best': 'Meilleur : {score} restantes · {time}',
+  'setup.pyramid.waitingHint':
+    'Une pyramide Classique déterministe, la même pour tout le monde. Associe des rangs qui font 13. Moins il en reste, mieux c’est.',
+  'setup.pyramid.pyramids': 'Pyramides',
+  'setup.pyramid.clears': 'Vidages',
+  'setup.pyramid.bestScore': 'Meilleur score',
+  'setup.pyramid.bestClear': 'Meilleur vidage',
+  'setup.pyramid.note':
+    'Solo et hors ligne. L’annulation et les indices restent sur ton appareil ; pas de compte ni de code de salle.',
 
   // --- install --------------------------------------------------------------
   'install.add': 'Ajouter',

@@ -4,16 +4,19 @@ import { cribbageCatalog } from '@parlour/game-cribbage';
 import { eightsCatalog } from '@parlour/game-eights';
 import { euchreCatalog } from '@parlour/game-euchre';
 import { ginCatalog } from '@parlour/game-gin';
+import { freecellCatalog } from '@parlour/game-freecell';
 import { golfCatalog } from '@parlour/game-golf';
 import { heartsCatalog } from '@parlour/game-hearts';
 import { klondikeCatalog } from '@parlour/game-klondike';
 import { ohhellCatalog } from '@parlour/game-ohhell';
 import { pokerCatalog } from '@parlour/game-poker';
 import { presidentCatalog } from '@parlour/game-president';
+import { pyramidCatalog } from '@parlour/game-pyramid';
 import { wildpileCatalog } from '@parlour/game-wildpile';
 import { ratscrewCatalog } from '@parlour/game-ratscrew';
 import { scopaCatalog } from '@parlour/game-scopa';
 import { spadesCatalog } from '@parlour/game-spades';
+import { spiderCatalog } from '@parlour/game-spider';
 import { spiteCatalog } from '@parlour/game-spite';
 
 /**
@@ -60,7 +63,10 @@ export type GameId =
   | 'scopa'
   | 'spite'
   | 'klondike'
-  | 'golf';
+  | 'golf'
+  | 'freecell'
+  | 'spider'
+  | 'pyramid';
 
 const SHELF: readonly GameCatalogEntry[] = [
   shelfEntry(blitzCatalog),
@@ -76,6 +82,9 @@ const SHELF: readonly GameCatalogEntry[] = [
   shelfEntry(spiteCatalog),
   shelfEntry(klondikeCatalog),
   shelfEntry(golfCatalog),
+  shelfEntry(freecellCatalog),
+  shelfEntry(spiderCatalog),
+  shelfEntry(pyramidCatalog),
   shelfEntry(heartsCatalog),
   shelfEntry(ginCatalog),
   shelfEntry(presidentCatalog),

@@ -319,6 +319,67 @@ describe('fx-driven table audio', () => {
     ]);
   });
 
+  it('maps FreeCell park, move, foundation, and win moments', () => {
+    expect(
+      soundCuesForFx(
+        [
+          { kind: 'freecell.cards-move', payload: { to: 'cell:0' }, at: 0 },
+          { kind: 'freecell.cards-move', payload: { to: 'tableau:2' }, at: 20 },
+          { kind: 'freecell.foundation-build', payload: {}, at: 40 },
+          { kind: 'freecell.win', payload: {}, at: 60 },
+        ],
+        'freecell',
+      ),
+    ).toEqual([
+      { id: 'freecell.park', atMs: 0 },
+      { id: 'freecell.move', atMs: 20 },
+      { id: 'freecell.foundation', atMs: 40 },
+      { id: 'freecell.win', atMs: 60 },
+    ]);
+  });
+
+  it('maps Spider deal, move, flip, suit-clear, and win moments', () => {
+    expect(
+      soundCuesForFx(
+        [
+          { kind: 'spider.stock-deal', payload: {}, at: 0 },
+          { kind: 'spider.cards-move', payload: {}, at: 20 },
+          { kind: 'spider.tableau-flip', payload: {}, at: 40 },
+          { kind: 'spider.suit-clear', payload: {}, at: 60 },
+          { kind: 'spider.win', payload: {}, at: 80 },
+        ],
+        'spider',
+      ),
+    ).toEqual([
+      { id: 'spider.deal', atMs: 0 },
+      { id: 'spider.move', atMs: 20 },
+      { id: 'spider.flip', atMs: 40 },
+      { id: 'spider.suit-clear', atMs: 60 },
+      { id: 'spider.win', atMs: 80 },
+    ]);
+  });
+
+  it('maps Pyramid draw, pair, king, hole-out, and win moments', () => {
+    expect(
+      soundCuesForFx(
+        [
+          { kind: 'pyramid.stock-draw', payload: {}, at: 0 },
+          { kind: 'pyramid.pair', payload: {}, at: 20 },
+          { kind: 'pyramid.remove', payload: {}, at: 40 },
+          { kind: 'pyramid.hole-out', payload: {}, at: 60 },
+          { kind: 'pyramid.win', payload: {}, at: 80 },
+        ],
+        'pyramid',
+      ),
+    ).toEqual([
+      { id: 'pyramid.draw', atMs: 0 },
+      { id: 'pyramid.pair', atMs: 20 },
+      { id: 'pyramid.king', atMs: 40 },
+      { id: 'pyramid.hole-out', atMs: 60 },
+      { id: 'pyramid.win', atMs: 80 },
+    ]);
+  });
+
   it('plays the Blitz knock immediately and leaves later celebration sounds choreographed', () => {
     expect(
       soundCuesForFx(

@@ -14,6 +14,9 @@ import { scopaEs } from './scopa';
 import { spiteEs } from './spite';
 import { golfEs } from './golf';
 import { klondikeEs } from './klondike';
+import { freecellEs } from './freecell';
+import { spiderEs } from './spider';
+import { pyramidEs } from './pyramid';
 import { eightsEs } from './eights';
 
 /**
@@ -40,5 +43,8 @@ export const ES_GAMES: GameCopyBook = {
   spite: spiteEs,
   klondike: klondikeEs,
   golf: golfEs,
+  freecell: freecellEs,
+  spider: spiderEs,
+  pyramid: pyramidEs,
   eights: eightsEs,
 };

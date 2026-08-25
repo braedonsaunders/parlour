@@ -9,6 +9,9 @@ import {
   heartsCuesForFx,
   golfCuesForFx,
   klondikeCuesForFx,
+  freecellCuesForFx,
+  spiderCuesForFx,
+  pyramidCuesForFx,
   presidentCuesForFx,
   ratscrewCuesForFx,
   pokerCuesForFx,
@@ -134,6 +137,30 @@ export const KLONDIKE_SFX = {
   flip: 'klondike.flip',
   foundation: 'klondike.foundation',
   win: 'klondike.win',
+} as const;
+
+export const FREECELL_SFX = {
+  move: 'freecell.move',
+  park: 'freecell.park',
+  foundation: 'freecell.foundation',
+  win: 'freecell.win',
+} as const;
+
+export const SPIDER_SFX = {
+  deal: 'spider.deal',
+  move: 'spider.move',
+  flip: 'spider.flip',
+  suitClear: 'spider.suit-clear',
+  win: 'spider.win',
+} as const;
+
+export const PYRAMID_SFX = {
+  draw: 'pyramid.draw',
+  recycle: 'pyramid.recycle',
+  pair: 'pyramid.pair',
+  king: 'pyramid.king',
+  holeOut: 'pyramid.hole-out',
+  win: 'pyramid.win',
 } as const;
 
 export const GIN_SFX = {
@@ -481,6 +508,45 @@ export const EIGHTS_SFX_PACK: SfxPack = {
   cuesForFx: eightsCuesForFx,
 };
 
+export const FREECELL_SFX_PACK: SfxPack = {
+  id: 'freecell',
+  label: 'FreeCell',
+  sounds: [
+    sound(FREECELL_SFX.move, '/audio/sfx/card-discard-flight.mp3', 0.68, 4, 45),
+    sound(FREECELL_SFX.park, '/audio/sfx/freecell-park.mp3', 0.74, 4, 40),
+    sound(FREECELL_SFX.foundation, '/audio/sfx/freecell-home.mp3', 0.72, 4, 50),
+    sound(FREECELL_SFX.win, '/audio/sfx/win-celebration.mp3', 0.88, 1, 1_000),
+  ],
+  cuesForFx: freecellCuesForFx,
+};
+
+export const SPIDER_SFX_PACK: SfxPack = {
+  id: 'spider',
+  label: 'Spider',
+  sounds: [
+    sound(SPIDER_SFX.deal, '/audio/sfx/spider-row-deal.mp3', 0.76, 2, 80),
+    sound(SPIDER_SFX.move, '/audio/sfx/card-discard-flight.mp3', 0.68, 4, 45),
+    sound(SPIDER_SFX.flip, '/audio/sfx/card-flip.mp3', 0.78, 3, 60),
+    sound(SPIDER_SFX.suitClear, '/audio/sfx/spider-suit-clear.mp3', 0.86, 2, 200),
+    sound(SPIDER_SFX.win, '/audio/sfx/win-celebration.mp3', 0.88, 1, 1_000),
+  ],
+  cuesForFx: spiderCuesForFx,
+};
+
+export const PYRAMID_SFX_PACK: SfxPack = {
+  id: 'pyramid',
+  label: 'Pyramid',
+  sounds: [
+    sound(PYRAMID_SFX.draw, '/audio/sfx/card-draw-stock.mp3', 0.74, 3, 70),
+    sound(PYRAMID_SFX.recycle, '/audio/sfx/stock-shuffle.mp3', 0.72, 1, 400),
+    sound(PYRAMID_SFX.pair, '/audio/sfx/pyramid-pair.mp3', 0.78, 4, 40),
+    sound(PYRAMID_SFX.king, '/audio/sfx/pyramid-king.mp3', 0.76, 3, 50),
+    sound(PYRAMID_SFX.holeOut, '/audio/sfx/pyramid-hole-out.mp3', 0.72, 1, 400),
+    sound(PYRAMID_SFX.win, '/audio/sfx/win-celebration.mp3', 0.88, 1, 1_000),
+  ],
+  cuesForFx: pyramidCuesForFx,
+};
+
 const packs = new Map<string, SfxPack>();
 
 /**
@@ -512,6 +578,9 @@ for (const pack of [
   RATSCREW_SFX_PACK,
   PRESIDENT_SFX_PACK,
   EIGHTS_SFX_PACK,
+  FREECELL_SFX_PACK,
+  SPIDER_SFX_PACK,
+  PYRAMID_SFX_PACK,
 ]) {
   registerSfxPack(pack);
 }

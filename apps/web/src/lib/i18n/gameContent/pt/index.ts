@@ -14,6 +14,9 @@ import { scopaPt } from './scopa';
 import { spitePt } from './spite';
 import { golfPt } from './golf';
 import { klondikePt } from './klondike';
+import { freecellPt } from './freecell';
+import { spiderPt } from './spider';
+import { pyramidPt } from './pyramid';
 import { eightsPt } from './eights';
 
 /** Brazilian Portuguese game copy, one file per shelf entry. */
@@ -33,5 +36,8 @@ export const PT_GAMES: GameCopyBook = {
   spite: spitePt,
   klondike: klondikePt,
   golf: golfPt,
+  freecell: freecellPt,
+  spider: spiderPt,
+  pyramid: pyramidPt,
   eights: eightsPt,
 };

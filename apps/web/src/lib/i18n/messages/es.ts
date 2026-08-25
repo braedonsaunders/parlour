@@ -191,8 +191,12 @@ export const es: Messages = {
   'setup.eyebrow.claimCrown': 'reclama la corona',
   'setup.eyebrow.dodgeEverything': 'esquiva de todo',
   'setup.eyebrow.chooseBoard': 'elige tu tablero',
+  'setup.eyebrow.pairToThirteen': 'empareja a trece',
   'setup.modes.golfHole': 'Hoyo de golf',
   'setup.modes.klondikeDeal': 'Reparto de Klondike',
+  'setup.modes.freecellDeal': 'Reparto de FreeCell',
+  'setup.modes.spiderDeal': 'Reparto de Spider',
+  'setup.modes.pyramidDeal': 'Reparto de Pirámide',
   'setup.modes.cribbageFormat': 'Formato de cribbage',
   'setup.busy.settingTable': 'Preparando la mesa…',
   'setup.busy.shuffling': 'Barajando…',
@@ -285,6 +289,37 @@ export const es: Messages = {
     'Barajas tal cual, mesas muertas incluidas: así ha repartido siempre el Klondike.',
   'setup.klondike.note':
     'En solitario y sin conexión. El deshacer, las pistas y el autoacabado seguro se quedan en tu dispositivo; no hace falta cuenta ni código de sala.',
+  'setup.freecell.cleared': 'Mesa diaria limpia',
+  'setup.freecell.waiting': 'Tu mesa diaria te espera',
+  'setup.freecell.best': 'Mejor: {moves} movimientos · {time}',
+  'setup.freecell.waitingHint':
+    'Un reparto de cuatro celdas determinado, el mismo para todo el mundo. Aparca cartas, baja en colores alternos y manda cada palo a casa.',
+  'setup.freecell.deals': 'Repartos',
+  'setup.freecell.bestMoves': 'Mejores movimientos',
+  'setup.freecell.bestTime': 'Mejor tiempo',
+  'setup.freecell.note':
+    'En solitario y sin conexión. El deshacer, las pistas y el autoacabado seguro se quedan en tu dispositivo; no hace falta cuenta ni código de sala.',
+  'setup.spider.cleared': 'Mesa diaria limpia',
+  'setup.spider.waiting': 'Tu mesa diaria te espera',
+  'setup.spider.best': 'Mejor: {moves} movimientos · {time}',
+  'setup.spider.waitingHint':
+    'Un reparto de dos palos determinado, el mismo para todo el mundo. Baja, pela Reyes-a-As del mismo palo y limpia las ocho series.',
+  'setup.spider.deals': 'Repartos',
+  'setup.spider.bestMoves': 'Mejores movimientos',
+  'setup.spider.bestTime': 'Mejor tiempo',
+  'setup.spider.note':
+    'En solitario y sin conexión. El deshacer y las pistas se quedan en tu dispositivo; no hace falta cuenta ni código de sala.',
+  'setup.pyramid.posted': 'Pirámide diaria anotada',
+  'setup.pyramid.waiting': 'Tu pirámide diaria te espera',
+  'setup.pyramid.best': 'Mejor: {score} restantes · {time}',
+  'setup.pyramid.waitingHint':
+    'Una pirámide Clásica determinada, la misma para todo el mundo. Empareja rangos que sumen 13. Gana quien deja menos.',
+  'setup.pyramid.pyramids': 'Pirámides',
+  'setup.pyramid.clears': 'Limpiezas',
+  'setup.pyramid.bestScore': 'Mejor puntuación',
+  'setup.pyramid.bestClear': 'Mejor limpieza',
+  'setup.pyramid.note':
+    'En solitario y sin conexión. El deshacer y las pistas se quedan en tu dispositivo; no hace falta cuenta ni código de sala.',
 
   // --- install --------------------------------------------------------------
   'install.add': 'Añadir',

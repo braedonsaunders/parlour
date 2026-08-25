@@ -14,6 +14,9 @@ import { scopaFr } from './scopa';
 import { spiteFr } from './spite';
 import { golfFr } from './golf';
 import { klondikeFr } from './klondike';
+import { freecellFr } from './freecell';
+import { spiderFr } from './spider';
+import { pyramidFr } from './pyramid';
 import { eightsFr } from './eights';
 
 /** French game copy, one file per shelf entry. */
@@ -33,5 +36,8 @@ export const FR_GAMES: GameCopyBook = {
   spite: spiteFr,
   klondike: klondikeFr,
   golf: golfFr,
+  freecell: freecellFr,
+  spider: spiderFr,
+  pyramid: pyramidFr,
   eights: eightsFr,
 };

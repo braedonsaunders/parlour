@@ -1,0 +1,281 @@
+.screen {
+  --py-select: #ffc46a;
+  --py-fresh: #7ee0b0;
+  --py-card: clamp(3.1rem, 8vw, 4.6rem);
+}
+
+.playfield {
+  background:
+    radial-gradient(ellipse at 50% 38%, rgba(184, 89, 63, 0.18), transparent 58%),
+    linear-gradient(180deg, rgba(36, 16, 12, 0.1), rgba(18, 8, 7, 0.22));
+}
+
+.titlePill {
+  min-width: 15rem;
+}
+
+.metrics {
+  display: block;
+  margin-top: 0.24rem;
+  color: rgba(255, 241, 213, 0.78);
+  font-size: 0.68rem;
+  letter-spacing: 0.05em;
+}
+
+.metrics b {
+  color: #fff4df;
+}
+
+.board {
+  position: absolute;
+  z-index: 5;
+  inset: clamp(5.35rem, 11vh, 6.5rem) max(0.7rem, env(safe-area-inset-right))
+    max(4.7rem, calc(env(safe-area-inset-bottom) + 4rem)) max(0.7rem, env(safe-area-inset-left));
+  display: grid;
+  grid-template-rows: auto 1fr;
+  gap: clamp(0.45rem, 1.6vh, 0.9rem);
+  max-width: 46rem;
+  margin-inline: auto;
+}
+
+.topRow {
+  display: flex;
+  justify-content: center;
+  gap: clamp(1.4rem, 4vw, 2.4rem);
+  min-height: calc(var(--py-card) * 1.4 + 1.3rem);
+}
+
+.pileWrap {
+  display: grid;
+  justify-items: center;
+  gap: 0.28rem;
+}
+
+.pileButton {
+  position: relative;
+  display: block;
+  width: var(--py-card);
+  aspect-ratio: 5 / 7;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+button.pileButton,
+.pyramidCard {
+  border-radius: 0.75rem;
+}
+
+.pileButton > [data-card],
+.pyramidCard > [data-card] {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.pileButton [data-card-chassis],
+.pyramidCard [data-card-chassis] {
+  width: 100%;
+  transition:
+    filter var(--dur-feedback) var(--ease-settle),
+    opacity var(--dur-feedback) var(--ease-settle);
+}
+
+.pileButton[data-hint],
+.pyramidCard[data-hint] {
+  filter: drop-shadow(0 0 12px rgba(255, 196, 106, 0.9));
+}
+
+.pyramidCard[data-playable='true'] > [data-card-chassis],
+.pileButton[data-selected] > [data-card-chassis] {
+  box-shadow:
+    0 0 0 3px var(--py-select),
+    0 0 22px rgba(255, 196, 106, 0.45);
+}
+
+.board [data-just-drawn] > [data-card-chassis] {
+  box-shadow:
+    0 0 0 3px var(--py-fresh),
+    0 0 22px rgba(126, 224, 176, 0.5);
+}
+
+.emptyPile,
+.emptySlot {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  min-width: 2.4rem;
+  min-height: 2.4rem;
+  border: 0.17rem dashed rgba(255, 241, 213, 0.28);
+  border-radius: 0.72rem;
+  background: rgba(42, 16, 12, 0.28);
+  color: rgba(255, 234, 198, 0.45);
+  font:
+    800 clamp(1.5rem, 4vw, 2.5rem)/1 var(--font-display),
+    sans-serif;
+}
+
+.pileCount {
+  position: absolute;
+  z-index: 4;
+  right: -0.42rem;
+  bottom: -0.3rem;
+  min-width: 1.45rem;
+  padding: 0.12rem 0.3rem;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 999px;
+  background: #4a2218;
+  color: white;
+  font-size: 0.65rem;
+  font-weight: 800;
+}
+
+.pileLabel {
+  max-width: var(--py-card);
+  color: rgba(255, 241, 213, 0.72);
+  font-size: clamp(0.55rem, 0.85vw, 0.68rem);
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-align: center;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.pyramid {
+  display: grid;
+  align-content: start;
+  justify-items: center;
+  gap: clamp(0.18rem, 0.8vh, 0.42rem);
+  min-height: 0;
+}
+
+.row {
+  display: flex;
+  justify-content: center;
+  gap: clamp(0.18rem, 1vw, 0.42rem);
+}
+
+.pyramidCard,
+.cardSlot,
+.emptySlot {
+  width: var(--py-card);
+  aspect-ratio: 5 / 7;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.pyramidCard:disabled {
+  opacity: 0.72;
+}
+
+.actions {
+  max-width: calc(100vw - 2rem);
+  align-items: center;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.actions::-webkit-scrollbar {
+  display: none;
+}
+
+.dailyChip {
+  display: grid;
+  place-items: center;
+  min-height: 2.75rem;
+  padding: 0.45rem 0.75rem;
+  border: 1px solid rgba(255, 224, 161, 0.45);
+  border-radius: 0.85rem;
+  background: rgba(226, 176, 73, 0.15);
+  color: #ffe0a1;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.hintBanner {
+  position: absolute;
+  z-index: 24;
+  left: 50%;
+  bottom: max(4.4rem, calc(env(safe-area-inset-bottom) + 3.8rem));
+  max-width: min(34rem, calc(100vw - 2rem));
+  translate: -50% 0;
+  padding: 0.48rem 0.85rem;
+  border: 1px solid rgba(255, 196, 106, 0.54);
+  border-radius: 999px;
+  background: rgba(57, 24, 16, 0.94);
+  color: #fff4e4;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-align: center;
+  box-shadow: 0 8px 20px rgba(16, 4, 2, 0.46);
+}
+
+.winPanel {
+  position: absolute;
+  z-index: 36;
+  left: 50%;
+  top: 50%;
+  display: grid;
+  justify-items: center;
+  gap: 0.55rem;
+  width: min(25rem, calc(100vw - 2rem));
+  translate: -50% -50%;
+  padding: 1.5rem;
+  text-align: center;
+}
+
+.winPanel h2 {
+  color: #fff1d5;
+  font:
+    800 2rem/1 var(--font-display),
+    sans-serif;
+}
+
+.winPanel strong {
+  color: #ffe0a1;
+}
+
+.winMoment {
+  position: absolute;
+  left: 50%;
+  top: 48%;
+  translate: -50% -50%;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: #fff1d5;
+  font-size: 2.4rem;
+  text-shadow: 0 4px 15px rgba(0, 0, 0, 0.7);
+}
+
+.winMoment strong {
+  color: #ffe0a1;
+  font:
+    800 clamp(2.4rem, 7vw, 5rem)/1 var(--font-display),
+    sans-serif;
+}
+
+@media (orientation: landscape) and (max-height: 560px) {
+  .screen {
+    --py-card: clamp(2.4rem, 5.4vw, 3.1rem);
+  }
+
+  .board {
+    inset: 3.55rem 0.75rem 3.6rem;
+    gap: 0.28rem;
+  }
+
+  .titlePill {
+    min-width: 10.5rem;
+    margin-left: 6rem;
+    padding: 0.35rem 0.55rem;
+  }
+
+  .metrics {
+    display: none;
+  }
+}

@@ -7,16 +7,25 @@ import type { EightsTableView } from '@/lib/eights/view';
 import type { EuchreTableView } from '@/lib/euchre/view';
 import type { GinTableView } from '@/lib/gin/view';
 import type { HeartsTableView } from '@/lib/hearts/view';
+import { rulesForFreecellMode } from '@/lib/freecell/modes';
+import { freecellTableView, type FreecellTableView } from '@/lib/freecell/view';
 import { rulesForGolfMode } from '@/lib/golf/modes';
 import { golfTableView, type GolfTableView } from '@/lib/golf/view';
 import { rulesForKlondikeMode } from '@/lib/klondike/modes';
 import { klondikeTableView, type KlondikeTableView } from '@/lib/klondike/view';
+import { rulesForPyramidMode } from '@/lib/pyramid/modes';
+import { pyramidTableView, type PyramidTableView } from '@/lib/pyramid/view';
+import { rulesForSpiderMode } from '@/lib/spider/modes';
+import { spiderTableView, type SpiderTableView } from '@/lib/spider/view';
 import type { PresidentTableView } from '@/lib/president/view';
 import type { RatscrewTableView } from '@/lib/ratscrew/view';
 import type { SpadesTableView } from '@/lib/spades/view';
 import type { WildTableView } from '@/lib/wild/view';
+import { FreecellTransport } from '@/lib/solo/FreecellTransport';
 import { GolfTransport } from '@/lib/solo/GolfTransport';
 import { KlondikeTransport } from '@/lib/solo/KlondikeTransport';
+import { PyramidTransport } from '@/lib/solo/PyramidTransport';
+import { SpiderTransport } from '@/lib/solo/SpiderTransport';
 import tableStyles from '@/styles/table.module.css';
 import { TableScreen, type TableView } from '../TableScreen';
 import { CribbageTableScreen } from '../cribbage/CribbageTableScreen';
@@ -24,8 +33,11 @@ import { EightsTableScreen } from '../eights/EightsTableScreen';
 import { EuchreTableScreen } from '../euchre/EuchreTableScreen';
 import { GinTableScreen } from '../gin/GinTableScreen';
 import { HeartsTableScreen } from '../hearts/HeartsTableScreen';
+import { FreecellTableScreen } from '../freecell/FreecellTableScreen';
 import { GolfTableScreen } from '../golf/GolfTableScreen';
 import { KlondikeTableScreen } from '../klondike/KlondikeTableScreen';
+import { PyramidTableScreen } from '../pyramid/PyramidTableScreen';
+import { SpiderTableScreen } from '../spider/SpiderTableScreen';
 import { PresidentTableScreen } from '../president/PresidentTableScreen';
 import { RatscrewTableScreen } from '../ratscrew/RatscrewTableScreen';
 import { SpadesTableScreen } from '../spades/SpadesTableScreen';
@@ -171,6 +183,42 @@ const GOLF_VIEW: GolfTableView = golfTableView(
   GOLF_TRANSPORT.legalMoves(),
 );
 const GOLF_DEAL_FX = GOLF_TRANSPORT.getSnapshot().session.setupFx ?? [];
+
+const FREECELL_TRANSPORT = new FreecellTransport({
+  mode: 'daily',
+  dailyKey: '2026-08-24',
+  seed: 31,
+  rules: rulesForFreecellMode('daily'),
+});
+const FREECELL_VIEW: FreecellTableView = freecellTableView(
+  FREECELL_TRANSPORT.getSnapshot(),
+  FREECELL_TRANSPORT.legalMoves(),
+);
+const FREECELL_DEAL_FX = FREECELL_TRANSPORT.getSnapshot().session.setupFx ?? [];
+
+const SPIDER_TRANSPORT = new SpiderTransport({
+  mode: 'daily',
+  dailyKey: '2026-08-24',
+  seed: 31,
+  rules: rulesForSpiderMode('daily'),
+});
+const SPIDER_VIEW: SpiderTableView = spiderTableView(
+  SPIDER_TRANSPORT.getSnapshot(),
+  SPIDER_TRANSPORT.legalMoves(),
+);
+const SPIDER_DEAL_FX = SPIDER_TRANSPORT.getSnapshot().session.setupFx ?? [];
+
+const PYRAMID_TRANSPORT = new PyramidTransport({
+  mode: 'daily',
+  dailyKey: '2026-08-24',
+  seed: 31,
+  rules: rulesForPyramidMode('daily'),
+});
+const PYRAMID_VIEW: PyramidTableView = pyramidTableView(
+  PYRAMID_TRANSPORT.getSnapshot(),
+  PYRAMID_TRANSPORT.legalMoves(),
+);
+const PYRAMID_DEAL_FX = PYRAMID_TRANSPORT.getSnapshot().session.setupFx ?? [];
 
 const CRIBBAGE_VIEW: CribbageTableView = {
   players: [
@@ -535,6 +583,48 @@ const SCREENS: readonly ScreenCase[] = [
     handRail: false,
     dealFx: GOLF_DEAL_FX,
     gameText: 'golf',
+  },
+  {
+    name: 'freecell',
+    Screen: FreecellTableScreen as ComponentType<never>,
+    view: FREECELL_VIEW,
+    eyebrow: 'FreeCell',
+    playfield: 'FreeCell table',
+    feltMark: 'F',
+    errorHeadline: 'The solitaire table lost the thread.',
+    loadingCopy: 'Laying out eight columns…',
+    dealState: true,
+    handRail: false,
+    dealFx: FREECELL_DEAL_FX,
+    gameText: 'freecell',
+  },
+  {
+    name: 'spider',
+    Screen: SpiderTableScreen as ComponentType<never>,
+    view: SPIDER_VIEW,
+    eyebrow: 'Spider',
+    playfield: 'Spider table',
+    feltMark: 'S',
+    errorHeadline: 'The solitaire table lost the thread.',
+    loadingCopy: 'Laying out ten columns…',
+    dealState: true,
+    handRail: false,
+    dealFx: SPIDER_DEAL_FX,
+    gameText: 'spider',
+  },
+  {
+    name: 'pyramid',
+    Screen: PyramidTableScreen as ComponentType<never>,
+    view: PYRAMID_VIEW,
+    eyebrow: 'Pyramid',
+    playfield: 'Pyramid table',
+    feltMark: 'P',
+    errorHeadline: 'The pyramid table lost the thread.',
+    loadingCopy: 'Laying out the pyramid…',
+    dealState: true,
+    handRail: false,
+    dealFx: PYRAMID_DEAL_FX,
+    gameText: 'pyramid',
   },
   {
     name: 'gin',

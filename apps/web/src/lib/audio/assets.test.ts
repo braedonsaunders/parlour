@@ -137,6 +137,21 @@ const REQUIRED_SOUNDS = [
   'eights.out',
   'eights.blocked',
   'eights.score',
+  'freecell.move',
+  'freecell.park',
+  'freecell.foundation',
+  'freecell.win',
+  'spider.deal',
+  'spider.move',
+  'spider.flip',
+  'spider.suit-clear',
+  'spider.win',
+  'pyramid.draw',
+  'pyramid.recycle',
+  'pyramid.pair',
+  'pyramid.king',
+  'pyramid.hole-out',
+  'pyramid.win',
 ] as const;
 
 describe('production audio suite', () => {
