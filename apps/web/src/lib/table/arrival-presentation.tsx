@@ -5,7 +5,6 @@ import {
   useContext,
   useLayoutEffect,
   useMemo,
-  useRef,
   useState,
   useSyncExternalStore,
   type ReactNode,
@@ -83,10 +82,18 @@ export function outboundDepartureCues(
   }
 }
 
+/**
+ * One store per provider, built on first render and never rebuilt.
+ *
+ * A lazily-filled ref is the obvious way to write this and the wrong one: the
+ * React Compiler's lint forbids touching a ref during render, because a render
+ * React throws away would still have mutated it. `useState`'s initialiser is
+ * the sanctioned form of "compute this exactly once" and is identical in
+ * effect — the factory runs on the first render and never again.
+ */
 function useArrivalStoreInstance(): ArrivalStore {
-  const storeRef = useRef<ArrivalStore | null>(null);
-  if (storeRef.current === null) storeRef.current = createArrivalStore();
-  return storeRef.current;
+  const [store] = useState(createArrivalStore);
+  return store;
 }
 
 function useArrivalClock(

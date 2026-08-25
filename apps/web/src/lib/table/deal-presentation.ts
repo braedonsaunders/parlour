@@ -6,7 +6,7 @@ import {
   useContext,
   useLayoutEffect,
   useMemo,
-  useRef,
+  useState,
   useSyncExternalStore,
   type ReactNode,
 } from 'react';
@@ -39,10 +39,10 @@ export type DealPresentationOptions = {
 
 const DealStoreContext = createContext<DealStore | null>(null);
 
+/** One store per provider; see the note in `arrival-presentation` on why not a ref. */
 function useDealStoreInstance(): DealStore {
-  const storeRef = useRef<DealStore | null>(null);
-  if (storeRef.current === null) storeRef.current = createDealStore();
-  return storeRef.current;
+  const [store] = useState(createDealStore);
+  return store;
 }
 
 function useDealClock(
