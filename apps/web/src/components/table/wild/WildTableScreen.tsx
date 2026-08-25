@@ -74,6 +74,7 @@ export type WildTableScreenProps = {
   fxKey: string | number;
   busy?: boolean;
   error?: string | null;
+  loadingCopy?: string;
   onPlay?: (card: string) => void;
   onDraw?: () => void;
   onChooseColor?: (color: WildpileColor) => void;
@@ -170,7 +171,7 @@ function WildTableScreenView(props: WildTableScreenProps) {
   }
 
   if (!view) {
-    return <TableLoadingScreen copy="Shuffling the pile…" />;
+    return <TableLoadingScreen copy={props.loadingCopy ?? 'Shuffling the pile…'} />;
   }
 
   const localBusy = (props.busy ?? false) || deal.dealing;

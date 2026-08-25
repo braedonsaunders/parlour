@@ -24,6 +24,7 @@ import {
   layerStream,
   loadRoundMaterial,
   recoveryPolicyFor,
+  isSeatLeftFault,
   VeilRoom,
   VeilSession,
   type RecoveryPolicy,
@@ -848,6 +849,12 @@ export class MultiplayerRoomSession {
           await veil.room.open(at.epoch, at.position, 'private');
           this.refreshView();
         } catch (error) {
+          if (this.snapshot.session?.result) return;
+          if (isSeatLeftFault(error)) {
+            const departed = this.departedHumanSeat();
+            if (departed !== null && this.shouldWalkover(departed)) this.awardWalkover(departed);
+            return;
+          }
           this.update({
             error: error instanceof Error ? error.message : 'A card could not be opened',
           });
@@ -856,14 +863,6 @@ export class MultiplayerRoomSession {
     );
   }
 
-  /**
-   * Rebuilds a departed seat's layer so the round can continue.
-   *
-   * This is the one moment Veil trades privacy for playability, so it is never
-   * silent: the seat is named in the badge afterwards. When the room's policy
-   * has no honest threshold — two seats — the round pauses instead, and the
-   * message says exactly why rather than blaming the network.
-   */
   /**
    * Holds a seat open for a player who dropped, and only recovers it if they
    * stay gone.
@@ -874,6 +873,9 @@ export class MultiplayerRoomSession {
    * is. A player who simply reconnects rebuilds that same layer themselves, out
    * of material nobody else ever had. So waiting is not politeness, it is the
    * difference between a round that stays private and one that does not.
+   *
+   * Two seats have no honest recovery: the only other player is the opponent.
+   * After the grace, that is a walkover, not a pause about key material.
    */
   private awaitReturnThenRecover(seat: number): void {
     if (this.pendingReturns.has(seat)) return;
@@ -891,7 +893,8 @@ export class MultiplayerRoomSession {
     });
     const timer = setTimeout(() => {
       this.pendingReturns.delete(seat);
-      void this.recoverLostSeat(seat);
+      if (this.shouldWalkover(seat)) this.awardWalkover(seat);
+      else void this.recoverLostSeat(seat);
     }, this.dependencies.reconnectGraceMs ?? RECONNECT_GRACE_MS);
     this.pendingReturns.set(seat, timer);
   }
@@ -951,9 +954,8 @@ export class MultiplayerRoomSession {
         paused: recovered
           ? null
           : veil.session.recovery.mode === 'none'
-            ? `Seat ${seat} left. ${veil.session.recovery.disclosure}`
-            : `Seat ${seat} left and not enough players are here to reopen their cards. ` +
-              `The round is paused until ${veil.session.recovery.threshold} of them are back.`,
+            ? null
+            : `Waiting for more players before the round can continue.`,
       },
     });
     if (recovered) {
@@ -961,7 +963,48 @@ export class MultiplayerRoomSession {
       if (this.snapshot.isHost) {
         void this.openSeatHandles(seat).then(() => this.driveBotSeats());
       }
+      return;
     }
+    if (this.shouldWalkover(seat)) this.awardWalkover(seat);
+  }
+
+  /** The only remaining human should just win — not sit in a cryptography lecture. */
+  private shouldWalkover(departedSeat: number): boolean {
+    const humans = this.snapshot.seats.filter((seat) => !seat.bot);
+    if ((this.snapshot.settings?.seats ?? humans.length) <= 2) return true;
+    const remaining = humans.filter((seat) => seat.seat !== departedSeat && seat.connected);
+    return remaining.length <= 1;
+  }
+
+  private departedHumanSeat(): number | null {
+    const gone = this.snapshot.seats.find((seat) => !seat.bot && !seat.connected);
+    return gone?.seat ?? null;
+  }
+
+  private awardWalkover(departedSeat: number): void {
+    const session = this.snapshot.session;
+    if (!session || session.result) return;
+    const winner =
+      this.snapshot.seats.find((seat) => seat.seat !== departedSeat && !seat.bot)?.seat ??
+      this.snapshot.localSeat;
+    if (winner === null) return;
+    this.update({
+      session: {
+        ...session,
+        status: 'ended',
+        result: {
+          winner,
+          rankings: this.snapshot.seats.map((seat) => ({
+            seat: seat.seat,
+            rank: seat.seat === winner ? 1 : 2,
+          })),
+          reason: 'opponent-left',
+        },
+        phase: { ...session.phase, actor: null },
+      },
+      error: null,
+      security: { ...this.snapshot.security, paused: null },
+    });
   }
 
   /**
@@ -1148,6 +1191,7 @@ export class MultiplayerRoomSession {
         fx: this.authority!.getSession().setupFx ?? [],
         fxKey: this.snapshot.fxKey + 1,
         stage: 'table',
+        localSeat: this.snapshot.localSeat ?? this.seatForLocalProfile(),
         security: openDeal
           ? securityFor('open', imported.settings.seats, 'open')
           : {
@@ -1293,8 +1337,15 @@ export class MultiplayerRoomSession {
       // own layer and nobody's hand is opened, which recovery cannot say.
       // Recovery is what happens when they do not come back.
       if (this.veil) this.awaitReturnThenRecover(presence.seat);
+      else if (this.shouldWalkover(presence.seat)) this.awardWalkover(presence.seat);
       else this.driveBotSeats();
     }
+  }
+
+  private seatForLocalProfile(): number | null {
+    return (
+      this.snapshot.seats.find((seat) => seat.profileId === this.profile.profileId)?.seat ?? null
+    );
   }
 
   private acceptSeatBot(seat: number, bot: boolean): void {

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import type { LegalMove } from '@parlour/engine';
 import {
   wildpileDiscardAllCards,
   type WildpileColor,
@@ -165,8 +166,8 @@ export const wildTablePack = defineTablePack<
   useSoloEffects: useSoloClocks,
   useRoomEffects: useRoomClocks,
 
-  renderPending: ({ fx, fxKey, error }) => (
-    <WildTableScreen view={null} fx={fx} fxKey={fxKey} error={error} />
+  renderPending: ({ fx, fxKey, error, loadingCopy }) => (
+    <WildTableScreen view={null} fx={fx} fxKey={fxKey} error={error} loadingCopy={loadingCopy} />
   ),
 
   renderSolo({ snapshot, fx, fxKey, error, dispatch, transport, quit }) {
@@ -217,7 +218,14 @@ export const wildTablePack = defineTablePack<
   renderRoom(ctx) {
     const { session, snapshot, localSeat, error, dispatch, quit } = ctx;
     const isLocalTurn = session.status === 'playing' && session.phase.actor === localSeat;
-    const legal = isLocalTurn ? session.def.flow.legalMoves(session.state, session.phase) : [];
+    let legal: readonly LegalMove[] = [];
+    if (isLocalTurn) {
+      try {
+        legal = session.def.flow.legalMoves(session.state, session.phase);
+      } catch {
+        legal = [];
+      }
+    }
     const wildSnapshot: WildSnapshot = {
       mode: wildModeForRules(session.config),
       players: snapshot.seats.map((player) => ({

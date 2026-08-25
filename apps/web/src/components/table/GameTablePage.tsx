@@ -77,6 +77,8 @@ export interface PendingTableProps {
   fx: readonly FxEvent[];
   fxKey: number | string;
   error: string | null;
+  /** Overrides the game's usual dealing splash, e.g. while a room handle is missing. */
+  loadingCopy?: string;
 }
 
 export interface TableGamePack<TSnapshot, TDispatch, TTransport, S, C extends RuleValues> {
@@ -188,7 +190,16 @@ export function GameTablePage<TSnapshot, TDispatch, TTransport, S, C extends Rul
   // Until this tab is on the client snapshot, and while a room handoff is
   // still resolving, stay on the splash — never a solo deal with default rules.
   if (!isClient || (expectedRoom && !room)) {
-    return <>{pack.renderPending({ fx: [], fxKey: 'loading', error: null })}</>;
+    return (
+      <>
+        {pack.renderPending({
+          fx: [],
+          fxKey: 'loading',
+          error: null,
+          loadingCopy: expectedRoom ? 'Finding the table…' : undefined,
+        })}
+      </>
+    );
   }
   if (room) return <RoomTablePage pack={pack} room={room} />;
   return <SoloTablePage pack={pack} />;

@@ -273,13 +273,11 @@ describe('a recycled stock has its own layer to lose', () => {
 });
 
 describe('what recovery refuses to do', () => {
-  it('will not recover at two seats — the round pauses and the message says so', async () => {
+  it('will not recover at two seats — the peel names a gone seat, not a lecture', async () => {
     const mesh = await dealtRoom(2);
     mesh.drop(1);
     expect(await mesh.rooms[0]!.recoverSeat(1, 0)).toBe(false);
-    await expect(mesh.pump(mesh.rooms[0]!.open(0, 0, 'private'))).rejects.toThrow(
-      /With two players there is no way to reopen their cards/,
-    );
+    await expect(mesh.pump(mesh.rooms[0]!.open(0, 0, 'private'))).rejects.toThrow(/seat-left/);
   });
 
   it('will not answer a recovery request for a seat that is still connected', async () => {

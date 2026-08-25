@@ -534,6 +534,52 @@ describe('multiplayer route composition', () => {
     expect(guest.getSnapshot().seats).toHaveLength(2);
   });
 
+  it('awards a walkover when a two-seat opponent stays gone', async () => {
+    const broker = new MockSignalingBroker();
+    const rtc = new MockRtcNetwork();
+    const host = new MultiplayerRoomSession(
+      { name: 'Host', avatarId: 'ember', profileId: 'walkover-host' },
+      {
+        signaling: broker.signaling('walkover-host-peer'),
+        peerConnection: rtc.factory('walkover-host'),
+        seed: 19,
+        heartbeatIntervalMs: 20,
+        heartbeatTimeoutMs: 400,
+        reconnectGraceMs: 30,
+      },
+    );
+    const guest = new MultiplayerRoomSession(
+      { name: 'Guest', avatarId: 'mint', profileId: 'walkover-guest' },
+      {
+        signaling: broker.signaling('walkover-guest-peer'),
+        peerConnection: rtc.factory('walkover-guest'),
+        seed: 4,
+        heartbeatIntervalMs: 20,
+        heartbeatTimeoutMs: 400,
+        reconnectGraceMs: 30,
+      },
+    );
+    sessions.push(host, guest);
+
+    const room = await host.create({ seats: 2 });
+    await guest.join(room.code);
+    await eventually(() => expect(guest.getSnapshot().localSeat).toBe(1));
+    await host.start();
+    await eventually(() => expect(host.getSnapshot().stage).toBe('table'));
+
+    guest.close();
+    await eventually(
+      () => {
+        const result = host.getSnapshot().session?.result;
+        expect(result?.reason).toBe('opponent-left');
+        expect(result?.winner).toBe(0);
+        expect(host.getSnapshot().error).toBeNull();
+      },
+      200,
+      20,
+    );
+  }, 120_000);
+
   it('pins the seated room on the tab so a table route cannot miss it', async () => {
     const host = new MultiplayerRoomSession(
       { name: 'Host', avatarId: 'ember', profileId: 'pin-tab-host' },

@@ -36,6 +36,19 @@ import type { SignedVeilEntry } from './transcript';
  */
 export type FaceVisibility = 'private' | 'public' | 'surrogate';
 
+/** A peel stopped because that seat is gone — the table turns this into a walkover. */
+export const SEAT_LEFT_FAULT = 'seat-left';
+
+export function isSeatLeftFault(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return (
+    message === SEAT_LEFT_FAULT ||
+    /seat-left/i.test(message) ||
+    /key material to read a live hand/i.test(message) ||
+    /no way to reopen their cards/i.test(message)
+  );
+}
+
 export interface VeilLink {
   /** `to === null` broadcasts to the room. */
   send(message: VeilMessage, to: string | null): void;
@@ -323,8 +336,7 @@ export class VeilRoom {
         epoch,
         position,
         this.session.recoveryFor(epoch).mode === 'none'
-          ? `Seat ${seat} left. With two players there is no way to reopen their cards without ` +
-              `handing over enough key material to read a live hand, so the round pauses here.`
+          ? SEAT_LEFT_FAULT
           : `Seat ${seat} left and their layer has not been recovered yet, so this card cannot ` +
               `be opened.`,
       );

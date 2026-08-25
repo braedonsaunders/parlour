@@ -11,6 +11,7 @@ import {
   type MultiplayerRoomSession,
   type MultiplayerRoomSnapshot,
 } from '@/app/_multiplayer/roomSession';
+import { isSeatLeftFault } from '@/lib/multiplayer/veil';
 
 /**
  * The friend-room half of a table page, written once.
@@ -75,7 +76,7 @@ export function useRoomTable<S, C extends RuleValues>(
     snapshot,
     session,
     localSeat: snapshot.localSeat,
-    error: localError ?? snapshot.error,
+    error: isSeatLeftFault(localError ?? snapshot.error) ? null : (localError ?? snapshot.error),
     dispatch,
     leave,
   };
@@ -118,5 +119,9 @@ const subscribeNoop = () => () => {};
 
 /** False during SSR/hydration, true on the client snapshot that follows. */
 export function useIsClient(): boolean {
-  return useSyncExternalStore(subscribeNoop, () => true, () => false);
+  return useSyncExternalStore(
+    subscribeNoop,
+    () => true,
+    () => false,
+  );
 }

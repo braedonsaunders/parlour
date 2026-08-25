@@ -65,10 +65,15 @@ export default function JoinPage() {
   // stage rather than for a seat, or a guest walks in on a deal that is about
   // to be thrown away.
   useEffect(() => {
-    if (snapshot?.stage === 'table' && snapshot.gameId) {
+    if (
+      snapshot?.stage === 'table' &&
+      snapshot.gameId &&
+      snapshot.localSeat !== null &&
+      snapshot.session
+    ) {
       router.replace(tableRouteFor(snapshot.gameId));
     }
-  }, [router, snapshot?.gameId, snapshot?.stage]);
+  }, [router, snapshot?.gameId, snapshot?.localSeat, snapshot?.session, snapshot?.stage]);
 
   const submit = useCallback(
     async (code: string, expectedHost?: string) => {
