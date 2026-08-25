@@ -17,7 +17,9 @@ const animating = () => has(styles.enter) || has(styles.enterForward) || has(sty
 
 function render(route?: string) {
   act(() =>
-    root.render(createElement(PageTransition, route === undefined ? {} : { route }, 'page')),
+    root.render(
+      createElement(PageTransition, { children: 'page', ...(route === undefined ? {} : { route }) }),
+    ),
   );
 }
 
