@@ -103,6 +103,10 @@ describe('table overlay stacking', () => {
     }
   });
 
+  it('does not park will-change on the wipe, so the scene canvas stays on the compositor', () => {
+    expect(wipe).not.toMatch(/will-change:/);
+  });
+
   it('covers the window rather than the viewport the browser admits to', () => {
     // `100dvh` stops short of the iOS home indicator in a standalone PWA, which
     // would leave a strip of the outgoing table showing under the panels.
@@ -140,6 +144,13 @@ describe('table menu on a phone', () => {
 });
 
 describe('table compositor diet', () => {
+  it('does not size the table to 100vw or isolate a full-viewport layer over the scene', () => {
+    const screen = declarationsFor(table, '.screen');
+    expect(screen).toMatch(/width:\s*100%;/);
+    expect(screen).not.toMatch(/width:\s*100vw;/);
+    expect(screen).not.toMatch(/isolation:\s*isolate;/);
+  });
+
   const dropFx = readStyles('drop-fx');
 
   it('does not promote every card with backface-visibility', () => {

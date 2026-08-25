@@ -21,7 +21,6 @@
   left: -25%;
   width: 150%;
   height: 160%;
-  will-change: transform;
   transform: translateX(-8%) skewX(-14deg);
 }
 
@@ -105,7 +104,6 @@
   height: 140%;
   z-index: 2;
   opacity: 0;
-  will-change: transform, opacity;
   background: linear-gradient(
     90deg,
     transparent 0%,
@@ -152,7 +150,6 @@
   font-weight: 700;
   line-height: 1;
   opacity: 0;
-  will-change: transform, opacity;
 }
 
 [data-status='cover'] .spark {
@@ -242,7 +239,6 @@
   font-size: 2rem;
   font-weight: 700;
   box-shadow: var(--shadow-lift);
-  will-change: transform, opacity;
   transform-origin: 50% 115%;
 }
 

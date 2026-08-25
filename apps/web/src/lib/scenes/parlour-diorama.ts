@@ -9,6 +9,8 @@ import {
   LIVE_SCENE_CONTEXT,
   makeTex,
   rr,
+  sceneBufferSize,
+  sceneBufferUnchanged,
   tongue,
 } from './diorama/primitives';
 
@@ -4062,14 +4064,28 @@ export function mountParlourDiorama(
     // A phone's screen is dense enough that the scene's soft, painterly work
     // reads identically at 1.5x, and the fill saved there is the single
     // biggest win available on the device that needs it most.
-    dpr = Math.min(window.devicePixelRatio || 1, coarseQuery.matches ? 1.5 : 2);
-    W = Math.max(1, canvas.clientWidth || window.innerWidth);
-    H = Math.max(1, canvas.clientHeight || window.innerHeight);
-    bakeDpr = Math.min(dpr, 1.6);
-    if (W * H > 1700000) bakeDpr = Math.min(bakeDpr, 1.25);
-    if (W * H > 2600000) bakeDpr = 1;
-    canvas.width = Math.round(W * dpr);
-    canvas.height = Math.round(H * dpr);
+    const next = sceneBufferSize(
+      canvas.clientWidth || window.innerWidth,
+      canvas.clientHeight || window.innerHeight,
+      window.devicePixelRatio || 1,
+      coarseQuery.matches,
+    );
+    const prev = {
+      dpr,
+      cssWidth: W,
+      cssHeight: H,
+      bakeDpr,
+      bufferWidth: canvas.width,
+      bufferHeight: canvas.height,
+    };
+    if (sceneBufferUnchanged(prev, next)) return;
+
+    dpr = next.dpr;
+    W = next.cssWidth;
+    H = next.cssHeight;
+    bakeDpr = next.bakeDpr;
+    canvas.width = next.bufferWidth;
+    canvas.height = next.bufferHeight;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     seedFields();
     plates.campfire = null;
@@ -4080,8 +4096,10 @@ export function mountParlourDiorama(
     flatFor = null;
     washGradient = null;
     scene = options.getScene();
-    if (reduced) renderScene(2.4);
-    else if (!frameId) frameId = requestAnimationFrame(frame);
+    // Setting width/height clears the bitmap. Paint now — waiting for the next
+    // rAF (or skipping it on the half-rate budget) leaves a dark empty frame.
+    renderScene(reduced || lastDrawn < 0 ? 2.4 : lastDrawn * 0.001);
+    if (!reduced && !frameId) frameId = requestAnimationFrame(frame);
   }
 
   const onPointerMove = (event: PointerEvent) => {

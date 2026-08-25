@@ -25,6 +25,54 @@ export const LIVE_SCENE_CONTEXT: CanvasRenderingContext2DSettings = {
   alpha: false,
 };
 
+/**
+ * Live-canvas backing-store size. Setting `canvas.width` clears the bitmap, so
+ * the scene must skip a no-op resize and paint in the same turn after a real
+ * one — otherwise a scrollbar appearing on a menu hop blanks the diorama.
+ */
+export type SceneBufferSize = {
+  dpr: number;
+  cssWidth: number;
+  cssHeight: number;
+  bakeDpr: number;
+  bufferWidth: number;
+  bufferHeight: number;
+};
+
+export function sceneBufferSize(
+  clientWidth: number,
+  clientHeight: number,
+  devicePixelRatio: number,
+  coarse: boolean,
+): SceneBufferSize {
+  const dpr = Math.min(devicePixelRatio || 1, coarse ? 1.5 : 2);
+  const cssWidth = Math.max(1, clientWidth);
+  const cssHeight = Math.max(1, clientHeight);
+  const area = cssWidth * cssHeight;
+  let bakeDpr = Math.min(dpr, 1.6);
+  if (area > 1_700_000) bakeDpr = Math.min(bakeDpr, 1.25);
+  if (area > 2_600_000) bakeDpr = 1;
+  return {
+    dpr,
+    cssWidth,
+    cssHeight,
+    bakeDpr,
+    bufferWidth: Math.round(cssWidth * dpr),
+    bufferHeight: Math.round(cssHeight * dpr),
+  };
+}
+
+export function sceneBufferUnchanged(prev: SceneBufferSize, next: SceneBufferSize): boolean {
+  return (
+    prev.bufferWidth === next.bufferWidth &&
+    prev.bufferHeight === next.bufferHeight &&
+    prev.dpr === next.dpr &&
+    prev.bakeDpr === next.bakeDpr &&
+    prev.cssWidth === next.cssWidth &&
+    prev.cssHeight === next.cssHeight
+  );
+}
+
 /** A 2D context, or a thrown error. See the note above on why this asserts. */
 export function context2d(
   canvas: HTMLCanvasElement,

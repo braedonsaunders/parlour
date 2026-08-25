@@ -11,6 +11,12 @@ function declarationsFor(selector: string): string {
   return match![1]!;
 }
 
+describe('panel chrome', () => {
+  it('does not sample the scene through a backdrop-filter', () => {
+    expect(declarationsFor('.panel-soft')).not.toMatch(/backdrop-filter:/);
+  });
+});
+
 describe('fat button chrome', () => {
   it('lifts on hover without a CSS filter or a standing will-change layer', () => {
     const rest = declarationsFor('.btn-fat');
