@@ -1,5 +1,5 @@
 /// <reference lib="webworker" />
-import { findWinnableSeed } from '@parlour/game-klondike';
+import { findWinnableSeed, type WinnableSeed } from '@parlour/game-klondike';
 
 export interface WinnableWorkerRequest {
   id: number;
@@ -9,11 +9,8 @@ export interface WinnableWorkerRequest {
   maxCandidates?: number;
 }
 
-export interface WinnableWorkerReply {
+export interface WinnableWorkerReply extends WinnableSeed {
   id: number;
-  seed: number;
-  rejected: number;
-  winnable: boolean;
 }
 
 /**

@@ -23,6 +23,7 @@ export {
   KlondikeFx,
   canAutoFinish,
   createKlondikeDef,
+  describeHintMove,
   hintFor,
   klondikeGame,
   klondikePlayerView,
@@ -30,6 +31,12 @@ export {
   type KlondikeHint,
 } from './game';
 export { klondikeHowToPlay } from './howto';
+export {
+  createHintPlanner,
+  sameLegalMove,
+  solverHintFor,
+  type HintPlanner,
+} from './hint-plan';
 export {
   isWinnableDeal,
   solveKlondike,

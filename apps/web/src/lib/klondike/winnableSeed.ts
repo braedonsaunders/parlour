@@ -53,8 +53,8 @@ export async function resolveWinnableSeed(seed: number, drawCount: 1 | 3): Promi
       };
       worker.addEventListener('message', (event: MessageEvent<WinnableWorkerReply>) => {
         if (event.data.id !== id) return;
-        const { seed: found, rejected, winnable } = event.data;
-        settle({ seed: found, rejected, winnable });
+        const { seed: found, rejected, winnable, line } = event.data;
+        settle({ seed: found, rejected, winnable, line });
       });
       worker.addEventListener('error', () => settle(new Error('winnable search failed')));
       const request: WinnableWorkerRequest = {

@@ -1,4 +1,4 @@
-import { applyPreset } from '@parlour/engine';
+import { applyPreset, type LegalMove } from '@parlour/engine';
 import { dailySeed, klondikeConfig, type KlondikeRules } from '@parlour/game-klondike';
 import { resolveWinnableSeed } from './winnableSeed';
 
@@ -76,6 +76,8 @@ export interface KlondikeRun {
    * to and could not, `null` when nobody asked.
    */
   winnable: boolean | null;
+  /** Proven winning line from deal search, when the solver found one. */
+  line?: readonly LegalMove[];
 }
 
 export function makeKlondikeRun(
@@ -108,7 +110,7 @@ export async function dealKlondikeRun(
   const run = makeKlondikeRun(mode, options);
   if (!options.winnableOnly) return run;
   const found = await resolveWinnableSeed(run.seed, rulesForKlondikeMode(mode).drawCount);
-  return { ...run, seed: found.seed, winnable: found.winnable };
+  return { ...run, seed: found.seed, winnable: found.winnable, line: found.line };
 }
 
 function randomInt32(): number {

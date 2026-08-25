@@ -56,6 +56,7 @@ function ActiveKlondikeTable({
         dailyKey: run.dailyKey,
         seed: run.seed,
         rules: rulesForKlondikeMode(run.mode),
+        line: run.line,
       }),
   );
   const { snapshot, fx, fxKey, error, dispatch, accept } = useSoloTable(transport, {

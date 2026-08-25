@@ -1,7 +1,7 @@
-import { createSession } from '@parlour/engine';
+import { createSession, type LegalMove } from '@parlour/engine';
 import { klondikeConfig, type KlondikeRules } from './config';
 import { klondikeGame } from './game';
-import { isWinnableDeal, type SolveOptions } from './solver';
+import { solveKlondike, type SolveOptions } from './solver';
 import type { KlondikeState } from './state';
 
 export interface WinnableSearchOptions extends SolveOptions {
@@ -16,6 +16,8 @@ export interface WinnableSeed {
   rejected: number;
   /** False when the search ran out of candidates and fell back to the first seed. */
   winnable: boolean;
+  /** Winning line for the returned seed, empty unless `winnable` is true. */
+  line: readonly LegalMove[];
 }
 
 const DEFAULT_MAX_CANDIDATES = 12;
@@ -58,12 +60,13 @@ export function findWinnableSeed(
   const maxCandidates = options.maxCandidates ?? DEFAULT_MAX_CANDIDATES;
   let seed = startSeed | 0;
   for (let rejected = 0; rejected < maxCandidates; rejected++) {
-    if (isWinnableDeal(klondikeDealFor(seed, drawCount), { ...options, drawCount })) {
-      return { seed, rejected, winnable: true };
+    const solved = solveKlondike(klondikeDealFor(seed, drawCount), { ...options, drawCount });
+    if (solved.outcome === 'solved') {
+      return { seed, rejected, winnable: true, line: solved.line };
     }
     seed = nextCandidate(seed);
   }
   // Every candidate came up short. Dealing the original beats dealing nothing,
   // and the caller can tell the player the guarantee did not hold.
-  return { seed: startSeed | 0, rejected: maxCandidates, winnable: false };
+  return { seed: startSeed | 0, rejected: maxCandidates, winnable: false, line: [] };
 }

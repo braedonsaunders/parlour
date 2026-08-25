@@ -33,6 +33,15 @@ describe('KlondikeTransport', () => {
     expect(undone.snapshot.session.state).toEqual(before.session.state);
   });
 
+  it('publishes a solver-backed hint the engine accepts', () => {
+    const table = transport();
+    const hinted = table.getSnapshot().hint;
+    expect(hinted).not.toBeNull();
+    const played = table.dispatch(hinted!.move.id, hinted!.move.payload);
+    expect(played.rejected).toBeNull();
+    expect(played.snapshot.eventCount).toBe(1);
+  }, 60_000);
+
   it('restarts the same seed with the original setup choreography', () => {
     const table = transport(88);
     const original = table.getSnapshot().session.state;

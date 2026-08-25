@@ -10,10 +10,11 @@ import {
 } from '@parlour/engine';
 import {
   canAutoFinish,
-  hintFor,
+  createHintPlanner,
   klondikeGame,
   klondikePlayerView,
   legalMovesFor,
+  type HintPlanner,
   type KlondikeHint,
   type KlondikePlayerView,
   type KlondikeRules,
@@ -52,6 +53,8 @@ export interface KlondikeTransportOptions {
   dailyKey: string | null;
   seed: number;
   rules: KlondikeRules;
+  /** Winning line from deal search, when the solver already walked one. */
+  line?: readonly LegalMove[];
 }
 
 /**
@@ -61,9 +64,11 @@ export interface KlondikeTransportOptions {
  */
 export class KlondikeTransport {
   private readonly listeners = new Set<() => void>();
+  private readonly planner: HintPlanner;
   private session: LiveSession;
 
   constructor(private readonly options: KlondikeTransportOptions) {
+    this.planner = createHintPlanner(options.line ?? []);
     this.session = this.freshSession();
   }
 
@@ -82,7 +87,7 @@ export class KlondikeTransport {
       eventCount: this.session.log.length,
       canUndo: this.session.log.length > 0,
       canFinish: this.session.status === 'playing' && canAutoFinish(state),
-      hint: this.session.status === 'playing' ? hintFor(state) : null,
+      hint: this.session.status === 'playing' ? this.planner.hint(this.session.state) : null,
     };
   }
 
@@ -94,6 +99,7 @@ export class KlondikeTransport {
     const outcome = sessionApply(klondikeGame, this.session, 0, move, payload);
     if (outcome.rejected) return this.rejection(outcome.rejected);
     this.session = outcome.session;
+    this.planner.follow({ id: move, payload });
     return this.publish({
       events: outcome.events,
       fx: outcome.fx,
@@ -110,11 +116,14 @@ export class KlondikeTransport {
       config: this.options.rules,
       seats: 1,
     });
+    if (this.session.log.length === 0) this.planner.rewind();
+    else this.planner.invalidate();
     return this.publish({ events: [], fx: [], rejected: null, snapshot: this.getSnapshot() });
   }
 
   restart(): KlondikeDispatch {
     this.session = this.freshSession();
+    this.planner.rewind();
     return this.publish({
       events: [],
       fx: this.session.setupFx ?? [],

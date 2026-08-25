@@ -442,8 +442,10 @@ export function legalMovesFor(state: KlondikeState): LegalMove[] {
 type HintKind =
   | 'foundation-uncover'
   | 'foundation'
+  | 'foundation-return'
   | 'uncover'
   | 'expose'
+  | 'shift'
   | 'waste-tableau'
   | 'empty-for-king'
   | 'draw'
@@ -463,6 +465,21 @@ export function hintFor(state: KlondikePlayerView): KlondikeHint | null {
     if (!best || ranked.score > best.score) best = { move, ...ranked };
   }
   return best ? { move: best.move, reason: hintReason(state, best.move, best.kind) } : null;
+}
+
+/** Spoken copy for any engine move, including solver-only retreats and side slides. */
+export function describeHintMove(state: KlondikePlayerView, move: LegalMove): string {
+  const ranked = rankHint(state, move);
+  if (ranked) return hintReason(state, move, ranked.kind);
+  if (move.id === 'foundation.toTableau') return hintReason(state, move, 'foundation-return');
+  if (move.id === 'tableau.move') return hintReason(state, move, 'shift');
+  if (move.id === 'waste.toTableau') return hintReason(state, move, 'waste-tableau');
+  if (move.id === 'tableau.toFoundation' || move.id === 'waste.toFoundation') {
+    return hintReason(state, move, 'foundation');
+  }
+  if (move.id === 'stock.draw') return hintReason(state, move, 'draw');
+  if (move.id === 'stock.recycle') return hintReason(state, move, 'recycle');
+  return 'Play that card.';
 }
 
 function rankHint(
@@ -602,6 +619,17 @@ function hintReason(state: KlondikePlayerView, move: LegalMove, kind: HintKind):
       return targetNamed
         ? `Move the ${named} onto the ${targetNamed} so a King has a home.`
         : `Clear a column so a King has a home.`;
+    case 'foundation-return': {
+      const to = (move.payload as FoundationToTableauPayload | undefined)?.to;
+      const destTop = validColumn(to) ? (state.tableau[to]?.up.at(-1) ?? null) : null;
+      return destTop
+        ? `Bring the ${named} back onto the ${nameOfCard(destTop)}.`
+        : `Bring the ${named} back onto the tableau.`;
+    }
+    case 'shift':
+      return targetNamed
+        ? `Move the ${named} onto the ${targetNamed}.`
+        : `Move the ${named} to an empty column.`;
     case 'draw':
       return state.rules.drawCount === 3 && state.stock.length >= 3
         ? 'Turn three from the stock.'

@@ -122,6 +122,7 @@ describe('winnable seed search', () => {
     const found = findWinnableSeed(1, 3);
 
     expect(found.winnable).toBe(true);
+    expect(found.line.length).toBeGreaterThan(0);
     expect(isWinnableDeal(klondikeDealFor(found.seed, 3), { drawCount: 3 })).toBe(true);
   }, 60_000);
 
@@ -150,7 +151,7 @@ describe('winnable seed search', () => {
   it('falls back to the original seed instead of dealing nothing', () => {
     const found = findWinnableSeed(7, 3, { maxCandidates: 2, nodeBudget: 1 });
 
-    expect(found).toEqual({ seed: 7, rejected: 2, winnable: false });
+    expect(found).toEqual({ seed: 7, rejected: 2, winnable: false, line: [] });
   });
 
   it('deals the same table the engine would deal for that seed', () => {
