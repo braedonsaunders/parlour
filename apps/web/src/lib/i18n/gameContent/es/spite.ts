@@ -6,11 +6,11 @@ export const spiteEs: GameCopy = {
   subtitle: 'la carrera del montón principal',
   tagline: 'Devuélvesela con creces',
   description:
-    'Construye los montones centrales del As a la Reina, vacía tu montón principal y arruina los planes de los demás con comodines bien colocados. El nombre ya lo dice todo.',
+    'Construye los montones centrales del 1 al 12, vacía tu montón principal y arruina los planes de los demás con comodines bien colocados. El nombre ya lo dice todo.',
   facts: ['2–4 jugadores', 'clásico · rápido · despiadado', 'solo o con amigos'],
   howToPlay: {
     summary:
-      'Spite & Malice — construye los montones centrales compartidos del As a la Reina y vacía tu montón principal antes que nadie más el suyo.',
+      'Spite & Malice — construye los montones centrales compartidos del 1 al 12 y vacía tu montón principal antes que nadie más el suyo.',
     objective:
       'Sé el primer jugador con el montón principal vacío. Cada carta que entierras en él es una carta de la que otro podrá presumir.',
     sections: [
@@ -52,10 +52,9 @@ export const spiteEs: GameCopy = {
         heading: 'Comodines',
         bullets: [
           {
-            label: 'Reyes',
-            text: 'comodín — juégalos como el rango que necesites, y ese rango se recuerda para el montón',
+            label: 'Comodines',
+            text: 'dieciocho en la baraja — juega uno como el rango que necesites, y ese rango se recuerda para el montón',
           },
-          { label: 'Jokers', text: 'exactamente igual cuando la mesa los reparte' },
           {
             label: 'Rangos recordados',
             text: 'un comodín que hace de 6 convierte la siguiente carta en un 7, la juegue quien la juegue',
@@ -132,19 +131,14 @@ export const spiteEs: GameCopy = {
       help: 'Montones delante de cada jugador. Terminar un turno significa descartar en uno de ellos.',
       group: 'El reparto',
     },
-    kingsWild: {
-      label: 'Los reyes son comodín',
-      help: 'Un Rey vale por el rango que digas. Desactivado, no se reparte ningún Rey.',
-      group: 'Comodines',
-    },
-    jokersWild: {
-      label: 'Los Jokers son comodín',
-      help: 'Los Jokers juegan exactamente igual que los Reyes. Desactivado, no se reparte ninguno.',
+    wilds: {
+      label: 'Comodines en la baraja',
+      help: 'Un comodín vale por el rango que digas. Dieciocho es la baraja de caja; menos hace que cada uno sea oro.',
       group: 'Comodines',
     },
     buildPiles: {
       label: 'Montones centrales',
-      help: 'Montones de construcción compartidos en los que juega todo el mundo. Menos montones significa más espera por los Ases de los demás.',
+      help: 'Montones de construcción compartidos en los que juega todo el mundo. Menos montones significa más espera por los unos de los demás.',
       group: 'El centro',
     },
     refillMidTurn: {

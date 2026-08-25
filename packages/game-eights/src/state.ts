@@ -60,6 +60,15 @@ export interface EightsState {
   roundIndex: number;
   dealer: SeatId;
   round: EightsRound;
+  /**
+   * True when this session was dealt behind Veil.
+   *
+   * Carried on the state rather than read from the runtime because the rules
+   * that change under Veil — waiting for a re-veiled stock, waiting for closed
+   * hands to open before the round is scored — are validated on state alone,
+   * and have to give the same answer on replay as they did at the table.
+   */
+  veiled: boolean;
   /** True once this round's points have been banked. */
   folded: boolean;
   readied: SeatId[];

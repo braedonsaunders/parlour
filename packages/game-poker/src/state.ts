@@ -72,6 +72,16 @@ export interface PokerState {
 
   hole: CardId[][];
   board: readonly CardId[];
+  /**
+   * True when this match was dealt behind Veil.
+   *
+   * Hold'em hides more than a hand: the board arrives a street at a time, and
+   * every card of it has to become readable to everyone at exactly the moment
+   * it is turned and not one action earlier. So a veiled match waits for the
+   * room to open those cards in public before the street can be dealt, and the
+   * same again for the hole cards of everyone still contesting a showdown.
+   */
+  veiled: boolean;
   /** the undealt remainder of this hand's deck, in deal order */
   deck: readonly CardId[];
 

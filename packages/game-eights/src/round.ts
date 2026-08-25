@@ -15,6 +15,8 @@ import {
   WILD_RANK,
   eightsDeck,
   handValue,
+  hasHiddenCard,
+  isHiddenCard,
   rankOf,
   suitOf,
   type EightsSuit,
@@ -39,6 +41,15 @@ export interface EightsDealCtx {
   seats: number;
   rng: Rng;
   fx: FxEmitter;
+  /**
+   * The order to deal from, when the room has one.
+   *
+   * A veiled deal comes out of a shuffle ceremony rather than the session rng,
+   * because an rng order is replayable by every seat and would make the whole
+   * deck readable. When this is absent the deal shuffles for itself, which is
+   * what an open room and every solo table do.
+   */
+  deckOrder?: readonly CardId[];
 }
 
 export function topCard(round: EightsRound): CardId {
@@ -67,6 +78,10 @@ export function canStack(round: EightsRound, rules: EightsRules, card: CardId): 
  * wild and go on anything — except an unanswered two, which wants a two.
  */
 export function canPlay(round: EightsRound, rules: EightsRules, card: CardId): boolean {
+  // A card nobody can read plays on nothing. Every caller that wants the
+  // benefit of the doubt for a closed hand — the blocked check — asks for it
+  // explicitly; everywhere else a handle is simply not a legal play.
+  if (isHiddenCard(card)) return false;
   if (round.pendingDraw > 0) return canStack(round, rules, card);
   if (rankOf(card) === WILD_RANK) return true;
   if (suitOf(card) === round.activeSuit) return true;
@@ -82,7 +97,9 @@ export function playableCards(
 }
 
 export function hasPlayable(round: EightsRound, rules: EightsRules, seat: SeatId): boolean {
-  return handOf(round, seat).some((card) => canPlay(round, rules, card));
+  // A hand the table cannot read might hold a play, so it is never counted as
+  // stuck — a veiled round blocks only when every open hand is out of options.
+  return handOf(round, seat).some((card) => isHiddenCard(card) || canPlay(round, rules, card));
 }
 
 /** No stock and nothing but the face-up card in the discard: the pile is spent. */
@@ -116,7 +133,7 @@ export function dealRound(ctx: EightsDealCtx, dealer: SeatId): EightsRound {
     throw new Error(`eights cannot deal ${config.handSize} cards to ${seats} seats from one pack`);
   }
 
-  const shuffled = shuffledIds(eightsDeck, ctx.rng);
+  const shuffled = ctx.deckOrder ? [...ctx.deckOrder] : shuffledIds(eightsDeck, ctx.rng);
   const hands: CardId[][] = Array.from({ length: seats }, () => []);
   let cursor = 0;
   for (let round = 0; round < config.handSize; round++) {
@@ -134,9 +151,12 @@ export function dealRound(ctx: EightsDealCtx, dealer: SeatId): EightsRound {
   }
 
   const rest = shuffled.slice(cursor);
+  // Under Veil the room opens starter candidates in public before the deal, so
+  // the readable cards sit at the front of what is left; a handle is skipped
+  // rather than asked for its rank, which would throw.
   const starterIndex = Math.max(
     0,
-    rest.findIndex((card) => rankOf(card) !== WILD_RANK),
+    rest.findIndex((card) => !isHiddenCard(card) && rankOf(card) !== WILD_RANK),
   );
   const starter = rest[starterIndex];
   if (!starter) throw new Error('eights deck has no card left to start the pile');
@@ -176,6 +196,14 @@ export interface EightsDrawOptions {
 export function replenish(round: EightsRound, fx: FxEmitter, rng: Rng): EightsRound {
   if (round.stock.length > 0 || round.discard.length <= 1) return round;
   const [top, ...recyclable] = round.discard;
+  // Every card in a spent discard is face up. Shuffling those into a stock with
+  // the session rng makes the rest of the deal readable by the whole table, so
+  // a veiled room re-veils them in a fresh epoch first and hands the recycled
+  // handles back through the move; the guard on `draw` is what stops the round
+  // arriving here before that has happened.
+  if (hasHiddenCard(round.hands.flat()) && recyclable.some((card) => !isHiddenCard(card))) {
+    return round;
+  }
   fx.emit(Fx.ShuffleStock, {});
   return { ...round, stock: rng.shuffle(recyclable), discard: top ? [top] : [] };
 }
@@ -384,14 +412,30 @@ function finishBlocked(round: EightsRound, fx: FxEmitter): EightsRound {
  * never changes again, so the table would only pass forever. Detecting it here
  * ends the round on the move that caused it rather than after a silent lap.
  */
+/**
+ * Whether the round is over but for the arithmetic.
+ *
+ * Separate from settling because a veiled round reaches this point with hands
+ * nobody can score yet: everyone still holding cards has to open them first,
+ * and the flow drives that from here.
+ */
+export function roundIsOver(round: EightsRound, rules: EightsRules): boolean {
+  if (round.awaitingSuit !== null || round.drawnCard !== null) return false;
+  if (round.hands.some((cards) => cards.length === 0)) return true;
+  if (!stockDry(round)) return false;
+  return round.hands.every((_cards, seat) => !hasPlayable(round, rules, seat));
+}
+
 export function settleRound(round: EightsRound, rules: EightsRules, fx: FxEmitter): EightsRound {
   if (round.outcome) return round;
-  if (round.awaitingSuit !== null || round.drawnCard !== null) return round;
+  if (!roundIsOver(round, rules)) return round;
+  // Scoring adds up what every seat is still holding, which a closed hand
+  // cannot answer. A veiled round stays open here until the reveal phase has
+  // walked round the table; settling on handles would score them all at zero.
+  if (hasHiddenCard(round.hands.flat())) return round;
   const shedder = round.hands.findIndex((cards) => cards.length === 0);
   if (shedder >= 0) return finishShed(round, shedder, fx);
-  if (!stockDry(round)) return round;
-  const stuck = round.hands.every((_cards, seat) => !hasPlayable(round, rules, seat));
-  return stuck ? finishBlocked(round, fx) : round;
+  return finishBlocked(round, fx);
 }
 
 /** Exposed for the round-end readout; the outcome carries the same numbers. */

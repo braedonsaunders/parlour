@@ -17,23 +17,22 @@ import type { MultiplayerSecurity } from '@/app/_multiplayer/roomSession';
  * never described as "cheat-proof" — see apps/web/src/lib/multiplayer/veil.
  */
 
-/** In-room badge: the guarantee, the audit state, and what recovery costs. */
+/**
+ * In-room badge: the name of the guarantee, and anything that has changed it.
+ *
+ * It used to also carry a shuffle counter, a paragraph on what the end-of-match
+ * audit had and had not proved, and a standing note about what a two-seat room
+ * cannot recover. All of that is true, and none of it is something a player can
+ * act on while holding cards — it is documentation wearing a badge. What is
+ * left is the label and the two things that genuinely change the game in front
+ * of you: a hand that stopped being private, and a round that has stopped.
+ *
+ * The machinery is untouched; this is only what the table says about it.
+ */
 export function SecurityBadge({ security }: { security: MultiplayerSecurity }) {
-  const ceremonyRunning = security.tier === 'veil' && !security.ceremony.ready;
   return (
     <div className="panel-soft flex flex-col gap-1 p-3 text-left" data-testid="table-security">
-      <p className="text-sm font-bold text-dusk-50">
-        {security.label}
-        {ceremonyRunning ? (
-          <span className="ml-2 text-xs font-normal text-hearth-200">
-            shuffling… {security.ceremony.laid}/{security.ceremony.seats}
-          </span>
-        ) : null}
-      </p>
-      <p className="text-xs text-dusk-100/80">{security.detail}</p>
-      {security.tier === 'veil' ? (
-        <p className="text-xs text-dusk-100/60">{security.recovery.disclosure}</p>
-      ) : null}
+      <p className="text-sm font-bold text-dusk-50">{security.label}</p>
       {security.recoveredSeats.length > 0 ? (
         <p className="text-xs text-hearth-200" data-testid="table-security-recovered">
           {seatList(security.recoveredSeats)} disconnected and{' '}

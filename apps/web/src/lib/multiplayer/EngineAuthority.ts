@@ -3,6 +3,7 @@ import {
   sessionApply,
   sessionInject,
   stateHash,
+  type CardId,
   type GameDef,
   type GameSession,
   type RuleValues,
@@ -82,11 +83,23 @@ export class EngineAuthority<S, C extends RuleValues> implements AuthorityAdapte
     };
   }
 
-  inject(actionId: string, move: string, payload?: unknown): AppliedPacket {
+  inject(
+    actionId: string,
+    move: string,
+    payload?: unknown,
+    reveals?: readonly (readonly [string, string])[],
+  ): AppliedPacket {
     if (this.acceptedActions.has(actionId)) throw new DuplicateActionError(actionId);
     const { session, settings } = this.authorityState;
     const { timestamp, atMs } = this.authorityTime(session);
-    const outcome = sessionInject(this.def, session, move, payload, { atMs });
+    // Openings are substituted into the state before the move validates, so a
+    // street injected with its board sees real cards where handles were.
+    const outcome = sessionInject(this.def, session, move, payload, {
+      atMs,
+      ...(reveals && reveals.length > 0
+        ? { reveals: reveals.map(([handle, card]) => [handle, card] as [CardId, CardId]) }
+        : {}),
+    });
     if (outcome.rejected) throw new Error(outcome.rejected.message);
     const events = outcome.events.map((event) => ({ ...event, ts: timestamp }));
     const nextSession = { ...outcome.session, log: [...session.log, ...events] };

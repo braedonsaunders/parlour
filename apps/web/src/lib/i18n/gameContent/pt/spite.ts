@@ -55,12 +55,8 @@ export const spitePt: GameCopy = {
         heading: 'Curingas',
         bullets: [
           {
-            label: 'Reis',
-            text: 'curingas — jogue-os como qualquer valor que precisar, e esse valor fica valendo para a pilha',
-          },
-          {
             label: 'Curingas',
-            text: 'funcionam exatamente igual quando a mesa os inclui na distribuição',
+            text: 'dezoito no baralho — jogue um como qualquer valor que precisar, e esse valor fica valendo para a pilha',
           },
           {
             label: 'Valores lembrados',
@@ -135,19 +131,14 @@ export const spitePt: GameCopy = {
       help: 'Pilhas em frente a cada jogador. Encerrar um turno significa descartar em uma delas.',
       group: 'A distribuição',
     },
-    kingsWild: {
-      label: 'Reis são curingas',
-      help: 'Um rei vale qualquer valor que você disser. Desligado, os reis nem entram no baralho.',
-      group: 'Curingas',
-    },
-    jokersWild: {
-      label: 'Curingas entram',
-      help: 'Os curingas funcionam exatamente como os reis. Desligado, nenhum entra no baralho.',
+    wilds: {
+      label: 'Curingas no baralho',
+      help: 'Um curinga vale qualquer valor que você disser. Dezoito é o baralho da caixa; menos torna cada um precioso.',
       group: 'Curingas',
     },
     buildPiles: {
       label: 'Pilhas centrais',
-      help: 'Sequências compartilhadas em que todo mundo joga. Menos pilhas significam mais espera pelo ás dos outros.',
+      help: 'Sequências compartilhadas em que todo mundo joga. Menos pilhas significam mais espera pelo 1 dos outros.',
       group: 'O centro',
     },
     refillMidTurn: {

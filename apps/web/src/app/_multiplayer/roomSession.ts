@@ -178,6 +178,7 @@ export class MultiplayerRoomSession {
   private recycleActionPending = false;
   /** a veiled redeal ceremony already under way, so it cannot start twice */
   private redealPending = false;
+  private openPending = false;
   /** bot turns already scheduled, keyed by log position, so none fires twice */
   private readonly scheduledBotTurns = new Set<string>();
   /** seats being held open for a player who dropped, keyed by seat */
@@ -653,6 +654,52 @@ export class MultiplayerRoomSession {
   }
 
   /**
+   * Turns the cards a veiled hand has to show, and only those.
+   *
+   * Hold'em is the reason this exists: the board arrives a street at a time and
+   * every card of it is public the moment it lands, which no other veiled game
+   * on the shelf needs. A showdown is the same mechanism pointed at hole cards.
+   * Both are named by the pack, so the room never has to know what a street is
+   * — it opens the handles it was given and injects the move it was told to.
+   *
+   * Host-only, for the same reason the redeal is: two peers opening the same
+   * position would each start a chain and neither would finish.
+   */
+  private maybeOpenVeiledCards(): void {
+    if (!this.snapshot.isHost || !this.veil || !this.authority || this.openPending) return;
+    const settings = this.snapshot.settings;
+    if (!settings) return;
+    const pending = roomGame(settings.gameId).publicOpenPending(this.authority.getSession().state);
+    if (!pending) return;
+
+    this.openPending = true;
+    void this.openInPublic(pending.handles)
+      .then((reveals) => this.inject(pending.move, undefined, { reveals }))
+      .catch((error: unknown) => {
+        this.update({
+          error: error instanceof Error ? error.message : 'A card could not be turned face up',
+        });
+      })
+      .finally(() => {
+        this.openPending = false;
+      });
+  }
+
+  /** Peels each handle in public and pairs it with the card it opened to. */
+  private async openInPublic(handles: readonly string[]): Promise<(readonly [string, string])[]> {
+    const veil = this.veil;
+    if (!veil) throw new Error('this room is not running Veil');
+    const reveals: (readonly [string, string])[] = [];
+    for (const handle of handles) {
+      const at = veil.session.positionFor(handle);
+      if (!at) throw new Error('a card to be turned is not in any open epoch');
+      const card = await veil.room.open(at.epoch, at.position, 'public');
+      reveals.push([handle, card]);
+    }
+    return reveals;
+  }
+
+  /**
    * Runs a whole shuffle ceremony for the next hand and returns its deck.
    *
    * The same shape as the opening deal: open an epoch over the deck, let every
@@ -748,10 +795,13 @@ export class MultiplayerRoomSession {
   private async openMyHandles(): Promise<void> {
     const veil = this.veil;
     const seat = this.snapshot.localSeat;
-    const state = this.authority?.getSession().state as { hands?: unknown } | undefined;
-    if (!veil || seat === null || !state) return;
-    const mine = Array.isArray(state.hands) ? (state.hands[seat] as unknown) : null;
-    if (!Array.isArray(mine)) return;
+    const settings = this.snapshot.settings;
+    const state = this.authority?.getSession().state;
+    if (!veil || seat === null || !state || !settings) return;
+    // Where a seat's own cards live is the pack's business: most games keep
+    // them in `hands`, a poker seat holds `hole`, and a crazy eights hand is
+    // nested inside the round on the table.
+    const mine = roomGame(settings.gameId).privateHandles(state, seat);
 
     const wanted = mine.filter(
       (card): card is string => typeof card === 'string' && !veil.session.knownFaces().has(card),
@@ -994,9 +1044,13 @@ export class MultiplayerRoomSession {
     return this.veil?.session.knownFaces() ?? new Map();
   }
 
-  inject(move: string, payload?: unknown): void {
+  inject(
+    move: string,
+    payload?: unknown,
+    meta?: { reveals?: readonly (readonly [string, string])[] },
+  ): void {
     if (!this.transport) throw new Error('the room is not connected');
-    this.transport.inject(move, payload);
+    this.transport.inject(move, payload, meta?.reveals);
   }
 
   close(): void {
@@ -1086,8 +1140,10 @@ export class MultiplayerRoomSession {
       this.driveBotSeats();
     }
     // A hand that just settled may leave a veiled match waiting for its next
-    // deck. Nothing else notices, because dealing is the room's job here.
+    // deck, and a betting round that just closed may leave it waiting for a
+    // board. Nothing else notices, because both are the room's job here.
     this.maybeDealVeiledHand();
+    this.maybeOpenVeiledCards();
   }
 
   private acceptPresence(presence: PresenceEvent): void {

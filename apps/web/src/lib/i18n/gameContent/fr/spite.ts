@@ -6,11 +6,11 @@ export const spiteFr: GameCopy = {
   subtitle: 'la course à la pile gagnante',
   tagline: 'Rends-leur la monnaie de leur carte',
   description:
-    'Monte les piles du centre de l’As à la Dame, vide ta pile gagnante et ruine les plans des autres avec des jokers bien placés. Le nom du jeu, c’est la règle.',
+    'Monte les piles du centre du 1 au 12, vide ta pile gagnante et ruine les plans des autres avec des jokers bien placés. Le nom du jeu, c’est la règle.',
   facts: ['2–4 joueurs', 'classique · rapide · sans pitié', 'solo ou entre amis'],
   howToPlay: {
     summary:
-      'Spite & Malice — monte les piles communes du centre de l’As à la Dame et vide ta pile gagnante avant tout le monde.',
+      'Spite & Malice — monte les piles communes du centre du 1 au 12 et vide ta pile gagnante avant tout le monde.',
     objective:
       'Sois le premier joueur à vider ta pile gagnante. Chaque carte que tu y laisses enfermée, c’est un autre joueur qui s’en réjouira.',
     sections: [
@@ -55,12 +55,8 @@ export const spiteFr: GameCopy = {
         heading: 'Les jokers',
         bullets: [
           {
-            label: 'Rois',
-            text: 'jokers — joue-les comme n’importe quel rang, et ce rang est mémorisé pour la pile',
-          },
-          {
             label: 'Jokers',
-            text: 'exactement pareil quand la table les mélange au jeu',
+            text: 'dix-huit dans le jeu — joue-en un comme n’importe quel rang, et ce rang est mémorisé pour la pile',
           },
           {
             label: 'Rangs mémorisés',
@@ -141,19 +137,14 @@ export const spiteFr: GameCopy = {
       help: 'Piles devant chaque joueur. Finir un tour, c’est se défausser sur l’une d’elles.',
       group: 'La donne',
     },
-    kingsWild: {
-      label: 'Les Rois sont jokers',
-      help: 'Un Roi tient lieu du rang que tu annonces. Désactivé, aucun Roi n’est distribué.',
-      group: 'Jokers',
-    },
-    jokersWild: {
-      label: 'Les Jokers sont jokers',
-      help: 'Les Jokers se jouent exactement comme les Rois. Désactivé, aucun n’est distribué.',
+    wilds: {
+      label: 'Jokers dans le jeu',
+      help: 'Un joker tient lieu du rang que tu annonces. Dix-huit, c’est le jeu de la boîte ; moins, et chacun devient précieux.',
       group: 'Jokers',
     },
     buildPiles: {
       label: 'Piles du centre',
-      help: 'Piles communes sur lesquelles tout le monde joue. Moins il y en a, plus tu attends l’As d’un autre.',
+      help: 'Piles communes sur lesquelles tout le monde joue. Moins il y en a, plus tu attends le 1 d’un autre.',
       group: 'Le centre',
     },
     refillMidTurn: {

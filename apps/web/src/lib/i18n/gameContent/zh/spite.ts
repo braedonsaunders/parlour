@@ -40,8 +40,7 @@ export const spiteZh: GameCopy = {
       {
         heading: '万能牌',
         bullets: [
-          { label: 'K', text: '万能牌——当成你需要的任何点数打出，这个点数会被牌堆记住' },
-          { label: 'Joker', text: '牌桌发进Joker时，用法和K完全一样' },
+          { label: '万能牌', text: '牌里共十八张——当成你需要的任何点数打出，这个点数会被牌堆记住' },
           { label: '被记住的点数', text: '一张当6用的万能牌，意味着下一张要出7，不管谁来出' },
         ],
       },
@@ -109,19 +108,14 @@ export const spiteZh: GameCopy = {
       help: '每位玩家面前的牌堆数。结束回合就是往其中一个弃牌。',
       group: '发牌',
     },
-    kingsWild: {
-      label: 'K是万能牌',
-      help: 'K可以当成你指定的任何点数。关闭则完全不发K。',
-      group: '万能牌',
-    },
-    jokersWild: {
-      label: 'Joker是万能牌',
-      help: 'Joker的用法和K完全一样。关闭则不发。',
+    wilds: {
+      label: '牌里的万能牌',
+      help: '万能牌可以当成你指定的任何点数。十八张是原版牌数；越少，每一张就越珍贵。',
       group: '万能牌',
     },
     buildPiles: {
       label: '中央牌堆',
-      help: '人人都能往上叠的公共牌堆。数量越少，越要干等别人的A。',
+      help: '人人都能往上叠的公共牌堆。数量越少，越要干等别人的1。',
       group: '中央',
     },
     refillMidTurn: {

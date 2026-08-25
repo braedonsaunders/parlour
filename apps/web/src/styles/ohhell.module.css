@@ -1,255 +1,389 @@
-/* Oh Hell table furniture: the seat ring with bid chips, the trick zone, the
-   turned trump, and the bid rail. */
-
 .screen {
-  --ohhell-accent: #b06a8f;
+  --oh-accent: #6b3d55;
+  --oh-shade: #381c2c;
+  --oh-under: #e2b049;
+  --oh-exact: #75e1cc;
+  --oh-over: #e2705a;
 }
 
-.feltMark {
-  font-size: 8rem;
-  opacity: 0.12;
+.playfield {
+  background:
+    radial-gradient(ellipse at 50% 42%, rgba(140, 78, 112, 0.18), transparent 58%),
+    linear-gradient(180deg, rgba(28, 12, 22, 0.1), rgba(20, 8, 16, 0.22));
 }
 
-.hudCluster {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.7rem;
-  margin-left: 0.6rem;
-}
-
-.hudStat {
-  display: inline-flex;
-  flex-direction: column;
-  line-height: 1.1;
-}
-
-.hudStat small {
-  font-size: 0.52rem;
-  font-weight: 800;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: rgba(253, 246, 234, 0.6);
-}
-
-.hudStat strong {
-  font-size: 0.86rem;
-  font-weight: 800;
-  color: #fdf6ea;
-  font-variant-numeric: tabular-nums;
-}
-
-.trumpGlyph[data-suit='hearts'],
-.trumpGlyph[data-suit='diamonds'] {
-  color: #e07a63;
-}
-
-/* --- seats ---------------------------------------------------------------- */
-
-.seatRing {
+/*
+ * The playfield is the only positioned box on a table (`inset: 0`), and
+ * `.screen` is not a flow container — so every region places itself against
+ * the felt rather than stacking. Laying these out in normal flow put the seat
+ * row, the local plate and the hand rail all at the top of the screen on top
+ * of each other.
+ */
+.board {
   position: absolute;
   inset: 0;
-  pointer-events: none;
+  display: grid;
+  grid-template-rows: auto 1fr auto auto;
+  /*
+   * The seat row takes what it needs and the centre gets the rest, rather than
+   * both being placed at magic percentages. That matters most at seven seats on
+   * a phone, where the row wraps to two and a percentage-placed trump card ends
+   * up behind it.
+   *
+   * Top clears the HUD pill; bottom clears the hand rail, the local plate and
+   * the bid rail stacked above it.
+   */
+  /* Bottom clears only the hand rail now; the bid rail and the local plate
+     are grid rows of their own, so nothing has to be guessed past them. */
+  padding: clamp(7.2rem, 14vh, 8.5rem) 0 12.6rem;
 }
 
+/*
+ * Seats wrap rather than sitting at fixed compass points.
+ *
+ * Every other table on the shelf seats exactly two or four, so each one places
+ * its opponents absolutely. Oh Hell runs three to seven, and a layout with a
+ * hard-coded north/east/west has nowhere to put seats five and six — so this is
+ * a flow layout that simply grows.
+ */
+.seats {
+  position: relative;
+  z-index: 4;
+  justify-self: center;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: center;
+  gap: clamp(0.3rem, 1.2vw, 0.9rem);
+  margin: 0;
+  padding: 0;
+  /* Leaves the HUD pill and the menu button their corners at every width. */
+  width: min(60rem, 78vw);
+  list-style: none;
+}
+
+/*
+ * `position: relative` is load-bearing, not tidiness.
+ *
+ * The shared seat plate paints its card fan with `position: absolute`, so
+ * without a positioned seat every fan escapes to the nearest positioned
+ * ancestor and they all stack in one place. The accent tokens matter for the
+ * same reason: the shared nameplate paints its pill from them, and a seat that
+ * does not declare them renders an unreadable plate.
+ */
 .seat {
-  --seat-span: 78;
-  --seat-step: calc(var(--seat-span) / max(var(--seat-of, 1) - 1, 1));
-  --seat-x: calc(var(--seat-slot, 0) * var(--seat-step) - var(--seat-span) / 2);
-  position: absolute;
-  left: calc(50% + var(--seat-x) * 1%);
-  top: 19%;
-  transform: translate(-50%, -50%);
+  --seat-accent: #6b3d55;
+  --seat-shade: #381c2c;
+  position: relative;
+  z-index: 4;
   display: grid;
   justify-items: center;
-  gap: 0.3rem;
-  pointer-events: auto;
+  gap: 0.15rem;
+  /* Wide enough for the nameplate pill, narrow enough that seven fit. */
+  width: clamp(5.2rem, 11vw, 7.5rem);
+  padding: 0.3rem 0.25rem;
+  border-radius: var(--radius-chunky);
+  transition: background var(--dur-feedback) var(--ease-settle);
 }
 
-.seat:only-child {
-  --seat-x: 0;
+/*
+ * Flow the fan instead of floating it above the plate. In this layout there is
+ * no reserved space above a seat to float into — the HUD is there — so it sits
+ * in the grid and contributes its own height.
+ */
+.seat [data-opponent-fan] {
+  position: static;
+  z-index: 0;
+  transform: none;
+  margin-bottom: 0.1rem;
 }
 
-.seat[data-turn] .seatBadge {
-  box-shadow: 0 0 0 3px var(--ohhell-accent);
+.seat [data-opponent-fan] > * {
+  margin-inline: -0.72rem;
 }
 
-.seatCards {
-  display: flex;
+.seat[data-active] {
+  background: rgba(255, 224, 173, 0.14);
+  box-shadow: inset 0 0 0 1px rgba(255, 224, 173, 0.4);
 }
-
-.seatCards > * + * {
-  margin-left: -1.5rem;
-}
-
-.seatBadge {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  padding: 0.25rem 0.55rem;
-  border-radius: 999px;
-  background: rgba(16, 24, 32, 0.78);
-  border: 2px solid rgba(253, 246, 234, 0.16);
-}
-
-.seatText {
-  display: grid;
-  line-height: 1.15;
-}
-
-.seatText strong {
-  font-size: 0.78rem;
-  font-weight: 800;
-  color: #fdf6ea;
-}
-
-.seatText small {
-  font-size: 0.6rem;
-  color: rgba(253, 246, 234, 0.66);
-  font-variant-numeric: tabular-nums;
-}
-
-.bidChip {
-  padding: 0.1rem 0.42rem;
-  border-radius: 999px;
-  background: rgba(253, 246, 234, 0.14);
-  color: #fdf6ea;
-  font-size: 0.64rem;
-  font-weight: 900;
-  font-variant-numeric: tabular-nums;
-}
-
-.bidChip[data-made] {
-  background: #5fae7b;
-  color: #10201a;
-}
-
-.bidChip[data-over] {
-  background: #c2593f;
-  color: #fdf6ea;
-}
-
-.dealerChip {
-  display: inline-grid;
-  place-items: center;
-  width: 1.15rem;
-  height: 1.15rem;
-  border-radius: 999px;
-  background: #fdf6ea;
-  color: #3d1f2e;
-  font-size: 0.6rem;
-  font-weight: 900;
-}
-
-/* --- the middle ----------------------------------------------------------- */
 
 .centre {
-  position: absolute;
-  left: 50%;
-  top: 52%;
-  transform: translate(-50%, -50%);
+  position: relative;
+  z-index: 3;
+  place-self: center;
   display: flex;
   align-items: center;
-  gap: 1.2rem;
+  justify-content: center;
+  gap: clamp(1rem, 4vw, 3rem);
 }
 
-.trickZone {
-  display: flex;
-  gap: 0.4rem;
-  align-items: flex-end;
-  min-height: 4.4rem;
-}
-
-.trickEmpty {
-  font-size: 0.72rem;
-  color: rgba(253, 246, 234, 0.45);
-  font-weight: 700;
-}
-
-.trickCard {
-  display: grid;
-  justify-items: center;
-  gap: 0.15rem;
-}
-
-.trickCard small {
-  font-size: 0.58rem;
-  color: rgba(253, 246, 234, 0.66);
-}
-
-.trumpCard {
-  display: grid;
-  justify-items: center;
-  gap: 0.15rem;
-  padding: 0.35rem;
-  border-radius: 0.6rem;
-  border: 2px solid var(--ohhell-accent);
-  background: rgba(16, 24, 32, 0.6);
-}
-
-.trumpCard small {
-  font-size: 0.52rem;
-  font-weight: 800;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: rgba(253, 246, 234, 0.6);
-}
-
-/* --- local seat and decisions --------------------------------------------- */
-
-.localStrip {
+.trump {
   display: grid;
   justify-items: center;
   gap: 0.3rem;
-  padding-top: 0.2rem;
 }
 
-.decision {
+.noTrump {
   display: grid;
-  justify-items: center;
-  gap: 0.4rem;
+  place-items: center;
+  width: clamp(3rem, 5vw, 4.2rem);
+  aspect-ratio: 5 / 7;
+  border: 2px dashed rgba(253, 246, 236, 0.4);
+  border-radius: 0.6rem;
+  color: var(--ink-dim);
+  font-size: 0.7rem;
+  line-height: 1.05;
+  text-align: center;
+  text-transform: uppercase;
 }
 
-.prompt {
-  font-size: 0.8rem;
+.trumpLabel {
+  color: var(--ink-dim);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.trick {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.trick li[data-local] {
+  translate: 0 -0.35rem;
+}
+
+/* The last grid row, directly above the hand rail. */
+.localRow {
+  position: relative;
+  z-index: 12;
+  justify-self: center;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: var(--radius-pill);
+  background: rgba(8, 20, 26, 0.42);
+}
+
+/*
+ * Bid, tricks, score — and the colour is the whole point.
+ *
+ * In Oh Hell, being over your bid is exactly as bad as being under it. A row
+ * that only counts tricks taken makes the player do that subtraction on every
+ * trick, so the standing is stated instead.
+ */
+.pips {
+  display: flex;
+  gap: 0.18rem;
+  margin: 0;
+  width: 100%;
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+ * The three pips a seat plate carries. `.pips span` already styles them all, so
+ * these exist chiefly so the class names the screen asks for resolve to
+ * something — a CSS-module miss returns undefined and React writes
+ * `class="undefined"` into the DOM rather than failing.
+ */
+.bid,
+.tricks,
+.score {
+  min-width: 0;
+}
+
+/* The contract is the number the whole hand is judged against. */
+.bid {
   font-weight: 800;
-  color: #fdf6ea;
 }
 
-.hook {
-  color: #e0a33f;
+.pips span {
+  display: grid;
+  flex: 1 1 0;
+  justify-items: center;
+  min-width: 0;
+  padding: 0.12rem 0.15rem;
+  border-radius: 0.45rem;
+  background: rgba(8, 20, 26, 0.42);
+  font-size: clamp(0.72rem, 1.5vw, 0.92rem);
+  font-weight: 700;
+  line-height: 1.05;
+}
+
+.pips small {
+  color: var(--ink-dim);
+  font-size: clamp(0.46rem, 1vw, 0.58rem);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.pips[data-standing='exact'] .tricks {
+  background: color-mix(in srgb, var(--oh-exact) 30%, rgba(8, 20, 26, 0.42));
+  box-shadow: inset 0 0 0 1px var(--oh-exact);
+}
+
+.pips[data-standing='under'] .tricks {
+  box-shadow: inset 0 0 0 1px var(--oh-under);
+}
+
+.pips[data-standing='over'] .tricks {
+  background: color-mix(in srgb, var(--oh-over) 26%, rgba(8, 20, 26, 0.42));
+  box-shadow: inset 0 0 0 1px var(--oh-over);
+}
+
+.contract {
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Bids totalling exactly the tricks available means the hook rule bit. */
+.evenWarning {
+  color: var(--oh-under);
+  font-style: normal;
   font-weight: 700;
 }
 
-.bidRow,
-.suitRow {
+/*
+ * The third grid row, not a floating panel.
+ *
+ * Absolutely positioning it above the hand meant the trump card and the bid
+ * buttons were placed independently, and at three or four seats — where the
+ * centre band is tallest — they landed on top of each other. In the grid the
+ * centre simply gets less room when a rail is showing.
+ */
+.actionRail {
+  position: relative;
+  z-index: 40;
+  justify-self: center;
+  margin-bottom: 0.4rem;
+  display: grid;
+  justify-items: center;
+  gap: 0.4rem;
+  width: max-content;
+  max-width: min(94vw, 44rem);
+  padding: 0.6rem 0.9rem;
+  border-radius: var(--radius-chunky);
+  background: rgba(12, 26, 32, 0.92);
+  box-shadow: var(--shadow-ambient);
+}
+
+.railPrompt {
+  margin: 0;
+  color: var(--ink-dim);
+  font-size: 0.86rem;
+  text-align: center;
+}
+
+.hooked {
+  color: var(--oh-under);
+  font-style: normal;
+  font-weight: 700;
+}
+
+.railButtons {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 0.4rem;
+  gap: 0.35rem;
 }
 
-.bidButton {
-  min-width: 2.6rem;
+.bidButton,
+.trumpButton {
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  padding: 0.3rem 0.6rem;
+  border: 0;
+  border-radius: 0.7rem;
+  background: linear-gradient(180deg, var(--oh-accent), var(--oh-shade));
+  color: var(--ink);
+  font-size: 1.05rem;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: var(--shadow-ambient);
 }
 
-.suitButton {
-  min-width: 3.2rem;
-  font-size: 1.3rem;
+.trumpButton {
+  display: grid;
+  justify-items: center;
+  gap: 0.1rem;
+  line-height: 1;
 }
 
-.suitButton[data-suit='hearts'],
-.suitButton[data-suit='diamonds'] {
-  color: #e07a63;
+.trumpButton small {
+  font-size: 0.55rem;
+  font-weight: 600;
+  text-transform: uppercase;
 }
 
-.waiting,
-.matchOver {
-  font-size: 0.8rem;
-  font-weight: 700;
-  color: rgba(253, 246, 234, 0.7);
+.bidButton:disabled,
+.trumpButton:disabled {
+  filter: var(--unplayable-filter);
+  opacity: var(--unplayable-opacity);
+  cursor: default;
 }
 
-.matchOver {
-  color: #f0c04e;
-  font-weight: 900;
+.roundEnd {
+  position: absolute;
+  z-index: 45;
+  inset: auto 0 4.5rem;
+  display: grid;
+  justify-items: center;
+  gap: 0.5rem;
+  margin: 0 auto;
+  padding: 1rem 1.2rem;
+  width: min(28rem, 92vw);
+  border-radius: var(--radius-chunky);
+  background: rgba(12, 26, 32, 0.94);
+  box-shadow: var(--shadow-lift);
+  z-index: 30;
+}
+
+.roundEnd h2 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.roundEnd ul {
+  display: grid;
+  gap: 0.2rem;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  list-style: none;
+  font-size: 0.86rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.roundEnd li[data-standing='exact'] {
+  color: var(--oh-exact);
+}
+
+.roundEnd li span {
+  float: right;
+  font-weight: 800;
+}
+
+.nextRound {
+  min-height: 2.75rem;
+  padding: 0.4rem 1.2rem;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(180deg, var(--parlour-amber), #96471c);
+  color: var(--ink);
+  font-weight: 800;
+  cursor: pointer;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .seat {
+    transition: none;
+  }
 }

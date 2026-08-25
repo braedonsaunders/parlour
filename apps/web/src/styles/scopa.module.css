@@ -1,324 +1,291 @@
-/* Scopa table furniture: the seat ring with bid chips, the trick zone, the
-   turned trump, and the bid rail. */
-
 .screen {
-  --scopa-accent: #5aa877;
+  --sc-accent: #8a4b3c;
+  --sc-shade: #48211a;
+  --sc-held: #66ffe1;
+  --sc-card: clamp(2.6rem, 4.6vw, 3.8rem);
 }
 
-.feltMark {
-  font-size: 8rem;
-  opacity: 0.12;
+.playfield {
+  background:
+    radial-gradient(ellipse at 50% 46%, rgba(180, 110, 70, 0.16), transparent 58%),
+    linear-gradient(180deg, rgba(34, 16, 10, 0.1), rgba(22, 10, 8, 0.22));
 }
 
-.hudCluster {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.7rem;
-  margin-left: 0.6rem;
-}
-
-.hudStat {
-  display: inline-flex;
-  flex-direction: column;
-  line-height: 1.1;
-}
-
-.hudStat small {
-  font-size: 0.52rem;
-  font-weight: 800;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: rgba(253, 246, 234, 0.6);
-}
-
-.hudStat strong {
-  font-size: 0.86rem;
-  font-weight: 800;
-  color: #fdf6ea;
-  font-variant-numeric: tabular-nums;
-}
-
-.trumpGlyph[data-suit='hearts'],
-.trumpGlyph[data-suit='diamonds'] {
-  color: #e07a63;
-}
-
-/* --- seats ---------------------------------------------------------------- */
-
-.seatRing {
+/*
+ * Rows, not percentages: opponents / felt / chooser / your plate.
+ *
+ * The playfield is the only positioned box on a table and `.screen` is not a
+ * flow container, so a region rendered as its sibling stacks at the top of the
+ * screen instead of below the felt.
+ */
+.board {
   position: absolute;
   inset: 0;
-  pointer-events: none;
+  display: grid;
+  grid-template-rows: auto 1fr auto auto;
+  align-items: center;
+  padding: clamp(5.4rem, 11vh, 7rem) 0 12.8rem;
 }
 
+.seats {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: center;
+  gap: clamp(0.4rem, 1.8vw, 1.4rem);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* `position: relative` and the seat tokens are load-bearing: the shared
+   nameplate paints its pill from them. */
 .seat {
-  --seat-span: 78;
-  --seat-step: calc(var(--seat-span) / max(var(--seat-of, 1) - 1, 1));
-  --seat-x: calc(var(--seat-slot, 0) * var(--seat-step) - var(--seat-span) / 2);
-  position: absolute;
-  left: calc(50% + var(--seat-x) * 1%);
-  top: 19%;
-  transform: translate(-50%, -50%);
+  --seat-accent: var(--sc-accent);
+  --seat-shade: var(--sc-shade);
+  position: relative;
   display: grid;
   justify-items: center;
-  gap: 0.3rem;
-  pointer-events: auto;
+  gap: 0.12rem;
+  width: clamp(4.8rem, 10vw, 7rem);
+  padding: 0.28rem 0.24rem;
+  border-radius: var(--radius-chunky);
+  transition: background var(--dur-feedback) var(--ease-settle);
 }
 
-.seat:only-child {
-  --seat-x: 0;
+.seat[data-turn] {
+  background: rgba(255, 224, 173, 0.14);
+  box-shadow: inset 0 0 0 1px rgba(255, 224, 173, 0.4);
 }
 
-.seat[data-turn] .seatBadge {
-  box-shadow: 0 0 0 3px var(--scopa-accent);
-}
-
-.seatCards {
+.pips {
   display: flex;
+  gap: 0.18rem;
+  margin: 0;
+  width: 100%;
+  font-variant-numeric: tabular-nums;
 }
 
-.seatCards > * + * {
-  margin-left: -1.5rem;
-}
-
-.seatBadge {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  padding: 0.25rem 0.55rem;
-  border-radius: 999px;
-  background: rgba(16, 24, 32, 0.78);
-  border: 2px solid rgba(253, 246, 234, 0.16);
-}
-
-.seatText {
+.pips span {
   display: grid;
-  line-height: 1.15;
-}
-
-.seatText strong {
-  font-size: 0.78rem;
-  font-weight: 800;
-  color: #fdf6ea;
-}
-
-.seatText small {
-  font-size: 0.6rem;
-  color: rgba(253, 246, 234, 0.66);
-  font-variant-numeric: tabular-nums;
-}
-
-.bidChip {
-  padding: 0.1rem 0.42rem;
-  border-radius: 999px;
-  background: rgba(253, 246, 234, 0.14);
-  color: #fdf6ea;
-  font-size: 0.64rem;
-  font-weight: 900;
-  font-variant-numeric: tabular-nums;
-}
-
-.bidChip[data-made] {
-  background: #5fae7b;
-  color: #10201a;
-}
-
-.bidChip[data-over] {
-  background: #c2593f;
-  color: #fdf6ea;
-}
-
-.dealerChip {
-  display: inline-grid;
-  place-items: center;
-  width: 1.15rem;
-  height: 1.15rem;
-  border-radius: 999px;
-  background: #fdf6ea;
-  color: #1b3a29;
-  font-size: 0.6rem;
-  font-weight: 900;
-}
-
-/* --- the middle ----------------------------------------------------------- */
-
-.centre {
-  position: absolute;
-  left: 50%;
-  top: 52%;
-  transform: translate(-50%, -50%);
-  display: flex;
-  align-items: center;
-  gap: 1.2rem;
-}
-
-.trickZone {
-  display: flex;
-  gap: 0.4rem;
-  align-items: flex-end;
-  min-height: 4.4rem;
-}
-
-.trickEmpty {
-  font-size: 0.72rem;
-  color: rgba(253, 246, 234, 0.45);
+  flex: 1 1 0;
+  justify-items: center;
+  min-width: 0;
+  padding: 0.1rem 0.14rem;
+  border-radius: 0.4rem;
+  background: rgba(8, 20, 26, 0.42);
+  font-size: clamp(0.7rem, 1.4vw, 0.88rem);
   font-weight: 700;
+  line-height: 1.05;
 }
 
-.trickCard {
-  display: grid;
-  justify-items: center;
-  gap: 0.15rem;
-}
-
-.trickCard small {
-  font-size: 0.58rem;
-  color: rgba(253, 246, 234, 0.66);
-}
-
-.trumpCard {
-  display: grid;
-  justify-items: center;
-  gap: 0.15rem;
-  padding: 0.35rem;
-  border-radius: 0.6rem;
-  border: 2px solid var(--scopa-accent);
-  background: rgba(16, 24, 32, 0.6);
-}
-
-.trumpCard small {
-  font-size: 0.52rem;
-  font-weight: 800;
-  letter-spacing: 0.1em;
+.pips small {
+  color: var(--ink-dim);
+  font-size: clamp(0.44rem, 0.9vw, 0.56rem);
+  font-weight: 500;
   text-transform: uppercase;
-  color: rgba(253, 246, 234, 0.6);
 }
 
-/* --- local seat and decisions --------------------------------------------- */
+/* ---------------------------------------------------------------------------
+   The felt
+   --------------------------------------------------------------------------- */
 
-.localStrip {
-  display: grid;
-  justify-items: center;
-  gap: 0.3rem;
-  padding-top: 0.2rem;
-}
-
-.decision {
-  display: grid;
-  justify-items: center;
-  gap: 0.4rem;
-}
-
-.prompt {
-  font-size: 0.8rem;
-  font-weight: 800;
-  color: #fdf6ea;
-}
-
-.hook {
-  color: #e0a33f;
-  font-weight: 700;
-}
-
-.bidRow,
-.suitRow {
+.table {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   justify-content: center;
-  gap: 0.4rem;
-}
-
-.bidButton {
-  min-width: 2.6rem;
-}
-
-.suitButton {
-  min-width: 3.2rem;
-  font-size: 1.3rem;
-}
-
-.suitButton[data-suit='hearts'],
-.suitButton[data-suit='diamonds'] {
-  color: #e07a63;
-}
-
-.waiting,
-.matchOver {
-  font-size: 0.8rem;
-  font-weight: 700;
-  color: rgba(253, 246, 234, 0.7);
-}
-
-.matchOver {
-  color: #f0c04e;
-  font-weight: 900;
-}
-
-/* --- the shared table ----------------------------------------------------- */
-
-.tableCards {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 0.35rem;
-  max-width: min(34rem, 78vw);
+  gap: clamp(0.3rem, 1.4vw, 0.8rem);
+  margin: 0;
+  padding: 0 1rem;
+  list-style: none;
 }
 
 .tableEmpty {
-  font-size: 0.75rem;
-  font-weight: 700;
-  color: rgba(253, 246, 234, 0.45);
+  color: var(--ink-dim);
+  font-size: 0.82rem;
+  font-style: italic;
 }
 
-.tableCard[data-taking] {
-  filter: drop-shadow(0 0 7px var(--scopa-accent));
+/* The 40-card Italian deck is four suits of pip values; the shared card
+   chassis parses `S12`-style ids and has nothing to say about `denari-7`. */
+.face {
+  display: grid;
+  place-items: center;
+  width: var(--sc-card);
+  aspect-ratio: 5 / 7;
+  border-radius: 0.42rem;
+  background: linear-gradient(180deg, #fdf6ec, #e6d8c2);
+  color: #2b1b12;
+  line-height: 1;
+  transition:
+    filter var(--dur-feedback) var(--ease-settle),
+    opacity var(--dur-feedback) var(--ease-settle);
 }
 
-.scopeChip {
-  padding: 0.1rem 0.4rem;
-  border-radius: 999px;
-  background: #f0c04e;
-  color: #3a2a08;
-  font-size: 0.62rem;
+.face b {
+  font-size: clamp(0.9rem, 2vw, 1.3rem);
   font-weight: 900;
 }
 
-/* --- choosing which cards to take ----------------------------------------- */
-
-.choices {
-  display: grid;
-  justify-items: center;
-  gap: 0.4rem;
+.face small {
+  font-size: 0.72rem;
+  opacity: 0.7;
 }
 
-.choiceRow {
+.face[data-suit='denari'] {
+  background: linear-gradient(180deg, #ffe6a1, #d9a63a);
+}
+.face[data-suit='coppe'] {
+  background: linear-gradient(180deg, #ffc9c0, #cf6a5c);
+}
+.face[data-suit='spade'] {
+  background: linear-gradient(180deg, #cfe0ee, #6f8fa8);
+}
+.face[data-suit='bastoni'] {
+  background: linear-gradient(180deg, #cfe6c6, #6f9c62);
+}
+
+/* The seven of coins is a point of its own; it should never be hard to find. */
+.face[data-settebello] {
+  box-shadow:
+    0 0 0 2px #ffd166,
+    0 0 14px rgba(255, 209, 102, 0.7);
+}
+
+.face[data-dim] {
+  filter: var(--unplayable-filter);
+  opacity: var(--unplayable-opacity);
+}
+
+/* ---------------------------------------------------------------------------
+   Choosing what to take
+   --------------------------------------------------------------------------- */
+
+.chooser {
+  display: grid;
+  justify-items: center;
+  gap: 0.35rem;
+  justify-self: center;
+  max-width: min(94vw, 42rem);
+  margin-bottom: 0.3rem;
+  padding: 0.5rem 0.8rem;
+  border-radius: var(--radius-chunky);
+  background: rgba(12, 26, 32, 0.92);
+  box-shadow: var(--shadow-ambient);
+}
+
+.chooserPrompt {
+  margin: 0;
+  color: var(--ink-dim);
+  font-size: 0.82rem;
+}
+
+.chooserButtons {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 0.45rem;
+  gap: 0.3rem;
 }
 
-.choice {
-  padding: 0.35rem 0.5rem;
-}
-
-.choiceCards {
-  display: inline-flex;
-  gap: 0.2rem;
-}
-
-.choiceLabel {
-  font-size: 0.78rem;
+.takeButton {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  min-height: 2.75rem;
+  padding: 0.3rem 0.7rem;
+  border: 0;
+  border-radius: 0.6rem;
+  background: linear-gradient(180deg, var(--sc-accent), var(--sc-shade));
+  color: var(--ink);
+  font-size: 0.86rem;
   font-weight: 800;
+  cursor: pointer;
 }
 
-.cancel {
-  font-size: 0.68rem;
+.takeButton[data-pose] {
+  background: rgba(8, 20, 26, 0.6);
   font-weight: 700;
-  color: rgba(253, 246, 234, 0.6);
-  text-decoration: underline;
+}
+
+.takeButton[data-scopa] {
+  box-shadow:
+    0 0 0 2px #ffd166,
+    0 0 16px rgba(255, 209, 102, 0.6);
+}
+
+.takeButton em {
+  color: #ffd166;
+  font-style: normal;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+}
+
+.takeButton:disabled {
+  filter: var(--unplayable-filter);
+  opacity: var(--unplayable-opacity);
+  cursor: default;
+}
+
+.localRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  justify-self: center;
+  padding: 0.2rem 0.6rem;
+  border-radius: var(--radius-pill);
+  background: rgba(8, 20, 26, 0.42);
+}
+
+.localRow .pips {
+  width: auto;
+}
+
+.localRow .pips span {
+  min-width: 2.4rem;
+}
+
+/*
+ * `pointer-events: auto` is required, not decorative: the shared hand rail
+ * turns pointer events OFF for itself and back on only for `.card`, a hashed
+ * CSS-module class this game's face is not.
+ */
+.handCard {
+  pointer-events: auto;
+  display: block;
+  width: var(--hand-card-width, 5.6rem);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.handCard:disabled {
+  cursor: default;
+}
+
+.handCard .face {
+  width: 100%;
+  box-shadow:
+    0 8px 18px -6px rgba(3, 11, 15, 0.7),
+    inset 0 0 0 1px rgba(92, 48, 25, 0.16);
+}
+
+/* Scoped to `.board`/`.handCard`: a CSS module rejects a selector with no
+   local class. */
+.handCard[data-held] .face {
+  outline: 3px solid var(--sc-held);
+  outline-offset: 2px;
+}
+
+.stock {
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .seat,
+  .face {
+    transition: none;
+  }
 }

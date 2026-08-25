@@ -1377,7 +1377,7 @@ describe('crazy eights rooms on the shared stack', () => {
     }
   });
 
-  it('states the eights ring and refuses a veiled table out loud', async () => {
+  it('states the eights ring and deals its rounds veiled', async () => {
     const broker = new MockSignalingBroker();
     const rtc = new MockRtcNetwork();
     const host = new MultiplayerRoomSession(
@@ -1389,12 +1389,14 @@ describe('crazy eights rooms on the shared stack', () => {
       },
     );
     sessions.push(host);
-    await expect(host.create({ gameId: 'eights', seats: 1 })).rejects.toThrow(/2–6 seats/);
-    await expect(host.create({ gameId: 'eights', seats: 7 })).rejects.toThrow(/2–6 seats/);
-    // A round is priced from every hand's face value, so Crazy Eights stays
-    // on the open tier rather than advertising a veil it cannot keep.
+    await expect(host.create({ gameId: 'eights', seats: 1 })).rejects.toThrow(/seat 2–6/);
+    await expect(host.create({ gameId: 'eights', seats: 7 })).rejects.toThrow(/seat 2–6/);
+    // A round is priced from every hand's face value, which used to be the
+    // reason Crazy Eights could not be veiled. It settles behind a reveal
+    // phase now — every seat still holding cards opens them before the round
+    // is scored — so the table keeps the veil it advertises.
     await host.create({ gameId: 'eights', seats: 4 });
-    expect(host.getSnapshot().security.tier).toBe('open');
+    expect(host.getSnapshot().security.tier).toBe('veil');
   });
 });
 

@@ -1,4 +1,5 @@
 import {
+  isVeilHandle,
   stableCardOrder,
   stdDeck,
   type CardId,
@@ -41,6 +42,22 @@ export function isEightsCard(card: CardId): boolean {
   return Object.hasOwn(eightsDeck.faces, card);
 }
 
+/**
+ * A card the table is holding but cannot read.
+ *
+ * Under Veil a hand is a row of handles until its owner opens it, and every
+ * reader below — suit, rank, value, sort order — would otherwise throw on one.
+ * A rule that reaches for a hidden card's suit needs a definite "no", not a
+ * crash, so the handle is named here once and the readers all defer to it.
+ */
+export function isHiddenCard(card: CardId): boolean {
+  return isVeilHandle(card);
+}
+
+export function hasHiddenCard(cards: readonly CardId[]): boolean {
+  return cards.some(isHiddenCard);
+}
+
 export function suitOf(card: CardId): EightsSuit {
   const suit = card.slice(0, 1);
   if (!isEightsSuit(suit)) throw new Error(`unknown eights card: ${card}`);
@@ -60,7 +77,7 @@ export function isEightsSuit(value: unknown): value is EightsSuit {
 }
 
 export function isWild(card: CardId): boolean {
-  return rankOf(card) === WILD_RANK;
+  return !isHiddenCard(card) && rankOf(card) === WILD_RANK;
 }
 
 /**
@@ -69,6 +86,9 @@ export function isWild(card: CardId): boolean {
  * ace is one, and everything else is worth its pips.
  */
 export function cardValue(card: CardId): number {
+  // A closed hand has no score yet; the round waits for its owner to open it
+  // rather than guessing, so a handle is worth nothing until it is a card.
+  if (isHiddenCard(card)) return 0;
   const rank = rankOf(card);
   if (rank === WILD_RANK) return 50;
   if (rank >= 10) return 10;
@@ -87,6 +107,11 @@ const SUIT_ORDER: Readonly<Record<EightsSuit, number>> = { S: 1, H: 2, D: 3, C: 
  */
 export const orderEightsHand: HandOrder = (cards) =>
   stableCardOrder(cards, (left, right) => {
+    // Handles sort to the back and never compare by face: under Veil a hand is
+    // handles until it opens, and asking one for its suit would throw.
+    const leftHidden = isHiddenCard(left);
+    const rightHidden = isHiddenCard(right);
+    if (leftHidden || rightHidden) return Number(leftHidden) - Number(rightHidden);
     const leftWild = isWild(left);
     const rightWild = isWild(right);
     if (leftWild !== rightWild) return leftWild ? -1 : 1;

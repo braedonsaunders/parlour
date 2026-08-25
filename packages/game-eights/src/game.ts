@@ -1,5 +1,8 @@
 import {
   Fx,
+  VEILED_REDEAL_PENDING,
+  isVeiledDealPayload,
+  veilSupport,
   type AutoMove,
   type BotPolicy,
   type CardId,
@@ -14,7 +17,16 @@ import {
   type RuleError,
   type SeatId,
 } from '@parlour/engine';
-import { EIGHTS_SUITS, isEightsSuit, type EightsSuit } from './cards';
+import {
+  EIGHTS_SUITS,
+  WILD_RANK,
+  eightsDeck,
+  hasHiddenCard,
+  isEightsSuit,
+  isHiddenCard,
+  rankOf,
+  type EightsSuit,
+} from './cards';
 import { eightsConfig, type EightsRules } from './config';
 import { eightsHowToPlay } from './howto';
 import {
@@ -32,6 +44,7 @@ import {
   nextSeat,
   playCardInRound,
   playableCards,
+  roundIsOver,
   settleRound,
 } from './round';
 import type { EightsRound, EightsState } from './state';
@@ -96,11 +109,25 @@ const playCard: Move<EightsState> = {
 };
 
 const draw: Move<EightsState> = {
-  validate(state, seat) {
+  validate(state, seat, _payload, ctx) {
     const gate = liveTurn(state, seat);
     if (gate !== true) return gate;
     if (state.round.drawnCard !== null) {
       return error('already-drew', 'play the card you drew, or pass');
+    }
+    // Turning a face-up discard back into the stock would make every remaining
+    // draw readable by the whole table, so a veiled room re-veils it in a fresh
+    // epoch first and the runtime hands the recycled cards back through `ctx`.
+    if (
+      state.veiled &&
+      state.round.stock.length === 0 &&
+      state.round.discard.slice(1).some((card) => !isHiddenCard(card)) &&
+      !ctx?.recycle
+    ) {
+      return error(
+        'stock-not-reveiled',
+        'the discard pile must be re-veiled before it becomes the stock',
+      );
     }
     return canDraw(state.round) || state.round.pendingDraw > 0
       ? true
@@ -205,14 +232,28 @@ const roundFold: Move<EightsState> = {
 };
 
 const nextRound: Move<EightsState> = {
-  validate(state) {
-    if (state.folded && matchEndResult(state) === null) return true;
-    return error('no-next-round', 'the match is not waiting on another deal');
+  validate(state, _seat, payload) {
+    if (!state.folded || matchEndResult(state) !== null) {
+      return error('no-next-round', 'the match is not waiting on another deal');
+    }
+    // An open room deals the next round from the session rng. A veiled one
+    // cannot: that order replays for every seat, so it waits for a deck the
+    // room shuffled behind the ceremony.
+    if (state.veiled && !isVeiledDealPayload(payload)) {
+      return { code: VEILED_REDEAL_PENDING, message: 'a veiled round needs its own shuffled deck' };
+    }
+    return true;
   },
-  apply(state, _seat, _payload, ctx) {
+  apply(state, _seat, payload, ctx) {
     const dealer = ((state.dealer + 1) % state.seats) as SeatId;
     const round = dealRound(
-      { config: state.rules, seats: state.seats, rng: ctx.rng, fx: ctx.fx },
+      {
+        config: state.rules,
+        seats: state.seats,
+        rng: ctx.rng,
+        fx: ctx.fx,
+        deckOrder: isVeiledDealPayload(payload) ? payload.deckOrder : undefined,
+      },
       dealer,
     );
     return {
@@ -223,6 +264,27 @@ const nextRound: Move<EightsState> = {
       folded: false,
       readied: [],
     };
+  },
+};
+
+/**
+ * A seat opening its hand at the end of a veiled round.
+ *
+ * The cards themselves are decrypted by the reveal machinery in the runtime
+ * before this ever runs; all this move does is refuse to be the seat that
+ * settles the round while it is still holding handles.
+ */
+const roundOpen: Move<EightsState> = {
+  validate(state, seat) {
+    if (!state.veiled) return error('not-veiled', 'this round has nothing to open');
+    return hasHiddenCard(handOf(state.round, seat))
+      ? error('hand-not-opened', 'the whole hand must be opened')
+      : true;
+  },
+  apply(state, seat, _payload, ctx) {
+    ctx.fx.emit('veil.open', { seat, cards: handOf(state.round, seat).length });
+    // Opening the last closed hand is what lets the round finally add up.
+    return { ...state, round: settleRound(state.round, state.rules, ctx.fx) };
   },
 };
 
@@ -246,6 +308,28 @@ function allReadied(state: EightsState): boolean {
     if (!state.readied.includes(seat)) return false;
   }
   return true;
+}
+
+/**
+ * Seats still holding cards nobody can read.
+ *
+ * A round is scored on what everyone is left holding, so a veiled round cannot
+ * settle until every closed hand has been opened. The room drives that through
+ * the phase below, one seat at a time, exactly as a gin showdown does.
+ */
+function closedSeats(state: EightsState): SeatId[] {
+  if (!state.veiled) return [];
+  return state.round.hands.flatMap((hand, seat) => (hasHiddenCard(hand) ? [seat as SeatId] : []));
+}
+
+function revealPhase(closed: readonly SeatId[], state: EightsState): PhaseState {
+  return {
+    phase: 'round-reveal',
+    actor: closed[0] as SeatId,
+    actors: closed,
+    round: state.roundIndex + 1,
+    label: 'show your hand',
+  };
 }
 
 function livePhase(state: EightsState): PhaseState {
@@ -326,11 +410,26 @@ const flow: Flow<EightsState> = {
     return phaseFor(state);
   },
 
+  /**
+   * The one system event a crazy eights match accepts: the next veiled deal.
+   * The move's own validation still runs, so an injected event cannot deal a
+   * round the rules would refuse.
+   */
+  canInject(state, _phase, moveId, payload) {
+    if (moveId !== 'next.round') {
+      return { code: 'not-injectable', message: `eights does not accept injected ${moveId}` };
+    }
+    return nextRound.validate(state, state.dealer, payload);
+  },
+
   legalMoves(state, phase) {
     return legalMoves(state, phase);
   },
 
   legalMovesFor(state, phase, seat) {
+    if (phase.phase === 'round-reveal') {
+      return (phase.actors ?? []).includes(seat) ? [{ id: 'round.open' }] : [];
+    }
     if (phase.phase === 'round-end') {
       return (phase.actors ?? []).includes(seat) && !state.readied.includes(seat)
         ? [{ id: 'ready' }]
@@ -340,6 +439,13 @@ const flow: Flow<EightsState> = {
   },
 
   advance(state) {
+    // 0. a veiled round that has run its course cannot be scored until every
+    //    seat still holding cards has opened them
+    if (!state.folded && !state.round.outcome && roundIsOver(state.round, state.rules)) {
+      const closed = closedSeats(state);
+      if (closed.length > 0) return { phase: revealPhase(closed, state) };
+    }
+
     // 1. a settled round banks its points before anything else happens
     if (!state.folded && state.round.outcome) {
       return {
@@ -352,6 +458,9 @@ const flow: Flow<EightsState> = {
       const ended = matchEndResult(state);
       if (ended) return { phase: overPhase(state), ended };
       if (allReadied(state)) {
+        // A veiled room waits: its next deck comes out of a ceremony the room
+        // runs, and arrives as an injected `next.round`.
+        if (state.veiled) return { phase: roundEndPhase(state) };
         return {
           phase: livePhase(state),
           autoMoves: [{ seat: null, move: 'next.round', reason: 'table ready' }],
@@ -411,6 +520,27 @@ export function createEightsDef(options: EightsDefOptions = {}): GameDef<EightsS
     howToPlay: eightsHowToPlay,
     configSchema: eightsConfig,
 
+    /*
+     * Veil.
+     *
+     * Hands are dealt face down, then the room keeps opening cards in public
+     * until it turns up something that is not an eight — a wild face up would
+     * ask the pile a question before anyone has been given the chance to
+     * answer it, so the starter has to be a card the table can already read.
+     *
+     * A match is many deals, and one ceremony covers one deck, so `next.round`
+     * is named as the redeal move: the room runs a fresh ceremony and injects
+     * the deck rather than the game reaching for the session rng, which every
+     * seat could replay.
+     */
+    veil: veilSupport({
+      deck: eightsDeck,
+      handSize: (config) => (config as EightsRules).handSize,
+      publicSetup: (opened) =>
+        opened.some((card) => !isHiddenCard(card) && rankOf(card) !== WILD_RANK),
+      redealMove: 'next.round',
+    }),
+
     setup(ctx) {
       const { config, seats } = ctx;
       if (!Number.isInteger(seats) || seats < EIGHTS_MIN_SEATS || seats > EIGHTS_MAX_SEATS) {
@@ -424,7 +554,11 @@ export function createEightsDef(options: EightsDefOptions = {}): GameDef<EightsS
         roundsWon: Array.from({ length: seats }, () => 0),
         roundIndex: 0,
         dealer,
-        round: dealRound({ config, seats, rng: ctx.rng, fx: ctx.fx }, dealer),
+        round: dealRound(
+          { config, seats, rng: ctx.rng, fx: ctx.fx, deckOrder: ctx.deckOrder },
+          dealer,
+        ),
+        veiled: ctx.veiled === true,
         folded: false,
         readied: [],
         lastOutcome: null,
@@ -437,6 +571,7 @@ export function createEightsDef(options: EightsDefOptions = {}): GameDef<EightsS
       pass,
       chooseSuit,
       ready,
+      'round.open': roundOpen,
       'round.fold': roundFold,
       'next.round': nextRound,
     },

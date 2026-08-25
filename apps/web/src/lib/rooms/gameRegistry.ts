@@ -175,6 +175,20 @@ export interface RoomGamePack {
    */
   recyclableStock(state: unknown, move: string): readonly string[] | null;
   /**
+   * The cards this seat is holding that only it may read.
+   *
+   * A veiled room opens these privately as soon as they are dealt, and it
+   * cannot guess where they live: most games keep them in `hands`, but a poker
+   * seat holds `hole` cards and a crazy eights hand is nested inside the round
+   * on the table. Asking the pack is the only thing that works for all three.
+   */
+  privateHandles(state: unknown, seat: number): readonly string[];
+  /**
+   * Cards this game is waiting to have opened in public, and the move that
+   * consumes them — a hold'em board, or a showdown. Null almost always.
+   */
+  publicOpenPending(state: unknown): { handles: readonly string[]; move: string } | null;
+  /**
    * The move that deals this game another hand inside the same session, or
    * null when a room is only ever one deal.
    */
@@ -223,6 +237,8 @@ interface PackSpec<S, C extends RuleValues> {
   clampConfig?(config: C): C;
   /** See {@link RoomGamePack.recyclableStock}. */
   recyclableStock?(state: S, move: string): readonly string[] | null;
+  /** See {@link RoomGamePack.privateHandles}. */
+  privateHandles?(state: S, seat: number): readonly string[];
 }
 
 /**
@@ -307,6 +323,16 @@ function definePack<S, C extends RuleValues>(spec: PackSpec<S, C>): RoomGamePack
     recyclableStock(state, move) {
       return spec.recyclableStock ? spec.recyclableStock(state as S, move) : null;
     },
+    privateHandles(state, seat) {
+      if (spec.privateHandles) return spec.privateHandles(state as S, seat);
+      const hands = (state as { hands?: unknown }).hands;
+      const mine = Array.isArray(hands) ? hands[seat] : null;
+      return Array.isArray(mine) ? (mine as string[]) : [];
+    },
+    publicOpenPending(state) {
+      const opens = spec.createDef().veil?.publicOpens?.(state);
+      return opens && opens.handles.length > 0 ? opens : null;
+    },
   };
 }
 
@@ -386,7 +412,11 @@ export const ROOM_GAMES: Record<MultiplayerGameId, RoomGamePack> = {
     name: 'Crazy Eights',
     configSchema: eightsConfig,
     createDef: createEightsDef,
-    veilRefusal: 'because scoring a round needs every hand face up',
+    privateHandles: (state, seat) => state.round.hands[seat] ?? [],
+    // The round is scored on what everyone is still holding, which a closed
+    // hand cannot answer — so a veiled round opens every hand still in play
+    // before it settles, and the pack waits in a reveal phase until it has.
+    recyclableStock: (state, move) => (move === 'draw' ? spentDiscard(state.round) : null),
   }),
 
   poker: definePack<PokerState, PokerRules>({
@@ -394,7 +424,10 @@ export const ROOM_GAMES: Record<MultiplayerGameId, RoomGamePack> = {
     name: 'Poker',
     configSchema: pokerConfig,
     createDef: createPokerDef,
-    veilRefusal: 'because a mid-hand public board open is not on the transport yet',
+    // Hold'em is the one game here that keeps turning cards mid-hand, so the
+    // board and the showdown are opened in public a street at a time — see
+    // `publicOpens` on the pack's veil block.
+    privateHandles: (state, seat) => state.hole[seat] ?? [],
   }),
 
   ohhell: definePack<OhHellState, OhHellRules>({

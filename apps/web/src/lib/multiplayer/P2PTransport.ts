@@ -190,12 +190,12 @@ export class P2PTransport implements Transport {
     void this.applyAsHost(action);
   }
 
-  inject(move: string, payload?: unknown): void {
+  inject(move: string, payload?: unknown, reveals?: readonly (readonly [string, string])[]): void {
     this.assertReady();
     if (!this.isHost()) throw new Error('only the host authority may inject system events');
     if (!this.authority.inject) throw new Error('this game authority does not accept injection');
     const actionId = `system:${this.signaling.publicKey}:${this.systemSequence++}`;
-    void this.applySystemAsHost(actionId, move, payload);
+    void this.applySystemAsHost(actionId, move, payload, reveals);
   }
 
   sendEmote(emote: Emote): boolean {
@@ -636,9 +636,10 @@ export class P2PTransport implements Transport {
     actionId: string,
     move: string,
     payload?: unknown,
+    reveals?: readonly (readonly [string, string])[],
   ): Promise<void> {
     try {
-      const packet = await this.authority.inject!(actionId, move, payload);
+      const packet = await this.authority.inject!(actionId, move, payload, reveals);
       this.broadcast({ type: 'applied', packet });
       this.emitEvent(packet);
     } catch (error) {

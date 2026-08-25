@@ -46,6 +46,7 @@ export function state(seed: RoundSeed, ruleOverrides: Partial<EightsRules> = {})
     roundIndex: 0,
     dealer: 0,
     round: round(seed),
+    veiled: false,
     folded: false,
     readied: [],
     lastOutcome: null,

@@ -15,14 +15,19 @@
  *     poker.blinds-up
  * Presets: classic / turbo / deep
  *
- * The pack ships no `veil` block: hold'em's hidden information is two cards a
- * seat holds, and the room's collaborative deal already stops a host stacking
- * the deck. Veiled hold'em also needs a mid-hand public open for the board,
- * which the transport does not have yet.
+ * Veil: hole cards are dealt face down and opened privately by whoever holds
+ * them. What makes hold'em different from every other veiled game here is that
+ * it keeps turning cards *during* the hand — three on the flop, one on the
+ * turn, one on the river, each public the moment it lands and not before — so
+ * the pack names those cards through `veil.publicOpens` and the room peels
+ * exactly those in public. A showdown is the same mechanism pointed at the
+ * hole cards of everyone still contesting the pot; a pot everyone folded out
+ * of is a walkover and those hands are never opened, so mucking survives.
  */
 export {
   GAME_ID,
   createPokerDef,
+  pokerPublicOpens,
   pokerGame,
   phaseForState,
   PokerFx,

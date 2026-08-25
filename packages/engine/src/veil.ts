@@ -344,6 +344,24 @@ export interface VeilSupport {
    * own way to say "not while veiled".
    */
   redealMove?: string;
+
+  /**
+   * The cards this game is waiting to have opened in public, and the move that
+   * consumes them. Null whenever nothing is pending, which is almost always.
+   *
+   * Polled by the host rather than pushed by the game, for the same reason the
+   * redeal is: a pack cannot reach the network, and the room must not have to
+   * understand any particular game's idea of a street or a showdown.
+   */
+  publicOpens?: (state: unknown) => VeilPublicOpen | null;
+}
+
+/** A set of handles the table has to be able to read, and what to do with them. */
+export interface VeilPublicOpen {
+  /** Handles to run the peel chain over, in public. */
+  handles: readonly CardId[];
+  /** The move to inject once they are open, carrying the openings as reveals. */
+  move: string;
 }
 
 /**
@@ -356,6 +374,22 @@ export interface VeilSupport {
  * produced. Any other rule error means the game is not waiting on one.
  */
 export const VEILED_REDEAL_PENDING = 'no-veiled-deck';
+
+/**
+ * How a veiled game says "these cards have to be turned face up before I can go on".
+ *
+ * The redeal code above covers a game that needs a whole new deck. This covers
+ * the other half: a game that needs particular cards it is already holding
+ * opened to the whole table mid-hand — a hold'em board, or the hole cards of
+ * everyone still contesting a pot at showdown.
+ *
+ * The room cannot read the game's state to know which those are, so the game
+ * names them through {@link VeilSupport.publicOpens} and refuses the move that
+ * would turn them until they are open. Seeing this code, and only this code, is
+ * the host's cue to run the peel chain in public and inject the move with the
+ * openings it produced.
+ */
+export const VEILED_OPEN_PENDING = 'no-veiled-open';
 
 /**
  * The payload a veiled redeal carries: the deck a ceremony just produced.
@@ -408,6 +442,8 @@ export interface VeilPack {
   publicSetup?: 'none' | 'one' | ((opened: readonly CardId[], config: RuleValues) => boolean);
   /** See {@link VeilSupport.redealMove} — the move that deals another hand. */
   redealMove?: string;
+  /** See {@link VeilSupport.publicOpens}. */
+  publicOpens?: (state: unknown) => VeilPublicOpen | null;
 }
 
 function resolveDeck(pack: VeilPack, config: RuleValues): DeckDef {
@@ -420,6 +456,7 @@ export function veilSupport(pack: VeilPack): VeilSupport {
   return {
     deck: (config) => resolveDeck(pack, config),
     redealMove: pack.redealMove,
+    publicOpens: pack.publicOpens,
     publicSetupFrom(seats, config) {
       if (mode === 'none') return resolveDeck(pack, config).cardIds.length;
       const size =

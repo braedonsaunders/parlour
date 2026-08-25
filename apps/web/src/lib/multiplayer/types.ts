@@ -117,6 +117,8 @@ export interface AuthorityAdapter {
     actionId: string,
     move: string,
     payload?: unknown,
+    /** Openings a mid-hand public turn produced, substituted before the move runs. */
+    reveals?: readonly (readonly [string, string])[],
   ): AppliedPacket | Promise<AppliedPacket>;
   applyRemote(packet: AppliedPacket): RemoteApplyResult | Promise<RemoteApplyResult>;
   exportSnapshot(): ReplaySnapshot;
@@ -129,7 +131,7 @@ export interface Transport {
   join(code: string): Promise<RoomHandle>;
   send(action: PlayerAction): void;
   /** Host-only authoritative system event, such as a deterministic clock tick. */
-  inject(move: string, payload?: unknown): void;
+  inject(move: string, payload?: unknown, reveals?: readonly (readonly [string, string])[]): void;
   sendEmote(emote: Emote): boolean;
   onEvent(cb: (event: AppliedPacket) => void): () => void;
   onSnapshot(cb: (notification: SnapshotNotification) => void): () => void;

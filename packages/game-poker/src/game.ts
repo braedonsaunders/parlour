@@ -1,5 +1,10 @@
 import {
   Fx,
+  VEILED_OPEN_PENDING,
+  VEILED_REDEAL_PENDING,
+  isVeilHandle,
+  isVeiledDealPayload,
+  veilSupport,
   type BotPolicy,
   type CardId,
   type FlowAdvance,
@@ -27,7 +32,7 @@ import {
   raiseLadder,
   smallBlindSeat,
 } from './betting';
-import { BOARD_CARDS, HOLE_CARDS, MAX_SEATS, MIN_SEATS, fullDeck } from './cards';
+import { BOARD_CARDS, DECK, HOLE_CARDS, MAX_SEATS, MIN_SEATS, fullDeck } from './cards';
 import {
   anteForLevel,
   blindsForLevel,
@@ -103,6 +108,7 @@ interface PokerDraft {
   hole: CardId[][];
   board: CardId[];
   deck: CardId[];
+  veiled: boolean;
   street: Street;
   folded: boolean[];
   allIn: boolean[];
@@ -134,6 +140,7 @@ function toDraft(state: PokerState): PokerDraft {
     hole: state.hole.map((cards) => [...cards]),
     board: [...state.board],
     deck: [...state.deck],
+    veiled: state.veiled,
     street: state.street,
     folded: [...state.folded],
     allIn: [...state.allIn],
@@ -462,11 +469,50 @@ const raise: Move<PokerState> = {
 // System moves
 // ---------------------------------------------------------------------------
 
+/**
+ * The cards a veiled hand is waiting to have turned face up, and what turns them.
+ *
+ * Two moments need this. A street cannot be dealt off a deck of handles — the
+ * board is public by definition — and a showdown cannot be scored without the
+ * hole cards of everyone still in the pot. Both are named here so the room can
+ * run its peel chain over exactly those cards and nothing else; a hand that
+ * folds around still never shows.
+ */
+export function pokerPublicOpens(state: PokerState): { handles: CardId[]; move: string } | null {
+  if (!state.veiled || state.street === 'hand-over') return null;
+
+  const showdown =
+    contestingSeats(state).length > 1 && state.street === 'river' && bettingClosed(state);
+  if (showdown) {
+    const handles = contestingSeats(state)
+      .flatMap((seat) => state.hole[seat] ?? [])
+      .filter(isVeilHandle);
+    return handles.length > 0 ? { handles, move: 'settle' } : null;
+  }
+
+  const next = STREET_AFTER[state.street];
+  if (!next || !bettingClosed(state)) return null;
+  if (contestingSeats(state).length <= 1) return null;
+  const count = CARDS_FOR_STREET[next] as number;
+  const handles = state.deck.slice(0, count).filter(isVeilHandle);
+  return handles.length > 0 ? { handles, move: 'dealStreet' } : null;
+}
+
 const dealStreet: Move<PokerState> = {
   validate(state) {
     const next = STREET_AFTER[state.street];
     if (!next) return err('no-street-left', 'the board is already complete');
     if (!bettingClosed(state)) return err('betting-open', 'the betting round is not finished');
+    // The board belongs to the whole table, so it cannot be dealt off handles.
+    // The room opens them in public first and injects this move with the
+    // openings; the runtime substitutes them before this ever runs again.
+    const count = CARDS_FOR_STREET[next] as number;
+    if (state.veiled && state.deck.slice(0, count).some(isVeilHandle)) {
+      return {
+        code: VEILED_OPEN_PENDING,
+        message: 'the board must be turned face up before this street can be dealt',
+      };
+    }
     return true;
   },
   apply(state, _seat, _payload, ctx) {
@@ -517,9 +563,22 @@ function bustedThisHand(draft: PokerDraft, before: readonly number[]): SeatId[] 
 const settle: Move<PokerState> = {
   validate(state) {
     if (state.street === 'hand-over') return err('already-settled', 'this hand is already scored');
-    const done =
-      contestingSeats(state).length <= 1 || (state.street === 'river' && bettingClosed(state));
+    const contenders = contestingSeats(state);
+    const done = contenders.length <= 1 || (state.street === 'river' && bettingClosed(state));
     if (!done) return err('hand-in-progress', 'the hand is still being played');
+    // A pot that is actually contested is scored on the cards, so those cards
+    // have to be readable. A walkover is not: everyone else folded, and a hand
+    // that never had to be shown still is not.
+    if (
+      state.veiled &&
+      contenders.length > 1 &&
+      contenders.some((seat) => (state.hole[seat] ?? []).some(isVeilHandle))
+    ) {
+      return {
+        code: VEILED_OPEN_PENDING,
+        message: 'every hand still in the pot must be shown before the pot can be scored',
+      };
+    }
     return true;
   },
   apply(state, _seat, _payload, ctx) {
@@ -628,12 +687,17 @@ const settle: Move<PokerState> = {
 };
 
 const nextHand: Move<PokerState> = {
-  validate(state) {
+  validate(state, _seat, payload) {
     if (state.street !== 'hand-over') return err('hand-in-progress', 'the hand is not finished');
     if (livingSeats(state).length <= 1) return err('match-over', 'the match is decided');
+    // A sit-and-go is many hands in one session, and one ceremony covers one
+    // deck; the rng order every seat can replay would hand the next hand over.
+    if (state.veiled && !isVeiledDealPayload(payload)) {
+      return { code: VEILED_REDEAL_PENDING, message: 'a veiled hand needs its own shuffled deck' };
+    }
     return true;
   },
-  apply(state, _seat, _payload, ctx) {
+  apply(state, _seat, payload, ctx) {
     const draft = toDraft(state);
     draft.handNo += 1;
     draft.handsThisLevel += 1;
@@ -649,7 +713,11 @@ const nextHand: Move<PokerState> = {
       });
     }
     draft.button = nextLiving(asState(draft), draft.button);
-    beginHand(draft, ctx.rng.shuffle(fullDeck()), ctx);
+    beginHand(
+      draft,
+      isVeiledDealPayload(payload) ? payload.deckOrder : ctx.rng.shuffle(fullDeck()),
+      ctx,
+    );
     return fromDraft(draft);
   },
 };
@@ -731,6 +799,11 @@ const flow: GameDef<PokerState, PokerRules>['flow'] = {
 
     if (bettingClosed(state)) {
       const move = state.street === 'river' ? 'settle' : 'dealStreet';
+      // A veiled table cannot take this step on its own: the board and the
+      // showdown are both cards the room has to open in public first, and it
+      // injects the move once it has. Auto-moving here would only produce a
+      // rejection every tick.
+      if (pokerPublicOpens(state) !== null) return { phase: phaseFor(state) };
       return {
         phase: phaseFor(state),
         autoMoves: [
@@ -740,6 +813,26 @@ const flow: GameDef<PokerState, PokerRules>['flow'] = {
     }
 
     return { phase: phaseFor(state) };
+  },
+
+  /**
+   * The system events a veiled hold'em match accepts: the next deal, the next
+   * street, and the showdown. Each move's own validation still runs, so an
+   * injected event cannot turn a card the rules would not have turned.
+   */
+  canInject(state, _phase, moveId, payload) {
+    const move =
+      moveId === 'nextHand'
+        ? nextHand
+        : moveId === 'dealStreet'
+          ? dealStreet
+          : moveId === 'settle'
+            ? settle
+            : null;
+    if (!move) {
+      return { code: 'not-injectable', message: `poker does not accept injected ${moveId}` };
+    }
+    return move.validate?.(state, state.button, payload) ?? true;
   },
 };
 
@@ -766,6 +859,7 @@ function emptyMatch(config: PokerRules, seats: number): PokerDraft {
     hole: Array.from({ length: seats }, () => []),
     board: [],
     deck: [],
+    veiled: false,
     street: 'preflop',
     folded: Array.from({ length: seats }, () => false),
     allIn: Array.from({ length: seats }, () => false),
@@ -796,12 +890,43 @@ export function createPokerDef(options: PokerDefOptions = {}): GameDef<PokerStat
     howToPlay: pokerHowToPlay,
     configSchema: pokerConfig,
 
+    /*
+     * Veil.
+     *
+     * Nothing is opened before the deal — hold'em starts with every card face
+     * down, and the two each seat is dealt are opened privately by whoever
+     * holds them. What makes this different from every other veiled game on
+     * the shelf is that hold'em keeps turning cards *during* the hand: three
+     * on the flop, one on the turn, one on the river, all of them public the
+     * moment they land and none of them public before. `publicOpens` names
+     * exactly those cards, and the room runs its peel chain over them and
+     * nothing else, so the board becomes readable on the street it belongs to.
+     *
+     * A showdown is the same mechanism pointed at hole cards instead: every
+     * seat still contesting the pot has to be readable before the pot can be
+     * scored. A pot everyone folded out of is a walkover, and those hands are
+     * never opened — mucking survives being veiled.
+     *
+     * A sit-and-go is many hands and one ceremony covers one deck, so
+     * `nextHand` is the redeal move.
+     */
+    veil: veilSupport({
+      deck: DECK,
+      handSize: HOLE_CARDS,
+      publicSetup: 'none',
+      redealMove: 'nextHand',
+      publicOpens: (state) => pokerPublicOpens(state as PokerState),
+    }),
+
     setup(ctx) {
       if (!Number.isInteger(ctx.seats) || ctx.seats < MIN_SEATS || ctx.seats > MAX_SEATS) {
         throw new Error(`poker seats ${MIN_SEATS}–${MAX_SEATS}, got ${ctx.seats}`);
       }
       const draft = emptyMatch(ctx.config, ctx.seats);
-      beginHand(draft, ctx.rng.shuffle(fullDeck()), {
+      draft.veiled = ctx.veiled === true;
+      // A veiled room deals from the order its shuffle ceremony produced; an
+      // open one shuffles for itself.
+      beginHand(draft, ctx.deckOrder ?? ctx.rng.shuffle(fullDeck()), {
         rng: ctx.rng,
         fx: ctx.fx,
         event: { seq: 0 },
