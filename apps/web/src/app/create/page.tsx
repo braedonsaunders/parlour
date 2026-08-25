@@ -100,8 +100,8 @@ function ActiveCreateLobby({ session }: { session: MultiplayerRoomSession }) {
         error={snapshot.error}
       />
       <p className="max-w-xl text-center text-sm text-dusk-100/80">
-        This {capacity}-seat table starts when every chair is filled. Share the code with friends, or
-        fill empty chairs with bots.
+        This {capacity}-seat table starts when every chair is filled. Share the code with friends,
+        or fill empty chairs with bots.
       </p>
     </main>
   );

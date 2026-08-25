@@ -556,8 +556,7 @@ function kingNeedsEmpty(state: KlondikePlayerView): boolean {
 
 function moveCard(state: KlondikePlayerView, move: LegalMove): CardId | null {
   const payload = move.payload as
-    | Partial<TableauMovePayload & TableauSourcePayload & FoundationToTableauPayload>
-    | undefined;
+    Partial<TableauMovePayload & TableauSourcePayload & FoundationToTableauPayload> | undefined;
   switch (move.id) {
     case 'tableau.move':
       return typeof payload?.card === 'string' ? payload.card : null;

@@ -36,23 +36,23 @@ server to lag, no account to create, and nothing stored about you. Real life is 
 
 <img src="docs/shots/shelf-fable.png" alt="The parlour game shelf" width="100%" />
 
-| Game | The pitch |
-| --- | --- |
-| **Blitz** · the 31 game | Knock your way to 31 in one suit. Three formats, six bot personalities. |
+| Game                         | The pitch                                                                                 |
+| ---------------------------- | ----------------------------------------------------------------------------------------- |
+| **Blitz** · the 31 game      | Knock your way to 31 in one suit. Three formats, six bot personalities.                   |
 | **Wild** · the shedding game | Skips, draw-fours, color dumps and jump-ins. Classic rules or the loud Party house rules. |
-| **Crazy Eights** | Match suit or rank, eights call the suit, losers pay for what they're still holding. |
-| **Egyptian Ratscrew** | Flip, challenge the face cards, and slap the sandwich — in real time. |
-| **Gin Rummy** | Meld, knock, go gin — and undercut whoever knocked too soon. |
-| **Hearts** | Pass three, dodge the Queen, break hearts, or shoot the moon. |
-| **Euchre** | Order it up, name trump, go alone, march the hand. |
-| **Cribbage** | Peg the board, count the show, try not to get skunked. |
-| **President** | Slam sets, clear the pile, trade cards with the Scum. |
-| **Poker** · no-limit hold'em | Blinds climb until one stack has the lot. Chips only. |
-| **Oh Hell** | Bid exactly the tricks you'll take. The hand grows, then shrinks back down. |
-| **Scopa** | Fish cards off the table by matching one — or the sum of several. |
-| **Spite & Malice** | Race to empty your payoff pile and bury what your neighbour needs. |
-| **Spades** | Bid books with a partner, break spades, mind the bags. |
-| **Klondike** | The solitaire everyone knows, dealt from a seed you can share. |
+| **Crazy Eights**             | Match suit or rank, eights call the suit, losers pay for what they're still holding.      |
+| **Egyptian Ratscrew**        | Flip, challenge the face cards, and slap the sandwich — in real time.                     |
+| **Gin Rummy**                | Meld, knock, go gin — and undercut whoever knocked too soon.                              |
+| **Hearts**                   | Pass three, dodge the Queen, break hearts, or shoot the moon.                             |
+| **Euchre**                   | Order it up, name trump, go alone, march the hand.                                        |
+| **Cribbage**                 | Peg the board, count the show, try not to get skunked.                                    |
+| **President**                | Slam sets, clear the pile, trade cards with the Scum.                                     |
+| **Poker** · no-limit hold'em | Blinds climb until one stack has the lot. Chips only.                                     |
+| **Oh Hell**                  | Bid exactly the tricks you'll take. The hand grows, then shrinks back down.               |
+| **Scopa**                    | Fish cards off the table by matching one — or the sum of several.                         |
+| **Spite & Malice**           | Race to empty your payoff pile and bury what your neighbour needs.                        |
+| **Spades**                   | Bid books with a partner, break spades, mind the bags.                                    |
+| **Klondike**                 | The solitaire everyone knows, dealt from a seed you can share.                            |
 
 House rules are real settings, not forks: every game ships rule toggles and named presets you can set
 when you create the room.
@@ -126,16 +126,16 @@ instead of being bolted on.
 - **Veiled decks are an engine primitive.** The protocol can deal opaque handles and record reveals in the log. Friend rooms do not use it — they play the open collaborative deal, the same replay on every peer.
 - **Games are packages, not engine branches.** Every game on the shelf was written against the public engine API.
 
-| A new game inherits for free | |
-| --- | --- |
-| 🎬 Animation | fx timeline → deal cascades, card flights, arrival glints |
-| 🤖 Bots | seat-fillable bot policies with difficulty tiers |
-| 🌐 Multiplayer | room codes, WebRTC mesh, host authority, rejoin |
-| ⏪ Replay | deterministic log replay for reconnect, spectate, debug |
-| 🏆 Matches | lives, scores, clocks, sudden death, podium celebration |
-| 🔊 Audio | per-game SFX pack keyed to your fx events |
-| 📖 Rules doc | structured help rendered by the in-app modal |
-| 📊 Stats | lifetime records and friend head-to-head, stored locally |
+| A new game inherits for free |                                                           |
+| ---------------------------- | --------------------------------------------------------- |
+| 🎬 Animation                 | fx timeline → deal cascades, card flights, arrival glints |
+| 🤖 Bots                      | seat-fillable bot policies with difficulty tiers          |
+| 🌐 Multiplayer               | room codes, WebRTC mesh, host authority, rejoin           |
+| ⏪ Replay                    | deterministic log replay for reconnect, spectate, debug   |
+| 🏆 Matches                   | lives, scores, clocks, sudden death, podium celebration   |
+| 🔊 Audio                     | per-game SFX pack keyed to your fx events                 |
+| 📖 Rules doc                 | structured help rendered by the in-app modal              |
+| 📊 Stats                     | lifetime records and friend head-to-head, stored locally  |
 
 ### Add a game
 

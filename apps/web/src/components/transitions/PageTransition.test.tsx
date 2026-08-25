@@ -1,4 +1,4 @@
-import { act, createElement } from 'react';
+import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import styles from '@/styles/page-transition.module.css';
@@ -17,7 +17,7 @@ const has = (cls: string | undefined): boolean =>
 const animating = () => has(styles.enter) || has(styles.enterForward) || has(styles.enterBack);
 
 function render(route?: string) {
-  act(() => root.render(createElement(PageTransition, { route, children: 'page' })));
+  act(() => root.render(<PageTransition route={route}>page</PageTransition>));
 }
 
 function finishAnimation() {

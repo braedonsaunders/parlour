@@ -22,8 +22,8 @@ export function MenuShell({ children }: { children: ReactNode }) {
   const previousPath = useMenuNavStore((state) => state.previousPath);
 
   const route = active ? displayPath : pathname;
-  const View = useMenuView(route);
-  const Previous = useMenuView(previousPath ?? '');
+  const view = useMenuView(route);
+  const previous = useMenuView(previousPath ?? '');
 
   useEffect(() => {
     const store = useMenuNavStore.getState();
@@ -62,20 +62,12 @@ export function MenuShell({ children }: { children: ReactNode }) {
     return <PageTransition route={pathname}>{children}</PageTransition>;
   }
 
-  if (active && View) {
-    return (
-      <PageTransition route={route}>
-        <View />
-      </PageTransition>
-    );
+  if (active && view) {
+    return <PageTransition route={route}>{view}</PageTransition>;
   }
 
-  if (active && Previous && route !== pathname) {
-    return (
-      <PageTransition route={previousPath ?? pathname}>
-        <Previous />
-      </PageTransition>
-    );
+  if (active && previous && route !== pathname) {
+    return <PageTransition route={previousPath ?? pathname}>{previous}</PageTransition>;
   }
 
   return <PageTransition route={active ? route : pathname}>{children}</PageTransition>;

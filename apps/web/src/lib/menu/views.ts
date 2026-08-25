@@ -1,5 +1,4 @@
-import type { ComponentType } from 'react';
-import { useSyncExternalStore } from 'react';
+import { createElement, useSyncExternalStore, type ComponentType, type ReactElement } from 'react';
 import { MENU_VIEW_ROUTES, isMenuViewRoute, normalizePath } from '@/lib/menu/paths';
 
 type PageModule = { default: ComponentType };
@@ -73,9 +72,9 @@ export function prefetchMenuViews(paths: readonly string[] = MENU_VIEW_ROUTES): 
   for (const path of paths) void prefetchMenuView(path);
 }
 
-export function useMenuView(pathname: string): ComponentType | null {
+export function useMenuView(pathname: string): ReactElement | null {
   const route = normalizePath(pathname);
-  return useSyncExternalStore(
+  const View = useSyncExternalStore(
     (onStoreChange) => {
       listeners.add(onStoreChange);
       if (isMenuViewRoute(route)) void prefetchMenuView(route);
@@ -86,6 +85,7 @@ export function useMenuView(pathname: string): ComponentType | null {
     () => cache.get(route) ?? null,
     () => null,
   );
+  return View ? createElement(View) : null;
 }
 
 export function resetMenuViewsForTests(): void {

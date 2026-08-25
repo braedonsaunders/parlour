@@ -61,7 +61,9 @@ async function matchNavigation(request) {
 }
 
 async function cachedNavigation(request) {
-  return (await matchNavigation(request)) ?? (await caches.match('/offline.html')) ?? Response.error();
+  return (
+    (await matchNavigation(request)) ?? (await caches.match('/offline.html')) ?? Response.error()
+  );
 }
 
 self.addEventListener('install', (event) => {

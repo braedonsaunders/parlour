@@ -205,9 +205,7 @@ describe('public assistance', () => {
       id: 'tableau.move',
       payload: { from: 2, card: 'S13', to: 1 },
     });
-    expect(hint?.reason).toBe(
-      'Move the King of spades to an empty column to turn a hidden card.',
-    );
+    expect(hint?.reason).toBe('Move the King of spades to an empty column to turn a hidden card.');
   });
 
   it('names the cards and why the move helps', () => {

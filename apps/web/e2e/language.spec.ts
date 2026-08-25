@@ -73,6 +73,11 @@ test('an explicit choice outranks the device language', async ({ browser }) => {
   const context = await browser.newContext({ locale: 'es-MX' });
   const page = await context.newPage();
   await page.goto('/');
+  // iPhone-sized WebKit puts the update toast over the chrome cluster. The
+  // banner itself is not clickable, but dismiss it so the language switch is
+  // the thing under the finger.
+  const dismiss = page.getByRole('button', { name: 'Dismiss update' });
+  if (await dismiss.isVisible()) await dismiss.click();
   await page.getByTestId('language-button').click();
   await page.getByTestId('language-option-en').click();
   await expect(page.getByTestId('play')).toHaveText('Play');

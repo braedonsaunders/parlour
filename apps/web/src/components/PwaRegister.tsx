@@ -107,7 +107,7 @@ export function PwaRegister() {
         <div
           role="status"
           data-testid="pwa-offline-status"
-          className="panel-soft pointer-events-auto flex items-center gap-3 rounded-full px-4 py-2.5 text-left shadow-xl"
+          className="panel-soft flex items-center gap-3 rounded-full px-4 py-2.5 text-left shadow-xl"
         >
           <span aria-hidden="true" className="text-lg text-hearth-200">
             ◌
@@ -123,7 +123,7 @@ export function PwaRegister() {
         <div
           role="status"
           data-testid="pwa-update-status"
-          className="panel-soft pointer-events-auto flex items-center gap-3 rounded-2xl px-4 py-3 text-left shadow-xl"
+          className="panel-soft flex items-center gap-3 rounded-2xl px-4 py-3 text-left shadow-xl"
         >
           <span aria-hidden="true" className="text-xl text-hearth-200">
             ✦
@@ -135,7 +135,7 @@ export function PwaRegister() {
             type="button"
             onClick={applyUpdate}
             disabled={applyingUpdate}
-            className="rounded-full bg-hearth-300 px-3 py-1.5 font-display text-xs font-extrabold text-[#43200a] transition hover:bg-hearth-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-hearth-100 disabled:opacity-60"
+            className="pointer-events-auto rounded-full bg-hearth-300 px-3 py-1.5 font-display text-xs font-extrabold text-[#43200a] transition hover:bg-hearth-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-hearth-100 disabled:opacity-60"
           >
             {applyingUpdate ? 'Refreshing…' : 'Refresh'}
           </button>
@@ -143,7 +143,7 @@ export function PwaRegister() {
             type="button"
             onClick={() => setWaitingWorker(null)}
             aria-label="Dismiss update"
-            className="grid h-9 w-9 place-items-center rounded-full text-xl text-dusk-200 transition hover:bg-dusk-800/60 hover:text-dusk-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-hearth-100"
+            className="pointer-events-auto grid h-9 w-9 place-items-center rounded-full text-xl text-dusk-200 transition hover:bg-dusk-800/60 hover:text-dusk-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-hearth-100"
           >
             ×
           </button>

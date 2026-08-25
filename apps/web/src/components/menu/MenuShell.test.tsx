@@ -13,9 +13,7 @@ vi.mock('next/navigation', () => ({
 vi.mock('@/lib/menu/views', () => ({
   useMenuView: (path: string) => {
     if (path === '/games') {
-      return function GamesView() {
-        return createElement('div', { 'data-testid': 'cached-games' }, 'shelf');
-      };
+      return createElement('div', { 'data-testid': 'cached-games' }, 'shelf');
     }
     return null;
   },
