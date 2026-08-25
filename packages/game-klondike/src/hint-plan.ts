@@ -26,7 +26,10 @@ function spokenHint(state: KlondikeState, move: LegalMove): KlondikeHint {
  * Next move on a proven winning line when the solver can find one. Falls back
  * to the public greedy hinter only when the position itself has no proof.
  */
-export function solverHintFor(state: KlondikeState, options: SolveOptions = {}): KlondikeHint | null {
+export function solverHintFor(
+  state: KlondikeState,
+  options: SolveOptions = {},
+): KlondikeHint | null {
   if (state.stage !== 'playing') return null;
   const result = solveKlondike(state, options);
   if (result.outcome === 'solved' && result.line[0]) return spokenHint(state, result.line[0]);

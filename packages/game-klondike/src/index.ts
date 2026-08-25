@@ -31,12 +31,7 @@ export {
   type KlondikeHint,
 } from './game';
 export { klondikeHowToPlay } from './howto';
-export {
-  createHintPlanner,
-  sameLegalMove,
-  solverHintFor,
-  type HintPlanner,
-} from './hint-plan';
+export { createHintPlanner, sameLegalMove, solverHintFor, type HintPlanner } from './hint-plan';
 export {
   isWinnableDeal,
   solveKlondike,
