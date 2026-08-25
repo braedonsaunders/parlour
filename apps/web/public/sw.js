@@ -47,7 +47,7 @@ function navigationCandidates(url) {
   ];
 }
 
-async function cachedNavigation(request) {
+async function matchNavigation(request) {
   const exact = await caches.match(request, { ignoreSearch: true });
   if (exact) return exact;
 
@@ -57,7 +57,11 @@ async function cachedNavigation(request) {
     if (response) return response;
   }
 
-  return (await caches.match('/offline.html')) ?? Response.error();
+  return undefined;
+}
+
+async function cachedNavigation(request) {
+  return (await matchNavigation(request)) ?? (await caches.match('/offline.html')) ?? Response.error();
 }
 
 self.addEventListener('install', (event) => {
@@ -97,15 +101,24 @@ self.addEventListener('fetch', (event) => {
   if (url.origin !== self.location.origin) return;
 
   if (request.mode === 'navigate') {
-    const network = fetch(request).then((response) => ({
-      response,
-      cacheWrite: cacheResponse(RUNTIME, request, response),
-    }));
-
     event.respondWith(
-      network.then(({ response }) => response).catch(() => cachedNavigation(request)),
+      (async () => {
+        const cached = await matchNavigation(request);
+        const network = fetch(request)
+          .then((response) => {
+            event.waitUntil(cacheResponse(RUNTIME, request, response));
+            return response;
+          })
+          .catch(() => undefined);
+
+        if (cached) {
+          event.waitUntil(network);
+          return cached;
+        }
+
+        return (await network) ?? (await cachedNavigation(request));
+      })(),
     );
-    event.waitUntil(network.then(({ cacheWrite }) => cacheWrite).catch(() => undefined));
     return;
   }
 

@@ -6,7 +6,7 @@ import { LocaleSync } from '@/components/LocaleSync';
 import { AudioDirector } from '@/components/AudioDirector';
 import { SceneStage } from '@/components/backgrounds/SceneStage';
 import { SplashScreen } from '@/components/SplashScreen';
-import { PageTransition } from '@/components/transitions/PageTransition';
+import { MenuShell } from '@/components/menu/MenuShell';
 import { WipeOverlay } from '@/components/transitions/WipeOverlay';
 import { PwaRegister } from '@/components/PwaRegister';
 import { Analytics } from '@vercel/analytics/next';
@@ -106,7 +106,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           />
         ) : null}
         <SceneStage />
-        <PageTransition>{children}</PageTransition>
+        <MenuShell>{children}</MenuShell>
         <WipeOverlay />
         <SplashScreen />
         <ComfortSync />

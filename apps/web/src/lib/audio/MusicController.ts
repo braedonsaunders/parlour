@@ -43,6 +43,14 @@ type Voice = {
 
 const FADE_MS = 900;
 
+type HowlHtml5 = {
+  _sounds?: Array<{ _node?: HTMLMediaElement }>;
+};
+
+function html5NodeOf(howl: Howl): HTMLMediaElement | undefined {
+  return (howl as unknown as HowlHtml5)._sounds?.[0]?._node;
+}
+
 function clamp01(value: number): number {
   if (!Number.isFinite(value)) return 0;
   return Math.min(1, Math.max(0, value));
@@ -130,6 +138,23 @@ export class MusicController {
     if (this.state.status !== 'playing') {
       this.state.status = 'playing';
       this.notify();
+    }
+  }
+
+  /**
+   * `ensurePlaying` plus a direct poke of Howler's HTML5 node. iOS can report
+   * the Howl as playing while the underlying <audio> is paused after a nav.
+   */
+  keepAlive(): void {
+    this.ensurePlaying();
+    if (!this.wantPlaying || this.pausedByMute) return;
+    const trackId = this.state.trackId;
+    const voice = trackId ? this.voices.get(trackId) : undefined;
+    if (!voice) return;
+    const node = html5NodeOf(voice.howl);
+    if (node && typeof node.play === 'function' && node.paused) {
+      const play = node.play();
+      if (play && typeof play.catch === 'function') void play.catch(() => undefined);
     }
   }
 

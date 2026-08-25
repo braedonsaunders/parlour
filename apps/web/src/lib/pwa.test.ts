@@ -52,6 +52,7 @@ describe('installable offline shell', () => {
     const worker = readFileSync(join(process.cwd(), 'public/sw.js'), 'utf8');
     expect(worker).toContain("'/offline.html'");
     expect(worker).toContain("caches.match('/offline.html')");
+    expect(worker).toContain('async function matchNavigation(request)');
     expect(readFileSync(join(process.cwd(), 'public/offline.html'), 'utf8')).toContain(
       'You’re still at the table',
     );

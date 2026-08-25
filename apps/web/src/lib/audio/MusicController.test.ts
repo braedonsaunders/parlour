@@ -428,6 +428,29 @@ describe('MusicController', () => {
     expect(howlFor('parlour-ambience.wav')).toBeUndefined();
   });
 
+  it('ignores a Web Audio node that has no play() method', () => {
+    const controller = new MusicController(makeManager());
+    controller.setMenu(true);
+    controller.play();
+    const howl = howlFor('music-title.m4a')!;
+    Object.assign(howl, { _sounds: [{ _node: { paused: true } }] });
+    expect(() => controller.keepAlive()).not.toThrow();
+    expect(controller.getState()).toMatchObject({ status: 'playing', trackId: 'title-1' });
+  });
+
+  it('replays a paused HTML5 node without changing tracks', () => {
+    const play = vi.fn(() => Promise.resolve());
+    const controller = new MusicController(makeManager());
+    controller.setMenu(true);
+    controller.play();
+    const howl = howlFor('music-title.m4a')!;
+    Object.assign(howl, { _sounds: [{ _node: { paused: true, play } }] });
+
+    controller.keepAlive();
+    expect(play).toHaveBeenCalledTimes(1);
+    expect(controller.getState()).toMatchObject({ status: 'playing', trackId: 'title-1' });
+  });
+
   it('restarts a silenced voice without changing tracks', () => {
     const controller = new MusicController(makeManager());
     controller.setMenu(true);

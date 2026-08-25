@@ -1,7 +1,7 @@
 'use client';
 
-import Link from 'next/link';
 import type { ReactNode } from 'react';
+import { MenuLink } from '@/components/menu/MenuLink';
 import type { GameArtCard, HowToPlayDoc } from '@parlour/engine';
 import { GameArt } from '@/components/GameArt';
 import { HowToPlayButton } from '@/components/HowToPlay';
@@ -89,12 +89,13 @@ export function GameSetupScreen<TMode extends SetupMode>({
   return (
     <main className={styles.fitScreen}>
       <header className={styles.fitHeader}>
-        <Link
+        <MenuLink
           href="/games"
+          direction="back"
           className="pill-soft text-sm font-bold text-dusk-100 hover:text-hearth-200"
         >
           {t('setup.backToGames')}
-        </Link>
+        </MenuLink>
         <h1
           className={`${styles.fitHeading} font-display font-extrabold tracking-tight text-hearth-50`}
         >

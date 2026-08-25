@@ -1,8 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
 import { motion } from 'motion/react';
+import { useMenuRouter } from '@/hooks/useMenuRouter';
 import { AvatarBadge } from '@/components/AvatarBadge';
 import { MainMenuLanguageButton } from '@/components/MainMenuLanguageButton';
 import { MainMenuMuteButton } from '@/components/MainMenuMuteButton';
@@ -26,11 +27,15 @@ const rise = {
 };
 
 export default function TitlePage() {
-  const router = useRouter();
+  const nav = useMenuRouter();
   const t = useT();
   useAudioManager();
   const name = useProfileStore((s) => s.name);
   const avatarId = useProfileStore((s) => s.avatarId);
+
+  useEffect(() => {
+    nav.prefetch('/games');
+  }, [nav]);
 
   return (
     <main className="flex min-h-dvh flex-col items-center justify-center gap-5 px-6 text-center">
@@ -81,7 +86,7 @@ export default function TitlePage() {
       >
         <button
           type="button"
-          onClick={() => router.push('/games')}
+          onClick={() => nav.push('/games', 'forward')}
           className="btn-fat w-64 text-lg"
           data-testid="play"
         >

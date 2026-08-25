@@ -2,13 +2,14 @@ import { act } from 'react';
 import { GAMES } from '@/lib/games';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { resetMenuNavForTests } from '@/stores/menuNav';
 import GameSelectPage from './page';
 
 // Read from the registry rather than a literal: shipping a game should not
 // mean editing a count in a test that is not about counting.
 const SHELF_SIZE = GAMES.length;
 
-const router = vi.hoisted(() => ({ push: vi.fn() }));
+const router = vi.hoisted(() => ({ push: vi.fn(), prefetch: vi.fn() }));
 
 vi.mock('next/navigation', () => ({ useRouter: () => router }));
 
@@ -32,7 +33,9 @@ function searchFor(value: string) {
 }
 
 beforeEach(() => {
+  resetMenuNavForTests();
   router.push.mockReset();
+  router.prefetch.mockReset();
   container = document.createElement('div');
   document.body.append(container);
   root = createRoot(container);

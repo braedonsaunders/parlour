@@ -21,7 +21,7 @@ import SpadesSetupPage from '@/app/spades/page';
 import WildSetupPage from '@/app/wild/page';
 
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: () => {} }),
+  useRouter: () => ({ push: () => {}, prefetch: () => {} }),
   usePathname: () => '/',
 }));
 

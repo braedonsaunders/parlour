@@ -2,6 +2,7 @@ import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import styles from '@/styles/page-transition.module.css';
+import { resetMenuNavForTests, useMenuNavStore } from '@/stores/menuNav';
 import { PageTransition } from './PageTransition';
 
 const nav = vi.hoisted(() => ({ pathname: '/' }));
@@ -11,10 +12,13 @@ let container: HTMLDivElement;
 let root: Root;
 
 const shell = () => container.firstElementChild as HTMLElement;
-const animating = () => shell().classList.contains(styles.enter!);
+const has = (cls: string | undefined) => Boolean(cls) && shell().classList.contains(cls ?? '');
+const animating = () => has(styles.enter) || has(styles.enterForward) || has(styles.enterBack);
 
-function render() {
-  act(() => root.render(createElement(PageTransition, null, 'page')));
+function render(route?: string) {
+  act(() =>
+    root.render(createElement(PageTransition, route === undefined ? {} : { route }, 'page')),
+  );
 }
 
 function finishAnimation() {
@@ -25,6 +29,7 @@ function finishAnimation() {
 
 beforeEach(() => {
   nav.pathname = '/';
+  resetMenuNavForTests();
   container = document.createElement('div');
   document.body.append(container);
   root = createRoot(container);
@@ -34,11 +39,12 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount());
   container.remove();
+  resetMenuNavForTests();
 });
 
 describe('PageTransition', () => {
   it('settles the page in, then gets out of the way', () => {
-    expect(animating()).toBe(true);
+    expect(has(styles.enter)).toBe(true);
 
     finishAnimation();
 
@@ -53,6 +59,18 @@ describe('PageTransition', () => {
     nav.pathname = '/games';
     render();
     expect(animating()).toBe(true);
+  });
+
+  it('slides forward and back with the menu stack', () => {
+    finishAnimation();
+    useMenuNavStore.getState().show('/games', 'forward');
+    render('/games');
+    expect(has(styles.enterForward)).toBe(true);
+
+    finishAnimation();
+    useMenuNavStore.getState().show('/', 'back');
+    render('/');
+    expect(has(styles.enterBack)).toBe(true);
   });
 
   it('ignores an animation finishing somewhere inside the page', () => {

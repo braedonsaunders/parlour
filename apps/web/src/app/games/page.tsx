@@ -1,9 +1,9 @@
 'use client';
 import { useT } from '@/lib/i18n';
 
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { MenuLink } from '@/components/menu/MenuLink';
+import { useMenuRouter } from '@/hooks/useMenuRouter';
 import { GameArt } from '@/components/GameArt';
 import { HowToPlayButton } from '@/components/HowToPlay';
 import { type GameCatalogEntry } from '@/lib/games';
@@ -14,8 +14,12 @@ import gameStyles from '@/styles/games.module.css';
 
 export default function GameSelectPage() {
   const t = useT();
-  const router = useRouter();
+  const nav = useMenuRouter();
   const [query, setQuery] = useState('');
+
+  useEffect(() => {
+    nav.prefetchShelf();
+  }, [nav]);
   // The shelf reads the localized catalog, so tiles, facts and the rules sheet
   // are all in the player's language — and search matches what they can see.
   const games = useLocalizedGames();
@@ -28,12 +32,13 @@ export default function GameSelectPage() {
   return (
     <main className={gameStyles.page}>
       <header className={gameStyles.header}>
-        <Link
+        <MenuLink
           href="/"
+          direction="back"
           className={`${gameStyles.backLink} pill-soft text-sm font-bold text-dusk-100 hover:text-hearth-200`}
         >
           {t('common.backArrow')}
-        </Link>
+        </MenuLink>
         <div className={gameStyles.heading}>
           <span className={gameStyles.eyebrow}>{t('shelf.heading')}</span>
           <h1 className="font-display text-2xl font-extrabold tracking-tight text-hearth-50">
@@ -95,7 +100,7 @@ export default function GameSelectPage() {
               <GameTile
                 key={game.id}
                 def={game}
-                onSelect={game.href ? () => router.push(game.href!) : undefined}
+                onSelect={game.href ? () => nav.push(game.href!, 'forward') : undefined}
               />
             ))}
           </div>

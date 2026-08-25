@@ -1,14 +1,45 @@
-/* The quiet counterpart to the table wipe: every other screen settles in with a
-   short rise and fade so a tap on "Play" reads as travel rather than a cut. */
+/* The quiet counterpart to the table wipe: menus travel sideways so a tap on
+   "Play" or a game tile reads as a push, and Back reads as a pop. First paint
+   still settles in with a short rise so a cold load is not a sideways slide. */
 
 .enter {
-  animation: pageIn 300ms var(--ease-settle) both;
+  animation: pageIn 240ms var(--ease-settle) both;
+}
+
+.enterForward {
+  animation: menuInForward 240ms var(--ease-settle) both;
+}
+
+.enterBack {
+  animation: menuInBack 240ms var(--ease-settle) both;
 }
 
 @keyframes pageIn {
   from {
     opacity: 0;
     transform: translate3d(0, 12px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes menuInForward {
+  from {
+    opacity: 0;
+    transform: translate3d(40px, 0, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes menuInBack {
+  from {
+    opacity: 0;
+    transform: translate3d(-40px, 0, 0);
   }
   to {
     opacity: 1;
