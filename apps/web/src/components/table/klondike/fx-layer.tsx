@@ -6,6 +6,7 @@ import { gsap } from 'gsap';
 import { PlayingCard } from '@/components/table/PlayingCard';
 import { TableCardFlight } from '@/components/table/shell';
 import { useTableAudio } from '@/components/table/fx-animation';
+import { prefersCalmMotion } from '@/lib/table/calm-motion';
 import styles from '@/styles/klondike.module.css';
 import tableStyles from '@/styles/table.module.css';
 
@@ -37,7 +38,7 @@ export function KlondikeFxLayer({
     const root = rootRef.current;
     if (!root || flights.length === 0) return;
     const calm =
-      reduced || (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false);
+      reduced || prefersCalmMotion();
     const context = gsap.context(() => {
       if (calm) {
         for (const flight of flights) {

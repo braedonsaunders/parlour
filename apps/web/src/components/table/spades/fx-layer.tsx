@@ -3,6 +3,7 @@
 import { useMemo, useEffect, type CSSProperties, type RefObject } from 'react';
 import { type FxEvent } from '@parlour/engine';
 import { gsap } from 'gsap';
+import { prefersCalmMotion } from '@/lib/table/calm-motion';
 import { buildSpadesTimeline, type SpadesCue } from '@/lib/spades/fx';
 import { zonePoint } from '../fx-animation';
 import tableStyles from '@/styles/table.module.css';
@@ -35,7 +36,7 @@ export function useSpadesFxAnimation(
     const root = rootRef.current;
     if (!root || cues.length === 0) return;
     const reduced =
-      forceReduced || (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false);
+      forceReduced || prefersCalmMotion();
     if (reduced) {
       // Calm motion has to mean no waiting, not merely no travel. Flashing each
       // cue in place still held the timeline open for the cue's full duration —

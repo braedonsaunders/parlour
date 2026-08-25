@@ -115,6 +115,83 @@ for (const row of rows.slice(0, 24)) {
   if (snippet) console.log(`                          ${snippet}`);
 }
 
+/**
+ * Self time says which line is hot; inclusive time says which *decision* is
+ * expensive. A hook that spends all its time inside React or GSAP has no self
+ * time at all and is invisible above, which is exactly how the most expensive
+ * thing on the table stayed hidden for three rounds of this.
+ */
+const parents = new Map();
+for (const node of profile.nodes) {
+  for (const child of node.children ?? []) parents.set(child, node.id);
+}
+const inclusive = new Map();
+for (const [id, us] of selfTime) {
+  let current = id;
+  const seen = new Set();
+  while (current !== undefined && !seen.has(current)) {
+    seen.add(current);
+    inclusive.set(current, (inclusive.get(current) ?? 0) + us / 1000);
+    current = parents.get(current);
+  }
+}
+
+console.log('\n  incl ms   share  function (inclusive of everything it calls)');
+console.log(`  ${'-'.repeat(96)}`);
+// React's own frames are excluded by default: a call tree through `flushSync`
+// is forty frames of scheduler before it reaches anything we wrote, and they
+// all report roughly the same total. PERF_ALL_FRAMES keeps them.
+const ours = (node) => {
+  if (process.env.PERF_ALL_FRAMES) return true;
+  const url = node.callFrame.url ?? '';
+  return url !== '' && !/0-h_j2_nobdzu|turbopack-/.test(url);
+};
+const deep = [...inclusive.entries()]
+  .map(([id, ms]) => ({ node: byId.get(id), ms }))
+  .filter((row) => row.node && row.ms > measured * 0.005 && ours(row.node))
+  .sort((left, right) => right.ms - left.ms)
+  .slice(0, 20);
+for (const row of deep) {
+  const share = `${((row.ms / measured) * 100).toFixed(1)}%`;
+  console.log(`  ${row.ms.toFixed(1).padStart(7)}  ${share.padStart(6)}  ${label(row.node)}`);
+  const snippet = await snippetAt(row.node.callFrame.url, row.node.callFrame.columnNumber);
+  if (snippet) console.log(`                          ${snippet.slice(0, 88)}`);
+}
+
+/**
+ * `PERF_UNDER=<snippet>` opens one frame up: it finds every call-tree node whose
+ * minified source starts with that text and reports what its children cost.
+ * This is how "the fx effect is 46% of a burst" becomes a list of things to
+ * change inside the fx effect.
+ */
+if (process.env.PERF_UNDER) {
+  const needle = process.env.PERF_UNDER;
+  const children = new Map();
+  let own = 0;
+  let total = 0;
+  for (const node of profile.nodes) {
+    const snippet = await snippetAt(node.callFrame.url, node.callFrame.columnNumber);
+    if (!snippet.startsWith(needle)) continue;
+    total += inclusive.get(node.id) ?? 0;
+    own += (selfTime.get(node.id) ?? 0) / 1000;
+    for (const childId of node.children ?? []) {
+      const child = byId.get(childId);
+      if (!child) continue;
+      const key = `${child.callFrame.functionName || '(anonymous)'}@${child.callFrame.columnNumber}`;
+      const entry = children.get(key) ?? { ms: 0, node: child };
+      entry.ms += inclusive.get(childId) ?? 0;
+      children.set(key, entry);
+    }
+  }
+  console.log(`\n  inside "${needle}…"  —  ${total.toFixed(0)}ms inclusive, ${own.toFixed(0)}ms its own code`);
+  console.log(`  ${'-'.repeat(96)}`);
+  for (const [, entry] of [...children.entries()].sort((a, b) => b[1].ms - a[1].ms).slice(0, 14)) {
+    console.log(`  ${entry.ms.toFixed(1).padStart(7)}  ${entry.node.callFrame.functionName || '(anonymous)'}`);
+    const snippet = await snippetAt(entry.node.callFrame.url, entry.node.callFrame.columnNumber);
+    if (snippet) console.log(`            ${snippet.slice(0, 88)}`);
+  }
+}
+
 const byFile = new Map();
 for (const row of rows) {
   const url = row.node.callFrame.url || '(native)';

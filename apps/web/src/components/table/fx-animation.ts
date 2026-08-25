@@ -6,6 +6,7 @@ import { gsap } from 'gsap';
 import { getAudioManager } from '@/lib/audio/AudioManager';
 import { soundCuesForFx, soundDefsForSfxPack } from '@/lib/audio/sfx';
 import { calculateFanStep } from '@/components/table/HandRail';
+import { prefersCalmMotion } from '@/lib/table/calm-motion';
 import { FX_TIMING, type FxCue, type Zone } from '@/lib/table/fx-motion';
 import styles from '@/styles/table.module.css';
 
@@ -47,7 +48,7 @@ export function useFxAnimation(
     const root = rootRef.current;
     if (!root || cues.length === 0) return;
     const reduced =
-      forceReduced || (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false);
+      forceReduced || prefersCalmMotion();
 
     if (reduced) {
       // Calm motion has to mean no waiting, not merely no travel. Flashing each

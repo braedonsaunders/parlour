@@ -29,7 +29,7 @@ import { serveExport, BASE } from './perf-server.mjs';
 const label = process.argv[2] ?? process.env.PERF_LABEL ?? 'run';
 const repeats = Number(process.argv[3] ?? 3);
 const throttle = Number(process.argv[4] ?? 4);
-const bursts = Number(process.env.PERF_BURSTS ?? 60);
+const bursts = Number(process.env.PERF_BURSTS ?? 240);
 
 /** The scenarios every measurement covers, so a win in one is not a loss elsewhere. */
 const SCENARIOS = [
@@ -66,6 +66,8 @@ for (const scenario of SCENARIOS) {
       deviceScaleFactor: devices['iPhone 14'].deviceScaleFactor,
       hasTouch: true,
     });
+    // PERF_INIT weighs a hypothesis without a rebuild — see the ablation probes.
+    if (process.env.PERF_INIT) await context.addInitScript(process.env.PERF_INIT);
     const page = await context.newPage();
     const session = await context.newCDPSession(page);
     if (throttle > 1) await session.send('Emulation.setCPUThrottlingRate', { rate: throttle });
@@ -103,13 +105,19 @@ for (const scenario of SCENARIOS) {
   results.push({
     scenario: scenario.id,
     meanMs: at('meanMs'),
+    reactMs: at('reactMs'),
+    renderMs: at('renderMs'),
+    effectMs: at('effectMs'),
+    layoutMs: at('layoutMs'),
+    calibrationMs: at('calibrationMs'),
+    score: at('score'),
     p50Ms: at('p50Ms'),
     p95Ms: at('p95Ms'),
     maxMs: at('maxMs'),
     layers: at('layers'),
     megapixels: at('megapixels'),
     nodes: at('nodes'),
-    jitter: spread(runs.map((run) => run.meanMs)),
+    jitter: spread(runs.map((run) => run.score)),
   });
 }
 
@@ -119,15 +127,18 @@ stopServer();
 const row = { label, throttle, bursts, repeats, scenarios: results };
 
 console.log(`\n  ${label} · ${bursts} bursts × ${repeats} runs · ${throttle}x CPU throttle`);
-console.log('  milliseconds to turn one burst of game state into a laid-out table\n');
-console.log('  scenario              mean     p50     p95     max   ±run   layers    Mpx   nodes');
+console.log(
+  '  cost of one burst of game state becoming a laid-out table, as a multiple\n  of a fixed synthetic workload timed in the same page — see `calibrate`\n',
+);
+console.log('  scenario             SCORE   ±run     p50  layout   calib   layers    Mpx   nodes');
 console.log(`  ${'-'.repeat(82)}`);
 for (const result of results) {
   console.log(
     `  ${result.scenario.padEnd(20)}` +
-      `${result.meanMs.toFixed(2).padStart(6)}${result.p50Ms.toFixed(2).padStart(8)}` +
-      `${result.p95Ms.toFixed(2).padStart(8)}${result.maxMs.toFixed(2).padStart(8)}` +
-      `${result.jitter.toFixed(2).padStart(7)}${String(result.layers).padStart(9)}` +
+      `${result.score.toFixed(3).padStart(6)}${result.jitter.toFixed(3).padStart(7)}` +
+      `${result.p50Ms.toFixed(2).padStart(8)}${result.layoutMs.toFixed(2).padStart(8)}` +
+      `${result.calibrationMs.toFixed(0).padStart(8)}` +
+      `${String(result.layers).padStart(9)}` +
       `${result.megapixels.toFixed(1).padStart(7)}${String(result.nodes).padStart(8)}`,
   );
 }
@@ -144,10 +155,10 @@ if (previous) {
   for (const result of results) {
     const before = previous.scenarios.find((entry) => entry.scenario === result.scenario);
     if (!before) continue;
-    const change = ((result.meanMs - before.meanMs) / before.meanMs) * 100;
+    const change = ((result.score - before.score) / before.score) * 100;
     const layerChange = result.layers - before.layers;
     console.log(
-      `  ${result.scenario.padEnd(20)} ${before.meanMs.toFixed(2)}ms → ${result.meanMs.toFixed(2)}ms` +
+      `  ${result.scenario.padEnd(20)} ${before.score.toFixed(3)} → ${result.score.toFixed(3)}` +
         `  ${change >= 0 ? '+' : ''}${change.toFixed(1)}%` +
         `   layers ${before.layers} → ${result.layers} (${layerChange >= 0 ? '+' : ''}${layerChange})`,
     );

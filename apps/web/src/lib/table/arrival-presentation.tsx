@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from 'react';
 import type { FxEvent } from '@parlour/engine';
+import { prefersCalmMotion } from './calm-motion';
 import { buildFxTimeline, type FxCue } from './fx-motion';
 
 type InboundCue = Extract<FxCue, { type: 'draw' | 'transfer' }>;
@@ -101,7 +102,7 @@ export function useArrivalCards(
 
   useLayoutEffect(() => {
     if (inbound.length === 0 && outbound.length === 0) return;
-    const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+    const reduced = prefersCalmMotion();
     if (reduced) {
       const allIn = new Set(inbound.map((cue) => cue.card));
       const allOut = new Set(outbound.map((cue) => cue.card));

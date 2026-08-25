@@ -5,6 +5,7 @@ import { type FxEvent } from '@parlour/engine';
 import type { EuchreSuit } from '@parlour/game-euchre';
 import { gsap } from 'gsap';
 import { buildEuchreTimeline, type EuchreCue } from '@/lib/euchre/fx';
+import { prefersCalmMotion } from '@/lib/table/calm-motion';
 import { FX_TIMING } from '@/lib/table/fx-motion';
 import { zonePoint } from '../fx-animation';
 import { PlayingCard } from '../PlayingCard';
@@ -36,7 +37,7 @@ export function useEuchreFxAnimation(
   useEffect(() => {
     const root = rootRef.current;
     if (!root || cues.length === 0) return;
-    const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+    const reduced = prefersCalmMotion();
     const bounds = root.getBoundingClientRect();
     const context = gsap.context(() => {
       const timeline = gsap.timeline();

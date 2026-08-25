@@ -2,6 +2,7 @@
 
 import { useLayoutEffect, useMemo, useState } from 'react';
 import type { FxEvent } from '@parlour/engine';
+import { prefersCalmMotion } from './calm-motion';
 import { buildFxTimeline, type FxCue } from './fx-motion';
 
 type SetupCue = Extract<FxCue, { type: 'deal' | 'flip' }>;
@@ -134,7 +135,7 @@ export function useDealPresentation(
   useLayoutEffect(() => {
     if (!plan) return;
     const reduced =
-      forceReduced || (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false);
+      forceReduced || prefersCalmMotion();
     if (reduced) {
       const timer = window.setTimeout(
         () => setLanded({ fxKey, cueIds: new Set(plan.cues.map(({ id }) => id)) }),
