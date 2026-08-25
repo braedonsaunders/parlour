@@ -41,6 +41,27 @@ describe('LocalTransport M2 acceptance', () => {
     },
   );
 
+  it('does not offer the card just taken from discard as a throw-back', () => {
+    const transport = new LocalTransport({
+      mode: 'classic',
+      seats: 2,
+      botTier: 1,
+      seed: 8,
+      player: { name: 'You', avatarId: 'fox' },
+    });
+
+    const taken = transport.getSnapshot().session.state.discard[0];
+    expect(taken).toBeDefined();
+    expect(transport.dispatch('draw.discard').rejected).toBeNull();
+
+    const discards = transport
+      .legalMoves()
+      .filter((move) => move.id === 'discard')
+      .map((move) => (move.payload as { card: string }).card);
+    expect(discards).not.toContain(taken);
+    expect(discards.length).toBeGreaterThan(0);
+  });
+
   it('sits classic-mode bots out after they lose their last life', () => {
     const transport = new LocalTransport({
       mode: 'classic',

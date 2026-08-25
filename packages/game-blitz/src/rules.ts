@@ -79,6 +79,13 @@ function requireLive(state: BlitzState, seat: SeatId): true | { code: string; me
   return true;
 }
 
+/** House-rule lock: the card just taken from discard cannot go straight back. */
+function discardable(state: BlitzState, seat: SeatId, card: CardId): boolean {
+  if (!(state.hands[seat] ?? []).includes(card)) return false;
+  if (state.rules.discardLock && card === state.drawnFromDiscard) return false;
+  return true;
+}
+
 function reshuffleStock(state: BlitzState, ctx: MoveCtx): BlitzState {
   const kept = state.discard.slice(1);
   const flipped = state.discard[0] as CardId;
@@ -343,13 +350,15 @@ const flow: GameDef<BlitzState, BlitzConfig>['flow'] = {
     if (phase.actor === null || state.outcome || isSittingOut(state, phase.actor)) return [];
     if (phase.phase === 'showdown.reveal') return [];
     if (phase.phase === 'discard') {
-      return (state.hands[phase.actor] ?? []).map(
-        (card) =>
-          ({
-            id: 'discard',
-            payload: { card },
-          }) satisfies LegalMove,
-      );
+      return (state.hands[phase.actor] ?? [])
+        .filter((card) => discardable(state, phase.actor as SeatId, card))
+        .map(
+          (card) =>
+            ({
+              id: 'discard',
+              payload: { card },
+            }) satisfies LegalMove,
+        );
     }
     const moves: LegalMove[] = [{ id: 'draw.stock' }];
     if (state.discard.length > 0) moves.push({ id: 'draw.discard' });

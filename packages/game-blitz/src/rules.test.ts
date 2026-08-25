@@ -267,8 +267,16 @@ describe('blitz round flow', () => {
     session = play(session, 0, 'draw.discard').session;
     expect(session.state.drawnFromDiscard).toBe(top);
 
+    const legal = def.flow.legalMoves(session.state, session.phase);
+    expect(legal).not.toContainEqual({ id: 'discard', payload: { card: top } });
+    expect(legal.filter((move) => move.id === 'discard')).toHaveLength(HAND_SIZE);
+
     const rejected = sessionApply(def, session, 0, 'discard', { card: top });
     expect(rejected.rejected?.code).toBe('discard-locked');
+
+    const kept = session.state.hands[0]!.find((card) => card !== top);
+    expect(kept).toBeDefined();
+    expect(sessionApply(def, session, 0, 'discard', { card: kept }).rejected).toBeUndefined();
 
     const openSession = createSession(def, {
       seed: 7,
@@ -276,6 +284,10 @@ describe('blitz round flow', () => {
       seats: 2,
     });
     const opened = play(openSession, 0, 'draw.discard').session;
+    expect(def.flow.legalMoves(opened.state, opened.phase)).toContainEqual({
+      id: 'discard',
+      payload: { card: top },
+    });
     expect(sessionApply(def, opened, 0, 'discard', { card: top }).rejected).toBeUndefined();
   });
 
