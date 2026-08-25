@@ -46,7 +46,9 @@ export function isDealDigest(value: unknown): value is string {
 }
 
 function toHex(bytes: Uint8Array): string {
-  return [...bytes].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+  let out = '';
+  for (const byte of bytes) out += byte.toString(16).padStart(2, '0');
+  return out;
 }
 
 async function sha256Hex(input: string): Promise<string> {

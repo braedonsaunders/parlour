@@ -299,8 +299,8 @@ export class VeilRoom {
     const participants = this.session.participantsFor(epoch);
     const others = participants.filter((seat) => seat !== this.session.seat);
     return participants.includes(this.session.seat)
-      ? [...others, this.session.seat]
-      : [...participants];
+      ? others.concat(this.session.seat)
+      : participants.slice();
   }
 
   private forward(epoch: number, position: number, locked: string, sequence: number): void {
@@ -518,7 +518,7 @@ export class VeilRoom {
   private chainFor(recipient: number, epoch: number): number[] {
     const participants = this.session.participantsFor(epoch);
     const others = participants.filter((seat) => seat !== recipient);
-    return participants.includes(recipient) ? [...others, recipient] : [...participants];
+    return participants.includes(recipient) ? others.concat(recipient) : participants.slice();
   }
 
   /**

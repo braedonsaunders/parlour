@@ -35,10 +35,13 @@ export function validateRoomCode(
 export function createRoomCode(randomBytes: (length: number) => Uint8Array): NormalizedRoomCode {
   const bytes = randomBytes(ROOM_CODE_LENGTH);
   if (bytes.length < ROOM_CODE_LENGTH) throw new Error('room code source returned too few bytes');
-  return [...bytes]
-    .slice(0, ROOM_CODE_LENGTH)
-    .map((value) => ROOM_CODE_ALPHABET[value % ROOM_CODE_ALPHABET.length])
-    .join('');
+  let code = '';
+  for (let index = 0; index < ROOM_CODE_LENGTH; index++) {
+    const value = bytes[index];
+    if (value === undefined) throw new Error('room code source returned too few bytes');
+    code += ROOM_CODE_ALPHABET[value % ROOM_CODE_ALPHABET.length];
+  }
+  return code;
 }
 
 export function resolveRoomShareOrigin(runtimeOrigin: string, configuredOrigin?: string): string {

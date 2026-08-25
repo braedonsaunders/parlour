@@ -79,11 +79,16 @@ export function roundIdFor(roomCode: string, seed: number, epoch: number): strin
   return `${roomCode}:${seed >>> 0}:${epoch}`;
 }
 
+function copyList<T>(value: readonly T[] | null | undefined, label: string): T[] {
+  if (!Array.isArray(value)) throw new Error(`${label} is missing`);
+  return value.slice();
+}
+
 export async function commitLayer(secret: VeilLayerSecret): Promise<string> {
   return hashTagged('layer-commitment', {
     epoch: secret.epoch,
     e: secret.key.e.toString(16),
-    order: [...secret.order],
+    order: copyList(secret.order, 'layer order'),
     salt: secret.salt,
   });
 }
@@ -105,12 +110,12 @@ export async function openEpoch(
   }
   return {
     epoch,
-    cards: [...cards],
+    cards: copyList(cards, 'epoch cards'),
     codebook: await buildCodebook(roundId, cards),
     deck: null,
     layers: [],
     handleBase,
-    participants: [...participants],
+    participants: copyList(participants, 'epoch seats'),
   };
 }
 
@@ -168,6 +173,9 @@ export async function layShuffleLayer(
     e: secret.key.e.toString(16),
     order: secret.order,
   });
+  if (!Array.isArray(deck) || deck.length !== epoch.cards.length) {
+    throw new Error('the shuffle did not return a deck');
+  }
   return {
     entry: { epoch: epoch.epoch, seat, deck, commitment: await commitLayer(secret) },
     secret,
@@ -205,6 +213,9 @@ export function checkLayer(
   if (entry.seat !== expectedSeat || entry.epoch !== epoch.epoch) {
     return { code: 'out-of-turn', message: `seat ${entry.seat} laid a layer out of turn` };
   }
+  if (!Array.isArray(entry.deck) || !Array.isArray(input)) {
+    return { code: 'wrong-size', message: 'the published deck is missing' };
+  }
   if (entry.deck.length !== epoch.cards.length) {
     return { code: 'wrong-size', message: 'the published deck changed size' };
   }
@@ -233,17 +244,19 @@ export function acceptLayer(
   seatsOrParticipants: number | readonly number[],
 ): VeilEpoch {
   const participants =
-    epoch.participants.length > 0
+    Array.isArray(epoch.participants) && epoch.participants.length > 0
       ? epoch.participants
       : typeof seatsOrParticipants === 'number'
         ? Array.from({ length: seatsOrParticipants }, (_, seat) => seat)
         : seatsOrParticipants;
-  const layers = [...epoch.layers, entry];
+  const layers = copyList(epoch.layers, 'epoch layers');
+  layers.push(entry);
+  const seats = copyList(participants, 'ceremony seats');
   return {
     ...epoch,
-    participants: [...participants],
+    participants: seats,
     layers,
-    deck: layers.length === participants.length ? [...entry.deck] : null,
+    deck: layers.length === seats.length ? copyList(entry.deck, 'published deck') : null,
   };
 }
 

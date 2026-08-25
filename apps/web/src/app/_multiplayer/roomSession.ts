@@ -303,21 +303,26 @@ export class MultiplayerRoomSession {
     if (this.snapshot.seats.length < (this.snapshot.settings?.seats ?? 2)) {
       throw new Error('every seat must be filled before the match starts');
     }
-    if (this.snapshot.security.tier === 'veil') {
-      // A veiled deal takes its unpredictability from the ceremony itself —
-      // every seat lays a layer on a deck nobody can read — so it needs no
-      // separate seed round, and it publishes the real position at the end.
-      await this.dealVeiled();
-    } else {
-      // An open room had no "the host dealt" signal at all, which is why a
-      // guest used to be pushed onto the table the moment it was seated. The
-      // deal is rebuilt on the seed every seat mixed, then published: the same
-      // snapshot a veiled deal sends, and peers adopt an unsolicited one only
-      // while their own log is still empty, so it opens the table for everyone
-      // without being able to rewrite a round in progress.
-      await this.dealOpen();
+    try {
+      if (this.snapshot.security.tier === 'veil') {
+        // A veiled deal takes its unpredictability from the ceremony itself —
+        // every seat lays a layer on a deck nobody can read — so it needs no
+        // separate seed round, and it publishes the real position at the end.
+        await this.dealVeiled();
+      } else {
+        // An open room had no "the host dealt" signal at all, which is why a
+        // guest used to be pushed onto the table the moment it was seated. The
+        // deal is rebuilt on the seed every seat mixed, then published: the same
+        // snapshot a veiled deal sends, and peers adopt an unsolicited one only
+        // while their own log is still empty, so it opens the table for everyone
+        // without being able to rewrite a round in progress.
+        await this.dealOpen();
+      }
+      this.update({ stage: 'table', error: null });
+    } catch (error) {
+      this.update({ error: startFault(error) });
+      throw error;
     }
-    this.update({ stage: 'table' });
   }
 
   /**
@@ -515,7 +520,7 @@ export class MultiplayerRoomSession {
         })
         .catch((error: unknown) => {
           this.update({
-            error: error instanceof Error ? error.message : 'A Veil message was rejected',
+            error: startFault(error, 'A Veil message was rejected'),
           });
         });
     });
@@ -1282,6 +1287,18 @@ function stateHolds(state: unknown, handle: string): boolean {
  */
 function packFor(settings: RoomSettings): RoomGamePack {
   return roomGame(settings.gameId);
+}
+
+/**
+ * Safari phones report a missing shuffle array as this TypeError. Name the
+ * moment instead of putting the engine's words on the lobby.
+ */
+function startFault(error: unknown, fallback = 'The match could not start'): string {
+  const message = error instanceof Error ? error.message : '';
+  if (/spread syntax|not (be )?iterable/i.test(message)) {
+    return 'This device could not finish the shuffle. Stay here and tap Start again.';
+  }
+  return message || fallback;
 }
 
 /**

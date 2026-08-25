@@ -93,8 +93,17 @@ export class ShuffleRunner {
     if (!waiting) return;
     this.pending.delete(response.id);
     clearTimeout(waiting.timer);
-    if ('error' in response) waiting.reject(new Error(response.error));
-    else waiting.resolve(response.deck);
+    if ('error' in response) {
+      waiting.reject(new Error(response.error));
+      return;
+    }
+    // iOS WebKit has been seen to post a success frame with the deck missing
+    // after cloning a large layer. Treat that as a dead worker, not a deck.
+    if (!Array.isArray(response.deck)) {
+      waiting.reject(new Error('the shuffle worker returned no deck'));
+      return;
+    }
+    waiting.resolve(response.deck);
   }
 
   private failAll(error: Error): void {

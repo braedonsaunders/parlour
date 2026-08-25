@@ -134,6 +134,23 @@ describe('the shuffle runner', () => {
     expect(await runner.shuffle(job)).toEqual(runShuffleJob(job));
   });
 
+  it('shuffles in-thread when the worker answers without a deck', async () => {
+    class EmptyDeckWorker extends FakeWorker {
+      postMessage(message: unknown): void {
+        this.seen.push(message);
+        const { id } = message as { id: number };
+        queueMicrotask(() => {
+          this.onmessage?.({ data: { id } as ShuffleResponse } as MessageEvent<ShuffleResponse>);
+        });
+      }
+    }
+    const runner = new ShuffleRunner(() => new EmptyDeckWorker());
+    const deck = await deckHex();
+    const job = { deck, e: generateLayerKey().e.toString(16), order: randomPermutation(8) };
+
+    expect(await runner.shuffle(job)).toEqual(runShuffleJob(job));
+  });
+
   it('shuffles in-thread when the worker reports a failure', async () => {
     const runner = new ShuffleRunner(() => new FakeWorker('error'));
     const deck = await deckHex();

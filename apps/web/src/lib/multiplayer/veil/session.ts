@@ -164,13 +164,16 @@ export class VeilSession {
    */
   async openRound(keys: readonly string[], deck: readonly CardId[]): Promise<VeilRoundHeader> {
     if (keys.length !== this.options.seats) throw new Error('every seat must publish a key');
+    if (!Array.isArray(keys) || !Array.isArray(deck)) {
+      throw new Error('a veiled round needs every seat key and the full deck');
+    }
     const header: VeilRoundHeader = {
       roundId: roundIdFor(this.options.roomCode, this.options.seed, 0),
       gameId: this.options.gameId,
       rulesHash: await hashTagged('rules', this.options.config),
       seats: this.options.seats,
-      keys: [...keys],
-      deck: [...deck],
+      keys: keys.slice(),
+      deck: deck.slice(),
     };
     this.transcript = await VeilTranscript.open(header);
     await this.beginEpoch(0, deck, this.allSeats());
@@ -195,7 +198,7 @@ export class VeilSession {
   }
 
   private validateParticipants(participants: readonly SeatId[]): SeatId[] {
-    const ordered = [...participants].sort((a, b) => a - b);
+    const ordered = Array.isArray(participants) ? participants.slice().sort((a, b) => a - b) : [];
     if (
       ordered.length === 0 ||
       new Set(ordered).size !== ordered.length ||
@@ -212,7 +215,8 @@ export class VeilSession {
     participants: readonly SeatId[],
   ): Promise<VeilEpoch> {
     if (this.epochs.has(epoch)) throw new Error(`deck epoch ${epoch} already exists`);
-    const latest = Math.max(-1, ...this.epochs.keys());
+    let latest = -1;
+    for (const key of this.epochs.keys()) if (key > latest) latest = key;
     if (epoch !== latest + 1) throw new Error(`deck epoch ${epoch} is out of sequence`);
     const roundId = roundIdFor(this.options.roomCode, this.options.seed, epoch);
     const opened = await openEpoch(
@@ -244,9 +248,10 @@ export class VeilSession {
     participants: readonly SeatId[],
   ): Promise<SignedVeilEntry<VeilRecycleEntry>> {
     if (!this.identity || !this.transcript) throw new Error('the Veil round is not open');
+    if (!Array.isArray(cards)) throw new Error('recycle cards are missing');
     const entry: VeilRecycleEntry = {
       epoch,
-      cards: [...cards],
+      cards: cards.slice(),
       participants: this.validateParticipants(participants),
     };
     await this.beginEpoch(epoch, entry.cards, entry.participants);
@@ -268,11 +273,12 @@ export class VeilSession {
    * only the opening epoch would leave the reshuffled stock unopenable.
    */
   liveEpochs(): number[] {
-    return [...this.epochs.keys()].sort((a, b) => a - b);
+    return Array.from(this.epochs.keys()).sort((a, b) => a - b);
   }
 
   participantsFor(epoch: number): readonly SeatId[] {
-    return this.epochs.get(epoch)?.participants ?? [];
+    const seats = this.epochs.get(epoch)?.participants;
+    return Array.isArray(seats) ? seats : [];
   }
 
   participates(seat: SeatId, epoch: number): boolean {
@@ -343,8 +349,9 @@ export class VeilSession {
     if (expectedSeat !== this.options.seat) return null;
     const input =
       current.layers.length === 0
-        ? (this.baseDecks.get(epoch) as readonly string[])
-        : (current.layers[current.layers.length - 1] as VeilLayerEntry).deck;
+        ? this.baseDecks.get(epoch)
+        : current.layers[current.layers.length - 1]?.deck;
+    if (!Array.isArray(input)) throw new Error('the shuffle input is missing');
     const { entry, secret } = await layShuffleLayer(
       current,
       this.options.seat,
@@ -366,8 +373,11 @@ export class VeilSession {
     if (!current) return { code: 'out-of-turn', message: 'unknown deck epoch' };
     const input =
       current.layers.length === 0
-        ? (this.baseDecks.get(entry.epoch) as readonly string[])
-        : (current.layers[current.layers.length - 1] as VeilLayerEntry).deck;
+        ? this.baseDecks.get(entry.epoch)
+        : current.layers[current.layers.length - 1]?.deck;
+    if (!Array.isArray(input)) {
+      return { code: 'wrong-size', message: 'the shuffle input is missing' };
+    }
     const expectedSeat = current.participants[current.layers.length];
     if (expectedSeat === undefined) {
       return { code: 'out-of-turn', message: 'this deck epoch is already closed' };
@@ -471,9 +481,10 @@ export class VeilSession {
 
   /** Builds the deck order the engine deals from once setup cards are open. */
   dealPlan(support: VeilSupport, publicSetup: readonly CardId[]): VeilDealPlan {
+    if (!Array.isArray(publicSetup)) throw new Error('veiled setup openings are missing');
     return {
       deckOrder: veiledDeckOrder(support, this.options.seats, publicSetup, this.options.config),
-      publicSetup: [...publicSetup],
+      publicSetup: publicSetup.slice(),
     };
   }
 
