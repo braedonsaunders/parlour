@@ -233,11 +233,11 @@ export const fr: Messages = {
   'setup.note.ratscrew':
     'Les tapes se jouent en temps réel — la première paume sur la pile l’emporte. Une fausse tape brûle ta carte du dessus.',
   'setup.note.ohhell':
-    'Annonce exactement ce que tu vas prendre. Les salles entre amis pour Oh Hell ne sont pas encore ouvertes.',
+    'Annonce exactement ce que tu vas prendre. Les salles entre amis utilisent les mêmes codes à quatre caractères, la même synchro live et le même retour à table que n’importe quelle table du parlour.',
   'setup.note.scopa':
-    'Vide la table pour marquer une scopa. Les salles entre amis pour Scopa ne sont pas encore ouvertes.',
+    'Vide la table pour marquer une scopa. Les salles entre amis utilisent les mêmes codes à quatre caractères, la même synchro live et le même retour à table que n’importe quelle table du parlour.',
   'setup.note.spite':
-    'Monte le centre de l’as à la dame. Les salles entre amis pour Spite ne sont pas encore ouvertes.',
+    'Monte le centre de l’as à la dame. Les salles entre amis utilisent les mêmes codes à quatre caractères, la même synchro live et le même retour à table que n’importe quelle table du parlour.',
   'setup.note.cribbage':
     'Les salles entre amis partagent le même journal de replay de l’hôte et le même retour à table que le reste de Parlour.',
   'setup.note.cribbageMatch':

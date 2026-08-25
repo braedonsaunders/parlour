@@ -58,6 +58,8 @@ export default function SpiteSetupPage() {
         busy={starting}
         soloBusyLabel={t('setup.busy.stackingPiles')}
         onSolo={startSolo}
+        createHref="/spite/create"
+        createTestId="create-spite-room"
         note={t('setup.note.spite')}
       />
     </GameSetupScreen>

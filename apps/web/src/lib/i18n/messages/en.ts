@@ -238,10 +238,12 @@ export const en = {
   'setup.note.poker': 'Chips are scorekeeping — there is nothing to buy and nothing to cash out.',
   'setup.note.ratscrew':
     'Slaps race in real time — first palm on the pile takes it. Mis-slaps burn your top card.',
-  'setup.note.ohhell': 'Bid exactly what you will take. Friend rooms for Oh Hell are not open yet.',
-  'setup.note.scopa': 'Clear the table to score a scopa. Friend rooms for Scopa are not open yet.',
+  'setup.note.ohhell':
+    'Bid exactly what you will take. Friend rooms use the same four-character codes, live replay sync, and reconnect flow as every parlour table.',
+  'setup.note.scopa':
+    'Clear the table to score a scopa. Friend rooms use the same four-character codes, live replay sync, and reconnect flow as every parlour table.',
   'setup.note.spite':
-    'Build the centre up from ace to queen. Friend rooms for Spite are not open yet.',
+    'Build the centre up from ace to queen. Friend rooms use the same four-character codes, live replay sync, and reconnect flow as every parlour table.',
   'setup.note.cribbage':
     'Friend rooms share the same host-authoritative replay log and reconnect flow as the rest of Parlour.',
   'setup.note.cribbageMatch':

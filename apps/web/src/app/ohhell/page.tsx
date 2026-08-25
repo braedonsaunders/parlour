@@ -64,6 +64,8 @@ export default function OhHellSetupPage() {
         busy={starting}
         soloBusyLabel={t('setup.busy.cuttingDeal')}
         onSolo={startSolo}
+        createHref="/ohhell/create"
+        createTestId="create-ohhell-room"
         note={t('setup.note.ohhell')}
       />
     </GameSetupScreen>

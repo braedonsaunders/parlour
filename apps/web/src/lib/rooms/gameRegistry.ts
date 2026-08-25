@@ -85,6 +85,8 @@ import {
 } from '@parlour/game-eights';
 import { ohhellConfig, ohhellGame, type OhHellRules, type OhHellState } from '@parlour/game-ohhell';
 import { createPokerDef, pokerConfig, type PokerRules, type PokerState } from '@parlour/game-poker';
+import { createScopaDef, scopaConfig, type ScopaRules, type ScopaState } from '@parlour/game-scopa';
+import { spiteConfig, spiteGame, type SpiteRules, type SpiteState } from '@parlour/game-spite';
 import {
   wildpileConfig,
   wildpileGame,
@@ -114,7 +116,9 @@ export type MultiplayerGameSession =
   | GameSession<SpadesState, SpadesRules>
   | GameSession<EightsState, EightsRules>
   | GameSession<PokerState, PokerRules>
-  | GameSession<OhHellState, OhHellRules>;
+  | GameSession<OhHellState, OhHellRules>
+  | GameSession<ScopaState, ScopaRules>
+  | GameSession<SpiteState, SpiteRules>;
 
 export type SessionAuthority = AuthorityAdapter & {
   getSession(): MultiplayerGameSession;
@@ -436,6 +440,22 @@ export const ROOM_GAMES: Record<MultiplayerGameId, RoomGamePack> = {
     configSchema: ohhellConfig,
     createDef: () => ohhellGame,
   }),
+
+  scopa: definePack<ScopaState, ScopaRules>({
+    id: 'scopa',
+    name: 'Scopa',
+    configSchema: scopaConfig,
+    createDef: createScopaDef,
+    veilRefusal: 'until hidden hands can stay hidden',
+  }),
+
+  spite: definePack<SpiteState, SpiteRules>({
+    id: 'spite',
+    name: 'Spite & Malice',
+    configSchema: spiteConfig,
+    createDef: () => spiteGame,
+    veilRefusal: 'until buried payoff cards can stay hidden',
+  }),
 };
 
 /**
@@ -463,10 +483,19 @@ export function findRoomGame(gameId: string | null | undefined): RoomGamePack | 
  * game's sentence was copied.
  */
 export function seatRefusal(pack: RoomGamePack): string {
-  const { min, max } = pack.seats;
+  const { min, max, allowed } = pack.seats;
+  if (allowed && allowed.length > 0) {
+    return `${pack.name} rooms seat ${formatSeatList(allowed)}.`;
+  }
   return min === max
     ? `${pack.name} rooms seat exactly ${min}.`
     : `${pack.name} rooms seat ${min}–${max}.`;
+}
+
+function formatSeatList(seats: readonly number[]): string {
+  if (seats.length === 1) return String(seats[0]);
+  if (seats.length === 2) return `${seats[0]} or ${seats[1]}`;
+  return `${seats.slice(0, -1).join(', ')} or ${seats[seats.length - 1]}`;
 }
 
 /** Every pack, in registry order — for exhaustive tests and tooling. */

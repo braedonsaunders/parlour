@@ -9,6 +9,7 @@ import { presidentCatalog } from '@parlour/game-president';
 import { ratscrewCatalog } from '@parlour/game-ratscrew';
 import { wildpileCatalog } from '@parlour/game-wildpile';
 import { describe, expect, it } from 'vitest';
+import { isMultiplayerGameId } from '@/lib/rooms/gameIds';
 import { GAMES, getGame, getGameMode, isGameId, isGameModeId, modePreset } from './shelf';
 
 describe('game shelf catalog', () => {
@@ -73,6 +74,22 @@ describe('game shelf catalog', () => {
     expect(getGame('president').href).toBe('/president');
     expect(getGame('klondike').href).toBe('/klondike');
     expect(getGame('golf').href).toBe('/golf');
+  });
+
+  it('every multi-seat shelf game has a friend room, and solitaire does not', () => {
+    const SOLO_ONLY = new Set(['klondike', 'golf']);
+    for (const game of GAMES) {
+      if (SOLO_ONLY.has(game.id)) {
+        expect(game.seats, game.id).toEqual([1]);
+        expect(isMultiplayerGameId(game.gameId), game.id).toBe(false);
+      } else {
+        expect(
+          game.seats.every((count) => count >= 2),
+          game.id,
+        ).toBe(true);
+        expect(isMultiplayerGameId(game.gameId), game.id).toBe(true);
+      }
+    }
   });
 
   it('getGame resolves known ids and throws on unknown ones', () => {

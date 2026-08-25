@@ -163,8 +163,8 @@ export type SetupTableActionsProps = {
   soloBusyLabel?: string;
   onSolo: () => void;
   /**
-   * Friend-room create path. When omitted the row is solo-only — Oh Hell,
-   * Scopa, and Spite have no rooms yet.
+   * Friend-room create path. When omitted the row is solo-only — single-seat
+   * solitaire (Klondike, Golf) has no rooms.
    */
   createHref?: string;
   createTestId?: string;

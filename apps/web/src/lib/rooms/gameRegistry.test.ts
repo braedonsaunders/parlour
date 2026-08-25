@@ -25,6 +25,8 @@ describe('room game registry', () => {
     // refused here rather than quietly seated at a Blitz table.
     expect(() => roomGame('klondike')).toThrow(/unsupported room game: klondike/);
     expect(() => roomGame('golf')).toThrow(/unsupported room game: golf/);
+    expect(() => roomGame('spite')).not.toThrow();
+    expect(() => roomGame('scopa')).not.toThrow();
     expect(findRoomGame('bridge')).toBeNull();
     expect(findRoomGame(null)).toBeNull();
     expect(findRoomGame(undefined)).toBeNull();
@@ -50,7 +52,17 @@ describe('room game registry', () => {
       expect(hasValidSeatCount(pack.id, max)).toBe(true);
       expect(hasValidSeatCount(pack.id, min - 1)).toBe(false);
       expect(hasValidSeatCount(pack.id, max + 1)).toBe(false);
+      if (pack.seats.allowed) {
+        for (let count = pack.seats.min; count <= pack.seats.max; count++) {
+          expect(hasValidSeatCount(pack.id, count)).toBe(pack.seats.allowed.includes(count));
+        }
+      }
     }
+  });
+
+  it('refuses the five-seat Scopa ring the rules do not deal', () => {
+    expect(hasValidSeatCount('scopa', 5)).toBe(false);
+    expect(seatRefusal(ROOM_GAMES.scopa)).toMatch(/2, 3, 4 or 6/);
   });
 
   it('resolves a config for every game, and resolving is a fixed point', () => {

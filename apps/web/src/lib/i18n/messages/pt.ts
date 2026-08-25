@@ -243,10 +243,11 @@ export const pt: Messages = {
   'setup.note.ratscrew':
     'Os tapas correm em tempo real — a primeira palma na pilha leva. Um tapa errado queima a carta de cima.',
   'setup.note.ohhell':
-    'Cante exatamente o que você vai fazer. As salas de amigos de Oh Hell ainda não abriram.',
+    'Cante exatamente o que você vai fazer. As salas de amigos usam os mesmos códigos de quatro caracteres, a mesma sincronização ao vivo e o mesmo fluxo de reconexão de qualquer mesa do parlour.',
   'setup.note.scopa':
-    'Limpe a mesa para marcar uma scopa. As salas de amigos de Scopa ainda não abriram.',
-  'setup.note.spite': 'Suba o centro do ás à dama. As salas de amigos de Spite ainda não abriram.',
+    'Limpe a mesa para marcar uma scopa. As salas de amigos usam os mesmos códigos de quatro caracteres, a mesma sincronização ao vivo e o mesmo fluxo de reconexão de qualquer mesa do parlour.',
+  'setup.note.spite':
+    'Suba o centro do ás à dama. As salas de amigos usam os mesmos códigos de quatro caracteres, a mesma sincronização ao vivo e o mesmo fluxo de reconexão de qualquer mesa do parlour.',
   'setup.note.cribbage':
     'As salas de amigos compartilham o mesmo registro de replay do anfitrião e o mesmo fluxo de reconexão do resto do Parlour.',
   'setup.note.cribbageMatch':

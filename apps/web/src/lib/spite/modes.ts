@@ -66,5 +66,5 @@ export function isSpiteModeId(value: unknown): value is SpiteModeId {
 /** Maps resolved rule values back to the presentation preset, for records. */
 export function spiteModeForRules(rules: SpiteRules): SpiteModeId {
   if (!rules.refillMidTurn) return 'cutthroat';
-  return rules.payoffSize <= 10 ? 'quick' : 'classic';
+  return rules.payoffSize <= 12 ? 'quick' : 'classic';
 }

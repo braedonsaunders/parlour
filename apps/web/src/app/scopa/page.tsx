@@ -62,6 +62,8 @@ export default function ScopaSetupPage() {
         busy={starting}
         soloBusyLabel={t('setup.busy.layingTable')}
         onSolo={startSolo}
+        createHref="/scopa/create"
+        createTestId="create-scopa-room"
         note={t('setup.note.scopa')}
       />
     </GameSetupScreen>

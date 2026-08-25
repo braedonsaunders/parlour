@@ -243,11 +243,11 @@ export const es: Messages = {
   'setup.note.ratscrew':
     'Las palmadas se disputan en tiempo real: la primera mano en la pila se la lleva. Una palmada fallida quema tu carta de arriba.',
   'setup.note.ohhell':
-    'Canta exactamente las bazas que vas a llevarte. Las salas de amistades de Oh Hell aún no están abiertas.',
+    'Canta exactamente las bazas que vas a llevarte. Las salas de amistades usan los mismos códigos de cuatro caracteres, la misma sincronización en vivo y el mismo reconexión que cualquier mesa del parlour.',
   'setup.note.scopa':
-    'Limpia la mesa para marcar una scopa. Las salas de amistades de Scopa aún no están abiertas.',
+    'Limpia la mesa para marcar una scopa. Las salas de amistades usan los mismos códigos de cuatro caracteres, la misma sincronización en vivo y el mismo reconexión que cualquier mesa del parlour.',
   'setup.note.spite':
-    'Sube el centro del as a la reina. Las salas de amistades de Spite aún no están abiertas.',
+    'Sube el centro del as a la reina. Las salas de amistades usan los mismos códigos de cuatro caracteres, la misma sincronización en vivo y el mismo reconexión que cualquier mesa del parlour.',
   'setup.note.cribbage':
     'Las salas de amistades comparten el mismo registro de replay del anfitrión y el mismo reconexión que el resto de Parlour.',
   'setup.note.cribbageMatch':

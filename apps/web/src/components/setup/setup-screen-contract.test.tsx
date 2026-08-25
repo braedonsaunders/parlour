@@ -152,10 +152,13 @@ describe('setup screen contract across every shipped game', () => {
     ['Euchre', EuchreSetupPage],
     ['Gin', GinSetupPage],
     ['Hearts', HeartsSetupPage],
+    ['Oh Hell', OhHellSetupPage],
     ['Poker', PokerSetupPage],
     ['President', PresidentSetupPage],
     ['Rat Screw', RatscrewSetupPage],
+    ['Scopa', ScopaSetupPage],
     ['Spades', SpadesSetupPage],
+    ['Spite & Malice', SpiteSetupPage],
     ['Wild', WildSetupPage],
   ];
 

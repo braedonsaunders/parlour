@@ -14,6 +14,12 @@ import { isMultiplayerGameId, type MultiplayerGameId } from './gameIds';
 export interface SeatRange {
   min: number;
   max: number;
+  /**
+   * Exact legal counts when the ring is not contiguous. Scopa seats 2, 3, 4
+   * or 6 — five is not a table, and a min–max check would let a forged
+   * announcement through.
+   */
+  allowed?: readonly number[];
 }
 
 export const DEFAULT_SEAT_RANGE: SeatRange = { min: 2, max: 4 };
@@ -31,6 +37,8 @@ const SEAT_RANGES: Readonly<Record<MultiplayerGameId, SeatRange>> = {
   spades: { min: 4, max: 4 },
   poker: { min: 2, max: 6 },
   ohhell: { min: 3, max: 7 },
+  scopa: { min: 2, max: 6, allowed: [2, 3, 4, 6] },
+  spite: { min: 2, max: 4 },
 };
 
 export function seatRangeFor(gameId: string | null | undefined): SeatRange {
@@ -39,6 +47,8 @@ export function seatRangeFor(gameId: string | null | undefined): SeatRange {
 
 /** True when `seats` is an integer inside the game's supported ring. */
 export function hasValidSeatCount(gameId: string | null | undefined, seats: number): boolean {
-  const { min, max } = seatRangeFor(gameId);
-  return Number.isInteger(seats) && seats >= min && seats <= max;
+  const range = seatRangeFor(gameId);
+  if (!Number.isInteger(seats)) return false;
+  if (range.allowed) return range.allowed.includes(seats);
+  return seats >= range.min && seats <= range.max;
 }

@@ -14,7 +14,9 @@ import { ohhellTablePack } from './tablePacks/ohhell';
 import { pokerTablePack } from './tablePacks/poker';
 import { presidentTablePack } from './tablePacks/president';
 import { ratscrewTablePack } from './tablePacks/ratscrew';
+import { scopaTablePack } from './tablePacks/scopa';
 import { spadesTablePack } from './tablePacks/spades';
+import { spiteTablePack } from './tablePacks/spite';
 import { wildTablePack } from './tablePacks/wild';
 
 /**
@@ -40,6 +42,10 @@ export function RoomGameTable({ gameId }: { gameId: MultiplayerGameId }) {
       return <GameTablePage pack={heartsTablePack} />;
     case 'ohhell':
       return <GameTablePage pack={ohhellTablePack} />;
+    case 'scopa':
+      return <GameTablePage pack={scopaTablePack} />;
+    case 'spite':
+      return <GameTablePage pack={spiteTablePack} />;
     case 'poker':
       return <GameTablePage pack={pokerTablePack} />;
     case 'president':

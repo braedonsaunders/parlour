@@ -233,9 +233,12 @@ export const zh: Messages = {
   'setup.note.hearts': '分数最低的人赢——躲开红心，小心皇后。',
   'setup.note.poker': '筹码只记分——没有要买的东西，也没有要兑的现。',
   'setup.note.ratscrew': '拍牌比的是实时手速——第一只手按上牌堆就拿走。拍错会烧掉你的顶牌。',
-  'setup.note.ohhell': '叫口要和自己能拿的墩数一模一样。Oh Hell 的好友房间还没开放。',
-  'setup.note.scopa': '清空桌面就能记一记 scopa。Scopa 的好友房间还没开放。',
-  'setup.note.spite': '把中心从 A 接到 Q。Spite 的好友房间还没开放。',
+  'setup.note.ohhell':
+    '叫口要和自己能拿的墩数一模一样。好友房间用同样的四字符房间码、实时回放同步和重连流程，和客厅里每张牌桌一样。',
+  'setup.note.scopa':
+    '清空桌面就能记一记 scopa。好友房间用同样的四字符房间码、实时回放同步和重连流程，和客厅里每张牌桌一样。',
+  'setup.note.spite':
+    '把中心从 A 接到 Q。好友房间用同样的四字符房间码、实时回放同步和重连流程，和客厅里每张牌桌一样。',
   'setup.note.cribbage': '好友房间和 Parlour 其他牌桌一样，用房主权威的回放日志和重连流程。',
   'setup.note.cribbageMatch': '多局赛可以单人打；好友房间只打一局完整的 121 分赛。',
   'setup.cribbageRoomsLocked': '好友房间目前只打一局完整的 121 分赛',
