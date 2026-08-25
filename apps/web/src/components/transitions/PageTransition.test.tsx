@@ -12,15 +12,12 @@ let container: HTMLDivElement;
 let root: Root;
 
 const shell = () => container.firstElementChild as HTMLElement;
-const has = (cls: string | undefined) => Boolean(cls) && shell().classList.contains(cls ?? '');
+const has = (cls: string | undefined): boolean =>
+  typeof cls === 'string' && shell().classList.contains(cls);
 const animating = () => has(styles.enter) || has(styles.enterForward) || has(styles.enterBack);
 
 function render(route?: string) {
-  act(() =>
-    root.render(
-      createElement(PageTransition, { children: 'page', ...(route === undefined ? {} : { route }) }),
-    ),
-  );
+  act(() => root.render(createElement(PageTransition, { route, children: 'page' })));
 }
 
 function finishAnimation() {

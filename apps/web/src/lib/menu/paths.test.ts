@@ -14,8 +14,10 @@ describe('menu view routes', () => {
     expect(isMenuViewRoute('/')).toBe(true);
     expect(isMenuViewRoute('/games/')).toBe(true);
     for (const game of GAMES) {
-      expect(game.href, `${game.id} is missing a setup href`).toBeTruthy();
-      expect(isMenuViewRoute(game.href!), game.href ?? undefined).toBe(true);
+      const href = game.href;
+      expect(href, `${game.id} is missing a setup href`).toBeTruthy();
+      if (!href) continue;
+      expect(isMenuViewRoute(href)).toBe(true);
     }
   });
 

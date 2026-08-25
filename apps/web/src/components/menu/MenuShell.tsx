@@ -27,6 +27,10 @@ export function MenuShell({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const store = useMenuNavStore.getState();
+    if (!isMenuViewRoute(pathname)) {
+      if (store.active) store.deactivate();
+      return;
+    }
     if (!store.active) {
       useMenuNavStore.setState({ displayPath: pathname });
     }
@@ -45,14 +49,16 @@ export function MenuShell({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const store = useMenuNavStore.getState();
+    if (!isMenuViewRoute(pathname)) return;
     if (store.frozen && store.active) return;
-    if (isTableRoute(pathname) || !isMenuViewRoute(pathname)) return;
     if (store.active && store.displayPath !== pathname) {
       store.show(pathname, inferMenuDirection(store.displayPath, pathname), false);
     }
   }, [pathname]);
 
-  if (isTableRoute(pathname) || isTableRoute(route)) {
+  // Create, join, profile, and tables are real Next routes. Keeping a cached
+  // menu view over them is why those buttons looked dead after a shelf tap.
+  if (!isMenuViewRoute(pathname) || isTableRoute(pathname) || isTableRoute(route)) {
     return <PageTransition route={pathname}>{children}</PageTransition>;
   }
 

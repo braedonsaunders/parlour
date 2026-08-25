@@ -58,6 +58,26 @@ describe('MenuShell', () => {
     expect(container.textContent).not.toContain('home');
   });
 
+  it('hands create and join routes back to Next so those buttons are not swallowed', () => {
+    act(() => {
+      useMenuNavStore.getState().show('/games', 'forward');
+    });
+    nav.pathname = '/games';
+    render('shelf');
+    expect(container.querySelector('[data-testid="cached-games"]')).not.toBeNull();
+
+    nav.pathname = '/eights/create';
+    render('create-lobby');
+    expect(container.textContent).toContain('create-lobby');
+    expect(container.querySelector('[data-testid="cached-games"]')).toBeNull();
+    expect(useMenuNavStore.getState().active).toBe(false);
+
+    nav.pathname = '/join';
+    render('join-table');
+    expect(container.textContent).toContain('join-table');
+    expect(container.querySelector('[data-testid="cached-games"]')).toBeNull();
+  });
+
   it('pops a frozen iOS history entry back to the previous menu', () => {
     act(() => {
       useMenuNavStore.getState().show('/games', 'forward', true);
