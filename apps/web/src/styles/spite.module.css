@@ -1,251 +1,471 @@
-/* Spite & Malice furniture: the centre builds, each seat's payoff pile and
-   discards, and the take-then-place interaction. */
-
 .screen {
-  --spite-accent: #a074b8;
+  --sp-accent: #3f6f5c;
+  --sp-shade: #1d3a30;
+  --sp-open: #ffe0a1;
+  --sp-held: #66ffe1;
+  --sp-card: clamp(2.9rem, 5vw, 4.1rem);
 }
 
-.feltMark {
-  font-size: 8rem;
-  opacity: 0.12;
+.playfield {
+  background:
+    radial-gradient(ellipse at 50% 44%, rgba(77, 150, 109, 0.18), transparent 58%),
+    linear-gradient(180deg, rgba(8, 31, 28, 0.08), rgba(5, 22, 22, 0.22));
 }
 
-.hudCluster {
-  display: inline-flex;
+/*
+ * Rows, not percentages: opponents / centre builds / your own piles.
+ *
+ * The playfield is the only positioned box on a table, and `.screen` is not a
+ * flow container — a region rendered as its sibling stacks at the top of the
+ * screen. Everything here is a grid row, so a wide table (four seats, four
+ * builds, four discards each) cannot fold onto itself.
+ */
+.board {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
   align-items: center;
-  gap: 0.7rem;
-  margin-left: 0.6rem;
+  /* Top clears the HUD pill; bottom clears the shared 13rem hand rail. */
+  padding: clamp(5.4rem, 11vh, 7rem) 0 12.8rem;
 }
-
-.hudStat {
-  display: inline-flex;
-  flex-direction: column;
-  line-height: 1.1;
-}
-
-.hudStat small {
-  font-size: 0.52rem;
-  font-weight: 800;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: rgba(253, 246, 234, 0.6);
-}
-
-.hudStat strong {
-  font-size: 0.86rem;
-  font-weight: 800;
-  color: #fdf6ea;
-  font-variant-numeric: tabular-nums;
-}
-
-/* --- opponents ------------------------------------------------------------ */
 
 .opponents {
-  position: absolute;
-  top: 6%;
-  left: 50%;
-  transform: translateX(-50%);
   display: flex;
-  gap: 1.4rem;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: center;
+  gap: clamp(0.5rem, 2vw, 1.6rem);
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
+/*
+ * `position: relative` and the seat tokens are both load-bearing: the shared
+ * nameplate paints its pill from `--seat-accent`, and anything absolutely
+ * placed inside a seat needs the seat to be the containing block.
+ */
 .seat {
+  --seat-accent: var(--sp-accent);
+  --seat-shade: var(--sp-shade);
+  position: relative;
   display: grid;
   justify-items: center;
-  gap: 0.25rem;
+  gap: 0.2rem;
+  padding: 0.3rem 0.4rem;
+  border-radius: var(--radius-chunky);
+  transition: background var(--dur-feedback) var(--ease-settle);
 }
 
-.seat[data-turn] .seatBadge {
-  box-shadow: 0 0 0 3px var(--spite-accent);
+.seat[data-turn] {
+  background: rgba(255, 224, 173, 0.14);
+  box-shadow: inset 0 0 0 1px rgba(255, 224, 173, 0.4);
 }
 
-.seatBadge {
-  display: inline-flex;
+.seatHead {
+  display: flex;
   align-items: center;
-  gap: 0.4rem;
-  padding: 0.22rem 0.5rem;
-  border-radius: 999px;
-  background: rgba(16, 24, 32, 0.78);
-  border: 2px solid rgba(253, 246, 234, 0.16);
-}
-
-.seatText {
-  display: grid;
-  line-height: 1.15;
-}
-
-.seatText strong {
-  font-size: 0.76rem;
-  font-weight: 800;
-  color: #fdf6ea;
-}
-
-.seatText small {
-  font-size: 0.58rem;
-  color: rgba(253, 246, 234, 0.66);
-  font-variant-numeric: tabular-nums;
+  gap: 0.35rem;
 }
 
 .seatPiles {
   display: flex;
+  align-items: center;
   gap: 0.2rem;
 }
 
-.seatDiscard {
-  display: inline-grid;
+.handCount {
+  padding-left: 0.15rem;
+  color: var(--ink-dim);
+  font-size: 0.7rem;
+  font-weight: 700;
+  white-space: nowrap;
 }
 
-/* --- centre builds -------------------------------------------------------- */
+/* ---------------------------------------------------------------------------
+   Piles
+   --------------------------------------------------------------------------- */
+
+.pile,
+.centrePile,
+.discardPile {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: var(--sp-card);
+  aspect-ratio: 5 / 7;
+  padding: 0;
+  border: 2px dashed rgba(253, 246, 236, 0.24);
+  border-radius: 0.5rem;
+  background: rgba(6, 18, 22, 0.34);
+  color: var(--ink);
+  cursor: default;
+}
+
+.pile[data-compact] {
+  width: calc(var(--sp-card) * 0.74);
+}
+
+.pile[data-tone='payoff'] {
+  border-style: solid;
+  border-color: color-mix(in srgb, var(--sp-accent) 70%, transparent);
+}
+
+button.pile:not(:disabled),
+.discardPile:not(:disabled),
+.centrePile:not(:disabled) {
+  cursor: pointer;
+}
+
+.pileCount {
+  position: absolute;
+  right: -0.3rem;
+  bottom: -0.35rem;
+  min-width: 1.1rem;
+  padding: 0.02rem 0.24rem;
+  border-radius: 999px;
+  background: rgba(6, 18, 22, 0.92);
+  font-size: 0.6rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.emptySlot {
+  color: rgba(253, 246, 236, 0.4);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+/* ---------------------------------------------------------------------------
+   The card face
+
+   Drawn here rather than as a PlayingCard: this deck is numbers and wilds, so
+   the shared chassis — rank plus suit glyph — has nothing to say about it. The
+   border, radius and inset hairline are deliberately the shared card's, because
+   a Spite card sitting next to the rest of the shelf should look like it came
+   out of the same box.
+   --------------------------------------------------------------------------- */
+
+.face {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border: 0.16rem solid #fffaf0;
+  border-radius: 0.5rem;
+  background:
+    radial-gradient(120% 90% at 50% 0%, #fffdf8 0%, #f6efe1 55%, #e6dbc7 100%),
+    linear-gradient(180deg, #fdf6ec, #e3d6c4);
+  color: #1d2b34;
+  font-family: var(--font-display), sans-serif;
+  line-height: 1;
+  box-shadow: inset 0 0 0 1px rgba(92, 48, 25, 0.14);
+}
+
+/* The rank, large, dead centre. */
+.centreRank {
+  font-size: clamp(1.35rem, 3.1vw, 2.1rem);
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.65);
+}
+
+/* An index in opposite corners, so a card reads from either end of a fan and
+   stays legible when the next one overlaps three-quarters of it. */
+.corner {
+  position: absolute;
+  font-size: clamp(0.5rem, 1.05vw, 0.72rem);
+  font-style: normal;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.75;
+}
+.corner[data-corner='tl'] {
+  top: 0.16rem;
+  left: 0.24rem;
+}
+.corner[data-corner='br'] {
+  right: 0.24rem;
+  bottom: 0.16rem;
+  transform: rotate(180deg);
+}
+
+/*
+ * In a fan, only the leading edge of a card shows.
+ *
+ * The shared rail overlaps cards by up to 48% of their width, so a rank sitting
+ * dead centre lands exactly on the slice edge and the next card cuts it in
+ * half — and half of "12" reads as "1", which is worse than unreadable. A
+ * sliced suit pip never had this problem, which is why the shared chassis can
+ * centre its glyph and this one cannot. The rank moves into the visible band
+ * instead, and the corner indices go, having nothing left to disambiguate.
+ */
+.handCard .face {
+  justify-items: start;
+  padding-left: 0.46rem;
+}
+.handCard .corner {
+  display: none;
+}
+
+/* ---------------------------------------------------------------------------
+   Wilds
+
+   Eighteen cards of the hundred and sixty-two, and most of the game is deciding
+   when to spend one — so they get the plate the numbers do not: deep plum, a
+   gold starburst, a wordmark. A wild already played reads as the rank it took,
+   because that is what the pile demands off it now, with the burst kept behind
+   it so you can still see at a glance that the ladder is standing on a wild.
+   --------------------------------------------------------------------------- */
+
+.face[data-wild] {
+  border-color: #f6ecff;
+  background:
+    radial-gradient(120% 90% at 50% 0%, #a986e8 0%, #7f6bd0 45%, #402f7a 100%),
+    linear-gradient(180deg, #8a5fd6, #402f7a);
+  color: #fff6df;
+  box-shadow: inset 0 0 0 1px rgba(255, 240, 200, 0.3);
+}
+
+.wildBurst {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 0;
+  width: 3.9em;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background:
+    conic-gradient(
+      from 0deg,
+      #ffd98a 0deg 8deg,
+      transparent 8deg 30deg,
+      #ffd98a 30deg 38deg,
+      transparent 38deg 60deg,
+      #ffd98a 60deg 68deg,
+      transparent 68deg 90deg,
+      #ffd98a 90deg 98deg,
+      transparent 98deg 120deg,
+      #ffd98a 120deg 128deg,
+      transparent 128deg 150deg,
+      #ffd98a 150deg 158deg,
+      transparent 158deg 180deg,
+      #ffd98a 180deg 188deg,
+      transparent 188deg 210deg,
+      #ffd98a 210deg 218deg,
+      transparent 218deg 240deg,
+      #ffd98a 240deg 248deg,
+      transparent 248deg 270deg,
+      #ffd98a 270deg 278deg,
+      transparent 278deg 300deg,
+      #ffd98a 300deg 308deg,
+      transparent 308deg 330deg,
+      #ffd98a 330deg 338deg,
+      transparent 338deg 360deg
+    ),
+    radial-gradient(circle, rgba(255, 217, 138, 0.55) 0%, transparent 62%);
+  opacity: 0.72;
+  mask-image: radial-gradient(circle, #000 34%, rgba(0, 0, 0, 0.55) 72%, transparent 100%);
+}
+
+/* The burst is sized in `em` off this, so one font-size scales the whole mark
+   — a wild on a compact discard pile shrinks its starburst with it. */
+.wildMark {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  gap: 0.08rem;
+  font-size: clamp(0.56rem, 1.35vw, 0.9rem);
+}
+.pile[data-compact] .wildMark,
+.discardPile .wildMark {
+  font-size: 0.5rem;
+}
+
+.wildWord {
+  position: relative;
+  font-size: 1em;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  color: #fffaf0;
+  text-shadow:
+    0 1px 0 #33205e,
+    0 2px 6px rgba(24, 12, 48, 0.8),
+    0 0 12px rgba(255, 214, 138, 0.5);
+}
+
+.face[data-wild] .centreRank {
+  color: #fff6df;
+  text-shadow:
+    0 1px 0 #3a2568,
+    0 0 12px rgba(255, 214, 138, 0.55);
+}
+
+.wildTag {
+  font-size: 0.42rem;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: #ffd98a;
+}
+
+/* ---------------------------------------------------------------------------
+   Centre builds and your own piles
+   --------------------------------------------------------------------------- */
 
 .centre {
-  position: absolute;
-  left: 50%;
-  top: 48%;
-  transform: translate(-50%, -50%);
   display: flex;
-  gap: 0.5rem;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(0.4rem, 2vw, 1.2rem);
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
 .centrePile {
-  display: grid;
-  justify-items: center;
-  gap: 0.15rem;
-  padding: 0.25rem;
-  border-radius: 0.5rem;
-  border: 2px dashed rgba(253, 246, 234, 0.18);
-  background: rgba(16, 24, 32, 0.35);
-}
-
-.centrePile[data-target] {
-  border-style: solid;
-  border-color: var(--spite-accent);
-  box-shadow: 0 0 10px rgba(160, 116, 184, 0.6);
-}
-
-.centrePile:disabled {
-  cursor: default;
-}
-
-.centreEmpty {
-  display: grid;
-  place-items: center;
-  width: 2.6rem;
-  height: 3.7rem;
-  border-radius: 0.4rem;
-  background: rgba(253, 246, 234, 0.07);
-  color: rgba(253, 246, 234, 0.55);
-  font-size: 1.1rem;
-  font-weight: 900;
+  width: calc(var(--sp-card) * 1.25);
 }
 
 .needs {
-  font-size: 0.52rem;
-  font-weight: 800;
-  letter-spacing: 0.06em;
+  position: absolute;
+  bottom: -1.1rem;
+  color: var(--ink-dim);
+  font-size: 0.6rem;
+  font-weight: 700;
   text-transform: uppercase;
-  color: rgba(253, 246, 234, 0.55);
+  letter-spacing: 0.04em;
+  white-space: nowrap;
 }
 
-/* --- the local seat ------------------------------------------------------- */
-
-.localStrip {
-  display: grid;
-  justify-items: center;
-  gap: 0.35rem;
-  padding-top: 0.2rem;
-}
-
-.localPiles {
+.localArea {
   display: flex;
-  align-items: flex-end;
-  gap: 1.2rem;
-}
-
-.payoff,
-.discardRow {
-  display: flex;
-  align-items: flex-end;
-  gap: 0.3rem;
-}
-
-.payoff {
-  flex-direction: column;
   align-items: center;
-  gap: 0.12rem;
+  justify-content: center;
+  gap: clamp(0.8rem, 3vw, 2rem);
 }
 
-.payoff small {
-  font-size: 0.52rem;
-  font-weight: 800;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: rgba(253, 246, 234, 0.6);
+.myDiscards {
+  display: flex;
+  align-items: center;
+  gap: clamp(0.3rem, 1.4vw, 0.8rem);
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
-.payoffCard,
 .discardPile {
-  border-radius: 0.45rem;
-  padding: 0.1rem;
-  border: 2px solid transparent;
+  width: calc(var(--sp-card) * 1.05);
 }
 
-.payoffCard[data-held],
-.discardPile[data-held] {
-  border-color: #f0c04e;
-  box-shadow: 0 0 10px rgba(240, 192, 78, 0.6);
+/* ---------------------------------------------------------------------------
+   Holding a card
+   --------------------------------------------------------------------------- */
+
+/*
+ * The same language every other table uses: what you are holding lifts and
+ * lights, what it can reach is ringed, and everything else falls back. The
+ * filter tokens are the shared ones, so Spite and the hand rail read alike.
+ */
+/* Scoped to `.board`: a CSS module rejects a selector with no local class, and
+   these are this table's idea of held/open, not a global one. */
+.board [data-held] {
+  outline: 3px solid var(--sp-held);
+  outline-offset: 2px;
+  translate: 0 -0.3rem;
 }
 
-.discardPile[data-target] {
-  border-color: var(--spite-accent);
-  box-shadow: 0 0 10px rgba(160, 116, 184, 0.6);
+.board [data-legal-target] {
+  border-style: solid;
+  border-color: var(--sp-open);
+  box-shadow:
+    0 0 0 2px var(--sp-open),
+    0 0 18px rgba(255, 195, 96, 0.6);
 }
 
-.payoffCard:disabled,
-.discardPile:disabled {
+.board[data-holding] .centrePile:not([data-legal-target]),
+.board[data-holding] .discardPile:not([data-legal-target]):not([data-held]),
+.board[data-holding] .opponents {
+  filter: var(--unplayable-filter);
+  opacity: var(--unplayable-opacity);
+}
+
+.centrePile,
+.discardPile,
+.pile,
+.opponents {
+  transition:
+    filter var(--dur-feedback) var(--ease-settle),
+    opacity var(--dur-feedback) var(--ease-settle);
+}
+
+/*
+ * The hand card chassis.
+ *
+ * Sized from the shared rail's own `--hand-card-width` so a Spite hand fans
+ * exactly like every other hand on the shelf.
+ *
+ * `pointer-events: auto` is required, not decorative: the shared rail turns
+ * pointer events OFF for itself and back on only for `.card`, which is a hashed
+ * CSS-module class this game's face is not. Without this the whole hand is
+ * unclickable and the board underneath swallows every tap.
+ */
+.handCard {
+  pointer-events: auto;
+  display: block;
+  width: var(--hand-card-width, 5.6rem);
+  aspect-ratio: 5 / 7;
+  padding: 0;
+  border: 0;
+  border-radius: 0.5rem;
+  background: transparent;
+  cursor: pointer;
+}
+
+.handCard:disabled {
   cursor: default;
-  opacity: 0.75;
 }
 
-.payoffEmpty {
-  font-size: 0.68rem;
-  color: rgba(253, 246, 234, 0.45);
+.handCard .face {
+  box-shadow:
+    0 8px 18px -6px rgba(3, 11, 15, 0.7),
+    inset 0 0 0 1px rgba(92, 48, 25, 0.16);
 }
 
-.discardEmpty {
-  display: inline-grid;
-  width: 2.6rem;
-  height: 3.7rem;
-  border-radius: 0.4rem;
-  background: rgba(253, 246, 234, 0.06);
-  border: 2px dashed rgba(253, 246, 234, 0.14);
+.stock {
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
 }
 
-/* --- prompts -------------------------------------------------------------- */
-
-.prompt {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 0.8rem;
-  font-weight: 800;
-  color: #fdf6ea;
+.result {
+  position: absolute;
+  z-index: 45;
+  left: 50%;
+  top: 44%;
+  translate: -50% -50%;
+  padding: 1rem 1.4rem;
+  border-radius: var(--radius-chunky);
+  background: rgba(12, 26, 32, 0.94);
+  box-shadow: var(--shadow-lift);
+  text-align: center;
 }
 
-.cancel {
-  font-size: 0.68rem;
-  font-weight: 700;
-  color: rgba(253, 246, 234, 0.6);
-  text-decoration: underline;
+.result h2 {
+  margin: 0;
+  font-size: 1.05rem;
 }
 
-.waiting,
-.matchOver {
-  font-size: 0.8rem;
-  font-weight: 700;
-  color: rgba(253, 246, 234, 0.7);
-}
-
-.matchOver {
-  color: #f0c04e;
-  font-weight: 900;
+@media (prefers-reduced-motion: reduce) {
+  .centrePile,
+  .discardPile,
+  .pile,
+  .opponents {
+    transition: none;
+  }
 }
