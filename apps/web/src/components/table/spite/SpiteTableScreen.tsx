@@ -241,7 +241,14 @@ export function SpiteTableScreen({
           ) : null}
         </div>
 
-        <HandRail count={view.hand.length} zone={`hand:${view.localSeat}`} label="Your hand">
+        {/* Looser than the default 0.48: these faces carry a big central
+            numeral, and at the default the card in front slices it in half. */}
+        <HandRail
+          count={view.hand.length}
+          zone={`hand:${view.localSeat}`}
+          label="Your hand"
+          fanStepRatio={0.82}
+        >
           {view.hand.map((card, index) => (
             <HandRailCard
               key={card.card}
@@ -310,7 +317,7 @@ function SpiteCard({ card, placeholder }: { card: SpiteCardView | null; placehol
 
   if (card.wild) {
     return (
-      <span className={styles.face} data-wild="">
+      <span className={styles.face} data-wild="" data-rank={card.label || undefined}>
         {/* The burst sits inside the mark so it follows it into the fan band
             rather than staying centred while the wordmark shifts off it. */}
         <span className={styles.wildMark}>
@@ -329,7 +336,7 @@ function SpiteCard({ card, placeholder }: { card: SpiteCardView | null; placehol
   }
 
   return (
-    <span className={styles.face}>
+    <span className={styles.face} data-rank={card.label}>
       <i className={styles.corner} data-corner="tl" aria-hidden="true">
         {card.label}
       </i>

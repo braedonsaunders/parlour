@@ -5,7 +5,7 @@ import { type FxEvent } from '@parlour/engine';
 import { gsap } from 'gsap';
 import { getAudioManager } from '@/lib/audio/AudioManager';
 import { soundCuesForFx, soundDefsForSfxPack } from '@/lib/audio/sfx';
-import { calculateFanStep } from '@/components/table/HandRail';
+import { calculateFanStep, fanStepRatioOf } from '@/components/table/HandRail';
 import { prefersCalmMotion } from '@/lib/table/calm-motion';
 import { FX_TIMING, type FxCue, type Zone } from '@/lib/table/fx-motion';
 import { cancelWaapiAnimations, isCardFlightCue, playCardFlight } from '@/lib/table/waapi-flight';
@@ -382,7 +382,7 @@ function predictedFanSlot(
     0;
   if (cardWidth <= 0) return null;
   const rem = Number.parseFloat(getComputedStyle(rail).fontSize) || 16;
-  const step = calculateFanStep(rail.clientWidth, cardWidth, plan.length);
+  const step = calculateFanStep(rail.clientWidth, cardWidth, plan.length, fanStepRatioOf(rail));
   const fanN = Math.max(plan.length, 1);
   const fanIndex = index - (plan.length - 1) / 2;
   const fanUn = 1 / fanN;

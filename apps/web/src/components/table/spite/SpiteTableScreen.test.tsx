@@ -168,13 +168,39 @@ describe('SpiteTableScreen', () => {
     }
   });
 
-  it('moves the rank into the visible band of a fanned card', () => {
-    // The shared rail overlaps cards by up to 48% of their width, so a rank
-    // centred on the face lands on the slice edge and half of "12" reads as
-    // "1". The fix is structural, and silent if it regresses.
-    const handFace = /\.handCard \.face \{([^}]*)\}/.exec(SPITE_STYLES)?.[1] ?? '';
-    expect(handFace).toContain('justify-items: start');
-    expect(SPITE_STYLES).toContain('.handCard .corner');
+  it('sizes the wild ring off the card, not off the rank', () => {
+    // The rank's size is a compromise with the fan — it shrinks on a narrow
+    // screen so the card in front cannot slice it. A ring has no such
+    // constraint, and inheriting that compromise put it at 23% of a phone card
+    // against 52% of a desktop one. Container units hold it steady instead.
+    const mark = /\.wildMark \{([^}]*)\}/.exec(SPITE_STYLES)?.[1] ?? '';
+    expect(mark).toMatch(/font-size: [\d.]+cqw/);
+    const face = /\.face \{([^}]*)\}/.exec(SPITE_STYLES)?.[1] ?? '';
+    expect(face, 'cqw needs a container to resolve against').toContain(
+      'container-type: inline-size',
+    );
+  });
+
+  it('scales the rank per context so a thumbnail pile is not wearing a full-size numeral', () => {
+    // One knob per context, or the numeral and the ring drift apart.
+    expect(SPITE_STYLES).toContain('--rank-size');
+    expect(SPITE_STYLES).toContain('.handCard .face');
+    expect(SPITE_STYLES).toContain('.pile[data-compact] .face');
+    const rank = /\.centreRank \{([^}]*)\}/.exec(SPITE_STYLES)?.[1] ?? '';
+    expect(rank).toContain('font-size: var(--rank-size)');
+  });
+
+  it('loosens the fan enough that the card in front cannot slice the rank', () => {
+    // At the rail's default the visible band ends at 51% of a card, and a
+    // numeral centred at 50% is cut exactly in half — "12" reads as "1". The
+    // face is identical in hand and on the felt, so the fan has to give way.
+    const transport = table();
+    render(transport);
+    const rail = container.querySelector<HTMLElement>('[data-zone^="hand:"]')!;
+    const ratio = Number(rail.dataset.fanRatio);
+    expect(ratio).toBeGreaterThan(0.6);
+    // Half a centred numeral plus its own half-width has to clear the overlap.
+    expect(ratio).toBeGreaterThan(0.5 + 0.06);
   });
 
   it('gives a wild its own plate, and shows the rank once it has taken one', () => {
@@ -186,9 +212,5 @@ describe('SpiteTableScreen', () => {
       expect(entry.label).toBe('');
     }
     expect(SPITE_STYLES).toContain('.face[data-wild]');
-    // The burst is sized in `em` off the mark so it shrinks with a compact pile
-    // instead of overflowing a discard the size of a thumbnail.
-    const burst = /\.wildBurst \{([^}]*)\}/.exec(SPITE_STYLES)?.[1] ?? '';
-    expect(burst).toMatch(/width: [\d.]+em/);
   });
 });

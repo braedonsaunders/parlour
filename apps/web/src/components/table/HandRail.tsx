@@ -25,6 +25,8 @@ export type HandRailProps = {
   fanPlan?: readonly string[];
   /** Card that should land in the lifted just-drawn seat. */
   liftCard?: string | null;
+  /** Loosen the fan for faces that carry a large central mark. */
+  fanStepRatio?: number;
   children: ReactNode;
 };
 
@@ -38,11 +40,46 @@ export type HandRailCardProps = {
   children: ReactNode;
 };
 
-export function calculateFanStep(width: number, cardWidth: number, count: number): number {
+/** How much of a card the next one may cover, when there is room to choose. */
+export const DEFAULT_FAN_STEP_RATIO = 0.48;
+
+/**
+ * `ratio` is the largest share of a card's width the fan will advance by, so a
+ * bigger number means a looser fan showing more of each card. Games whose faces
+ * carry a large central mark need a looser one: at the default, the visible
+ * band ends at 51% and a numeral centred at 50% is sliced exactly in half.
+ */
+export function calculateFanStep(
+  width: number,
+  cardWidth: number,
+  count: number,
+  ratio: number = DEFAULT_FAN_STEP_RATIO,
+): number {
   if (count <= 1 || width <= 0 || cardWidth <= 0) return 0;
-  const edgeGutter = Math.max(20, Math.min(40, width * 0.06));
+  /*
+   * The gutter grows with the ratio because the fan is an arc, not a row: the
+   * outermost cards are rotated, so they reach further than this linear step
+   * accounts for, and the wider the fan the further they reach. At the default
+   * ratio the factor is exactly 1 and nothing moves — the reserve only appears
+   * for a game that has asked to spread out, which is the only case where the
+   * edge cards were running off a narrow screen.
+   */
+  const spread = 1 + (ratio / DEFAULT_FAN_STEP_RATIO - 1) * 1.25;
+  const edgeGutter = Math.max(20, Math.min(40, width * 0.06)) * spread;
   const availableSpan = Math.max(0, width - edgeGutter * 2 - cardWidth);
-  return Math.min(cardWidth * 0.48, availableSpan / (count - 1));
+  return Math.min(cardWidth * ratio, availableSpan / (count - 1));
+}
+
+/**
+ * The ratio a rail was rendered with.
+ *
+ * Read from the DOM rather than passed around because the flight animation
+ * targets the same fan from a completely different call path — if the two ever
+ * disagreed, cards would land beside the slot they were flying to.
+ */
+export function fanStepRatioOf(rail: HTMLElement): number {
+  const declared = Number.parseFloat(rail.dataset.fanRatio ?? '');
+  return Number.isFinite(declared) && declared > 0 ? declared : DEFAULT_FAN_STEP_RATIO;
 }
 
 /** Shared motion and hit-target chassis for every playable card in a hand rail. */
@@ -104,6 +141,7 @@ export function HandRail({
   dealState,
   fanPlan,
   liftCard,
+  fanStepRatio = DEFAULT_FAN_STEP_RATIO,
   children,
 }: HandRailProps) {
   const receiving = useFanReceiving();
@@ -155,7 +193,7 @@ export function HandRail({
     if (count > 0 && geometry.cardWidth === 0) measure();
   }, [count, geometry.cardWidth, measure]);
 
-  const step = calculateFanStep(geometry.width, geometry.cardWidth, count);
+  const step = calculateFanStep(geometry.width, geometry.cardWidth, count, fanStepRatio);
   const fanN = Math.max(count, 1);
   return (
     <div
@@ -173,6 +211,7 @@ export function HandRail({
       data-deal-state={dealState}
       data-receiving={receiving || undefined}
       data-fan-plan={fanPlan?.join(',') || undefined}
+      data-fan-ratio={fanStepRatio}
       data-fan-lift={liftCard || undefined}
       // The fan's spread is a pure function of this count, published so a card
       // in flight can work out the angle of the slot it is aiming at by

@@ -148,41 +148,146 @@ button.pile:not(:disabled),
    --------------------------------------------------------------------------- */
 
 .face {
+  --rank-ink: #2b3a45;
+  --rank-tint: #eef1f4;
   position: relative;
   display: grid;
   place-items: center;
   width: 100%;
   height: 100%;
   overflow: hidden;
-  border: 0.16rem solid #fffaf0;
+  border: 0.16rem solid #fffdf8;
   border-radius: 0.5rem;
   background:
-    radial-gradient(120% 90% at 50% 0%, #fffdf8 0%, #f6efe1 55%, #e6dbc7 100%),
-    linear-gradient(180deg, #fdf6ec, #e3d6c4);
-  color: #1d2b34;
+    radial-gradient(112% 78% at 50% 6%, #ffffff 0%, #fdfcf9 46%, var(--rank-tint) 100%), #fffdf8;
+  color: var(--rank-ink);
+  container-type: inline-size;
   font-family: var(--font-display), sans-serif;
   line-height: 1;
-  box-shadow: inset 0 0 0 1px rgba(92, 48, 25, 0.14);
+  box-shadow:
+    inset 0 0 0 1px rgba(20, 34, 44, 0.1),
+    inset 0 -0.42rem 0.5rem -0.4rem color-mix(in srgb, var(--rank-ink) 24%, transparent);
+}
+
+/*
+ * A hairline frame in the rank's own colour.
+ *
+ * The boxed deck prints each rank in its own hue, which looks decorative but is
+ * doing real work: colour here is an *alias* for the number, not a second
+ * dimension beside it, so a hand of five sorts itself out at a glance without
+ * anything having to be read twice. That is the opposite of the four suits this
+ * pack used to deal, where colour and rank varied independently and the colour
+ * therefore told you nothing.
+ */
+.face::after {
+  content: '';
+  position: absolute;
+  inset: 0.16rem;
+  border: 1.5px solid color-mix(in srgb, var(--rank-ink) 42%, transparent);
+  border-radius: 0.3rem;
+  pointer-events: none;
+}
+
+/*
+ * One knob per context.
+ *
+ * The numeral and the wild ring are both sized off `--rank-size`, so a card
+ * cannot end up with a big number and a small ring or the reverse — which is
+ * exactly what happened when the two were tuned independently and the compact
+ * discard piles ended up wearing a full-size starburst.
+ */
+.face {
+  --rank-size: 1.5rem;
+}
+.handCard .face {
+  --rank-size: clamp(1.05rem, 3.4vw, 2.6rem);
+}
+.pile .face,
+.centrePile .face,
+.discardPile .face {
+  --rank-size: clamp(0.95rem, 2vw, 1.5rem);
+}
+.pile[data-compact] .face {
+  --rank-size: clamp(0.72rem, 1.5vw, 1.12rem);
 }
 
 /* The rank, large, dead centre. */
 .centreRank {
-  font-size: clamp(1.35rem, 3.1vw, 2.1rem);
+  color: var(--rank-ink);
+  font-size: var(--rank-size);
   font-weight: 900;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.04em;
   font-variant-numeric: tabular-nums;
-  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.65);
+  text-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.9),
+    0 2px 5px color-mix(in srgb, var(--rank-ink) 26%, transparent);
 }
 
 /* An index in opposite corners, so a card reads from either end of a fan and
    stays legible when the next one overlaps three-quarters of it. */
 .corner {
   position: absolute;
-  font-size: clamp(0.5rem, 1.05vw, 0.72rem);
+  z-index: 1;
+  color: var(--rank-ink);
+  font-size: max(0.5rem, calc(var(--rank-size) * 0.3));
   font-style: normal;
-  font-weight: 800;
+  font-weight: 900;
   font-variant-numeric: tabular-nums;
-  opacity: 0.75;
+  opacity: 0.92;
+}
+
+/*
+ * Twelve hues, one per rank, spaced round the wheel and pulled toward ink so
+ * they read as printed rather than lit. Adjacent ranks are deliberately far
+ * apart — 6 and 7 are the pair you most need to tell apart in a fan.
+ */
+.face[data-rank='1'] {
+  --rank-ink: #c0392b;
+  --rank-tint: #fbeceb;
+}
+.face[data-rank='2'] {
+  --rank-ink: #1f7a8c;
+  --rank-tint: #e9f4f6;
+}
+.face[data-rank='3'] {
+  --rank-ink: #d9822b;
+  --rank-tint: #fdf2e6;
+}
+.face[data-rank='4'] {
+  --rank-ink: #4b3f9e;
+  --rank-tint: #eeecf8;
+}
+.face[data-rank='5'] {
+  --rank-ink: #3f8f4f;
+  --rank-tint: #ecf5ee;
+}
+.face[data-rank='6'] {
+  --rank-ink: #b5306e;
+  --rank-tint: #fbeaf2;
+}
+.face[data-rank='7'] {
+  --rank-ink: #17607a;
+  --rank-tint: #e8f2f5;
+}
+.face[data-rank='8'] {
+  --rank-ink: #a8571b;
+  --rank-tint: #fbefe4;
+}
+.face[data-rank='9'] {
+  --rank-ink: #6b3fa0;
+  --rank-tint: #f2ecfa;
+}
+.face[data-rank='10'] {
+  --rank-ink: #2f7d5f;
+  --rank-tint: #e9f4f0;
+}
+.face[data-rank='11'] {
+  --rank-ink: #9c2f35;
+  --rank-tint: #f9ebec;
+}
+.face[data-rank='12'] {
+  --rank-ink: #2c4a8c;
+  --rank-tint: #eaeff8;
 }
 .corner[data-corner='tl'] {
   top: 0.16rem;
@@ -195,40 +300,34 @@ button.pile:not(:disabled),
 }
 
 /*
- * In a fan, only the leading edge of a card shows.
+ * A hand card is the same card as one on the felt.
  *
- * The shared rail overlaps cards by up to 48% of their width, so a rank sitting
- * dead centre lands exactly on the slice edge and the next card cuts it in
- * half — and half of "12" reads as "1", which is worse than unreadable. A
- * sliced suit pip never had this problem, which is why the shared chassis can
- * centre its glyph and this one cannot. The rank moves into the visible band
- * instead, and the corner indices go, having nothing left to disambiguate.
+ * It did not used to be: the rank was shoved into the left of the face because
+ * the default fan advances by 48% of a card's width, leaving a visible band
+ * that ends at 51% — and a numeral centred at 50% therefore got sliced exactly
+ * down the middle, so "12" read as "1". Moving the numeral fixed the slicing
+ * and made the hand look like a different deck from the board. The fan is
+ * loosened instead (see `fanStepRatio` on the rail), so the whole numeral
+ * clears the card in front and the face never needs a second layout.
  */
-.handCard .face {
-  justify-items: start;
-  padding-left: 0.46rem;
-}
-.handCard .corner {
-  display: none;
-}
 
 /* ---------------------------------------------------------------------------
    Wilds
 
    Eighteen cards of the hundred and sixty-two, and most of the game is deciding
-   when to spend one — so they get the plate the numbers do not: deep plum, a
-   gold starburst, a wordmark. A wild already played reads as the rank it took,
-   because that is what the pile demands off it now, with the burst kept behind
-   it so you can still see at a glance that the ladder is standing on a wild.
+   when to spend one. Every number card is white with a single hue; the wild is
+   the one card that owns all of them at once, which is both how the boxed deck
+   marks its wilds and the fastest way to find one in a fan. A wild already
+   played reads as the rank it took, because that is what the pile demands off
+   it now, with the spectrum kept behind so you can still see at a glance that
+   the ladder is standing on a wild.
    --------------------------------------------------------------------------- */
 
 .face[data-wild] {
-  border-color: #f6ecff;
-  background:
-    radial-gradient(120% 90% at 50% 0%, #a986e8 0%, #7f6bd0 45%, #402f7a 100%),
-    linear-gradient(180deg, #8a5fd6, #402f7a);
-  color: #fff6df;
-  box-shadow: inset 0 0 0 1px rgba(255, 240, 200, 0.3);
+  --rank-ink: #2a1c4a;
+  --rank-tint: #efeaf8;
+  border-color: #fffdf8;
+  background: radial-gradient(112% 78% at 50% 6%, #ffffff 0%, #fbf9fd 44%, #efeaf8 100%), #fffdf8;
 }
 
 .wildBurst {
@@ -236,41 +335,31 @@ button.pile:not(:disabled),
   top: 50%;
   left: 50%;
   z-index: 0;
-  width: 3.9em;
+  width: 4.1em;
   aspect-ratio: 1;
   transform: translate(-50%, -50%);
   border-radius: 50%;
+  /*
+   * The white disc is painted *over* the spectrum rather than masked out of it.
+   * A mask would have needed the -webkit- prefix to be safe, and when the mask
+   * silently does not apply you do not get a ring, you get a solid rainbow disc
+   * with the wordmark unreadable on top of it.
+   */
   background:
+    radial-gradient(circle, #fffdf8 0 58%, transparent 59%),
     conic-gradient(
-      from 0deg,
-      #ffd98a 0deg 8deg,
-      transparent 8deg 30deg,
-      #ffd98a 30deg 38deg,
-      transparent 38deg 60deg,
-      #ffd98a 60deg 68deg,
-      transparent 68deg 90deg,
-      #ffd98a 90deg 98deg,
-      transparent 98deg 120deg,
-      #ffd98a 120deg 128deg,
-      transparent 128deg 150deg,
-      #ffd98a 150deg 158deg,
-      transparent 158deg 180deg,
-      #ffd98a 180deg 188deg,
-      transparent 188deg 210deg,
-      #ffd98a 210deg 218deg,
-      transparent 218deg 240deg,
-      #ffd98a 240deg 248deg,
-      transparent 248deg 270deg,
-      #ffd98a 270deg 278deg,
-      transparent 278deg 300deg,
-      #ffd98a 300deg 308deg,
-      transparent 308deg 330deg,
-      #ffd98a 330deg 338deg,
-      transparent 338deg 360deg
-    ),
-    radial-gradient(circle, rgba(255, 217, 138, 0.55) 0%, transparent 62%);
-  opacity: 0.72;
-  mask-image: radial-gradient(circle, #000 34%, rgba(0, 0, 0, 0.55) 72%, transparent 100%);
+      from 200deg,
+      #c0392b,
+      #d9822b,
+      #d8b02a,
+      #3f8f4f,
+      #1f7a8c,
+      #2c4a8c,
+      #6b3fa0,
+      #b5306e,
+      #c0392b
+    );
+  opacity: 0.95;
 }
 
 /* The burst is sized in `em` off this, so one font-size scales the whole mark
@@ -281,38 +370,53 @@ button.pile:not(:disabled),
   display: grid;
   place-items: center;
   gap: 0.08rem;
-  font-size: clamp(0.56rem, 1.35vw, 0.9rem);
-}
-.pile[data-compact] .wildMark,
-.discardPile .wildMark {
-  font-size: 0.5rem;
+  /*
+   * Sized off the card, not off `--rank-size`.
+   *
+   * The numeral's size is a compromise with the fan — it has to shrink on a
+   * narrow screen so the card in front cannot slice it — but a ring has no
+   * such constraint, and when it inherited that compromise it came out at 23%
+   * of a phone card against 52% of a desktop one. `cqw` keeps it at the same
+   * fraction of the card at every size, which is the only thing that reads as
+   * correct.
+   */
+  font-size: 13.5cqw;
 }
 
 .wildWord {
   position: relative;
   font-size: 1em;
   font-weight: 900;
-  letter-spacing: 0.1em;
-  color: #fffaf0;
-  text-shadow:
-    0 1px 0 #33205e,
-    0 2px 6px rgba(24, 12, 48, 0.8),
-    0 0 12px rgba(255, 214, 138, 0.5);
+  letter-spacing: 0.02em;
+  /*
+   * Spectrum letters, and nothing else in this rule may set a background:
+   * `background-clip: text` clips every layer, so a plate behind the text would
+   * be clipped to the glyphs too and never show.
+   */
+  background-image: linear-gradient(100deg, #c0392b, #d9822b, #3f8f4f, #1f7a8c, #6b3fa0, #b5306e);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 
 .face[data-wild] .centreRank {
-  color: #fff6df;
-  text-shadow:
-    0 1px 0 #3a2568,
-    0 0 12px rgba(255, 214, 138, 0.55);
+  position: relative;
+  padding: 0 0.1em;
+  background: rgba(255, 253, 248, 0.92);
+  color: #2a1c4a;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.9);
 }
 
 .wildTag {
+  position: relative;
+  padding: 0 0.24em;
+  border-radius: 0.2em;
+  background: rgba(255, 253, 248, 0.92);
   font-size: 0.42rem;
   font-weight: 800;
   letter-spacing: 0.09em;
   text-transform: uppercase;
-  color: #ffd98a;
+  color: #6b3fa0;
 }
 
 /* ---------------------------------------------------------------------------
