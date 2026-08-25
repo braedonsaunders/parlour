@@ -39,14 +39,11 @@
   cursor: pointer;
   transition:
     transform var(--dur-feedback) var(--ease-pop),
-    border-color var(--dur-tap) ease,
-    filter var(--dur-tap) ease;
-  will-change: transform;
+    border-color var(--dur-tap) ease;
 }
 
 .tile:hover {
   transform: translateY(-4px) scale(1.02);
-  filter: saturate(1.06);
 }
 
 .tile[data-selected='true'] {

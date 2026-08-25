@@ -23,6 +23,10 @@ describe('game library layout', () => {
     expect(grid).toMatch(/grid-template-columns:\s*repeat\(4, minmax\(0, 1fr\)\);/);
   });
 
+  it('does not sample the scene through a backdrop-filter on the search chrome', () => {
+    expect(declarationsFor('.search')).not.toMatch(/backdrop-filter:/);
+  });
+
   it('uses one vertical grid column on phones with no horizontal scroller', () => {
     const phone = styles.slice(styles.indexOf('@media (max-width: 640px)'));
 

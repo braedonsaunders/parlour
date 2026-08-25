@@ -1,33 +1,19 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import styles from '@/styles/page-transition.module.css';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { resetMenuNavForTests, useMenuNavStore } from '@/stores/menuNav';
 import { PageTransition } from './PageTransition';
-
-const nav = vi.hoisted(() => ({ pathname: '/' }));
-vi.mock('next/navigation', () => ({ usePathname: () => nav.pathname }));
 
 let container: HTMLDivElement;
 let root: Root;
 
 const shell = () => container.firstElementChild as HTMLElement;
-const has = (cls: string | undefined): boolean =>
-  typeof cls === 'string' && shell().classList.contains(cls);
-const animating = () => has(styles.enter) || has(styles.enterForward) || has(styles.enterBack);
 
 function render(route?: string) {
   act(() => root.render(<PageTransition route={route}>page</PageTransition>));
 }
 
-function finishAnimation() {
-  act(() => {
-    shell().dispatchEvent(new Event('animationend', { bubbles: true }));
-  });
-}
-
 beforeEach(() => {
-  nav.pathname = '/';
   resetMenuNavForTests();
   container = document.createElement('div');
   document.body.append(container);
@@ -42,50 +28,18 @@ afterEach(() => {
 });
 
 describe('PageTransition', () => {
-  it('settles the page in, then gets out of the way', () => {
-    expect(has(styles.enter)).toBe(true);
-
-    finishAnimation();
-
-    // The class carries a transform. Leaving it on — even at its identity
-    // resting value — would make this wrapper the containing block for every
-    // `position: fixed` descendant and re-anchor the corner chrome for good.
-    expect(animating()).toBe(false);
+  it('keeps a still full-viewport shell so Windows does not promote it over the scene', () => {
+    expect(shell().className).toBe('relative z-10 min-h-dvh');
+    expect(shell().textContent).toBe('page');
   });
 
-  it('re-arms on the next screen', () => {
-    finishAnimation();
-    nav.pathname = '/games';
-    render();
-    expect(animating()).toBe(true);
-  });
-
-  it('slides forward and back with the menu stack', () => {
-    finishAnimation();
+  it('does not arm motion when the menu stack hops', () => {
     useMenuNavStore.getState().show('/games', 'forward');
     render('/games');
-    expect(has(styles.enterForward)).toBe(true);
+    expect(shell().className).toBe('relative z-10 min-h-dvh');
 
-    finishAnimation();
     useMenuNavStore.getState().show('/', 'back');
     render('/');
-    expect(has(styles.enterBack)).toBe(true);
-  });
-
-  it('ignores an animation finishing somewhere inside the page', () => {
-    const inner = document.createElement('div');
-    shell().append(inner);
-
-    act(() => {
-      inner.dispatchEvent(new Event('animationend', { bubbles: true }));
-    });
-
-    expect(animating()).toBe(true);
-  });
-
-  it('leaves tables to the full-screen wipe', () => {
-    nav.pathname = '/spades/table';
-    render();
-    expect(animating()).toBe(false);
+    expect(shell().className).toBe('relative z-10 min-h-dvh');
   });
 });

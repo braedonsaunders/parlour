@@ -13,6 +13,18 @@ function declarationsFor(selector: string): string {
   return match![1]!;
 }
 
+describe('mode tile compositing', () => {
+  it('lifts on hover without a CSS filter or a standing will-change layer', () => {
+    const rest = declarationsFor('.tile');
+    const hover = declarationsFor('.tile:hover');
+
+    expect(rest).not.toMatch(/will-change:/);
+    expect(rest).not.toMatch(/filter:/);
+    expect(hover).not.toMatch(/filter:/);
+    expect(hover).toMatch(/transform:/);
+  });
+});
+
 describe('mode picker artwork containment', () => {
   it('clips animated artwork in an isolated block-level preview frame', () => {
     const preview = declarationsFor('.preview');
