@@ -34,10 +34,13 @@ const { FakeHowl } = vi.hoisted(() => {
     stopped = false;
     unloaded = false;
 
-    constructor(opts: { src: string[]; format?: string[]; loop?: boolean }) {
+    html5: boolean;
+
+    constructor(opts: { src: string[]; format?: string[]; loop?: boolean; html5?: boolean }) {
       this.src = opts.src[0]!;
       this.format = opts.format;
       this.loop = opts.loop ?? false;
+      this.html5 = opts.html5 ?? false;
       FakeHowl.instances.push(this);
     }
 
@@ -69,6 +72,15 @@ const { FakeHowl } = vi.hoisted(() => {
 
     seek(): number | this {
       return this;
+    }
+
+    playing(id?: number): boolean {
+      if (id === undefined) return this.playingIds.size > 0;
+      return this.playingIds.has(id);
+    }
+
+    on(event: string, handler: () => void): this {
+      return this.once(event, handler);
     }
 
     once(event: string, handler: () => void): this {
@@ -136,7 +148,11 @@ describe('MusicController', () => {
 
     expect(controller.getState().trackId).toBe('casino-1');
     expect(controller.getState().status).toBe('playing');
-    expect(howlFor('music-casino-1.m4a')).toMatchObject({ format: ['m4a'], loop: false });
+    expect(howlFor('music-casino-1.m4a')).toMatchObject({
+      format: ['m4a'],
+      loop: false,
+      html5: false,
+    });
 
     controller.next();
     expect(controller.getState().trackId).toBe('casino-2');
@@ -375,6 +391,54 @@ describe('MusicController', () => {
     expect(controller.getState().trackId).toBe(FALLBACK_TRACK.id);
     expect(howlFor('parlour-ambience.wav')?.loop).toBe(true);
     expect(controller.getState().status).toBe('playing');
+  });
+
+  it('uses html5 music on iOS so a shelf navigation cannot suspend the theme', () => {
+    vi.stubGlobal('navigator', {
+      userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)',
+      platform: 'iPhone',
+      maxTouchPoints: 5,
+    });
+    const controller = new MusicController(makeManager());
+    controller.setMenu(true);
+    controller.play();
+    expect(howlFor('music-title.m4a')).toMatchObject({ html5: true });
+    vi.unstubAllGlobals();
+  });
+
+  it('keeps wrapping the title theme after the first playthrough', () => {
+    const controller = new MusicController(makeManager());
+    controller.setMenu(true);
+    controller.play();
+
+    howlFor('music-title.m4a')?.emit('end');
+    howlFor('music-title.m4a')?.emit('end');
+    expect(controller.getState()).toMatchObject({ status: 'playing', trackId: 'title-1' });
+  });
+
+  it('does not retire a track on playerror so a later gesture can retry', () => {
+    const controller = new MusicController(makeManager());
+    controller.setMenu(true);
+    controller.play();
+    howlFor('music-title.m4a')?.emit('playerror');
+
+    expect(controller.getState().trackId).toBe('title-1');
+    controller.next();
+    expect(controller.getState().trackId).toBe('title-1');
+    expect(howlFor('parlour-ambience.wav')).toBeUndefined();
+  });
+
+  it('restarts a silenced voice without changing tracks', () => {
+    const controller = new MusicController(makeManager());
+    controller.setMenu(true);
+    controller.play();
+    const howl = howlFor('music-title.m4a')!;
+    howl.pause();
+    expect(howl.playing()).toBe(false);
+
+    controller.ensurePlaying();
+    expect(howl.playing()).toBe(true);
+    expect(controller.getState()).toMatchObject({ status: 'playing', trackId: 'title-1' });
   });
 
   it('pauses when muted and resumes when unmuted', () => {

@@ -57,10 +57,12 @@ vi.mock('howler', () => ({
   Howl: FakeHowl,
   Howler: {
     volume: (value: number) => howlerVolume(value),
-    ctx: { resume: () => Promise.resolve() },
+    autoSuspend: true,
+    ctx: { state: 'running', resume: vi.fn(() => Promise.resolve()) },
   },
 }));
 
+import { Howler } from 'howler';
 import {
   AudioManager,
   AUDIO_STORAGE_KEY,
@@ -262,15 +264,63 @@ describe('voice concurrency', () => {
 });
 
 describe('unlock', () => {
-  it('unlocks on the first user gesture only', () => {
+  it('unlocks on the first user gesture and keeps resuming afterwards', async () => {
+    const resume = vi.fn(() => Promise.resolve());
+    (
+      Howler as { autoSuspend?: boolean; ctx?: { state: string; resume: () => Promise<void> } }
+    ).ctx = {
+      state: 'suspended',
+      resume,
+    };
+
     const manager = makeManager();
+    expect(Howler.autoSuspend).toBe(false);
     expect(manager.isUnlocked()).toBe(false);
 
     manager.unlock();
     window.dispatchEvent(new Event('pointerdown'));
     expect(manager.isUnlocked()).toBe(true);
+    await Promise.resolve();
+    expect(resume).toHaveBeenCalledTimes(1);
 
+    (Howler as { ctx?: { state: string; resume: () => Promise<void> } }).ctx = {
+      state: 'suspended',
+      resume,
+    };
     window.dispatchEvent(new Event('keydown'));
-    expect(manager.isUnlocked()).toBe(true);
+    await Promise.resolve();
+    expect(resume).toHaveBeenCalledTimes(2);
+    manager.dispose();
+  });
+
+  it('holds a silent audio session on iOS after the first gesture', () => {
+    vi.stubGlobal('navigator', {
+      userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)',
+      platform: 'iPhone',
+      maxTouchPoints: 5,
+    });
+    const play = vi.fn(function (this: { paused: boolean }) {
+      this.paused = false;
+      return Promise.resolve();
+    });
+    vi.stubGlobal(
+      'Audio',
+      class {
+        loop = false;
+        preload = '';
+        volume = 1;
+        paused = true;
+        play = play;
+        pause = vi.fn();
+        setAttribute = vi.fn();
+      },
+    );
+
+    const manager = makeManager();
+    manager.unlock();
+    window.dispatchEvent(new Event('pointerdown'));
+    expect(play).toHaveBeenCalledTimes(1);
+    manager.dispose();
+    vi.unstubAllGlobals();
   });
 });

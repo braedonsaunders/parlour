@@ -1,6 +1,21 @@
 import { Howl, Howler } from 'howler';
+import { isAppleTouchDevice } from '@/lib/audio/platform';
 
 export const AUDIO_STORAGE_KEY = 'parlour.audio.v1';
+
+type HowlerRuntime = {
+  volume?: (value: number) => void;
+  ctx?: { state?: string; resume?: () => Promise<void> };
+  autoSuspend?: boolean;
+};
+
+/** One-sample WAV that keeps the iOS audio session alive across SPA navigations. */
+const SESSION_HOLD_SRC =
+  'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA';
+
+function howlerRuntime(): HowlerRuntime {
+  return Howler as unknown as HowlerRuntime;
+}
 
 export type AudioChannel = 'master' | 'music' | 'sfx';
 
@@ -92,11 +107,17 @@ export class AudioManager {
   private entries = new Map<string, Entry>();
   private listeners = new Set<(settings: AudioSettings) => void>();
   private unlocked = false;
-  private unlockBound: (() => void) | null = null;
+  private gestureBound = false;
+  private gestureHandler: (() => void) | null = null;
+  private lifecycleHandler: (() => void) | null = null;
+  private sessionHold: HTMLAudioElement | null = null;
 
   constructor() {
     this.settings = parseSettings(this.readStorage());
     this.applyMasterVolume();
+    // Howler otherwise suspends the shared context after 30s of "silence",
+    // which races unmute and iOS PWA route changes.
+    howlerRuntime().autoSuspend = false;
   }
 
   getSettings(): AudioSettings {
@@ -208,23 +229,55 @@ export class AudioManager {
     for (const id of this.entries.keys()) this.stop(id);
   }
 
-  /** Arms a one-shot gesture listener so mobile autoplay policy releases the context. */
+  /**
+   * Arms persistent gesture + page-lifecycle listeners. The first gesture
+   * unlocks autoplay; every later gesture resumes the context so iOS cannot
+   * leave music dead after a mute toggle or a client-side navigation.
+   */
   unlock(): void {
-    if (this.unlocked || this.unlockBound || typeof window === 'undefined') return;
+    if (this.gestureBound || typeof window === 'undefined') return;
+    this.gestureBound = true;
 
-    const handler = () => {
+    const onGesture = () => {
       this.unlocked = true;
-      const ctx = (Howler as unknown as { ctx?: { resume?: () => Promise<void> } }).ctx;
-      void ctx?.resume?.();
-      window.removeEventListener('pointerdown', handler);
-      window.removeEventListener('keydown', handler);
-      this.unlockBound = null;
+      this.holdSession();
+      void this.resumeContext();
       this.notify();
     };
 
-    this.unlockBound = handler;
-    window.addEventListener('pointerdown', handler, { once: true });
-    window.addEventListener('keydown', handler, { once: true });
+    this.gestureHandler = onGesture;
+    window.addEventListener('pointerdown', onGesture, { capture: true });
+    window.addEventListener('touchstart', onGesture, { capture: true, passive: true });
+    window.addEventListener('keydown', onGesture, { capture: true });
+    this.watchPageLifecycle();
+  }
+
+  /** Resume the shared Howler context if the browser suspended it. */
+  async resumeContext(): Promise<boolean> {
+    this.holdSession();
+    const ctx = howlerRuntime().ctx;
+    if (ctx && ctx.state !== 'running' && typeof ctx.resume === 'function') {
+      try {
+        await ctx.resume();
+      } catch {
+        return false;
+      }
+    }
+    return !ctx || ctx.state === 'running' || ctx.state === undefined;
+  }
+
+  dispose(): void {
+    if (typeof window !== 'undefined' && this.gestureHandler) {
+      window.removeEventListener('pointerdown', this.gestureHandler, { capture: true });
+      window.removeEventListener('touchstart', this.gestureHandler, { capture: true });
+      window.removeEventListener('keydown', this.gestureHandler, { capture: true });
+    }
+    this.gestureHandler = null;
+    this.gestureBound = false;
+    this.unwatchPageLifecycle();
+    this.sessionHold?.pause();
+    this.sessionHold = null;
+    this.listeners.clear();
   }
 
   private ensureHowl(entry: Entry): Howl | null {
@@ -247,6 +300,46 @@ export class AudioManager {
       entry.failed = true;
       return null;
     }
+  }
+
+  private holdSession(): void {
+    if (!isAppleTouchDevice() || typeof Audio === 'undefined') return;
+    if (!this.sessionHold) {
+      try {
+        const hold = new Audio(SESSION_HOLD_SRC);
+        hold.loop = true;
+        hold.preload = 'auto';
+        hold.volume = 0.01;
+        hold.setAttribute('playsinline', 'true');
+        this.sessionHold = hold;
+      } catch {
+        return;
+      }
+    }
+    if (this.sessionHold.paused) {
+      const play = this.sessionHold.play?.();
+      if (play && typeof play.catch === 'function') void play.catch(() => undefined);
+    }
+  }
+
+  private watchPageLifecycle(): void {
+    if (this.lifecycleHandler || typeof window === 'undefined') return;
+    const onShow = () => {
+      if (document.visibilityState === 'hidden') return;
+      void this.resumeContext().then((running) => {
+        if (running && this.unlocked) this.notify();
+      });
+    };
+    this.lifecycleHandler = onShow;
+    document.addEventListener('visibilitychange', onShow);
+    window.addEventListener('pageshow', onShow);
+  }
+
+  private unwatchPageLifecycle(): void {
+    if (!this.lifecycleHandler || typeof window === 'undefined') return;
+    document.removeEventListener('visibilitychange', this.lifecycleHandler);
+    window.removeEventListener('pageshow', this.lifecycleHandler);
+    this.lifecycleHandler = null;
   }
 
   private applyMasterVolume(): void {
@@ -306,5 +399,6 @@ export function getAudioManager(): AudioManager {
 }
 
 export function resetAudioManagerForTests(): void {
+  instance?.dispose();
   instance = null;
 }

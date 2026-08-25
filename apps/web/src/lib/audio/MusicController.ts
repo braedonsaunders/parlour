@@ -14,6 +14,7 @@ import {
   type MusicTrack,
 } from '@/lib/audio/music';
 import { getAudioManager } from '@/lib/audio/AudioManager';
+import { isAppleTouchDevice } from '@/lib/audio/platform';
 
 export const MUSIC_STORAGE_KEY = 'parlour.music.v1';
 
@@ -93,6 +94,43 @@ export class MusicController {
   autoStart(): void {
     if (this.state.status !== 'idle') return;
     this.play();
+  }
+
+  /**
+   * Restarts the current song if we still want playback but the voice went
+   * silent (iOS suspending the element, a rejected autoplay, a route change).
+   */
+  ensurePlaying(): void {
+    if (!this.wantPlaying || this.pausedByMute) return;
+    const trackId = this.state.trackId;
+    if (!trackId || this.gainFor(trackId) <= 0) return;
+
+    const voice = this.voices.get(trackId);
+    if (!voice || voice.failed) {
+      this.play(trackId);
+      return;
+    }
+
+    const playing =
+      voice.soundId !== null &&
+      typeof voice.howl.playing === 'function' &&
+      voice.howl.playing(voice.soundId);
+    if (playing) {
+      if (this.state.status !== 'playing') {
+        this.state.status = 'playing';
+        this.notify();
+      }
+      return;
+    }
+
+    const soundId = voice.howl.play(voice.soundId ?? undefined);
+    voice.soundId = soundId;
+    voice.gain = this.gainFor(trackId);
+    voice.howl.volume(voice.gain, soundId);
+    if (this.state.status !== 'playing') {
+      this.state.status = 'playing';
+      this.notify();
+    }
   }
 
   play(trackId?: string): void {
@@ -337,7 +375,10 @@ export class MusicController {
         src: [track.src],
         ...(track.format ? { format: [track.format] } : {}),
         loop: track.loop ?? false,
-        html5: false,
+        // iOS PWAs suspend Web Audio on client navigations. An <audio>
+        // element keeps the title theme alive; SFX stay on Web Audio so they
+        // cannot steal iOS's single HTML5 slot.
+        html5: isAppleTouchDevice(),
         volume: 0,
       }),
       soundId: null,
@@ -350,11 +391,7 @@ export class MusicController {
       if (generation !== this.transitionGeneration || !this.wantPlaying) return;
       if (this.state.trackId === trackId) this.next();
     });
-    voice.howl.once('playerror', () => {
-      voice.failed = true;
-    });
-    voice.howl.once('end', () => {
-      if (generation !== this.transitionGeneration) return;
+    voice.howl.on('end', () => {
       if (!this.wantPlaying || this.state.status !== 'playing') return;
       if (this.state.trackId === trackId) this.next();
     });

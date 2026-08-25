@@ -4,25 +4,25 @@ import { useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import { PARLOUR_SFX } from '@/lib/audio/sfx';
 import { resolveMusicContext } from '@/lib/audio/context';
-import { useAudioManager, useAudioStore, useMusicController } from '@/stores/audio';
+import { useAudioManager, useMusicController } from '@/stores/audio';
 
 /** Preloads audio on every route, unlocks it on gesture, and keeps the music alive. */
 export function AudioDirector() {
   const manager = useAudioManager();
   const controller = useMusicController();
-  const unlocked = useAudioStore((state) => state.unlocked);
-  const music = useAudioStore((state) => state.channels.music);
-  const master = useAudioStore((state) => state.channels.master);
   const pathname = usePathname();
 
   useEffect(() => {
     controller.setMenu(resolveMusicContext(pathname) === 'menu');
-  }, [controller, pathname]);
-
-  useEffect(() => {
-    if (!unlocked || music.muted || master.muted) return;
-    controller.autoStart();
-  }, [controller, unlocked, music.muted, master.muted]);
+    const kick = () => {
+      if (!manager.isUnlocked() || manager.gainFor('music') <= 0) return;
+      controller.autoStart();
+      controller.ensurePlaying();
+    };
+    const unsubscribe = manager.subscribe(kick);
+    kick();
+    return unsubscribe;
+  }, [controller, manager, pathname]);
 
   useEffect(() => {
     const onPointerDown = (event: PointerEvent) => {

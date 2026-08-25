@@ -20,10 +20,16 @@ const { FakeHowl } = vi.hoisted(() => {
     stop(): void {}
     unload(): void {}
     fade(): void {}
+    playing(): boolean {
+      return true;
+    }
     volume(): number | this {
       return this;
     }
     seek(): number | this {
+      return this;
+    }
+    on(): this {
       return this;
     }
     once(): this {
