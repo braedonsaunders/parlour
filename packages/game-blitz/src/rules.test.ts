@@ -96,6 +96,12 @@ describe('handValue', () => {
     expect(bestSuit([])).toBeNull();
   });
 
+  it('skips unopened handles instead of throwing, so a guest table can paint mid-peel', () => {
+    expect(() => bestSuit(['v#0', 'v#1', 'S1'])).not.toThrow();
+    expect(bestSuit(['v#0', 'v#1', 'S1'])).toEqual({ suit: 'spades', value: 11 });
+    expect(handValue(['v#0', 'v#1', 'v#2'], BASE)).toBe(0);
+  });
+
   it('recognises a natural suited 31 as a blitz', () => {
     expect(handValue(['S1', 'S12', 'S13'], BASE)).toBe(31);
     expect(isBlitz(['S1', 'S12', 'S13'])).toBe(true);

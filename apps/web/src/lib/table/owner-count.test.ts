@@ -21,4 +21,8 @@ describe('ownerCurrentCount', () => {
   it('returns null when this view has no local hand', () => {
     expect(ownerCurrentCount([{ hand: ['S1', 'S13', 'S12'], isLocal: false }])).toBeNull();
   });
+
+  it('does not crash when the local hand is still veiled handles', () => {
+    expect(ownerCurrentCount([{ hand: ['v#0', 'v#1', 'v#2'], isLocal: true }])).toBe(0);
+  });
 });

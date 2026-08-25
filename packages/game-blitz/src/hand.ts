@@ -20,8 +20,9 @@ export function suitOf(card: CardId): string {
 export function suitSums(hand: readonly CardId[]): Map<string, number> {
   const sums = new Map<string, number>();
   for (const card of hand) {
-    const suit = suitOf(card);
-    sums.set(suit, (sums.get(suit) ?? 0) + pipValue(card));
+    const face = DECK.faces[card];
+    if (!face?.suit || typeof face.rank !== 'number') continue;
+    sums.set(face.suit, (sums.get(face.suit) ?? 0) + pipValue(card));
   }
   return sums;
 }
