@@ -27,7 +27,7 @@
         height: 100%;
         background: #10282c;
         color: var(--paper);
-        font-family: "Iowan Old Style", Palatino, "Palatino Linotype", Georgia, serif;
+        font-family: 'Iowan Old Style', Palatino, 'Palatino Linotype', Georgia, serif;
       }
 
       .shell {
@@ -69,11 +69,7 @@
         padding: 18px 18px 16px;
         background:
           radial-gradient(ellipse 70% 40% at 50% 0%, rgba(255, 255, 255, 0.08), transparent 50%),
-          repeating-linear-gradient(
-            125deg,
-            rgba(255, 255, 255, 0.015) 0 2px,
-            transparent 2px 6px
-          ),
+          repeating-linear-gradient(125deg, rgba(255, 255, 255, 0.015) 0 2px, transparent 2px 6px),
           linear-gradient(180deg, #2b7674, #1d5256 70%);
         box-shadow:
           inset 0 1px 0 rgba(255, 255, 255, 0.14),
@@ -171,18 +167,13 @@
       }
 
       .card.back {
-        background:
-          repeating-linear-gradient(
-            45deg,
-            #245c62 0 4px,
-            #1b484e 4px 8px
-          );
+        background: repeating-linear-gradient(45deg, #245c62 0 4px, #1b484e 4px 8px);
         border: 1px solid #14383c;
         box-shadow: 0 6px 10px rgba(0, 0, 0, 0.28);
       }
 
       .card.back::after {
-        content: "P";
+        content: 'P';
         position: absolute;
         inset: 8px;
         border: 1px solid rgba(226, 176, 73, 0.45);
@@ -403,20 +394,38 @@
 
     <script>
       const RANK = { A: 1, J: 11, Q: 12, K: 13 };
-      const SUIT_COLOR = { "♠": "black", "♣": "black", "♥": "red", "♦": "red" };
+      const SUIT_COLOR = { '♠': 'black', '♣': 'black', '♥': 'red', '♦': 'red' };
 
       const columns = [
-        ["A♠", "5♦", "J♣", "10♥", "9♠"],
-        ["K♥", "2♣", "7♦", "Q♠", "4♥"],
-        ["10♣", "6♠", "A♦", "8♦", "7♣"],
-        ["5♠", "K♣", "9♥", "2♦", "Q♥"],
-        ["3♣", "J♦", "4♠", "10♦", "6♥"],
-        ["8♣", "A♥", "5♣", "K♦", "2♠"],
-        ["9♦", "3♦", "J♥", "4♦", "Q♣"],
+        ['A♠', '5♦', 'J♣', '10♥', '9♠'],
+        ['K♥', '2♣', '7♦', 'Q♠', '4♥'],
+        ['10♣', '6♠', 'A♦', '8♦', '7♣'],
+        ['5♠', 'K♣', '9♥', '2♦', 'Q♥'],
+        ['3♣', 'J♦', '4♠', '10♦', '6♥'],
+        ['8♣', 'A♥', '5♣', 'K♦', '2♠'],
+        ['9♦', '3♦', 'J♥', '4♦', 'Q♣'],
       ];
 
-      const stock = ["3♠", "6♣", "K♠", "A♣", "5♥", "J♠", "2♥", "7♥", "Q♦", "4♣", "8♠", "10♠", "6♦", "9♣", "7♠", "3♥", "6♠"];
-      let waste = "8♥";
+      const stock = [
+        '3♠',
+        '6♣',
+        'K♠',
+        'A♣',
+        '5♥',
+        'J♠',
+        '2♥',
+        '7♥',
+        'Q♦',
+        '4♣',
+        '8♠',
+        '10♠',
+        '6♦',
+        '9♣',
+        '7♠',
+        '3♥',
+        '6♠',
+      ];
+      let waste = '8♥';
       let flying = false;
 
       function parse(face) {
@@ -431,34 +440,34 @@
         return Math.abs(a - b) === 1;
       }
 
-      function cardEl(face, extra = "") {
+      function cardEl(face, extra = '') {
         const { rank, suit, color } = parse(face);
-        const el = document.createElement("button");
-        el.type = "button";
+        const el = document.createElement('button');
+        el.type = 'button';
         el.className = `card face ${color} ${extra}`.trim();
         el.dataset.face = face;
         el.innerHTML = `<span class="tl">${rank}<span>${suit}</span></span><span class="pip">${suit}</span><span class="br">${rank}<span>${suit}</span></span>`;
         return el;
       }
 
-      function backEl(extra = "") {
-        const el = document.createElement("button");
-        el.type = "button";
+      function backEl(extra = '') {
+        const el = document.createElement('button');
+        el.type = 'button';
         el.className = `card back ${extra}`.trim();
         return el;
       }
 
       function render() {
-        const tableau = document.getElementById("tableau");
+        const tableau = document.getElementById('tableau');
         tableau.replaceChildren();
         columns.forEach((col, i) => {
-          const wrap = document.createElement("div");
-          wrap.className = "col";
+          const wrap = document.createElement('div');
+          wrap.className = 'col';
           col.forEach((face, j) => {
             const exposed = j === col.length - 1;
-            const el = cardEl(face, exposed && legal(face) ? "playable" : "");
+            const el = cardEl(face, exposed && legal(face) ? 'playable' : '');
             if (exposed && legal(face)) {
-              el.addEventListener("click", () => playFrom(i));
+              el.addEventListener('click', () => playFrom(i));
               el.title = `Play ${face} onto ${waste}`;
             } else {
               el.disabled = true;
@@ -468,48 +477,46 @@
           tableau.appendChild(wrap);
         });
 
-        const stockBox = document.getElementById("stock");
+        const stockBox = document.getElementById('stock');
         stockBox.replaceChildren();
         const shown = Math.min(3, stock.length);
         for (let i = 0; i < shown; i++) {
-          const back = backEl(i === shown - 1 ? "stock-draw" : "");
-          if (i === shown - 1) back.addEventListener("click", drawStock);
+          const back = backEl(i === shown - 1 ? 'stock-draw' : '');
+          if (i === shown - 1) back.addEventListener('click', drawStock);
           stockBox.appendChild(back);
         }
         if (stock.length === 0) {
-          const empty = document.createElement("div");
-          empty.className = "card";
-          empty.style.background = "transparent";
-          empty.style.border = "1px dashed rgba(244,239,228,0.25)";
-          empty.style.boxShadow = "none";
+          const empty = document.createElement('div');
+          empty.className = 'card';
+          empty.style.background = 'transparent';
+          empty.style.border = '1px dashed rgba(244,239,228,0.25)';
+          empty.style.boxShadow = 'none';
           stockBox.appendChild(empty);
         }
 
-        const wasteBox = document.getElementById("waste");
+        const wasteBox = document.getElementById('waste');
         wasteBox.replaceChildren(cardEl(waste));
 
         const remaining = columns.reduce((n, col) => n + col.length, 0);
-        document.getElementById("cleared").textContent = String(35 - remaining);
-        document.getElementById("left").textContent = String(remaining);
-        document.getElementById("stockHint").textContent =
-          stock.length === 0 ? "empty" : `${stock.length} left · tap to turn`;
+        document.getElementById('cleared').textContent = String(35 - remaining);
+        document.getElementById('left').textContent = String(remaining);
+        document.getElementById('stockHint').textContent =
+          stock.length === 0 ? 'empty' : `${stock.length} left · tap to turn`;
       }
 
       function setStatus(text) {
-        document.getElementById("status").textContent = text;
+        document.getElementById('status').textContent = text;
       }
 
       function playableList() {
-        return columns
-          .map((col) => col[col.length - 1])
-          .filter((face) => face && legal(face));
+        return columns.map((col) => col[col.length - 1]).filter((face) => face && legal(face));
       }
 
       function afterChange(note) {
         render();
         const plays = playableList();
         if (plays.length) {
-          setStatus(`${note} Hole is ${waste}. Play ${plays.join(" or ")}.`);
+          setStatus(`${note} Hole is ${waste}. Play ${plays.join(' or ')}.`);
         } else if (stock.length) {
           setStatus(`${note} No ±1 showing. Turn the stock.`);
         } else {
@@ -517,7 +524,7 @@
           setStatus(
             left
               ? `${note} Stock is gone. ${left} left on the grass — that is your score.`
-              : `${note} Table cleared. Hole in one.`
+              : `${note} Table cleared. Hole in one.`,
           );
         }
       }
@@ -536,18 +543,22 @@
       function drawStock() {
         if (flying || stock.length === 0) return;
         const face = stock.pop();
-        fly(face, () => {
-          waste = face;
-          afterChange(`Turned ${face}.`);
-        }, true);
+        fly(
+          face,
+          () => {
+            waste = face;
+            afterChange(`Turned ${face}.`);
+          },
+          true,
+        );
       }
 
       function fly(face, done, fromStock) {
         flying = true;
         const origin = fromStock
-          ? document.querySelector("#stock .card:last-child")
+          ? document.querySelector('#stock .card:last-child')
           : document.querySelector(`.card.playable[data-face="${CSS.escape(face)}"]`);
-        const dest = document.querySelector("#waste .card") || document.getElementById("waste");
+        const dest = document.querySelector('#waste .card') || document.getElementById('waste');
         if (!origin || !dest) {
           flying = false;
           done();
@@ -555,11 +566,11 @@
         }
         const a = origin.getBoundingClientRect();
         const b = dest.getBoundingClientRect();
-        const ghost = cardEl(face, "flight");
+        const ghost = cardEl(face, 'flight');
         ghost.style.left = `${a.left}px`;
         ghost.style.top = `${a.top}px`;
         document.body.appendChild(ghost);
-        origin.classList.add("gone");
+        origin.classList.add('gone');
         requestAnimationFrame(() => {
           ghost.style.transform = `translate(${b.left - a.left}px, ${b.top - a.top}px)`;
         });
