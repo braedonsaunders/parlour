@@ -196,4 +196,14 @@ describe('table compositor diet', () => {
     expect(declarationsFor(table, '.flightCardVisual')).not.toMatch(/filter:/);
     expect(declarationsFor(table, '.flightCardVisual .card')).toMatch(/box-shadow:/);
   });
+
+  it('does not interpolate or hover-swap a CSS filter on the hand', () => {
+    const card = table.match(/^\.card\s*\{([^}]*)\}/m);
+    expect(card, '.card exists').not.toBeNull();
+    expect(card![1]).toMatch(/transition:\s*transform 140ms/);
+    expect(card![1]).not.toMatch(/filter/);
+    expect(declarationsFor(table, '.localHand button.card:not(:disabled):hover')).not.toMatch(
+      /filter:/,
+    );
+  });
 });

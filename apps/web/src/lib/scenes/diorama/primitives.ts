@@ -15,6 +15,16 @@
 
 import { hex } from './noise';
 
+/**
+ * The live scene is a full-bleed layer under home chrome and every table.
+ * `desynchronized` opens a second swap chain; on Windows, DComp clears the
+ * overlay tiles (logo, Play, filtered cards) to black whenever parallax
+ * presents a new bitmap. Keep this on the page compositor.
+ */
+export const LIVE_SCENE_CONTEXT: CanvasRenderingContext2DSettings = {
+  alpha: false,
+};
+
 /** A 2D context, or a thrown error. See the note above on why this asserts. */
 export function context2d(
   canvas: HTMLCanvasElement,

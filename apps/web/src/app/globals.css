@@ -112,13 +112,15 @@
       var(--shadow-ambient);
     transition:
       transform var(--dur-tap) var(--ease-pop),
-      filter var(--dur-tap) ease;
-    will-change: transform;
+      box-shadow var(--dur-tap) ease;
   }
 
   .btn-fat:hover {
     transform: translate3d(0, -2px, 0) scale(1.03);
-    filter: saturate(1.08);
+    box-shadow:
+      inset 0 2px 0 var(--bevel-light),
+      inset 0 -4px 0 var(--bevel-dark),
+      var(--shadow-lift);
   }
 
   .btn-fat:active {

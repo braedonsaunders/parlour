@@ -18,4 +18,8 @@
   width: 100%;
   height: 100%;
   display: block;
+  /* Own a compositor texture so a parallax present does not discard the
+     HTML tiles sitting above this bitmap (Windows DComp flashes those black). */
+  transform: translateZ(0);
+  backface-visibility: hidden;
 }

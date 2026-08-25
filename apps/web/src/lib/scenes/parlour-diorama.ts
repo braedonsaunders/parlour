@@ -6,6 +6,7 @@ import {
   ellipse,
   fillPat,
   glow,
+  LIVE_SCENE_CONTEXT,
   makeTex,
   rr,
   tongue,
@@ -107,7 +108,7 @@ export function mountParlourDiorama(
   canvas: HTMLCanvasElement,
   options: DioramaOptions,
 ): () => void {
-  const ctx = context2d(canvas, { alpha: false, desynchronized: true });
+  const ctx = context2d(canvas, LIVE_SCENE_CONTEXT);
 
   /* ------------------------------------------------------------------ */
   /* textures — generated once                                           */
