@@ -1,7 +1,7 @@
 import type { LegalMove } from '@parlour/engine';
 import { describe, expect, it } from 'vitest';
 import type { KlondikeTableView } from './view';
-import { moveForTarget, selectionForCard, targetsForSelection } from './view';
+import { describeHint, moveForTarget, selectionForCard, targetsForSelection } from './view';
 
 function view(legal: readonly LegalMove[]): KlondikeTableView {
   return {
@@ -41,5 +41,21 @@ describe('Klondike table selection', () => {
 
   it('does not turn an inert public card into a fake source', () => {
     expect(selectionForCard(view([{ id: 'stock.draw' }]), 'tableau:0', 'S13')).toBeNull();
+  });
+});
+
+describe('Klondike hint copy', () => {
+  it('shows the spoken reason without zone ids', () => {
+    const table = view([]);
+    expect(
+      describeHint(
+        {
+          move: { id: 'tableau.move', payload: { from: 0, card: 'D13', to: 1 } },
+          reason: 'Move the King of diamonds to an empty column to turn a hidden card.',
+        },
+        table,
+      ),
+    ).toBe('Move the King of diamonds to an empty column to turn a hidden card.');
+    expect(describeHint(null, table)).toBeNull();
   });
 });

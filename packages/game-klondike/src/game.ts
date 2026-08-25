@@ -17,7 +17,10 @@ import {
   TABLEAU_COLUMNS,
   canPlaceOnFoundation,
   canPlaceOnTableau,
+  isKing,
   isPackedRun,
+  nameOfCard,
+  rankOfCard,
   suitOfCard,
   type KlondikeSuit,
 } from './cards';
@@ -436,25 +439,177 @@ export function legalMovesFor(state: KlondikeState): LegalMove[] {
   return legal;
 }
 
+type HintKind =
+  | 'foundation-uncover'
+  | 'foundation'
+  | 'uncover'
+  | 'expose'
+  | 'waste-tableau'
+  | 'empty-for-king'
+  | 'draw'
+  | 'recycle';
+
+interface RankedHint {
+  move: LegalMove;
+  score: number;
+  kind: HintKind;
+}
+
 export function hintFor(state: KlondikePlayerView): KlondikeHint | null {
-  const legal = legalMovesFor(state);
-  const tableauFoundation = legal.find((move) => move.id === 'tableau.toFoundation');
-  if (tableauFoundation) return { move: tableauFoundation, reason: 'Build a foundation.' };
-  const wasteFoundation = legal.find((move) => move.id === 'waste.toFoundation');
-  if (wasteFoundation) return { move: wasteFoundation, reason: 'The waste can build upward.' };
-  const uncover = legal.find((move) => {
-    if (move.id !== 'tableau.move') return false;
-    const input = move.payload as TableauMovePayload;
-    const source = state.tableau[input.from] as KlondikeColumn;
-    return source.down.length > 0 && source.up[0] === input.card;
+  let best: RankedHint | null = null;
+  for (const move of legalMovesFor(state)) {
+    const ranked = rankHint(state, move);
+    if (!ranked || ranked.score <= 0) continue;
+    if (!best || ranked.score > best.score) best = { move, ...ranked };
+  }
+  return best ? { move: best.move, reason: hintReason(state, best.move, best.kind) } : null;
+}
+
+function rankHint(
+  state: KlondikePlayerView,
+  move: LegalMove,
+): { score: number; kind: HintKind } | null {
+  switch (move.id) {
+    case 'tableau.toFoundation': {
+      const from = (move.payload as TableauSourcePayload).from;
+      const column = state.tableau[from];
+      if (!column) return null;
+      const uncovers = column.up.length === 1 && column.down.length > 0;
+      const ace = rankOfCard(column.up.at(-1) ?? '') === 1;
+      return {
+        score: 180 + (uncovers ? 20 + column.down.length : 0) + (ace ? 5 : 0),
+        kind: uncovers ? 'foundation-uncover' : 'foundation',
+      };
+    }
+    case 'waste.toFoundation':
+      return {
+        score: 180 + (rankOfCard(state.waste.at(-1) ?? '') === 1 ? 5 : 0),
+        kind: 'foundation',
+      };
+    case 'tableau.move':
+      return rankTableauMove(state, move);
+    case 'waste.toTableau':
+      return { score: 80, kind: 'waste-tableau' };
+    case 'stock.draw':
+      return { score: 10, kind: 'draw' };
+    case 'stock.recycle':
+      return { score: 10, kind: 'recycle' };
+    default:
+      return null;
+  }
+}
+
+function rankTableauMove(
+  state: KlondikePlayerView,
+  move: LegalMove,
+): { score: number; kind: HintKind } | null {
+  const meta = tableauMoveMeta(state, move);
+  if (!meta) return null;
+  if (meta.destEmpty && isKing(meta.card) && meta.empties) return null;
+  if (meta.uncovers) return { score: 100 + meta.downs, kind: 'uncover' };
+  if (meta.exposed) {
+    const suit = suitOfCard(meta.exposed);
+    const freesFoundation = Boolean(
+      suit && canPlaceOnFoundation(meta.exposed, state.foundations[suit]),
+    );
+    return { score: freesFoundation ? 90 : 70, kind: 'expose' };
+  }
+  if (meta.empties && !hasEmptyColumn(state) && kingNeedsEmpty(state)) {
+    return { score: 60, kind: 'empty-for-king' };
+  }
+  return null;
+}
+
+function tableauMoveMeta(state: KlondikePlayerView, move: LegalMove) {
+  if (move.id !== 'tableau.move') return null;
+  const input = move.payload as TableauMovePayload;
+  const source = state.tableau[input.from];
+  const destination = state.tableau[input.to];
+  if (!source || !destination) return null;
+  const runIndex = source.up.indexOf(input.card);
+  if (runIndex < 0) return null;
+  const movingEntireUp = runIndex === 0;
+  return {
+    card: input.card,
+    downs: source.down.length,
+    destEmpty: destination.up.length === 0,
+    destTop: destination.up.at(-1) ?? null,
+    empties: movingEntireUp && source.down.length === 0,
+    exposed: runIndex > 0 ? (source.up[runIndex - 1] as CardId) : null,
+    uncovers: movingEntireUp && source.down.length > 0,
+  };
+}
+
+function hasEmptyColumn(state: KlondikePlayerView): boolean {
+  return state.tableau.some((column) => column.down.length === 0 && column.up.length === 0);
+}
+
+function kingNeedsEmpty(state: KlondikePlayerView): boolean {
+  const waste = state.waste.at(-1);
+  if (waste && isKing(waste)) return true;
+  return state.tableau.some((column) => {
+    const index = column.up.findIndex((card) => isKing(card));
+    if (index < 0) return false;
+    return !(index === 0 && column.down.length === 0);
   });
-  if (uncover) return { move: uncover, reason: 'Open the next hidden tableau card.' };
-  const wasteTableau = legal.find((move) => move.id === 'waste.toTableau');
-  if (wasteTableau) return { move: wasteTableau, reason: 'Add the waste card to the tableau.' };
-  const tableauMove = legal.find((move) => move.id === 'tableau.move');
-  if (tableauMove) return { move: tableauMove, reason: 'Pack this run onto the tableau.' };
-  const stock = legal.find((move) => move.id === 'stock.draw' || move.id === 'stock.recycle');
-  return stock ? { move: stock, reason: 'Turn the stock for another card.' } : null;
+}
+
+function moveCard(state: KlondikePlayerView, move: LegalMove): CardId | null {
+  const payload = move.payload as
+    | Partial<TableauMovePayload & TableauSourcePayload & FoundationToTableauPayload>
+    | undefined;
+  switch (move.id) {
+    case 'tableau.move':
+      return typeof payload?.card === 'string' ? payload.card : null;
+    case 'tableau.toFoundation':
+      return validColumn(payload?.from) ? (state.tableau[payload.from]?.up.at(-1) ?? null) : null;
+    case 'waste.toTableau':
+    case 'waste.toFoundation':
+      return state.waste.at(-1) ?? null;
+    case 'foundation.toTableau':
+      return validSuit(payload?.suit) ? (state.foundations[payload.suit].at(-1) ?? null) : null;
+    default:
+      return null;
+  }
+}
+
+function hintReason(state: KlondikePlayerView, move: LegalMove, kind: HintKind): string {
+  const card = moveCard(state, move);
+  const named = card ? nameOfCard(card) : 'that card';
+  const meta = tableauMoveMeta(state, move);
+  const targetNamed = meta?.destTop ? nameOfCard(meta.destTop) : null;
+  const exposedNamed = meta?.exposed ? nameOfCard(meta.exposed) : null;
+  switch (kind) {
+    case 'foundation-uncover':
+      return `Put the ${named} up to turn a hidden card.`;
+    case 'foundation':
+      return `Put the ${named} up.`;
+    case 'uncover':
+      return targetNamed
+        ? `Move the ${named} onto the ${targetNamed} to turn a hidden card.`
+        : `Move the ${named} to an empty column to turn a hidden card.`;
+    case 'expose':
+      return targetNamed
+        ? `Move the ${named} onto the ${targetNamed}${exposedNamed ? ` to free the ${exposedNamed}` : ''}.`
+        : `Move the ${named} to an empty column${exposedNamed ? ` to free the ${exposedNamed}` : ''}.`;
+    case 'waste-tableau': {
+      const to = (move.payload as TableauTargetPayload | undefined)?.to;
+      const destTop = validColumn(to) ? (state.tableau[to]?.up.at(-1) ?? null) : null;
+      return destTop
+        ? `Play the ${named} from the waste onto the ${nameOfCard(destTop)}.`
+        : `Play the ${named} from the waste onto an empty column.`;
+    }
+    case 'empty-for-king':
+      return targetNamed
+        ? `Move the ${named} onto the ${targetNamed} so a King has a home.`
+        : `Clear a column so a King has a home.`;
+    case 'draw':
+      return state.rules.drawCount === 3 && state.stock.length >= 3
+        ? 'Turn three from the stock.'
+        : 'Turn the stock.';
+    case 'recycle':
+      return 'Flip the waste back into the stock.';
+  }
 }
 
 export function canAutoFinish(state: KlondikePlayerView): boolean {

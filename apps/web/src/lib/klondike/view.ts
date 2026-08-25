@@ -181,12 +181,8 @@ export function cardOfMove(move: LegalMove, view: KlondikeTableView): string | n
   }
 }
 
-export function describeHint(hint: KlondikeHint | null, view: KlondikeTableView): string | null {
-  if (!hint) return null;
-  const from = sourceOfMove(hint.move, view);
-  const to = targetOfMove(hint.move, view);
-  const card = cardOfMove(hint.move, view);
-  return [hint.reason, card && `${card}:`, from, to && `→ ${to}`].filter(Boolean).join(' ');
+export function describeHint(hint: KlondikeHint | null, _view: KlondikeTableView): string | null {
+  return hint?.reason ?? null;
 }
 
 function recordPayload(move: LegalMove): Record<string, unknown> {

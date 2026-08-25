@@ -10,6 +10,7 @@ export {
   colorOfCard,
   isKing,
   isPackedRun,
+  nameOfCard,
   orderKlondikeHand,
   rankOfCard,
   suitOfCard,

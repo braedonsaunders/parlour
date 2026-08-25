@@ -183,6 +183,63 @@ describe('public assistance', () => {
     expect(hintFor(klondikePlayerView(left))).toEqual(hintFor(klondikePlayerView(right)));
   });
 
+  it('does not slide a king stack between empty columns', () => {
+    const sliding = emptyState({ stock: ['S9'] });
+    sliding.tableau[0] = { down: [], up: ['D13'] };
+    const hint = hintFor(klondikePlayerView(sliding));
+    expect(hint?.move.id).toBe('stock.draw');
+    expect(hint?.reason).toBe('Turn the stock.');
+    expect(hint?.reason).not.toMatch(/tableau:|D13/);
+
+    const onlySlide = emptyState();
+    onlySlide.tableau[0] = { down: [], up: ['D13', 'C12'] };
+    expect(hintFor(klondikePlayerView(onlySlide))).toBeNull();
+  });
+
+  it('prefers turning a hidden card over shuffling a parked king', () => {
+    const state = emptyState();
+    state.tableau[0] = { down: [], up: ['D13'] };
+    state.tableau[2] = { down: ['S2'], up: ['S13', 'H12'] };
+    const hint = hintFor(klondikePlayerView(state));
+    expect(hint?.move).toEqual({
+      id: 'tableau.move',
+      payload: { from: 2, card: 'S13', to: 1 },
+    });
+    expect(hint?.reason).toBe(
+      'Move the King of spades to an empty column to turn a hidden card.',
+    );
+  });
+
+  it('names the cards and why the move helps', () => {
+    const foundation = emptyState({ waste: ['H1'] });
+    expect(hintFor(klondikePlayerView(foundation))).toEqual({
+      move: { id: 'waste.toFoundation', hint: 'Move H1 to its foundation' },
+      reason: 'Put the Ace of hearts up.',
+    });
+
+    const waste = emptyState({ waste: ['H8'] });
+    waste.tableau[0] = { down: [], up: ['S9'] };
+    expect(hintFor(klondikePlayerView(waste))?.reason).toBe(
+      'Play the 8 of hearts from the waste onto the 9 of spades.',
+    );
+
+    const houseKing = emptyState();
+    houseKing.tableau[0] = { down: [], up: ['H6', 'S5'] };
+    houseKing.tableau[1] = { down: [], up: ['C7'] };
+    houseKing.tableau[2] = { down: ['D2'], up: ['D13'] };
+    houseKing.tableau[3] = { down: [], up: ['S10'] };
+    houseKing.tableau[4] = { down: [], up: ['H10'] };
+    houseKing.tableau[5] = { down: [], up: ['C10'] };
+    houseKing.tableau[6] = { down: [], up: ['D10'] };
+    expect(hintFor(klondikePlayerView(houseKing))).toEqual({
+      move: { id: 'tableau.move', payload: { from: 0, card: 'H6', to: 1 } },
+      reason: 'Move the 6 of hearts onto the 7 of clubs so a King has a home.',
+    });
+
+    const drawThree = emptyState({ stock: ['S2', 'S3', 'S4'] });
+    expect(hintFor(klondikePlayerView(drawThree))?.reason).toBe('Turn three from the stock.');
+  });
+
   it('only offers auto-finish when every hidden card is open and ordinary foundation moves finish', () => {
     const state = emptyState();
     for (const suit of SUITS) {

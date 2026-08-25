@@ -4,6 +4,7 @@ import {
   canPlaceOnTableau,
   colorOfCard,
   isPackedRun,
+  nameOfCard,
   rankOfCard,
   suitOfCard,
 } from './cards';
@@ -15,6 +16,9 @@ describe('Klondike card rules', () => {
     expect(rankOfCard('H13')).toBe(13);
     expect(colorOfCard('D9')).toBe('red');
     expect(colorOfCard('C9')).toBe('black');
+    expect(nameOfCard('D13')).toBe('King of diamonds');
+    expect(nameOfCard('S1')).toBe('Ace of spades');
+    expect(nameOfCard('C10')).toBe('10 of clubs');
   });
 
   it('builds tableau down in alternating colors and admits only Kings to empties', () => {

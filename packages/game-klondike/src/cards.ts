@@ -28,6 +28,31 @@ export function isKing(card: CardId): boolean {
   return rankOfCard(card) === 13;
 }
 
+const RANK_NAMES = [
+  '',
+  'Ace',
+  '2',
+  '3',
+  '4',
+  '5',
+  '6',
+  '7',
+  '8',
+  '9',
+  '10',
+  'Jack',
+  'Queen',
+  'King',
+] as const;
+
+/** Spoken face, e.g. "King of diamonds". Unknown ids stay as the raw card. */
+export function nameOfCard(card: CardId): string {
+  const rank = rankOfCard(card);
+  const suit = suitOfCard(card);
+  const rankName = rank >= 1 && rank <= 13 ? RANK_NAMES[rank] : null;
+  return rankName && suit ? `${rankName} of ${suit}` : card;
+}
+
 export function isPackedRun(cards: readonly CardId[]): boolean {
   for (let index = 1; index < cards.length; index++) {
     const above = cards[index - 1] as CardId;
