@@ -78,9 +78,12 @@ export const pt: Messages = {
   'join.unreachable': 'Não foi possível alcançar a mesa {code}. Confira o código e sua conexão.',
   'join.unreachableGeneric': 'Não foi possível alcançar essa mesa.',
   'join.seated': 'Você tem um lugar. A mesa abre quando o anfitrião der as cartas.',
+  'join.lobbyClosed': 'O anfitrião fechou a sala.',
 
   // --- room lobby -----------------------------------------------------------
   'room.codeLabel': 'Código da sala',
+  'room.addBot': 'Adicionar bot',
+  'room.lobbyClosed': 'O anfitrião fechou a sala.',
   'room.connected': 'A mesa está conectada',
   'room.reconnecting': 'Reconectando — seu lugar está guardado',
   'room.finding': 'Procurando a mesa…',

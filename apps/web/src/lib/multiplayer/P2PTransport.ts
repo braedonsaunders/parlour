@@ -10,6 +10,8 @@ import {
   HEARTBEAT_INTERVAL_MS,
   HEARTBEAT_TIMEOUT_MS,
   MultiplayerState,
+  houseBotPeerId,
+  houseBotProfile,
   validatePresenceSnapshot,
 } from './resilience';
 import { validateEmote } from './emotes';
@@ -100,6 +102,11 @@ export class P2PTransport implements Transport {
   private pendingHostMigration = false;
   private closed = false;
   private systemSequence = 0;
+  /**
+   * While the room is still seating, a vanished host closes the lobby instead
+   * of electing a replacement, and a vanished guest frees their chair.
+   */
+  private lobbyHold = true;
 
   constructor(options: P2PTransportOptions) {
     this.authority = options.authority;
@@ -282,6 +289,36 @@ export class P2PTransport implements Transport {
     this.assertReady();
     if (!this.isHost()) throw new Error('only the host may publish a starting position');
     this.broadcast({ type: 'sync.snapshot', snapshot: this.exportMigration() });
+  }
+
+  /** Match has started — host loss elects, guest loss becomes a bot. */
+  holdLobby(hold: boolean): void {
+    this.lobbyHold = hold;
+  }
+
+  /** Host is leaving the lobby: tell everyone before the channels go down. */
+  announceClosed(): void {
+    if (this.closed) return;
+    this.broadcast({ type: 'room.closed' });
+  }
+
+  /** Host-only: fill an empty lobby chair with a house bot. */
+  seatBot(seat: number): void {
+    this.assertReady();
+    if (!this.isHost()) throw new Error('only the host can seat a bot');
+    if (!this.lobbyHold) throw new Error('bots can only be seated in the lobby');
+    const profile = houseBotProfile(seat);
+    this.resilience!.assignBotSeat(seat);
+    this.profiles.set(houseBotPeerId(seat), profile);
+    this.authority.setSeatBot(seat, true);
+    this.broadcastPresence();
+    this.emitPresence({
+      kind: 'peer.joined',
+      peerId: houseBotPeerId(seat),
+      seat,
+      profile,
+      bot: true,
+    });
   }
 
   close(): void {
@@ -532,6 +569,11 @@ export class P2PTransport implements Transport {
         });
         return;
       }
+      case 'room.closed':
+        if (peerId !== this.resilience?.hostId) return;
+        this.emitPresence({ kind: 'room.closed' });
+        this.close();
+        return;
       case 'host.changed':
         if (peerId !== message.hostId) return;
         if (message.term === undefined) {
@@ -586,7 +628,13 @@ export class P2PTransport implements Transport {
     this.broadcastPresence();
     this.emitPresence(
       reclaimed === null
-        ? { kind: 'peer.joined', peerId, seat, profile: this.profileFor(peerId, profileId) }
+        ? {
+            kind: 'peer.joined',
+            peerId,
+            seat,
+            profile: this.profileFor(peerId, profileId),
+            bot: false,
+          }
         : { kind: 'seat.reclaimed', peerId, seat, profile: this.profileFor(peerId, profileId) },
     );
   }
@@ -662,10 +710,24 @@ export class P2PTransport implements Transport {
     });
     const before = new Map(this.resilience.seats);
     const beforePresence = this.resilience.exportPresence();
-    const election = this.resilience.expireAndElect(this.now(), this.heartbeatTimeoutMs);
+    const election = this.resilience.expireAndElect(
+      this.now(),
+      this.heartbeatTimeoutMs,
+      this.lobbyHold,
+    );
+    if (election.changed && this.lobbyHold) {
+      this.emitPresence({ kind: 'room.closed' });
+      this.close();
+      return;
+    }
     for (const [seat, occupant] of this.resilience.seats) {
       if (!before.get(seat)?.bot && occupant.bot) {
         this.authority.setSeatBot(seat, true);
+        this.emitPresence({ kind: 'peer.left', peerId: occupant.peerId, seat, bot: true });
+      }
+    }
+    for (const [seat, occupant] of before) {
+      if (!this.resilience.seats.has(seat) && !occupant.bot) {
         this.emitPresence({ kind: 'peer.left', peerId: occupant.peerId, seat, bot: true });
       }
     }
@@ -710,6 +772,11 @@ export class P2PTransport implements Transport {
     const before = new Map(this.resilience!.seats);
     const seats = maxSeats ?? this.authority.exportSnapshot().settings.seats;
     if (!this.resilience!.applyPresence(presence, seats, authoritative)) return;
+    for (const [seat, previous] of before) {
+      if (!this.resilience!.seats.has(seat) && !previous.bot) {
+        this.emitPresence({ kind: 'peer.left', peerId: previous.peerId, seat, bot: true });
+      }
+    }
     for (const [seat, occupant] of this.resilience!.seats) {
       const previous = before.get(seat);
       if (!previous) {
@@ -717,7 +784,10 @@ export class P2PTransport implements Transport {
           kind: 'peer.joined',
           peerId: occupant.peerId,
           seat,
-          profile: this.profileFor(occupant.peerId, occupant.profileId),
+          profile: occupant.bot
+            ? (this.profiles.get(occupant.peerId) ?? houseBotProfile(seat))
+            : this.profileFor(occupant.peerId, occupant.profileId),
+          bot: occupant.bot,
         });
       } else if (!previous.bot && occupant.bot) {
         this.authority.setSeatBot(seat, true);

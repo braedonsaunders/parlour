@@ -38,18 +38,14 @@ export default function CreateGinRoomPage() {
   }, [avatarId, mode, name, overrides]);
 
   if (!session) return <GinLobbyLoading />;
-  return (
-    <ActiveGinLobby session={session} capacity={2} onStarted={() => router.push('/gin/table')} />
-  );
+  return <ActiveGinLobby session={session} onStarted={() => router.push('/gin/table')} />;
 }
 
 function ActiveGinLobby({
   session,
-  capacity,
   onStarted,
 }: {
   session: MultiplayerRoomSession;
-  capacity: number;
   onStarted: () => void;
 }) {
   const snapshot = useSyncExternalStore(
@@ -64,7 +60,7 @@ function ActiveGinLobby({
     clearActiveMultiplayerSession();
   };
 
-  if (snapshot.error) {
+  if (snapshot.error && !room) {
     return (
       <main className="flex min-h-dvh flex-col items-center justify-center gap-5 px-6 text-center">
         <p className="panel-soft max-w-md p-5 text-dusk-50" role="alert">
@@ -90,8 +86,9 @@ function ActiveGinLobby({
       <RoomLobby
         code={room.code}
         shareUrl={room.shareUrl}
-        capacity={capacity}
+        capacity={snapshot.settings?.seats ?? 2}
         isHost
+        onAddBot={(seat) => session.addBot(seat)}
         connection={snapshot.connection === 'closed' ? 'reconnecting' : snapshot.connection}
         seats={snapshot.seats.map((seat) => ({
           seat: seat.seat,
@@ -100,10 +97,8 @@ function ActiveGinLobby({
           bot: seat.bot,
           connected: seat.connected,
         }))}
-        onStart={() => {
-          session.start();
-          onStarted();
-        }}
+        onStart={() => session.start().then(onStarted)}
+        error={snapshot.error}
       />
       <p className="max-w-xl text-center text-sm text-dusk-100/80">
         This head-to-head table starts when your opponent pulls up a chair. Share the code — first

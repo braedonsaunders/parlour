@@ -6,9 +6,9 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { RoomLobby } from '@/components/multiplayer/RoomLobby';
-import { SecurityBadge } from '@/components/multiplayer/TableSecurity';
 import { useProfileStore } from '@/stores/profile';
 import { useOhHellSetupStore } from '@/stores/ohhellSetup';
+import { usePersistHydrated } from '@/stores/usePersistHydrated';
 import {
   activateMultiplayerSession,
   clearActiveMultiplayerSession,
@@ -22,11 +22,12 @@ export default function CreateOhHellRoomPage() {
   const avatarId = useProfileStore((state) => state.avatarId);
   const mode = useOhHellSetupStore((state) => state.mode);
   const seats = useOhHellSetupStore((state) => state.seats);
+  const ready = usePersistHydrated(useOhHellSetupStore);
   const sessionRef = useRef<MultiplayerRoomSession | null>(null);
   const [session, setSession] = useState<MultiplayerRoomSession | null>(null);
 
   useEffect(() => {
-    if (sessionRef.current) return;
+    if (!ready || sessionRef.current) return;
     const next = new MultiplayerRoomSession(multiplayerProfile(name, avatarId));
     sessionRef.current = next;
     setSession(next);
@@ -38,9 +39,9 @@ export default function CreateOhHellRoomPage() {
       })
       .then(() => activateMultiplayerSession(next))
       .catch(() => undefined);
-  }, [avatarId, mode, name, seats]);
+  }, [avatarId, mode, name, ready, seats]);
 
-  if (!session) return <OhHellLobbyLoading />;
+  if (!ready || !session) return <OhHellLobbyLoading />;
   return <ActiveOhHellLobby session={session} onStarted={() => router.push('/ohhell/table')} />;
 }
 
@@ -63,7 +64,7 @@ function ActiveOhHellLobby({
     clearActiveMultiplayerSession();
   };
 
-  if (snapshot.error) {
+  if (snapshot.error && !room) {
     return (
       <main className="flex min-h-dvh flex-col items-center justify-center gap-5 px-6 text-center">
         <p className="panel-soft max-w-md p-5 text-dusk-50" role="alert">
@@ -91,6 +92,7 @@ function ActiveOhHellLobby({
         shareUrl={room.shareUrl}
         capacity={snapshot.settings?.seats ?? 4}
         isHost
+        onAddBot={(seat) => session.addBot(seat)}
         connection={snapshot.connection === 'closed' ? 'reconnecting' : snapshot.connection}
         seats={snapshot.seats.map((seat) => ({
           seat: seat.seat,
@@ -99,12 +101,9 @@ function ActiveOhHellLobby({
           bot: seat.bot,
           connected: seat.connected,
         }))}
-        onStart={() => {
-          session.start();
-          onStarted();
-        }}
+        onStart={() => session.start().then(onStarted)}
+        error={snapshot.error}
       />
-      <SecurityBadge security={snapshot.security} />
       <p className="max-w-xl text-center text-sm text-dusk-100/80">
         Share the code until every seat is filled, then deal. A friend room plays one round at the
         size you picked — the full arc is a solo match for now. Oh Hell rooms are open replay: every

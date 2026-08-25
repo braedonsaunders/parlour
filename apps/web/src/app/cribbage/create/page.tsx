@@ -4,7 +4,6 @@ import Link from 'next/link';
 import { useWipeRouter } from '@/hooks/useWipeRouter';
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { RoomLobby } from '@/components/multiplayer/RoomLobby';
-import { SecurityBadge } from '@/components/multiplayer/TableSecurity';
 import { useProfileStore } from '@/stores/profile';
 import { cribbageRulesFor, useCribbageSetupStore } from '@/stores/cribbageSetup';
 import {
@@ -56,7 +55,7 @@ function ActiveLobby({
     session.close();
     clearActiveMultiplayerSession();
   };
-  if (snapshot.error) {
+  if (snapshot.error && !room) {
     return (
       <main className="flex min-h-dvh flex-col items-center justify-center gap-5 px-6 text-center">
         <p className="panel-soft max-w-md p-5 text-dusk-50" role="alert">
@@ -83,6 +82,7 @@ function ActiveLobby({
         shareUrl={room.shareUrl}
         capacity={2}
         isHost
+        onAddBot={(seat) => session.addBot(seat)}
         connection={snapshot.connection === 'closed' ? 'reconnecting' : snapshot.connection}
         seats={snapshot.seats.map((seat) => ({
           seat: seat.seat,
@@ -91,14 +91,9 @@ function ActiveLobby({
           bot: seat.bot,
           connected: seat.connected,
         }))}
-        onStart={() =>
-          void session
-            .start()
-            .then(onStarted)
-            .catch(() => undefined)
-        }
+        onStart={() => session.start().then(onStarted)}
+        error={snapshot.error}
       />
-      <SecurityBadge security={snapshot.security} />
       <p className="max-w-xl text-center text-sm text-dusk-100/80">
         Share the code with one friend. This room plays a complete race to 121 with deterministic
         host and guest replays.

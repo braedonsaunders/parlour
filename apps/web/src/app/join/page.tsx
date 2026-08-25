@@ -17,6 +17,8 @@ import { useProfileStore } from '@/stores/profile';
 import styles from '@/styles/join.module.css';
 import {
   activateMultiplayerSession,
+  clearActiveMultiplayerSession,
+  getActiveMultiplayerSession,
   multiplayerProfile,
   MultiplayerRoomSession,
 } from '../_multiplayer/roomSession';
@@ -71,6 +73,14 @@ export default function JoinPage() {
   const submit = useCallback(
     async (code: string, expectedHost?: string) => {
       if (checking) return;
+      const live = getActiveMultiplayerSession();
+      if (live) {
+        const snap = live.getSnapshot();
+        if (snap.connection !== 'closed' && (snap.room || snap.connection === 'connecting')) {
+          setRoomSession(live);
+          return;
+        }
+      }
       setChecking(true);
       setError(null);
       const next = new MultiplayerRoomSession(multiplayerProfile(name, avatarId));
@@ -113,6 +123,7 @@ export default function JoinPage() {
         session={roomSession}
         onLeave={() => {
           roomSession.close();
+          clearActiveMultiplayerSession();
           setRoomSession(null);
         }}
       />
@@ -187,6 +198,26 @@ function GuestLobby({
   const snapshot = useRoomSnapshot(session);
   const room = snapshot?.room;
   if (!snapshot || !room) return null;
+
+  if (snapshot.connection === 'closed' && snapshot.error) {
+    return (
+      <main className="flex min-h-dvh flex-col items-center justify-center gap-5 px-6 text-center">
+        <p className="panel-soft max-w-md p-5 text-dusk-50" role="alert">
+          {snapshot.error}
+        </p>
+        <Link
+          href="/"
+          onClick={() => {
+            session.close();
+            clearActiveMultiplayerSession();
+          }}
+          className="btn-fat btn-fat--ghost"
+        >
+          {t('common.backArrow')}
+        </Link>
+      </main>
+    );
+  }
 
   return (
     <main className="flex min-h-dvh flex-col items-center justify-center gap-5 px-6 py-8">

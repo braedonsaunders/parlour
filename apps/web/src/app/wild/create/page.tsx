@@ -4,8 +4,8 @@ import Link from 'next/link';
 import { useWipeRouter } from '@/hooks/useWipeRouter';
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { RoomLobby } from '@/components/multiplayer/RoomLobby';
-import { SecurityBadge } from '@/components/multiplayer/TableSecurity';
 import { useProfileStore } from '@/stores/profile';
+import { usePersistHydrated } from '@/stores/usePersistHydrated';
 import { useWildSetupStore, wildRulesFor } from '@/stores/wildSetup';
 import {
   activateMultiplayerSession,
@@ -21,12 +21,13 @@ export default function CreateWildRoomPage() {
   const mode = useWildSetupStore((state) => state.mode);
   const seats = useWildSetupStore((state) => state.seats);
   const overrides = useWildSetupStore((state) => state.overrides);
+  const ready = usePersistHydrated(useWildSetupStore);
   const rulesKey = JSON.stringify(wildRulesFor(mode, overrides));
   const sessionRef = useRef<MultiplayerRoomSession | null>(null);
   const [session, setSession] = useState<MultiplayerRoomSession | null>(null);
 
   useEffect(() => {
-    if (sessionRef.current) return;
+    if (!ready || sessionRef.current) return;
     const next = new MultiplayerRoomSession(multiplayerProfile(name, avatarId));
     sessionRef.current = next;
     setSession(next);
@@ -38,25 +39,17 @@ export default function CreateWildRoomPage() {
       })
       .then(() => activateMultiplayerSession(next))
       .catch(() => undefined);
-  }, [avatarId, name, rulesKey, seats]);
+  }, [avatarId, name, ready, rulesKey, seats]);
 
-  if (!session) return <WildLobbyLoading />;
-  return (
-    <ActiveWildLobby
-      session={session}
-      capacity={seats}
-      onStarted={() => router.push('/wild/table')}
-    />
-  );
+  if (!ready || !session) return <WildLobbyLoading />;
+  return <ActiveWildLobby session={session} onStarted={() => router.push('/wild/table')} />;
 }
 
 function ActiveWildLobby({
   session,
-  capacity,
   onStarted,
 }: {
   session: MultiplayerRoomSession;
-  capacity: number;
   onStarted: () => void;
 }) {
   const snapshot = useSyncExternalStore(
@@ -71,7 +64,7 @@ function ActiveWildLobby({
     clearActiveMultiplayerSession();
   };
 
-  if (snapshot.error) {
+  if (snapshot.error && !room) {
     return (
       <main className="flex min-h-dvh flex-col items-center justify-center gap-5 px-6 text-center">
         <p className="panel-soft max-w-md p-5 text-dusk-50" role="alert">
@@ -84,6 +77,7 @@ function ActiveWildLobby({
     );
   }
   if (!room) return <WildLobbyLoading />;
+  const capacity = snapshot.settings?.seats ?? snapshot.seats.length;
 
   return (
     <main className="flex min-h-dvh flex-col items-center justify-center gap-5 px-6 py-8">
@@ -99,6 +93,7 @@ function ActiveWildLobby({
         shareUrl={room.shareUrl}
         capacity={capacity}
         isHost
+        onAddBot={(seat) => session.addBot(seat)}
         connection={snapshot.connection === 'closed' ? 'reconnecting' : snapshot.connection}
         seats={snapshot.seats.map((seat) => ({
           seat: seat.seat,
@@ -107,17 +102,12 @@ function ActiveWildLobby({
           bot: seat.bot,
           connected: seat.connected,
         }))}
-        onStart={() => {
-          void session
-            .start()
-            .then(onStarted)
-            .catch(() => undefined);
-        }}
+        onStart={() => session.start().then(onStarted)}
+        error={snapshot.error}
       />
-      <SecurityBadge security={snapshot.security} />
       <p className="max-w-xl text-center text-sm text-dusk-100/80">
-        This {capacity}-seat pile starts when every chair is filled. Share the code with{' '}
-        {capacity === 2 ? 'one friend' : `${capacity - 1} friends`}.
+        This {capacity}-seat pile starts when every chair is filled. Share the code with friends, or
+        fill empty chairs with bots.
       </p>
     </main>
   );

@@ -6,6 +6,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { RoomLobby } from '@/components/multiplayer/RoomLobby';
 import { useProfileStore } from '@/stores/profile';
 import { presidentRulesFor, usePresidentSetupStore } from '@/stores/presidentSetup';
+import { usePersistHydrated } from '@/stores/usePersistHydrated';
 import {
   activateMultiplayerSession,
   clearActiveMultiplayerSession,
@@ -20,11 +21,12 @@ export default function CreatePresidentRoomPage() {
   const mode = usePresidentSetupStore((state) => state.mode);
   const seats = usePresidentSetupStore((state) => state.seats);
   const overrides = usePresidentSetupStore((state) => state.overrides);
+  const ready = usePersistHydrated(usePresidentSetupStore);
   const sessionRef = useRef<MultiplayerRoomSession | null>(null);
   const [session, setSession] = useState<MultiplayerRoomSession | null>(null);
 
   useEffect(() => {
-    if (sessionRef.current) return;
+    if (!ready || sessionRef.current) return;
     const next = new MultiplayerRoomSession(multiplayerProfile(name, avatarId));
     sessionRef.current = next;
     setSession(next);
@@ -36,25 +38,19 @@ export default function CreatePresidentRoomPage() {
       })
       .then(() => activateMultiplayerSession(next))
       .catch(() => undefined);
-  }, [avatarId, mode, name, overrides, seats]);
+  }, [avatarId, mode, name, overrides, ready, seats]);
 
-  if (!session) return <PresidentLobbyLoading />;
+  if (!ready || !session) return <PresidentLobbyLoading />;
   return (
-    <ActivePresidentLobby
-      session={session}
-      capacity={seats}
-      onStarted={() => router.push('/president/table')}
-    />
+    <ActivePresidentLobby session={session} onStarted={() => router.push('/president/table')} />
   );
 }
 
 function ActivePresidentLobby({
   session,
-  capacity,
   onStarted,
 }: {
   session: MultiplayerRoomSession;
-  capacity: number;
   onStarted: () => void;
 }) {
   const snapshot = useSyncExternalStore(
@@ -69,7 +65,7 @@ function ActivePresidentLobby({
     clearActiveMultiplayerSession();
   };
 
-  if (snapshot.error) {
+  if (snapshot.error && !room) {
     return (
       <main className="flex min-h-dvh flex-col items-center justify-center gap-5 px-6 text-center">
         <p className="panel-soft max-w-md p-5 text-dusk-50" role="alert">
@@ -82,6 +78,7 @@ function ActivePresidentLobby({
     );
   }
   if (!room) return <PresidentLobbyLoading />;
+  const capacity = snapshot.settings?.seats ?? snapshot.seats.length;
 
   return (
     <main className="flex min-h-dvh flex-col items-center justify-center gap-5 px-6 py-8">
@@ -97,6 +94,7 @@ function ActivePresidentLobby({
         shareUrl={room.shareUrl}
         capacity={capacity}
         isHost
+        onAddBot={(seat) => session.addBot(seat)}
         connection={snapshot.connection === 'closed' ? 'reconnecting' : snapshot.connection}
         seats={snapshot.seats.map((seat) => ({
           seat: seat.seat,
@@ -105,10 +103,8 @@ function ActivePresidentLobby({
           bot: seat.bot,
           connected: seat.connected,
         }))}
-        onStart={() => {
-          session.start();
-          onStarted();
-        }}
+        onStart={() => session.start().then(onStarted)}
+        error={snapshot.error}
       />
       <p className="max-w-xl text-center text-sm text-dusk-100/80">
         This {capacity}-seat ladder starts when every chair fills. Share the code with{' '}

@@ -67,9 +67,12 @@ export const fr: Messages = {
   'join.unreachable': 'Impossible de joindre la table {code}. Vérifie le code et ta connexion.',
   'join.unreachableGeneric': 'Impossible de joindre cette table.',
   'join.seated': 'Tu as une place. La table ouvre quand l’hôte donne.',
+  'join.lobbyClosed': 'L’hôte a fermé le salon.',
 
   // --- room lobby -----------------------------------------------------------
   'room.codeLabel': 'Code de salle',
+  'room.addBot': 'Ajouter un bot',
+  'room.lobbyClosed': 'L’hôte a fermé le salon.',
   'room.connected': 'La table est connectée',
   'room.reconnecting': 'Reconnexion — ta place est gardée',
   'room.finding': 'Recherche de la table…',

@@ -63,6 +63,7 @@ const validMessages = [
   { type: 'heartbeat', sentAt: 1 },
   { type: 'host.changed', hostId: 'host', snapshot: migration },
   { type: 'host.changed', hostId: 'host', term: 2, snapshot: migration },
+  { type: 'room.closed' },
   { type: 'heartbeat', sentAt: 100, hostId: 'host', term: 2 },
   { type: 'sync.request', expectedSeq: 2 },
   { type: 'sync.snapshot', snapshot: migration },

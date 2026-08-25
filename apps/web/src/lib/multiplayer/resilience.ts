@@ -1,4 +1,10 @@
-import type { PlayerAction, PresenceSnapshot, ProfileId, SeatPresence } from './types';
+import type {
+  PlayerAction,
+  PlayerProfile,
+  PresenceSnapshot,
+  ProfileId,
+  SeatPresence,
+} from './types';
 
 export const HEARTBEAT_INTERVAL_MS = 1_000;
 export const HEARTBEAT_TIMEOUT_MS = 3_500;
@@ -110,6 +116,22 @@ export class MultiplayerState {
     this.presenceVersion++;
   }
 
+  /** Seats a house bot in the lobby. The chair stays taken until the host removes it. */
+  assignBotSeat(seat: number): SeatPresence {
+    const occupant = houseBotOccupant(seat);
+    if (
+      this.seats.has(seat) ||
+      [...this.seats.values()].some(
+        (taken) => taken.peerId === occupant.peerId || taken.profileId === occupant.profileId,
+      )
+    ) {
+      throw new Error('seat assignment conflicts with current presence');
+    }
+    this.seats.set(seat, occupant);
+    this.presenceVersion++;
+    return occupant;
+  }
+
   reclaimSeat(peerId: string, profileId: ProfileId): number | null {
     for (const [seat, occupant] of this.seats) {
       if (occupant.profileId === profileId && occupant.bot) {
@@ -163,6 +185,11 @@ export class MultiplayerState {
   expireAndElect(
     now: number,
     timeoutMs = HEARTBEAT_TIMEOUT_MS,
+    /**
+     * Lobby: drop the chair so a friend can sit again.
+     * Match: keep the chair and hand it to a bot.
+     */
+    releaseExpired = false,
   ): { changed: boolean; hostId: string; term: number; resend: PlayerAction[] } {
     const expired = new Set<string>();
     for (const [peerId, seenAt] of this.lastSeen) {
@@ -184,9 +211,10 @@ export class MultiplayerState {
     let presenceChanged = false;
     const ownsPresence = previousHostId === this.localPeerId || this.hostId === this.localPeerId;
     if (ownsPresence) {
-      for (const [seat, occupant] of this.seats) {
+      for (const [seat, occupant] of [...this.seats]) {
         if (expired.has(occupant.peerId) && !occupant.bot) {
-          this.seats.set(seat, { ...occupant, bot: true });
+          if (releaseExpired) this.seats.delete(seat);
+          else this.seats.set(seat, { ...occupant, bot: true });
           presenceChanged = true;
         }
       }
@@ -200,4 +228,21 @@ export class MultiplayerState {
       resend: hostExpired ? [...this.pending.values()] : [],
     };
   }
+}
+
+export function houseBotPeerId(seat: number): string {
+  return `bot:${seat}`;
+}
+
+export function houseBotOccupant(seat: number): SeatPresence {
+  const peerId = houseBotPeerId(seat);
+  return { peerId, profileId: peerId, bot: true };
+}
+
+export function houseBotProfile(seat: number): PlayerProfile {
+  return {
+    profileId: houseBotPeerId(seat),
+    name: `Bot ${seat + 1}`,
+    avatarId: 'cobalt',
+  };
 }

@@ -181,6 +181,14 @@ describe('resilience state', () => {
     );
   });
 
+  it('releases an expired lobby seat instead of handing it to a bot', () => {
+    const state = new MultiplayerState('host', 'host');
+    state.assignSeat(1, 'peer-z', 'profile-z');
+    state.seePeer('peer-z', 0);
+    state.expireAndElect(HEARTBEAT_TIMEOUT_MS + 1, HEARTBEAT_TIMEOUT_MS, true);
+    expect(state.seats.has(1)).toBe(false);
+  });
+
   it('turns an expired human seat into a bot and lets its profile reclaim it', () => {
     const state = new MultiplayerState('host', 'host');
     state.assignSeat(2, 'peer-z', 'profile-z');

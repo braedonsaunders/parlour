@@ -60,7 +60,7 @@ function ActiveLobby({
     clearActiveMultiplayerSession();
   };
 
-  if (snapshot.error) {
+  if (snapshot.error && !room) {
     return (
       <main className="flex min-h-dvh flex-col items-center justify-center gap-5 px-6 text-center">
         <p className="panel-soft max-w-md p-5 text-dusk-50" role="alert">
@@ -88,6 +88,7 @@ function ActiveLobby({
         shareUrl={room.shareUrl}
         capacity={4}
         isHost
+        onAddBot={(seat) => session.addBot(seat)}
         connection={snapshot.connection === 'closed' ? 'reconnecting' : snapshot.connection}
         seats={snapshot.seats.map((seat) => ({
           seat: seat.seat,
@@ -96,13 +97,11 @@ function ActiveLobby({
           bot: seat.bot,
           connected: seat.connected,
         }))}
-        onStart={() => {
-          session.start();
-          onStarted();
-        }}
+        onStart={() => session.start().then(onStarted)}
+        error={snapshot.error}
       />
       <p className="max-w-xl text-center text-sm text-dusk-100/80">
-        This table seats exactly four. Share the code with three friends — empty chairs wait.
+        This table seats exactly four. Share the code with friends, or fill empty chairs with bots.
       </p>
     </main>
   );

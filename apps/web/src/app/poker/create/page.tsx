@@ -6,9 +6,9 @@ import Link from 'next/link';
 import { useWipeRouter } from '@/hooks/useWipeRouter';
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { RoomLobby } from '@/components/multiplayer/RoomLobby';
-import { SecurityBadge } from '@/components/multiplayer/TableSecurity';
 import { useProfileStore } from '@/stores/profile';
 import { usePokerSetupStore } from '@/stores/pokerSetup';
+import { usePersistHydrated } from '@/stores/usePersistHydrated';
 import {
   activateMultiplayerSession,
   clearActiveMultiplayerSession,
@@ -22,11 +22,12 @@ export default function CreatePokerRoomPage() {
   const avatarId = useProfileStore((state) => state.avatarId);
   const mode = usePokerSetupStore((state) => state.mode);
   const seats = usePokerSetupStore((state) => state.seats);
+  const ready = usePersistHydrated(usePokerSetupStore);
   const sessionRef = useRef<MultiplayerRoomSession | null>(null);
   const [session, setSession] = useState<MultiplayerRoomSession | null>(null);
 
   useEffect(() => {
-    if (sessionRef.current) return;
+    if (!ready || sessionRef.current) return;
     const next = new MultiplayerRoomSession(multiplayerProfile(name, avatarId));
     sessionRef.current = next;
     setSession(next);
@@ -38,25 +39,17 @@ export default function CreatePokerRoomPage() {
       })
       .then(() => activateMultiplayerSession(next))
       .catch(() => undefined);
-  }, [avatarId, mode, name, seats]);
+  }, [avatarId, mode, name, ready, seats]);
 
-  if (!session) return <PokerLobbyLoading />;
-  return (
-    <ActivePokerLobby
-      session={session}
-      capacity={seats}
-      onStarted={() => router.push('/poker/table')}
-    />
-  );
+  if (!ready || !session) return <PokerLobbyLoading />;
+  return <ActivePokerLobby session={session} onStarted={() => router.push('/poker/table')} />;
 }
 
 function ActivePokerLobby({
   session,
-  capacity,
   onStarted,
 }: {
   session: MultiplayerRoomSession;
-  capacity: number;
   onStarted: () => void;
 }) {
   const snapshot = useSyncExternalStore(
@@ -71,7 +64,7 @@ function ActivePokerLobby({
     clearActiveMultiplayerSession();
   };
 
-  if (snapshot.error) {
+  if (snapshot.error && !room) {
     return (
       <main className="flex min-h-dvh flex-col items-center justify-center gap-5 px-6 text-center">
         <p className="panel-soft max-w-md p-5 text-dusk-50" role="alert">
@@ -84,6 +77,7 @@ function ActivePokerLobby({
     );
   }
   if (!room) return <PokerLobbyLoading />;
+  const capacity = snapshot.settings?.seats ?? snapshot.seats.length;
 
   return (
     <main className="flex min-h-dvh flex-col items-center justify-center gap-5 px-6 py-8">
@@ -99,6 +93,7 @@ function ActivePokerLobby({
         shareUrl={room.shareUrl}
         capacity={capacity}
         isHost
+        onAddBot={(seat) => session.addBot(seat)}
         connection={snapshot.connection === 'closed' ? 'reconnecting' : snapshot.connection}
         seats={snapshot.seats.map((seat) => ({
           seat: seat.seat,
@@ -107,12 +102,9 @@ function ActivePokerLobby({
           bot: seat.bot,
           connected: seat.connected,
         }))}
-        onStart={() => {
-          session.start();
-          onStarted();
-        }}
+        onStart={() => session.start().then(onStarted)}
+        error={snapshot.error}
       />
-      <SecurityBadge security={snapshot.security} />
       <p className="max-w-xl text-center text-sm text-dusk-100/80">
         Poker rooms are open replay: every peer holds the whole game state, so a modified client
         could read your hole cards. Play these with people you would hand your cards to anyway.

@@ -299,13 +299,38 @@ export class MultiplayerRoomSession {
     }
   }
 
+  /**
+   * Seats a house bot in an empty lobby chair.
+   *
+   * A friend room with bots cannot run Veil — the bots live on the host device
+   * and have no shuffle layer — so `start` deals that table in the open.
+   */
+  addBot(seat: number): void {
+    if (!this.snapshot.isHost || this.snapshot.stage !== 'lobby' || !this.transport) return;
+    const capacity = this.snapshot.settings?.seats ?? 0;
+    if (!Number.isInteger(seat) || seat < 1 || seat >= capacity) return;
+    if (this.snapshot.seats.some((player) => player.seat === seat)) return;
+    try {
+      this.transport.seatBot(seat);
+    } catch {
+      // A friend sat in the same chair between the click and the assign.
+    }
+  }
+
   async start(): Promise<void> {
-    if (!this.snapshot.isHost) throw new Error('only the host can start the match');
+    if (!this.snapshot.isHost) {
+      const error = new Error('only the host can start the match');
+      this.update({ error: startFault(error) });
+      throw error;
+    }
     if (this.snapshot.seats.length < (this.snapshot.settings?.seats ?? 2)) {
-      throw new Error('every seat must be filled before the match starts');
+      const error = new Error('every seat must be filled before the match starts');
+      this.update({ error: startFault(error) });
+      throw error;
     }
     try {
-      if (this.snapshot.security.tier === 'veil') {
+      const houseBots = this.snapshot.seats.some((seat) => seat.bot);
+      if (this.snapshot.security.tier === 'veil' && !houseBots) {
         // A veiled deal takes its unpredictability from the ceremony itself —
         // every seat lays a layer on a deck nobody can read — so it needs no
         // separate seed round, and it publishes the real position at the end.
@@ -317,8 +342,17 @@ export class MultiplayerRoomSession {
         // snapshot a veiled deal sends, and peers adopt an unsolicited one only
         // while their own log is still empty, so it opens the table for everyone
         // without being able to rewrite a round in progress.
+        //
+        // House bots also take this path: they have no Veil key, so a ceremony
+        // that waited on every seat would hang, and the host already sees their
+        // cards.
         await this.dealOpen();
+        if (houseBots) {
+          const seats = this.snapshot.settings?.seats ?? this.snapshot.seats.length;
+          this.update({ security: securityFor('open', seats, 'open') });
+        }
       }
+      this.transport?.holdLobby(false);
       this.update({ stage: 'table', error: null });
     } catch (error) {
       this.update({ error: startFault(error) });
@@ -1054,11 +1088,25 @@ export class MultiplayerRoomSession {
   }
 
   close(): void {
+    if (this.snapshot.isHost && this.snapshot.stage === 'lobby') {
+      this.transport?.announceClosed();
+    }
+    this.teardownTransport();
+    this.update({ connection: 'closed' });
+  }
+
+  /** Guest-side: the host left the lobby, so this device is no longer in a room. */
+  private dissolveLobby(message: string): void {
+    this.teardownTransport();
+    this.update({ error: message, connection: 'closed' });
+    if (getActiveMultiplayerSession() === this) clearActiveMultiplayerSession();
+  }
+
+  private teardownTransport(): void {
     this.veil?.room.cancelAll();
     this.veil = null;
     this.transport?.close();
     this.transport = null;
-    this.update({ connection: 'closed' });
   }
 
   private prepare(settings: RoomSettings, signaling?: NostrSignaling): void {
@@ -1093,19 +1141,23 @@ export class MultiplayerRoomSession {
     this.transport.onSnapshot(() => {
       // The host published the opening position, so adopt it — and check the
       // deal inside it is the one the table's shares add up to.
+      const imported = this.authority!.exportSnapshot();
+      const openDeal = imported.settings.security !== 'veil';
       this.update({
         session: this.presented(this.authority!.getSession()),
         fx: this.authority!.getSession().setupFx ?? [],
         fxKey: this.snapshot.fxKey + 1,
         stage: 'table',
-        security: {
-          ...this.snapshot.security,
-          ceremony: {
-            laid: settings.seats,
-            seats: settings.seats,
-            ready: settings.security === 'veil',
-          },
-        },
+        security: openDeal
+          ? securityFor('open', imported.settings.seats, 'open')
+          : {
+              ...this.snapshot.security,
+              ceremony: {
+                laid: settings.seats,
+                seats: settings.seats,
+                ready: true,
+              },
+            },
       });
       this.verifyPublishedDeal();
       void this.openMyHandles();
@@ -1155,7 +1207,15 @@ export class MultiplayerRoomSession {
       this.update({ error: presence.message });
       return;
     }
+    if (presence.kind === 'room.closed') {
+      this.dissolveLobby(LOBBY_CLOSED);
+      return;
+    }
     if (presence.kind === 'host.changed') {
+      if (this.snapshot.stage === 'lobby' && !this.snapshot.isHost) {
+        this.dissolveLobby(LOBBY_CLOSED);
+        return;
+      }
       const isHost = presence.hostId === this.snapshot.room?.peerId;
       this.update({
         isHost,
@@ -1171,13 +1231,14 @@ export class MultiplayerRoomSession {
       this.veil?.room.markSeatPresent(presence.seat);
       this.cancelPendingReturn(presence.seat);
       const existing = this.snapshot.seats.filter((seat) => seat.seat !== presence.seat);
+      const houseBot = presence.kind === 'peer.joined' && presence.bot;
       const joined: MultiplayerSeat = isLocal
         ? { ...this.profile, seat: presence.seat, connected: true, bot: false }
         : {
             ...presence.profile,
             seat: presence.seat,
             connected: true,
-            bot: false,
+            bot: houseBot,
           };
       const authoritativeSession = this.presented(this.authority!.getSession());
       this.update({
@@ -1216,6 +1277,12 @@ export class MultiplayerRoomSession {
       return;
     }
     if (presence.kind === 'peer.left') {
+      if (this.snapshot.stage === 'lobby') {
+        this.update({
+          seats: this.snapshot.seats.filter((seat) => seat.seat !== presence.seat),
+        });
+        return;
+      }
       this.update({
         seats: this.snapshot.seats.map((seat) =>
           seat.seat === presence.seat ? { ...seat, connected: false, bot: true } : seat,
@@ -1255,27 +1322,87 @@ export class MultiplayerRoomSession {
   }
 }
 
-let activeSession: MultiplayerRoomSession | null = null;
-const activeListeners = new Set<Listener>();
+/**
+ * The seated room has to survive a Next.js client-chunk split.
+ *
+ * Join and table routes can each evaluate this module as a different copy, so a
+ * module-level `let` is not enough: the phone would land on `/wild/table` with
+ * no room handle, boot a solo deal, and the host would see that friend leave.
+ * `globalThis` is one object per tab. The sessionStorage marker is the belt:
+ * a table page that can see the marker but not the handle waits instead of
+ * dealing solo.
+ */
+const ACTIVE_ROOM_KEY = '__parlourActiveRoom';
+const ACTIVE_LISTENERS_KEY = '__parlourActiveRoomListeners';
+const ROOM_MARKER_KEY = 'parlour.active-room';
+
+type ActiveRoomTab = {
+  [ACTIVE_ROOM_KEY]?: MultiplayerRoomSession | null;
+  [ACTIVE_LISTENERS_KEY]?: Set<Listener>;
+};
+
+function tabStore(): ActiveRoomTab {
+  return globalThis as ActiveRoomTab;
+}
+
+function activeListeners(): Set<Listener> {
+  const store = tabStore();
+  store[ACTIVE_LISTENERS_KEY] ??= new Set();
+  return store[ACTIVE_LISTENERS_KEY];
+}
+
+function rememberActiveRoom(session: MultiplayerRoomSession): void {
+  const gameId = session.getSnapshot().gameId;
+  try {
+    if (gameId) sessionStorage.setItem(ROOM_MARKER_KEY, gameId);
+  } catch {
+    // Private mode can refuse storage; the in-memory handle is still enough
+    // for same-tab navigation.
+  }
+}
+
+function forgetActiveRoom(): void {
+  try {
+    sessionStorage.removeItem(ROOM_MARKER_KEY);
+  } catch {
+    // ignore
+  }
+}
+
+/** English, like the other session errors — the join page surfaces it as-is. */
+export const LOBBY_CLOSED = 'The host closed the lobby.';
+
+export function expectedRoomGameId(): string | null {
+  try {
+    return sessionStorage.getItem(ROOM_MARKER_KEY);
+  } catch {
+    return null;
+  }
+}
 
 export function activateMultiplayerSession(session: MultiplayerRoomSession): void {
-  if (activeSession && activeSession !== session) activeSession.close();
-  activeSession = session;
-  for (const listener of activeListeners) listener();
+  const store = tabStore();
+  const current = store[ACTIVE_ROOM_KEY];
+  if (current && current !== session) current.close();
+  store[ACTIVE_ROOM_KEY] = session;
+  rememberActiveRoom(session);
+  for (const listener of activeListeners()) listener();
 }
 
 export function getActiveMultiplayerSession(): MultiplayerRoomSession | null {
-  return activeSession;
+  return tabStore()[ACTIVE_ROOM_KEY] ?? null;
 }
 
 export function subscribeActiveMultiplayerSession(listener: Listener): () => void {
-  activeListeners.add(listener);
-  return () => activeListeners.delete(listener);
+  const listeners = activeListeners();
+  listeners.add(listener);
+  return () => listeners.delete(listener);
 }
 
 export function clearActiveMultiplayerSession(): void {
-  activeSession = null;
-  for (const listener of activeListeners) listener();
+  tabStore()[ACTIVE_ROOM_KEY] = null;
+  forgetActiveRoom();
+  for (const listener of activeListeners()) listener();
 }
 
 export function multiplayerProfile(name: string, avatarId: string): MultiplayerProfile {

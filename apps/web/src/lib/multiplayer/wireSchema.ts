@@ -55,6 +55,8 @@ export type WireMessage =
   | { type: 'applied'; packet: AppliedPacket }
   | { type: 'heartbeat'; sentAt: number; hostId?: string; term?: number }
   | { type: 'host.changed'; hostId: string; term?: number; snapshot: MigrationSnapshot }
+  /** Host is tearing the lobby down — guests must leave, not elect a replacement. */
+  | { type: 'room.closed' }
   | { type: 'sync.request'; expectedSeq: number }
   | { type: 'sync.snapshot'; snapshot: MigrationSnapshot }
   | { type: 'emote'; emote: Emote }
@@ -442,6 +444,8 @@ function isWireMessage(value: unknown): value is WireMessage {
         (value.term === undefined || isBoundedInteger(value.term, MAX_SEQUENCE)) &&
         isMigrationSnapshot(value.snapshot)
       );
+    case 'room.closed':
+      return hasOnlyKeys(value, ['type']);
     case 'sync.request':
       return (
         hasOnlyKeys(value, ['type', 'expectedSeq']) &&

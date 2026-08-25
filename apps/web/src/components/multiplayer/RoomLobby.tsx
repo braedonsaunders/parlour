@@ -19,8 +19,9 @@ type RoomLobbyProps = {
   capacity: number;
   isHost: boolean;
   connection: 'connecting' | 'connected' | 'reconnecting';
-  onStart?: () => void;
+  onStart?: () => void | Promise<void>;
   onAddBot?: (seat: number) => void;
+  error?: string | null;
 };
 
 export function RoomLobby({
@@ -32,10 +33,24 @@ export function RoomLobby({
   connection,
   onStart,
   onAddBot,
+  error,
 }: RoomLobbyProps) {
   const t = useT();
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'error'>('idle');
+  const [starting, setStarting] = useState(false);
   const occupied = new Map(seats.map((seat) => [seat.seat, seat]));
+
+  async function handleStart() {
+    if (!onStart || starting) return;
+    setStarting(true);
+    try {
+      await onStart();
+    } catch {
+      // The session already put the player-facing copy on snapshot.error.
+    } finally {
+      setStarting(false);
+    }
+  }
 
   async function copyLink() {
     try {
@@ -130,7 +145,7 @@ export function RoomLobby({
                       type="button"
                       onClick={() => onAddBot(seat)}
                     >
-                      Add bot
+                      {t('room.addBot')}
                     </button>
                   )}
                 </>
@@ -140,16 +155,24 @@ export function RoomLobby({
         })}
       </ol>
 
+      {error && (
+        <p className="mt-4 text-sm text-hearth-200" role="alert">
+          {error}
+        </p>
+      )}
+
       {isHost && (
         <button
           className="btn-fat mt-6 w-full"
           type="button"
-          disabled={seats.length < capacity || connection !== 'connected'}
-          onClick={onStart}
+          disabled={starting || seats.length < capacity || connection !== 'connected'}
+          onClick={() => void handleStart()}
         >
-          {seats.length < capacity
-            ? t.count('room.waitingFor', capacity - seats.length)
-            : t('room.start')}
+          {starting
+            ? t('table.dealing')
+            : seats.length < capacity
+              ? t.count('room.waitingFor', capacity - seats.length)
+              : t('room.start')}
         </button>
       )}
     </section>

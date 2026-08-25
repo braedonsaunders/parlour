@@ -76,9 +76,12 @@ export const en = {
   'join.unreachable': 'Could not reach table {code}. Check the code and your connection.',
   'join.unreachableGeneric': 'Could not reach that table.',
   'join.seated': 'You have a seat. The table opens when the host deals.',
+  'join.lobbyClosed': 'The host closed the lobby.',
 
   // --- room lobby -----------------------------------------------------------
   'room.codeLabel': 'Room code',
+  'room.addBot': 'Add bot',
+  'room.lobbyClosed': 'The host closed the lobby.',
   'room.connected': 'The table is connected',
   'room.reconnecting': 'Reconnecting — your seat is saved',
   'room.finding': 'Finding the table…',

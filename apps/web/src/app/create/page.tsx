@@ -4,10 +4,10 @@ import Link from 'next/link';
 import { useWipeRouter } from '@/hooks/useWipeRouter';
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { RoomLobby } from '@/components/multiplayer/RoomLobby';
-import { SecurityBadge } from '@/components/multiplayer/TableSecurity';
 import { useProfileStore } from '@/stores/profile';
 import {
   activateMultiplayerSession,
+  clearActiveMultiplayerSession,
   multiplayerProfile,
   MultiplayerRoomSession,
 } from '../_multiplayer/roomSession';
@@ -31,9 +31,6 @@ export default function CreateRoomPage() {
       .catch(() => undefined);
   }, [avatarId, name, opening]);
 
-  // No privacy tier to pick. Every room mixes its shuffle across all the seats,
-  // so the fair-deal guarantee is simply on, and the badge in the room states
-  // what it does and does not cover rather than asking the player to choose it.
   if (!opening) {
     return (
       <main className="flex min-h-dvh flex-col items-center justify-center gap-5 px-6 py-8">
@@ -48,18 +45,14 @@ export default function CreateRoomPage() {
     );
   }
   if (!session) return <LobbyLoading />;
-  return (
-    <ActiveCreateLobby session={session} capacity={2} onStarted={() => router.push('/table')} />
-  );
+  return <ActiveCreateLobby session={session} onStarted={() => router.push('/table')} />;
 }
 
 function ActiveCreateLobby({
   session,
-  capacity,
   onStarted,
 }: {
   session: MultiplayerRoomSession;
-  capacity: number;
   onStarted: () => void;
 }) {
   const snapshot = useSyncExternalStore(
@@ -69,7 +62,7 @@ function ActiveCreateLobby({
   );
   const room = snapshot.room;
 
-  if (snapshot.error) {
+  if (snapshot.error && !room) {
     return (
       <main className="flex min-h-dvh flex-col items-center justify-center gap-5 px-6 text-center">
         <p className="panel-soft max-w-md p-5 text-dusk-50" role="alert">
@@ -87,7 +80,10 @@ function ActiveCreateLobby({
     <main className="flex min-h-dvh flex-col items-center justify-center gap-5 px-6 py-8">
       <Link
         href="/"
-        onClick={() => session.close()}
+        onClick={() => {
+          session.close();
+          clearActiveMultiplayerSession();
+        }}
         className="pill-soft chrome-nw absolute z-30 text-sm font-bold text-dusk-100 hover:text-hearth-200"
       >
         ← Leave
@@ -95,8 +91,9 @@ function ActiveCreateLobby({
       <RoomLobby
         code={room.code}
         shareUrl={room.shareUrl}
-        capacity={capacity}
+        capacity={snapshot.settings?.seats ?? 2}
         isHost
+        onAddBot={(seat) => session.addBot(seat)}
         connection={snapshot.connection === 'closed' ? 'reconnecting' : snapshot.connection}
         seats={snapshot.seats.map((seat) => ({
           seat: seat.seat,
@@ -105,16 +102,11 @@ function ActiveCreateLobby({
           bot: seat.bot,
           connected: seat.connected,
         }))}
-        onStart={() => {
-          void session
-            .start()
-            .then(onStarted)
-            .catch(() => undefined);
-        }}
+        onStart={() => session.start().then(onStarted)}
+        error={snapshot.error}
       />
-      <SecurityBadge security={snapshot.security} />
       <p className="text-center text-sm text-dusk-100/80">
-        Share the code with a friend. The match unlocks when a second player sits down.
+        Share the code with a friend, or fill the empty chair with a bot.
       </p>
     </main>
   );

@@ -94,10 +94,11 @@ export type RemoteApplyResult = {
 };
 
 export type PresenceEvent =
-  | { kind: 'peer.joined'; peerId: PeerId; seat: SeatId; profile: PlayerProfile }
+  | { kind: 'peer.joined'; peerId: PeerId; seat: SeatId; profile: PlayerProfile; bot: boolean }
   | { kind: 'peer.left'; peerId: PeerId; seat: SeatId; bot: true }
   | { kind: 'seat.reclaimed'; peerId: PeerId; seat: SeatId; profile: PlayerProfile }
   | { kind: 'host.changed'; hostId: PeerId }
+  | { kind: 'room.closed' }
   | { kind: 'connection'; state: 'connecting' | 'connected' | 'reconnecting' | 'closed' }
   | { kind: 'error'; message: string };
 

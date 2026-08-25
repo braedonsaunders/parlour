@@ -5,7 +5,13 @@ import type { FxEvent, GameSession, RuleValues } from '@parlour/engine';
 import { useWipeRouter } from '@/hooks/useWipeRouter';
 import { useDeferredTransport } from '@/lib/table/useDeferredTransport';
 import { useMatchReport, type MatchReport } from '@/lib/table/useMatchReport';
-import { useActiveRoom, useRoomTable, type RoomTable } from '@/lib/table/useRoomTable';
+import {
+  useActiveRoom,
+  useExpectedRoom,
+  useIsClient,
+  useRoomTable,
+  type RoomTable,
+} from '@/lib/table/useRoomTable';
 import {
   useSoloTable,
   type SoloRound,
@@ -41,6 +47,11 @@ export interface SoloTableContext<TTransport, TSnapshot, TDispatch> {
   dispatch(move: string, payload?: unknown): void;
   /** Escape hatch for tables that drive the transport directly (next hand). */
   accept(outcome: TDispatch): void;
+  /**
+   * Replaces the snapshot without a move. Blitz's timed clock polls the
+   * transport; most packs never touch this.
+   */
+  setSnapshot?(snapshot: TSnapshot): void;
   /** Leaves the table for this game's shelf page. */
   quit(): void;
   /**
@@ -73,6 +84,11 @@ export interface TableGamePack<TSnapshot, TDispatch, TTransport, S, C extends Ru
   id: string;
   /** The engine def id a friend room announces. Usually the same as `id`. */
   gameId: string;
+  /**
+   * Where Quit sends the player. Defaults to `/${id}`. Blitz's shelf is
+   * `/play`, not `/blitz`.
+   */
+  homeHref?: string;
 
   /**
    * Reads whatever setup state a fresh deal depends on and returns the factory
@@ -130,6 +146,7 @@ export interface SoloDriverResult<TSnapshot, TDispatch> {
   error: string | null;
   dispatch(move: string, payload?: unknown): void;
   accept(outcome: TDispatch): void;
+  setSnapshot?(snapshot: TSnapshot): void;
 }
 
 /** A hook that turns a live transport into everything the screen needs. */
@@ -149,6 +166,7 @@ export function turnBasedDriver<
   round(snapshot: TSnapshot): SoloRound;
   botPaceMs(snapshot: TSnapshot): number;
   fxFor?(outcome: TDispatch): readonly FxEvent[];
+  onAccepted?(outcome: TDispatch): void;
 }): SoloDriver<TTransport, TSnapshot, TDispatch> {
   return (transport) => useSoloTable<TSnapshot, TDispatch>(transport, options);
 }
@@ -163,8 +181,15 @@ export function GameTablePage<TSnapshot, TDispatch, TTransport, S, C extends Rul
   pack: TableGamePack<TSnapshot, TDispatch, TTransport, S, C>;
 }) {
   const room = useActiveRoom(pack.gameId);
+  const expectedRoom = useExpectedRoom(pack.gameId);
+  const isClient = useIsClient();
   // Two components rather than two branches in one: the solo table and the room
   // table hold different hooks, so swapping between them has to remount.
+  // Until this tab is on the client snapshot, and while a room handoff is
+  // still resolving, stay on the splash — never a solo deal with default rules.
+  if (!isClient || (expectedRoom && !room)) {
+    return <>{pack.renderPending({ fx: [], fxKey: 'loading', error: null })}</>;
+  }
   if (room) return <RoomTablePage pack={pack} room={room} />;
   return <SoloTablePage pack={pack} />;
 }
@@ -188,7 +213,9 @@ function ActiveSoloTable<TSnapshot, TDispatch, TTransport, S, C extends RuleValu
   transport: TTransport;
 }) {
   const router = useWipeRouter();
-  const { snapshot, fx, fxKey, error, dispatch, accept } = pack.useSoloDriver(transport);
+  const { snapshot, fx, fxKey, error, dispatch, accept, setSnapshot } =
+    pack.useSoloDriver(transport);
+  const home = pack.homeHref ?? `/${pack.id}`;
 
   const ctx: SoloTableContext<TTransport, TSnapshot, TDispatch> = {
     transport,
@@ -198,7 +225,8 @@ function ActiveSoloTable<TSnapshot, TDispatch, TTransport, S, C extends RuleValu
     error,
     dispatch,
     accept,
-    quit: () => router.push(`/${pack.id}`),
+    setSnapshot,
+    quit: () => router.push(home),
     push: (href: string) => router.push(href),
   };
 
@@ -220,6 +248,7 @@ function RoomTablePage<TSnapshot, TDispatch, TTransport, S, C extends RuleValues
   const router = useWipeRouter();
   const table = useRoomTable<S, C>(room, pack.gameId);
   const { session, localSeat, snapshot, error } = table;
+  const home = pack.homeHref ?? `/${pack.id}`;
 
   const ctx: RoomTableContext<S, C> | null =
     session && localSeat !== null
@@ -228,7 +257,7 @@ function RoomTablePage<TSnapshot, TDispatch, TTransport, S, C extends RuleValues
           room,
           session,
           localSeat,
-          quit: () => table.leave(() => router.push(`/${pack.id}`)),
+          quit: () => table.leave(() => router.push(home)),
           push: (href: string) => router.push(href),
         }
       : null;

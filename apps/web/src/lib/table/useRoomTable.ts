@@ -4,6 +4,7 @@ import { useCallback, useState, useSyncExternalStore } from 'react';
 import type { GameSession, RuleValues } from '@parlour/engine';
 import {
   clearActiveMultiplayerSession,
+  expectedRoomGameId,
   getActiveMultiplayerSession,
   multiplayerSession,
   subscribeActiveMultiplayerSession,
@@ -94,5 +95,28 @@ export function useActiveRoom(gameId: string): MultiplayerRoomSession | null {
     getActiveMultiplayerSession,
     () => null,
   );
-  return room?.getSnapshot().gameId === gameId ? room : null;
+  const snapshot = room?.getSnapshot();
+  if (!snapshot || snapshot.gameId !== gameId || snapshot.connection === 'closed') return null;
+  return room;
+}
+
+/**
+ * True when this tab navigated here from a live room for `gameId`.
+ *
+ * Table pages must not boot a solo deal while this is set: that is how a phone
+ * used to land on a different game after the join page handed off.
+ */
+export function useExpectedRoom(gameId: string): boolean {
+  return useSyncExternalStore(
+    subscribeActiveMultiplayerSession,
+    () => expectedRoomGameId() === gameId,
+    () => false,
+  );
+}
+
+const subscribeNoop = () => () => {};
+
+/** False during SSR/hydration, true on the client snapshot that follows. */
+export function useIsClient(): boolean {
+  return useSyncExternalStore(subscribeNoop, () => true, () => false);
 }

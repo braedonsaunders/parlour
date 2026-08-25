@@ -57,7 +57,9 @@ export function useMultiplayerRoom(gameId: MultiplayerGameId): MultiplayerRoomSe
     getActiveMultiplayerSession,
     () => null,
   );
-  return room?.getSnapshot().gameId === gameId ? room : null;
+  const snapshot = room?.getSnapshot();
+  if (!snapshot || snapshot.gameId !== gameId || snapshot.connection === 'closed') return null;
+  return room;
 }
 
 // ---------------------------------------------------------------------------

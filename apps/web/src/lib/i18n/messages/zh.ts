@@ -76,9 +76,12 @@ export const zh: Messages = {
   'join.unreachable': '连不上牌桌 {code}。请检查房间码和网络连接。',
   'join.unreachableGeneric': '连不上那张牌桌。',
   'join.seated': '你已入座。房主发牌后牌桌就会开局。',
+  'join.lobbyClosed': '房主关闭了房间。',
 
   // --- room lobby -----------------------------------------------------------
   'room.codeLabel': '房间码',
+  'room.addBot': '添加机器人',
+  'room.lobbyClosed': '房主关闭了房间。',
   'room.connected': '牌桌已连接',
   'room.reconnecting': '正在重连——你的座位还在',
   'room.finding': '正在寻找牌桌…',

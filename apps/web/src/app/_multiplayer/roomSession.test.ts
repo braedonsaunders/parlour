@@ -40,7 +40,15 @@ import { EngineAuthority } from '@/lib/multiplayer';
 import { NostrSignaling, type SignalPayload } from '@/lib/multiplayer/NostrSignaling';
 import type { RoomSettings } from '@/lib/multiplayer/types';
 import { MULTIPLAYER_GAME_IDS, ROOM_GAMES } from '@/lib/rooms/gameRegistry';
-import { multiplayerSession, MultiplayerRoomSession } from './roomSession';
+import {
+  activateMultiplayerSession,
+  clearActiveMultiplayerSession,
+  expectedRoomGameId,
+  getActiveMultiplayerSession,
+  LOBBY_CLOSED,
+  multiplayerSession,
+  MultiplayerRoomSession,
+} from './roomSession';
 
 type SignalHandler = (sender: string, signal: SignalPayload) => void;
 
@@ -200,7 +208,10 @@ async function eventually(assertion: () => void, attempts = 40, delayMs = 0) {
 describe('multiplayer route composition', () => {
   const sessions: MultiplayerRoomSession[] = [];
 
-  afterEach(() => sessions.splice(0).forEach((session) => session.close()));
+  afterEach(() => {
+    sessions.splice(0).forEach((session) => session.close());
+    clearActiveMultiplayerSession();
+  });
 
   // D3 seam: a share link carries a host-binding capability because a 4-char
   // code is a public locator, not an authenticator. roomSession must forward it
@@ -384,6 +395,164 @@ describe('multiplayer route composition', () => {
     expect(stateHash(guest.getSnapshot().session?.state)).toBe(
       stateHash(host.getSnapshot().session?.state),
     );
+  });
+
+  it('kicks every guest when the host leaves the lobby', async () => {
+    const broker = new MockSignalingBroker();
+    const rtc = new MockRtcNetwork();
+    const host = new MultiplayerRoomSession(
+      { name: 'Host', avatarId: 'ember', profileId: 'leave-host' },
+      {
+        signaling: broker.signaling('leave-host-peer'),
+        peerConnection: rtc.factory('leave-host'),
+        seed: 42,
+      },
+    );
+    const guest = new MultiplayerRoomSession(
+      { name: 'Guest', avatarId: 'cobalt', profileId: 'leave-guest' },
+      {
+        signaling: broker.signaling('leave-guest-peer'),
+        peerConnection: rtc.factory('leave-guest'),
+        seed: 7,
+      },
+    );
+    sessions.push(host, guest);
+
+    const room = await host.create({ seats: 2 });
+    await guest.join(room.code);
+    await eventually(() => expect(guest.getSnapshot().localSeat).toBe(1));
+
+    host.close();
+
+    await eventually(() => {
+      expect(guest.getSnapshot().error).toBe(LOBBY_CLOSED);
+      expect(guest.getSnapshot().connection).toBe('closed');
+    });
+  });
+
+  it('lets the host fill empty chairs with bots and deal one shared table', async () => {
+    const broker = new MockSignalingBroker();
+    const rtc = new MockRtcNetwork();
+    const host = new MultiplayerRoomSession(
+      { name: 'Host', avatarId: 'ember', profileId: 'bot-host' },
+      {
+        signaling: broker.signaling('bot-host-peer'),
+        peerConnection: rtc.factory('bot-host'),
+        seed: 42,
+      },
+    );
+    const guest = new MultiplayerRoomSession(
+      { name: 'Guest', avatarId: 'cobalt', profileId: 'bot-guest' },
+      {
+        signaling: broker.signaling('bot-guest-peer'),
+        peerConnection: rtc.factory('bot-guest'),
+        seed: 7,
+      },
+    );
+    sessions.push(host, guest);
+
+    const room = await host.create({
+      gameId: 'wildpile',
+      seats: 4,
+      config: applyPreset(wildpileConfig, 'party'),
+    });
+    await guest.join(room.code);
+    await eventually(() => expect(guest.getSnapshot().localSeat).toBe(1));
+
+    host.addBot(2);
+    host.addBot(3);
+
+    await eventually(() => {
+      expect(host.getSnapshot().seats).toHaveLength(4);
+      expect(host.getSnapshot().seats.filter((seat) => seat.bot)).toHaveLength(2);
+      expect(guest.getSnapshot().seats.filter((seat) => seat.bot)).toHaveLength(2);
+    });
+
+    await host.start();
+
+    expect(host.getSnapshot().stage).toBe('table');
+    expect(host.getSnapshot().security.tier).toBe('open');
+    await eventually(() => expect(guest.getSnapshot().stage).toBe('table'));
+    expect(stateHash(guest.getSnapshot().session?.state)).toBe(
+      stateHash(host.getSnapshot().session?.state),
+    );
+  });
+
+  it('keeps the lobby up and names the fault when chairs are still empty', async () => {
+    const host = new MultiplayerRoomSession(
+      { name: 'Host', avatarId: 'ember', profileId: 'start-empty-host' },
+      {
+        signaling: new MockSignalingBroker().signaling('start-empty-host-peer'),
+        peerConnection: new MockRtcNetwork().factory('start-empty-host'),
+        seed: 3,
+      },
+    );
+    sessions.push(host);
+    await host.create({
+      gameId: 'wildpile',
+      seats: 4,
+      config: applyPreset(wildpileConfig, 'party'),
+    });
+
+    await expect(host.start()).rejects.toThrow(/every seat must be filled/);
+    expect(host.getSnapshot().error).toMatch(/every seat must be filled/);
+    expect(host.getSnapshot().stage).toBe('lobby');
+  });
+
+  it('announces the created seat count so a guest draws the same chairs', async () => {
+    const broker = new MockSignalingBroker();
+    const rtc = new MockRtcNetwork();
+    const host = new MultiplayerRoomSession(
+      { name: 'Host', avatarId: 'ember', profileId: 'seat-count-host' },
+      {
+        signaling: broker.signaling('seat-count-host-peer'),
+        peerConnection: rtc.factory('seat-count-host'),
+        seed: 11,
+      },
+    );
+    const guest = new MultiplayerRoomSession(
+      { name: 'Guest', avatarId: 'cobalt', profileId: 'seat-count-guest' },
+      {
+        signaling: broker.signaling('seat-count-guest-peer'),
+        peerConnection: rtc.factory('seat-count-guest'),
+        seed: 13,
+      },
+    );
+    sessions.push(host, guest);
+
+    const room = await host.create({
+      gameId: 'wildpile',
+      seats: 2,
+      config: applyPreset(wildpileConfig, 'party'),
+    });
+    await guest.join(room.code);
+    await eventually(() => expect(guest.getSnapshot().localSeat).toBe(1));
+
+    expect(host.getSnapshot().settings?.seats).toBe(2);
+    expect(guest.getSnapshot().settings?.seats).toBe(2);
+    expect(host.getSnapshot().seats).toHaveLength(2);
+    expect(guest.getSnapshot().seats).toHaveLength(2);
+  });
+
+  it('pins the seated room on the tab so a table route cannot miss it', async () => {
+    const host = new MultiplayerRoomSession(
+      { name: 'Host', avatarId: 'ember', profileId: 'pin-tab-host' },
+      {
+        signaling: new MockSignalingBroker().signaling('pin-tab-host-peer'),
+        peerConnection: new MockRtcNetwork().factory('pin-tab-host'),
+        seed: 3,
+      },
+    );
+    sessions.push(host);
+    await host.create({ seats: 2 });
+
+    activateMultiplayerSession(host);
+    expect(getActiveMultiplayerSession()).toBe(host);
+    expect(expectedRoomGameId()).toBe('blitz');
+
+    clearActiveMultiplayerSession();
+    expect(getActiveMultiplayerSession()).toBeNull();
+    expect(expectedRoomGameId()).toBeNull();
   });
 
   it('runs the live Veil ceremony with each peer in its assigned seat', async () => {

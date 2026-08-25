@@ -4,8 +4,8 @@ import Link from 'next/link';
 import { useWipeRouter } from '@/hooks/useWipeRouter';
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { RoomLobby } from '@/components/multiplayer/RoomLobby';
-import { SecurityBadge } from '@/components/multiplayer/TableSecurity';
 import { useProfileStore } from '@/stores/profile';
+import { usePersistHydrated } from '@/stores/usePersistHydrated';
 import { useRatscrewSetupStore, ratscrewRulesFor } from '@/stores/ratscrewSetup';
 import {
   activateMultiplayerSession,
@@ -21,12 +21,13 @@ export default function CreateRatscrewRoomPage() {
   const mode = useRatscrewSetupStore((state) => state.mode);
   const seats = useRatscrewSetupStore((state) => state.seats);
   const overrides = useRatscrewSetupStore((state) => state.overrides);
+  const ready = usePersistHydrated(useRatscrewSetupStore);
   const rulesKey = JSON.stringify(ratscrewRulesFor(mode, overrides));
   const sessionRef = useRef<MultiplayerRoomSession | null>(null);
   const [session, setSession] = useState<MultiplayerRoomSession | null>(null);
 
   useEffect(() => {
-    if (sessionRef.current) return;
+    if (!ready || sessionRef.current) return;
     const next = new MultiplayerRoomSession(multiplayerProfile(name, avatarId));
     sessionRef.current = next;
     setSession(next);
@@ -38,25 +39,17 @@ export default function CreateRatscrewRoomPage() {
       })
       .then(() => activateMultiplayerSession(next))
       .catch(() => undefined);
-  }, [avatarId, name, rulesKey, seats]);
+  }, [avatarId, name, ready, rulesKey, seats]);
 
-  if (!session) return <LobbyLoading />;
-  return (
-    <ActiveLobby
-      session={session}
-      capacity={seats}
-      onStarted={() => router.push('/ratscrew/table')}
-    />
-  );
+  if (!ready || !session) return <LobbyLoading />;
+  return <ActiveLobby session={session} onStarted={() => router.push('/ratscrew/table')} />;
 }
 
 function ActiveLobby({
   session,
-  capacity,
   onStarted,
 }: {
   session: MultiplayerRoomSession;
-  capacity: number;
   onStarted: () => void;
 }) {
   const snapshot = useSyncExternalStore(
@@ -71,7 +64,7 @@ function ActiveLobby({
     clearActiveMultiplayerSession();
   };
 
-  if (snapshot.error) {
+  if (snapshot.error && !room) {
     return (
       <main className="flex min-h-dvh flex-col items-center justify-center gap-5 px-6 text-center">
         <p className="panel-soft max-w-md p-5 text-dusk-50" role="alert">
@@ -84,6 +77,7 @@ function ActiveLobby({
     );
   }
   if (!room) return <LobbyLoading />;
+  const capacity = snapshot.settings?.seats ?? snapshot.seats.length;
 
   return (
     <main className="flex min-h-dvh flex-col items-center justify-center gap-5 px-6 py-8">
@@ -99,6 +93,7 @@ function ActiveLobby({
         shareUrl={room.shareUrl}
         capacity={capacity}
         isHost
+        onAddBot={(seat) => session.addBot(seat)}
         connection={snapshot.connection === 'closed' ? 'reconnecting' : snapshot.connection}
         seats={snapshot.seats.map((seat) => ({
           seat: seat.seat,
@@ -107,14 +102,9 @@ function ActiveLobby({
           bot: seat.bot,
           connected: seat.connected,
         }))}
-        onStart={() => {
-          void session
-            .start()
-            .then(onStarted)
-            .catch(() => undefined);
-        }}
+        onStart={() => session.start().then(onStarted)}
+        error={snapshot.error}
       />
-      <SecurityBadge security={snapshot.security} />
       <p className="max-w-xl text-center text-sm text-dusk-100/80">
         Slaps resolve in arrival order on the host — first palm on the pile takes it. This{' '}
         {capacity}-seat table starts when every chair is filled.
