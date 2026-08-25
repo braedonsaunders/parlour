@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import type { ReactNode } from 'react';
+import { useWipeRouter } from '@/hooks/useWipeRouter';
 import { useT } from '@/lib/i18n';
 import styles from '@/styles/modes.module.css';
 
@@ -154,4 +155,61 @@ export function SetupActions({
       {note && <p className={`${styles.fitHint} text-center text-xs text-dusk-200/80`}>{note}</p>}
     </>
   );
+}
+
+export type SetupTableActionsProps = {
+  busy?: boolean;
+  /** Shown on Play solo while the table is being set. */
+  soloBusyLabel?: string;
+  onSolo: () => void;
+  /**
+   * Friend-room create path. When omitted the row is solo-only — Oh Hell,
+   * Scopa, and Spite have no rooms yet.
+   */
+  createHref?: string;
+  createTestId?: string;
+  createDisabled?: boolean;
+  createTitle?: string;
+  note?: ReactNode;
+};
+
+/**
+ * The three ways off a game type page. Labels live here so Blitz cannot say
+ * "Deal me in" / "Create Room" while Wild says "Play solo" / "Create friend
+ * room". Pages pass the routes and busy copy; they do not pick the words.
+ */
+export function SetupTableActions({
+  busy = false,
+  soloBusyLabel,
+  onSolo,
+  createHref,
+  createTestId,
+  createDisabled,
+  createTitle,
+  note,
+}: SetupTableActionsProps) {
+  const t = useT();
+  const router = useWipeRouter();
+  const actions: SetupAction[] = [
+    {
+      label: t('setup.playSolo'),
+      busyLabel: soloBusyLabel,
+      onClick: onSolo,
+      testId: 'deal-me-in',
+    },
+  ];
+  if (createHref) {
+    actions.push(
+      {
+        label: t('setup.createFriendRoom'),
+        tone: 'teal',
+        onClick: () => router.push(createHref),
+        disabled: createDisabled,
+        title: createTitle,
+        testId: createTestId,
+      },
+      { label: t('setup.joinWithCode'), tone: 'ghost', href: '/join' },
+    );
+  }
+  return <SetupActions actions={actions} busy={busy} note={note} />;
 }

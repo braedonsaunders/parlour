@@ -7,9 +7,9 @@ import { RuleSettings } from '@/components/settings/RuleSettings';
 import {
   BotDifficultyPicker,
   GameSetupScreen,
-  SetupActions,
   SetupFact,
   SetupPanel,
+  SetupTableActions,
 } from '@/components/setup';
 import { CRIBBAGE_MODES } from '@/lib/cribbage/modes';
 import { useT } from '@/lib/i18n';
@@ -66,25 +66,14 @@ export default function CribbageSetupPage() {
         label={t('setup.houseRules')}
       />
 
-      <SetupActions
+      <SetupTableActions
         busy={starting}
-        actions={[
-          {
-            label: matchPlay ? t('setup.startSoloMatch') : t('setup.playSolo'),
-            busyLabel: t('setup.busy.settingPegs'),
-            onClick: startSolo,
-            testId: 'deal-me-in',
-          },
-          {
-            label: t('setup.createFriendRoom'),
-            tone: 'teal',
-            onClick: () => router.push('/cribbage/create'),
-            disabled: matchPlay,
-            title: matchPlay ? t('setup.cribbageRoomsLocked') : undefined,
-            testId: 'create-cribbage-room',
-          },
-          { label: t('setup.joinWithCode'), tone: 'ghost', href: '/join' },
-        ]}
+        soloBusyLabel={t('setup.busy.settingPegs')}
+        onSolo={startSolo}
+        createHref="/cribbage/create"
+        createTestId="create-cribbage-room"
+        createDisabled={matchPlay}
+        createTitle={matchPlay ? t('setup.cribbageRoomsLocked') : undefined}
         note={matchPlay ? t('setup.note.cribbageMatch') : t('setup.note.cribbage')}
       />
     </GameSetupScreen>

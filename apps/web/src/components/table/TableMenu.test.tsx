@@ -84,6 +84,7 @@ describe('TableMenu', () => {
 
     const confirm = container.querySelector<HTMLButtonElement>('[data-testid="confirm-quit"]');
     expect(confirm?.textContent).toContain('Quit match');
+    expect(confirm?.className).toContain('btn-fat--danger');
     act(() => confirm?.click());
     expect(onQuit).toHaveBeenCalledTimes(1);
     expect(onClose).not.toHaveBeenCalled();

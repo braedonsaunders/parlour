@@ -8,8 +8,8 @@ import {
   BotDifficultyPicker,
   GameSetupScreen,
   SeatPicker,
-  SetupActions,
   SetupPanel,
+  SetupTableActions,
 } from '@/components/setup';
 import { getGame } from '@/lib/games';
 import { useT } from '@/lib/i18n';
@@ -69,23 +69,12 @@ export default function EightsSetupPage() {
         onReset={resetRules}
       />
 
-      <SetupActions
+      <SetupTableActions
         busy={starting}
-        actions={[
-          {
-            label: t('setup.playSolo'),
-            busyLabel: t('setup.busy.shufflingPack'),
-            onClick: startSolo,
-            testId: 'deal-me-in',
-          },
-          {
-            label: t('setup.createFriendRoom'),
-            tone: 'teal',
-            onClick: () => router.push('/eights/create'),
-            testId: 'create-eights-room',
-          },
-          { label: t('setup.joinWithCode'), tone: 'ghost', href: '/join' },
-        ]}
+        soloBusyLabel={t('setup.busy.shufflingPack')}
+        onSolo={startSolo}
+        createHref="/eights/create"
+        createTestId="create-eights-room"
         note={t('setup.note.friendRooms')}
       />
     </GameSetupScreen>

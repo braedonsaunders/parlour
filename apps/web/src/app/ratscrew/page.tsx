@@ -11,8 +11,8 @@ import {
   BotDifficultyPicker,
   GameSetupScreen,
   SeatPicker,
-  SetupActions,
   SetupPanel,
+  SetupTableActions,
 } from '@/components/setup';
 import { RATSCREW_MODES } from '@/lib/ratscrew/modes';
 import { useRatscrewSetupStore, ratscrewRulesFor } from '@/stores/ratscrewSetup';
@@ -68,23 +68,12 @@ export default function RatscrewSetupPage() {
         onReset={resetRules}
       />
 
-      <SetupActions
+      <SetupTableActions
         busy={starting}
-        actions={[
-          {
-            label: t('setup.playSolo'),
-            busyLabel: t('setup.busy.shufflingStacks'),
-            onClick: startSolo,
-            testId: 'deal-me-in',
-          },
-          {
-            label: t('setup.createFriendRoom'),
-            tone: 'teal',
-            onClick: () => router.push('/ratscrew/create'),
-            testId: 'create-ratscrew-room',
-          },
-          { label: t('setup.joinWithCode'), tone: 'ghost', href: '/join' },
-        ]}
+        soloBusyLabel={t('setup.busy.shufflingStacks')}
+        onSolo={startSolo}
+        createHref="/ratscrew/create"
+        createTestId="create-ratscrew-room"
         note={t('setup.note.ratscrew')}
       />
     </GameSetupScreen>

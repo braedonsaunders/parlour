@@ -84,7 +84,7 @@ export function TableMenu({ open, onClose, onQuit, howToPlay }: TableMenuProps) 
               </button>
               <button
                 type="button"
-                className={`${styles.quitButton} btn-fat`}
+                className={`${styles.quitButton} btn-fat btn-fat--danger`}
                 data-testid="confirm-quit"
                 onClick={onQuit}
               >

@@ -6,8 +6,8 @@ import {
   BotDifficultyPicker,
   GameSetupScreen,
   SeatPicker,
-  SetupActions,
   SetupPanel,
+  SetupTableActions,
 } from '@/components/setup';
 import { getGame } from '@/lib/games';
 import { useT } from '@/lib/i18n';
@@ -56,19 +56,13 @@ export default function ModeSelectPage() {
         <BotDifficultyPicker value={botTier} onChange={setBotTier} />
       </SetupPanel>
 
-      <SetupActions
+      <SetupTableActions
         busy={starting}
-        actions={[
-          {
-            label: t('setup.dealMeIn'),
-            busyLabel: t('setup.busy.settingTable'),
-            onClick: start,
-            testId: 'deal-me-in',
-          },
-          { label: t('setup.createRoom'), tone: 'teal', onClick: () => router.push('/create') },
-          { label: t('setup.joinRoom'), tone: 'ghost', onClick: () => router.push('/join') },
-        ]}
-        note={t('setup.note.blitzRooms')}
+        soloBusyLabel={t('setup.busy.settingTable')}
+        onSolo={start}
+        createHref="/create"
+        createTestId="create-blitz-room"
+        note={t('setup.note.friendRooms')}
       />
     </GameSetupScreen>
   );

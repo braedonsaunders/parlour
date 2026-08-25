@@ -6,9 +6,9 @@ import { GameArt } from '@/components/GameArt';
 import {
   BotDifficultyPicker,
   GameSetupScreen,
-  SetupActions,
   SetupFact,
   SetupPanel,
+  SetupTableActions,
 } from '@/components/setup';
 import { SPADES_MODES } from '@/lib/spades/modes';
 import { getGameMode } from '@/lib/games';
@@ -51,23 +51,12 @@ export default function SpadesSetupPage() {
         <BotDifficultyPicker value={botTier} onChange={setBotTier} />
       </SetupPanel>
 
-      <SetupActions
+      <SetupTableActions
         busy={starting}
-        actions={[
-          {
-            label: t('setup.playSolo'),
-            busyLabel: t('setup.busy.shuffling'),
-            onClick: startSolo,
-            testId: 'deal-me-in',
-          },
-          {
-            label: t('setup.createFriendRoom'),
-            tone: 'teal',
-            onClick: () => router.push('/spades/create'),
-            testId: 'create-spades-room',
-          },
-          { label: t('setup.joinWithCode'), tone: 'ghost', href: '/join' },
-        ]}
+        soloBusyLabel={t('setup.busy.shuffling')}
+        onSolo={startSolo}
+        createHref="/spades/create"
+        createTestId="create-spades-room"
         note={t('setup.note.friendRooms')}
       />
     </GameSetupScreen>

@@ -8,8 +8,8 @@ import {
   BotDifficultyPicker,
   GameSetupScreen,
   SeatPicker,
-  SetupActions,
   SetupPanel,
+  SetupTableActions,
 } from '@/components/setup';
 import { getGame } from '@/lib/games';
 import { useT } from '@/lib/i18n';
@@ -69,23 +69,12 @@ export default function PresidentSetupPage() {
         onReset={resetRules}
       />
 
-      <SetupActions
+      <SetupTableActions
         busy={starting}
-        actions={[
-          {
-            label: t('setup.playSolo'),
-            busyLabel: t('setup.busy.cuttingDeck'),
-            onClick: startSolo,
-            testId: 'deal-me-in',
-          },
-          {
-            label: t('setup.createFriendRoom'),
-            tone: 'teal',
-            onClick: () => router.push('/president/create'),
-            testId: 'create-president-room',
-          },
-          { label: t('setup.joinWithCode'), tone: 'ghost', href: '/join' },
-        ]}
+        soloBusyLabel={t('setup.busy.cuttingDeck')}
+        onSolo={startSolo}
+        createHref="/president/create"
+        createTestId="create-president-room"
         note={t('setup.note.friendRoomsEight')}
       />
     </GameSetupScreen>

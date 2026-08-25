@@ -5,6 +5,8 @@ import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { RoomLobby } from '@/components/multiplayer/RoomLobby';
 import { HostRoomMatch } from '@/lib/games/RoomGameTable';
 import { useProfileStore } from '@/stores/profile';
+import { useSetupStore } from '@/stores/setup';
+import { usePersistHydrated } from '@/stores/usePersistHydrated';
 import {
   activateMultiplayerSession,
   clearActiveMultiplayerSession,
@@ -15,35 +17,27 @@ import {
 export default function CreateRoomPage() {
   const name = useProfileStore((state) => state.name);
   const avatarId = useProfileStore((state) => state.avatarId);
+  const seats = useSetupStore((state) => state.seats);
+  const ready = usePersistHydrated(useSetupStore);
   const sessionRef = useRef<MultiplayerRoomSession | null>(null);
   const [session, setSession] = useState<MultiplayerRoomSession | null>(null);
-  const [opening, setOpening] = useState(false);
 
   useEffect(() => {
-    if (!opening || sessionRef.current) return;
+    if (!ready || sessionRef.current) return;
     const next = new MultiplayerRoomSession(multiplayerProfile(name, avatarId));
     sessionRef.current = next;
     setSession(next);
     void next
-      .create({ seats: 2 })
+      .create({
+        gameId: 'blitz',
+        seats,
+        config: {},
+      })
       .then(() => activateMultiplayerSession(next))
       .catch(() => undefined);
-  }, [avatarId, name, opening]);
+  }, [avatarId, name, ready, seats]);
 
-  if (!opening) {
-    return (
-      <main className="flex min-h-dvh flex-col items-center justify-center gap-5 px-6 py-8">
-        <h1 className="text-2xl font-black text-dusk-50">Open a table</h1>
-        <button type="button" className="btn-fat" onClick={() => setOpening(true)}>
-          Open the table
-        </button>
-        <Link href="/" className="pill-soft text-sm font-bold text-dusk-100">
-          ← Back home
-        </Link>
-      </main>
-    );
-  }
-  if (!session) return <LobbyLoading />;
+  if (!ready || !session) return <BlitzLobbyLoading />;
   return (
     <HostRoomMatch session={session}>
       <ActiveCreateLobby session={session} />
@@ -59,28 +53,31 @@ function ActiveCreateLobby({ session }: { session: MultiplayerRoomSession }) {
   );
   const room = snapshot.room;
 
+  const leave = () => {
+    session.close();
+    clearActiveMultiplayerSession();
+  };
+
   if (snapshot.error && !room) {
     return (
       <main className="flex min-h-dvh flex-col items-center justify-center gap-5 px-6 text-center">
         <p className="panel-soft max-w-md p-5 text-dusk-50" role="alert">
           {snapshot.error}
         </p>
-        <Link href="/" className="btn-fat btn-fat--ghost">
-          Back home
+        <Link href="/play" onClick={leave} className="btn-fat btn-fat--ghost">
+          Back to Blitz
         </Link>
       </main>
     );
   }
-  if (!room) return <LobbyLoading />;
+  if (!room) return <BlitzLobbyLoading />;
+  const capacity = snapshot.settings?.seats ?? snapshot.seats.length;
 
   return (
     <main className="flex min-h-dvh flex-col items-center justify-center gap-5 px-6 py-8">
       <Link
-        href="/"
-        onClick={() => {
-          session.close();
-          clearActiveMultiplayerSession();
-        }}
+        href="/play"
+        onClick={leave}
         className="pill-soft chrome-nw absolute z-30 text-sm font-bold text-dusk-100 hover:text-hearth-200"
       >
         ← Leave
@@ -88,7 +85,7 @@ function ActiveCreateLobby({ session }: { session: MultiplayerRoomSession }) {
       <RoomLobby
         code={room.code}
         shareUrl={room.shareUrl}
-        capacity={snapshot.settings?.seats ?? 2}
+        capacity={capacity}
         isHost
         onAddBot={(seat) => session.addBot(seat)}
         connection={snapshot.connection === 'closed' ? 'reconnecting' : snapshot.connection}
@@ -102,14 +99,15 @@ function ActiveCreateLobby({ session }: { session: MultiplayerRoomSession }) {
         onStart={() => session.start()}
         error={snapshot.error}
       />
-      <p className="text-center text-sm text-dusk-100/80">
-        Share the code with a friend, or fill the empty chair with a bot.
+      <p className="max-w-xl text-center text-sm text-dusk-100/80">
+        This {capacity}-seat table starts when every chair is filled. Share the code with friends, or
+        fill empty chairs with bots.
       </p>
     </main>
   );
 }
 
-function LobbyLoading() {
+function BlitzLobbyLoading() {
   return (
     <main className="flex min-h-dvh items-center justify-center" aria-busy="true">
       <p className="panel-soft animate-pulse px-5 py-3 font-bold text-hearth-100">

@@ -6,9 +6,9 @@ import { RuleSettings } from '@/components/settings/RuleSettings';
 import {
   BotDifficultyPicker,
   GameSetupScreen,
-  SetupActions,
   SetupFact,
   SetupPanel,
+  SetupTableActions,
 } from '@/components/setup';
 import { getGame } from '@/lib/games';
 import { useT } from '@/lib/i18n';
@@ -83,23 +83,12 @@ export default function GinSetupPage() {
         label={t('setup.houseRules')}
       />
 
-      <SetupActions
+      <SetupTableActions
         busy={starting}
-        actions={[
-          {
-            label: t('setup.playSolo'),
-            busyLabel: t('setup.busy.shuffling'),
-            onClick: startSolo,
-            testId: 'deal-me-in',
-          },
-          {
-            label: t('setup.createFriendRoom'),
-            tone: 'teal',
-            onClick: () => router.push('/gin/create'),
-            testId: 'create-gin-room',
-          },
-          { label: t('setup.joinWithCode'), tone: 'ghost', href: '/join' },
-        ]}
+        soloBusyLabel={t('setup.busy.shuffling')}
+        onSolo={startSolo}
+        createHref="/gin/create"
+        createTestId="create-gin-room"
         note={t('setup.note.friendRoomsGin')}
       />
     </GameSetupScreen>

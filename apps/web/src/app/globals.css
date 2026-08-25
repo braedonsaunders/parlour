@@ -144,6 +144,13 @@
     text-shadow: none;
   }
 
+  .btn-fat--danger {
+    border-color: rgba(94, 22, 22, 0.7);
+    background: linear-gradient(180deg, #f07167 0%, #c62828 48%, #8a1616 100%);
+    color: #3c0d05;
+    text-shadow: 0 1px 0 rgba(255, 226, 214, 0.55);
+  }
+
   .panel-soft {
     border-radius: var(--radius-chunky);
     border: 1px solid rgba(175, 218, 228, 0.16);

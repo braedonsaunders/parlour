@@ -7,8 +7,8 @@ import {
   BotDifficultyPicker,
   GameSetupScreen,
   SeatPicker,
-  SetupActions,
   SetupPanel,
+  SetupTableActions,
 } from '@/components/setup';
 import { SCOPA_MODES } from '@/lib/scopa/modes';
 import { getGameMode } from '@/lib/games';
@@ -58,16 +58,10 @@ export default function ScopaSetupPage() {
         <BotDifficultyPicker value={botTier} onChange={setBotTier} />
       </SetupPanel>
 
-      <SetupActions
+      <SetupTableActions
         busy={starting}
-        actions={[
-          {
-            label: t('setup.playSolo'),
-            busyLabel: t('setup.busy.layingTable'),
-            onClick: startSolo,
-            testId: 'deal-me-in',
-          },
-        ]}
+        soloBusyLabel={t('setup.busy.layingTable')}
+        onSolo={startSolo}
         note={t('setup.note.scopa')}
       />
     </GameSetupScreen>

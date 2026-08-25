@@ -1189,9 +1189,11 @@ button.card:not(:disabled):hover {
   gap: 0.6rem;
 }
 
-.quitButton {
-  border-color: rgba(94, 22, 22, 0.65);
-  background: linear-gradient(180deg, #ef8f7c 0%, #d05438 48%, #a2321d 100%);
+/* Doubled so this still wins if a table stylesheet loads after `btn-fat`. The
+   quit confirm used to flip amber or coral depending on chunk order. */
+.quitButton.quitButton {
+  border-color: rgba(94, 22, 22, 0.7);
+  background: linear-gradient(180deg, #f07167 0%, #c62828 48%, #8a1616 100%);
   color: #3c0d05;
   text-shadow: 0 1px 0 rgba(255, 226, 214, 0.55);
 }

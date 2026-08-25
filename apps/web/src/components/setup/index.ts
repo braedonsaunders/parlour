@@ -5,4 +5,12 @@ export {
   type SetupHelp,
   type SetupMode,
 } from './GameSetupScreen';
-export { SeatPicker, SetupActions, SetupFact, SetupPanel, type SetupAction } from './SetupControls';
+export {
+  SeatPicker,
+  SetupActions,
+  SetupFact,
+  SetupPanel,
+  SetupTableActions,
+  type SetupAction,
+  type SetupTableActionsProps,
+} from './SetupControls';

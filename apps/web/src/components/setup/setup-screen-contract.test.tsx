@@ -144,4 +144,31 @@ describe('setup screen contract across every shipped game', () => {
     const chosen = container.querySelectorAll('[role="radio"][aria-checked="true"]');
     expect(chosen).toHaveLength(1);
   });
+
+  const ROOM_SETUP_PAGES: readonly [string, ComponentType][] = [
+    ['Blitz', BlitzSetupPage],
+    ['Cribbage', CribbageSetupPage],
+    ['Crazy Eights', EightsSetupPage],
+    ['Euchre', EuchreSetupPage],
+    ['Gin', GinSetupPage],
+    ['Hearts', HeartsSetupPage],
+    ['Poker', PokerSetupPage],
+    ['President', PresidentSetupPage],
+    ['Rat Screw', RatscrewSetupPage],
+    ['Spades', SpadesSetupPage],
+    ['Wild', WildSetupPage],
+  ];
+
+  it.each(ROOM_SETUP_PAGES)('%s uses the shared Play solo / room labels', (_name, Page) => {
+    render(Page);
+
+    const copy = container.textContent ?? '';
+    expect(copy).toContain('Play solo');
+    expect(copy).toContain('Create friend room');
+    expect(copy).toContain('Join with a code');
+    expect(copy).not.toContain('Deal me in');
+    expect(copy).not.toContain('Create Room');
+    expect(copy).not.toContain('Join Room');
+    expect(copy).not.toContain('Start solo match');
+  });
 });

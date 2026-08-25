@@ -8,8 +8,8 @@ import {
   BotDifficultyPicker,
   GameSetupScreen,
   SeatPicker,
-  SetupActions,
   SetupPanel,
+  SetupTableActions,
 } from '@/components/setup';
 import { POKER_MODES } from '@/lib/poker/modes';
 import { getGameMode } from '@/lib/games';
@@ -60,23 +60,12 @@ export default function PokerSetupPage() {
         <BotDifficultyPicker value={botTier} onChange={setBotTier} />
       </SetupPanel>
 
-      <SetupActions
+      <SetupTableActions
         busy={starting}
-        actions={[
-          {
-            label: t('setup.playSolo'),
-            busyLabel: t('setup.busy.shuffling'),
-            onClick: startSolo,
-            testId: 'deal-me-in',
-          },
-          {
-            label: t('setup.createFriendRoom'),
-            tone: 'teal',
-            onClick: () => router.push('/poker/create'),
-            testId: 'create-poker-room',
-          },
-          { label: t('setup.joinWithCode'), tone: 'ghost', href: '/join' },
-        ]}
+        soloBusyLabel={t('setup.busy.shuffling')}
+        onSolo={startSolo}
+        createHref="/poker/create"
+        createTestId="create-poker-room"
         note={t('setup.note.poker')}
       />
     </GameSetupScreen>

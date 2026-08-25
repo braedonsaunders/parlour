@@ -6,9 +6,9 @@ import { GameArt } from '@/components/GameArt';
 import {
   BotDifficultyPicker,
   GameSetupScreen,
-  SetupActions,
   SetupFact,
   SetupPanel,
+  SetupTableActions,
 } from '@/components/setup';
 import { EUCHRE_MODES } from '@/lib/euchre/modes';
 import { getGameMode } from '@/lib/games';
@@ -51,23 +51,12 @@ export default function EuchreSetupPage() {
         <BotDifficultyPicker value={botTier} onChange={setBotTier} />
       </SetupPanel>
 
-      <SetupActions
+      <SetupTableActions
         busy={starting}
-        actions={[
-          {
-            label: t('setup.playSolo'),
-            busyLabel: t('setup.busy.shuffling'),
-            onClick: startSolo,
-            testId: 'deal-me-in',
-          },
-          {
-            label: t('setup.createFriendRoom'),
-            tone: 'teal',
-            onClick: () => router.push('/euchre/create'),
-            testId: 'create-euchre-room',
-          },
-          { label: t('setup.joinWithCode'), tone: 'ghost', href: '/join' },
-        ]}
+        soloBusyLabel={t('setup.busy.shuffling')}
+        onSolo={startSolo}
+        createHref="/euchre/create"
+        createTestId="create-euchre-room"
         note={t('setup.note.friendRooms')}
       />
     </GameSetupScreen>

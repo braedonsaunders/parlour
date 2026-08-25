@@ -7,8 +7,8 @@ import {
   BotDifficultyPicker,
   GameSetupScreen,
   SeatPicker,
-  SetupActions,
   SetupPanel,
+  SetupTableActions,
 } from '@/components/setup';
 import { SPITE_MODES } from '@/lib/spite/modes';
 import { getGameMode } from '@/lib/games';
@@ -54,16 +54,10 @@ export default function SpiteSetupPage() {
         <BotDifficultyPicker value={botTier} onChange={setBotTier} />
       </SetupPanel>
 
-      <SetupActions
+      <SetupTableActions
         busy={starting}
-        actions={[
-          {
-            label: t('setup.playSolo'),
-            busyLabel: t('setup.busy.stackingPiles'),
-            onClick: startSolo,
-            testId: 'deal-me-in',
-          },
-        ]}
+        soloBusyLabel={t('setup.busy.stackingPiles')}
+        onSolo={startSolo}
         note={t('setup.note.spite')}
       />
     </GameSetupScreen>

@@ -8,8 +8,8 @@ import {
   BotDifficultyPicker,
   GameSetupScreen,
   SeatPicker,
-  SetupActions,
   SetupPanel,
+  SetupTableActions,
 } from '@/components/setup';
 import { OHHELL_MODES } from '@/lib/ohhell/modes';
 import { getGameMode } from '@/lib/games';
@@ -60,16 +60,10 @@ export default function OhHellSetupPage() {
         <BotDifficultyPicker value={botTier} onChange={setBotTier} />
       </SetupPanel>
 
-      <SetupActions
+      <SetupTableActions
         busy={starting}
-        actions={[
-          {
-            label: t('setup.playSolo'),
-            busyLabel: t('setup.busy.cuttingDeal'),
-            onClick: startSolo,
-            testId: 'deal-me-in',
-          },
-        ]}
+        soloBusyLabel={t('setup.busy.cuttingDeal')}
+        onSolo={startSolo}
         note={t('setup.note.ohhell')}
       />
     </GameSetupScreen>

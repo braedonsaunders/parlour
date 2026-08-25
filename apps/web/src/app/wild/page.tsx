@@ -11,8 +11,8 @@ import {
   BotDifficultyPicker,
   GameSetupScreen,
   SeatPicker,
-  SetupActions,
   SetupPanel,
+  SetupTableActions,
 } from '@/components/setup';
 import { WILD_MODES } from '@/lib/wild/modes';
 import { useWildSetupStore, wildRulesFor } from '@/stores/wildSetup';
@@ -68,23 +68,12 @@ export default function WildSetupPage() {
         onReset={resetRules}
       />
 
-      <SetupActions
+      <SetupTableActions
         busy={starting}
-        actions={[
-          {
-            label: t('setup.playSolo'),
-            busyLabel: t('setup.busy.shufflingPile'),
-            onClick: startSolo,
-            testId: 'deal-me-in',
-          },
-          {
-            label: t('setup.createFriendRoom'),
-            tone: 'teal',
-            onClick: () => router.push('/wild/create'),
-            testId: 'create-wild-room',
-          },
-          { label: t('setup.joinWithCode'), tone: 'ghost', href: '/join' },
-        ]}
+        soloBusyLabel={t('setup.busy.shufflingPile')}
+        onSolo={startSolo}
+        createHref="/wild/create"
+        createTestId="create-wild-room"
         note={t('setup.note.friendRoomsBlitz')}
       />
     </GameSetupScreen>
