@@ -3,9 +3,9 @@
 import { applyPreset } from '@parlour/engine';
 import { ohhellConfig } from '@parlour/game-ohhell';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { RoomLobby } from '@/components/multiplayer/RoomLobby';
+import { HostRoomMatch } from '@/lib/games/RoomGameTable';
 import { useProfileStore } from '@/stores/profile';
 import { useOhHellSetupStore } from '@/stores/ohhellSetup';
 import { usePersistHydrated } from '@/stores/usePersistHydrated';
@@ -17,7 +17,6 @@ import {
 } from '../../_multiplayer/roomSession';
 
 export default function CreateOhHellRoomPage() {
-  const router = useRouter();
   const name = useProfileStore((state) => state.name);
   const avatarId = useProfileStore((state) => state.avatarId);
   const mode = useOhHellSetupStore((state) => state.mode);
@@ -42,16 +41,14 @@ export default function CreateOhHellRoomPage() {
   }, [avatarId, mode, name, ready, seats]);
 
   if (!ready || !session) return <OhHellLobbyLoading />;
-  return <ActiveOhHellLobby session={session} onStarted={() => router.push('/ohhell/table')} />;
+  return (
+    <HostRoomMatch session={session}>
+      <ActiveOhHellLobby session={session} />
+    </HostRoomMatch>
+  );
 }
 
-function ActiveOhHellLobby({
-  session,
-  onStarted,
-}: {
-  session: MultiplayerRoomSession;
-  onStarted: () => void;
-}) {
+function ActiveOhHellLobby({ session }: { session: MultiplayerRoomSession }) {
   const snapshot = useSyncExternalStore(
     session.subscribe,
     session.getSnapshot,
@@ -101,7 +98,7 @@ function ActiveOhHellLobby({
           bot: seat.bot,
           connected: seat.connected,
         }))}
-        onStart={() => session.start().then(onStarted)}
+        onStart={() => session.start()}
         error={snapshot.error}
       />
       <p className="max-w-xl text-center text-sm text-dusk-100/80">

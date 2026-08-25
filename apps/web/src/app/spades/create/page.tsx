@@ -3,9 +3,9 @@
 import { applyPreset } from '@parlour/engine';
 import { spadesConfig } from '@parlour/game-spades';
 import Link from 'next/link';
-import { useWipeRouter } from '@/hooks/useWipeRouter';
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { RoomLobby } from '@/components/multiplayer/RoomLobby';
+import { HostRoomMatch } from '@/lib/games/RoomGameTable';
 import { useProfileStore } from '@/stores/profile';
 import { useSpadesSetupStore } from '@/stores/spadesSetup';
 import {
@@ -16,7 +16,6 @@ import {
 } from '../../_multiplayer/roomSession';
 
 export default function CreateSpadesRoomPage() {
-  const router = useWipeRouter();
   const name = useProfileStore((state) => state.name);
   const avatarId = useProfileStore((state) => state.avatarId);
   const mode = useSpadesSetupStore((state) => state.mode);
@@ -39,16 +38,14 @@ export default function CreateSpadesRoomPage() {
   }, [avatarId, mode, name]);
 
   if (!session) return <SpadesLobbyLoading />;
-  return <ActiveSpadesLobby session={session} onStarted={() => router.push('/spades/table')} />;
+  return (
+    <HostRoomMatch session={session}>
+      <ActiveSpadesLobby session={session} />
+    </HostRoomMatch>
+  );
 }
 
-function ActiveSpadesLobby({
-  session,
-  onStarted,
-}: {
-  session: MultiplayerRoomSession;
-  onStarted: () => void;
-}) {
+function ActiveSpadesLobby({ session }: { session: MultiplayerRoomSession }) {
   const snapshot = useSyncExternalStore(
     session.subscribe,
     session.getSnapshot,
@@ -98,7 +95,7 @@ function ActiveSpadesLobby({
           bot: seat.bot,
           connected: seat.connected,
         }))}
-        onStart={() => session.start().then(onStarted)}
+        onStart={() => session.start()}
         error={snapshot.error}
       />
       <p className="max-w-xl text-center text-sm text-dusk-100/80">

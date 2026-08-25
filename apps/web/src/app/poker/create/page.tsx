@@ -3,9 +3,9 @@
 import { applyPreset } from '@parlour/engine';
 import { pokerConfig } from '@parlour/game-poker';
 import Link from 'next/link';
-import { useWipeRouter } from '@/hooks/useWipeRouter';
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { RoomLobby } from '@/components/multiplayer/RoomLobby';
+import { HostRoomMatch } from '@/lib/games/RoomGameTable';
 import { useProfileStore } from '@/stores/profile';
 import { usePokerSetupStore } from '@/stores/pokerSetup';
 import { usePersistHydrated } from '@/stores/usePersistHydrated';
@@ -17,7 +17,6 @@ import {
 } from '../../_multiplayer/roomSession';
 
 export default function CreatePokerRoomPage() {
-  const router = useWipeRouter();
   const name = useProfileStore((state) => state.name);
   const avatarId = useProfileStore((state) => state.avatarId);
   const mode = usePokerSetupStore((state) => state.mode);
@@ -42,16 +41,14 @@ export default function CreatePokerRoomPage() {
   }, [avatarId, mode, name, ready, seats]);
 
   if (!ready || !session) return <PokerLobbyLoading />;
-  return <ActivePokerLobby session={session} onStarted={() => router.push('/poker/table')} />;
+  return (
+    <HostRoomMatch session={session}>
+      <ActivePokerLobby session={session} />
+    </HostRoomMatch>
+  );
 }
 
-function ActivePokerLobby({
-  session,
-  onStarted,
-}: {
-  session: MultiplayerRoomSession;
-  onStarted: () => void;
-}) {
+function ActivePokerLobby({ session }: { session: MultiplayerRoomSession }) {
   const snapshot = useSyncExternalStore(
     session.subscribe,
     session.getSnapshot,
@@ -102,7 +99,7 @@ function ActivePokerLobby({
           bot: seat.bot,
           connected: seat.connected,
         }))}
-        onStart={() => session.start().then(onStarted)}
+        onStart={() => session.start()}
         error={snapshot.error}
       />
       <p className="max-w-xl text-center text-sm text-dusk-100/80">

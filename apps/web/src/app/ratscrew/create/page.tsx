@@ -1,9 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { useWipeRouter } from '@/hooks/useWipeRouter';
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { RoomLobby } from '@/components/multiplayer/RoomLobby';
+import { HostRoomMatch } from '@/lib/games/RoomGameTable';
 import { useProfileStore } from '@/stores/profile';
 import { usePersistHydrated } from '@/stores/usePersistHydrated';
 import { useRatscrewSetupStore, ratscrewRulesFor } from '@/stores/ratscrewSetup';
@@ -15,7 +15,6 @@ import {
 } from '../../_multiplayer/roomSession';
 
 export default function CreateRatscrewRoomPage() {
-  const router = useWipeRouter();
   const name = useProfileStore((state) => state.name);
   const avatarId = useProfileStore((state) => state.avatarId);
   const mode = useRatscrewSetupStore((state) => state.mode);
@@ -42,16 +41,14 @@ export default function CreateRatscrewRoomPage() {
   }, [avatarId, name, ready, rulesKey, seats]);
 
   if (!ready || !session) return <LobbyLoading />;
-  return <ActiveLobby session={session} onStarted={() => router.push('/ratscrew/table')} />;
+  return (
+    <HostRoomMatch session={session}>
+      <ActiveLobby session={session} />
+    </HostRoomMatch>
+  );
 }
 
-function ActiveLobby({
-  session,
-  onStarted,
-}: {
-  session: MultiplayerRoomSession;
-  onStarted: () => void;
-}) {
+function ActiveLobby({ session }: { session: MultiplayerRoomSession }) {
   const snapshot = useSyncExternalStore(
     session.subscribe,
     session.getSnapshot,
@@ -102,7 +99,7 @@ function ActiveLobby({
           bot: seat.bot,
           connected: seat.connected,
         }))}
-        onStart={() => session.start().then(onStarted)}
+        onStart={() => session.start()}
         error={snapshot.error}
       />
       <p className="max-w-xl text-center text-sm text-dusk-100/80">

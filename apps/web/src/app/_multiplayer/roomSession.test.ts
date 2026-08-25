@@ -821,6 +821,104 @@ describe('multiplayer route composition', () => {
     );
   });
 
+  it('plays a peeled Wild card by opening its handle, not the face sitting in the view', async () => {
+    const broker = new MockSignalingBroker();
+    const rtc = new MockRtcNetwork();
+    const host = new MultiplayerRoomSession(
+      { name: 'Host', avatarId: 'ember', profileId: 'wild-play-host' },
+      {
+        signaling: broker.signaling('wild-play-host-peer'),
+        peerConnection: rtc.factory('host'),
+        seed: 91,
+      },
+    );
+    const guest = new MultiplayerRoomSession(
+      { name: 'Guest', avatarId: 'mint', profileId: 'wild-play-guest' },
+      {
+        signaling: broker.signaling('wild-play-guest-peer'),
+        peerConnection: rtc.factory('guest'),
+        seed: 7,
+      },
+    );
+    sessions.push(host, guest);
+
+    const room = await host.create({
+      gameId: 'wildpile',
+      seats: 2,
+      config: applyPreset(wildpileConfig, 'party'),
+    });
+    await guest.join(room.code);
+    await eventually(() => expect(guest.getSnapshot().localSeat).toBe(1));
+    await host.start();
+    await eventually(() => {
+      expect(host.getSnapshot().stage).toBe('table');
+      expect(guest.getSnapshot().stage).toBe('table');
+    });
+
+    await eventually(
+      () => {
+        const hostHand =
+          multiplayerSession<WildpileState, WildpileRules>(host.getSnapshot(), 'wildpile')?.state
+            .hands[0] ?? [];
+        const guestHand =
+          multiplayerSession<WildpileState, WildpileRules>(guest.getSnapshot(), 'wildpile')?.state
+            .hands[1] ?? [];
+        expect(hostHand.length).toBeGreaterThan(0);
+        expect(guestHand.length).toBeGreaterThan(0);
+        expect(hostHand.every((card) => !isVeilHandle(card))).toBe(true);
+        expect(guestHand.every((card) => !isVeilHandle(card))).toBe(true);
+      },
+      1_000,
+      10,
+    );
+
+    const actor = multiplayerSession<WildpileState, WildpileRules>(host.getSnapshot(), 'wildpile')!
+      .phase.actor;
+    const speaker = actor === 0 ? host : guest;
+    const live = multiplayerSession<WildpileState, WildpileRules>(
+      speaker.getSnapshot(),
+      'wildpile',
+    )!;
+    let play = live.def.flow
+      .legalMoves(live.state, live.phase)
+      .find((move) => move.id === 'playCard');
+    if (!play) {
+      speaker.send('draw');
+      await eventually(
+        () => {
+          const after = multiplayerSession<WildpileState, WildpileRules>(
+            speaker.getSnapshot(),
+            'wildpile',
+          )!;
+          expect(after.log.length).toBeGreaterThan(0);
+          play = after.def.flow
+            .legalMoves(after.state, after.phase)
+            .find((move) => move.id === 'playCard');
+          expect(play).toBeDefined();
+        },
+        1_000,
+        10,
+      );
+    }
+    expect(play).toBeDefined();
+    const before = multiplayerSession<WildpileState, WildpileRules>(host.getSnapshot(), 'wildpile')!
+      .log.length;
+    speaker.send(play!.id, play!.payload);
+
+    await eventually(
+      () => {
+        expect(
+          multiplayerSession<WildpileState, WildpileRules>(host.getSnapshot(), 'wildpile')?.log
+            .length,
+        ).toBe(before + 1);
+        expect(host.getSnapshot().error).toBeNull();
+        expect(guest.getSnapshot().error).toBeNull();
+      },
+      1_000,
+      10,
+    );
+  }, 120_000);
+
   it('races Rat Screw slaps through the authority with hash-identical logs', async () => {
     const broker = new MockSignalingBroker();
     const rtc = new MockRtcNetwork();

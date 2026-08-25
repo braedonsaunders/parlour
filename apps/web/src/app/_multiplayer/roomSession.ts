@@ -324,6 +324,7 @@ export class MultiplayerRoomSession {
       this.update({ error: startFault(error) });
       throw error;
     }
+    activateMultiplayerSession(this);
     if (this.snapshot.seats.length < (this.snapshot.settings?.seats ?? 2)) {
       const error = new Error('every seat must be filled before the match starts');
       this.update({ error: startFault(error) });
@@ -798,7 +799,11 @@ export class MultiplayerRoomSession {
     extra?: readonly string[],
   ): { reveals?: readonly (readonly [string, string])[] } {
     const veil = this.veil;
-    const state = this.snapshot.session?.state;
+    // Authority still holds handles. The presented snapshot has already
+    // overlaid this seat's faces, so looking for a handle there would skip
+    // every opening a peeled playCard actually needs — and the engine would
+    // refuse the move as illegal until the turn clock drew instead.
+    const state = this.authority?.getSession().state ?? this.snapshot.session?.state;
     if (!veil || !state) return {};
     const wanted = new Set<string>(extra ?? []);
     const named = (payload as { card?: unknown } | null | undefined)?.card;

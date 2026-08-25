@@ -10,9 +10,8 @@ import {
   normalizeRoomCode,
   validateRoomHostPubkey,
 } from '@/lib/rooms/code';
-import { useWipeRouter } from '@/hooks/useWipeRouter';
 import { RoomLobby } from '@/components/multiplayer/RoomLobby';
-import { tableRouteFor } from '@/lib/rooms/tableRoute';
+import { RoomGameTable } from '@/lib/games/RoomGameTable';
 import { useProfileStore } from '@/stores/profile';
 import styles from '@/styles/join.module.css';
 import {
@@ -47,7 +46,6 @@ function useRoomSnapshot(session: MultiplayerRoomSession | null) {
 
 export default function JoinPage() {
   const t = useT();
-  const router = useWipeRouter();
   const name = useProfileStore((state) => state.name);
   const avatarId = useProfileStore((state) => state.avatarId);
   const linkCode = useSyncExternalStore(subscribeNoop, readLinkCode, () => '');
@@ -59,21 +57,6 @@ export default function JoinPage() {
   const autoTried = useRef(false);
   const code = typed ?? linkCode;
   const snapshot = useRoomSnapshot(roomSession);
-
-  // Taking a seat only puts you in the room. The table opens when the host
-  // deals, which reaches this peer as the opening position — so wait for the
-  // stage rather than for a seat, or a guest walks in on a deal that is about
-  // to be thrown away.
-  useEffect(() => {
-    if (
-      snapshot?.stage === 'table' &&
-      snapshot.gameId &&
-      snapshot.localSeat !== null &&
-      snapshot.session
-    ) {
-      router.replace(tableRouteFor(snapshot.gameId));
-    }
-  }, [router, snapshot?.gameId, snapshot?.localSeat, snapshot?.session, snapshot?.stage]);
 
   const submit = useCallback(
     async (code: string, expectedHost?: string) => {
@@ -121,6 +104,16 @@ export default function JoinPage() {
         .slice(0, ROOM_CODE_LENGTH),
     );
   }, []);
+
+  if (
+    roomSession &&
+    snapshot?.stage === 'table' &&
+    snapshot.gameId &&
+    snapshot.localSeat !== null &&
+    snapshot.session
+  ) {
+    return <RoomGameTable gameId={snapshot.gameId} />;
+  }
 
   if (roomSession && snapshot?.room && snapshot.localSeat !== null) {
     return (

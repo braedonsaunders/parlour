@@ -1,9 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { useWipeRouter } from '@/hooks/useWipeRouter';
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { RoomLobby } from '@/components/multiplayer/RoomLobby';
+import { HostRoomMatch } from '@/lib/games/RoomGameTable';
 import { useProfileStore } from '@/stores/profile';
 import { presidentRulesFor, usePresidentSetupStore } from '@/stores/presidentSetup';
 import { usePersistHydrated } from '@/stores/usePersistHydrated';
@@ -15,7 +15,6 @@ import {
 } from '../../_multiplayer/roomSession';
 
 export default function CreatePresidentRoomPage() {
-  const router = useWipeRouter();
   const name = useProfileStore((state) => state.name);
   const avatarId = useProfileStore((state) => state.avatarId);
   const mode = usePresidentSetupStore((state) => state.mode);
@@ -42,17 +41,13 @@ export default function CreatePresidentRoomPage() {
 
   if (!ready || !session) return <PresidentLobbyLoading />;
   return (
-    <ActivePresidentLobby session={session} onStarted={() => router.push('/president/table')} />
+    <HostRoomMatch session={session}>
+      <ActivePresidentLobby session={session} />
+    </HostRoomMatch>
   );
 }
 
-function ActivePresidentLobby({
-  session,
-  onStarted,
-}: {
-  session: MultiplayerRoomSession;
-  onStarted: () => void;
-}) {
+function ActivePresidentLobby({ session }: { session: MultiplayerRoomSession }) {
   const snapshot = useSyncExternalStore(
     session.subscribe,
     session.getSnapshot,
@@ -103,7 +98,7 @@ function ActivePresidentLobby({
           bot: seat.bot,
           connected: seat.connected,
         }))}
-        onStart={() => session.start().then(onStarted)}
+        onStart={() => session.start()}
         error={snapshot.error}
       />
       <p className="max-w-xl text-center text-sm text-dusk-100/80">

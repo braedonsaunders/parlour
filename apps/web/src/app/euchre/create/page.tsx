@@ -3,9 +3,9 @@
 import { applyPreset } from '@parlour/engine';
 import { euchreConfig } from '@parlour/game-euchre';
 import Link from 'next/link';
-import { useWipeRouter } from '@/hooks/useWipeRouter';
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { RoomLobby } from '@/components/multiplayer/RoomLobby';
+import { HostRoomMatch } from '@/lib/games/RoomGameTable';
 import { useProfileStore } from '@/stores/profile';
 import { useEuchreSetupStore } from '@/stores/euchreSetup';
 import {
@@ -16,7 +16,6 @@ import {
 } from '../../_multiplayer/roomSession';
 
 export default function CreateEuchreRoomPage() {
-  const router = useWipeRouter();
   const name = useProfileStore((state) => state.name);
   const avatarId = useProfileStore((state) => state.avatarId);
   const mode = useEuchreSetupStore((state) => state.mode);
@@ -39,16 +38,14 @@ export default function CreateEuchreRoomPage() {
   }, [avatarId, mode, name]);
 
   if (!session) return <EuchreLobbyLoading />;
-  return <ActiveEuchreLobby session={session} onStarted={() => router.push('/euchre/table')} />;
+  return (
+    <HostRoomMatch session={session}>
+      <ActiveEuchreLobby session={session} />
+    </HostRoomMatch>
+  );
 }
 
-function ActiveEuchreLobby({
-  session,
-  onStarted,
-}: {
-  session: MultiplayerRoomSession;
-  onStarted: () => void;
-}) {
+function ActiveEuchreLobby({ session }: { session: MultiplayerRoomSession }) {
   const snapshot = useSyncExternalStore(
     session.subscribe,
     session.getSnapshot,
@@ -98,7 +95,7 @@ function ActiveEuchreLobby({
           bot: seat.bot,
           connected: seat.connected,
         }))}
-        onStart={() => session.start().then(onStarted)}
+        onStart={() => session.start()}
         error={snapshot.error}
       />
       <p className="max-w-xl text-center text-sm text-dusk-100/80">

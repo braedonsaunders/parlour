@@ -96,9 +96,18 @@ export function useActiveRoom(gameId: string): MultiplayerRoomSession | null {
     getActiveMultiplayerSession,
     () => null,
   );
-  const snapshot = room?.getSnapshot();
-  if (!snapshot || snapshot.gameId !== gameId || snapshot.connection === 'closed') return null;
+  const snapshot = useSyncExternalStore(
+    room?.subscribe ?? subscribeNoop,
+    room?.getSnapshot ?? emptySnapshot,
+    emptySnapshot,
+  );
+  if (!snapshot || snapshot.connection === 'closed') return null;
+  if (snapshot.gameId !== gameId && snapshot.settings?.gameId !== gameId) return null;
   return room;
+}
+
+function emptySnapshot(): MultiplayerRoomSnapshot | null {
+  return null;
 }
 
 /**
