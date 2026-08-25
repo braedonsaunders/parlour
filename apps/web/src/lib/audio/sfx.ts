@@ -11,6 +11,9 @@ import {
   presidentCuesForFx,
   ratscrewCuesForFx,
   pokerCuesForFx,
+  ohhellCuesForFx,
+  spiteCuesForFx,
+  scopaCuesForFx,
   spadesCuesForFx,
 } from './game-cues';
 
@@ -303,6 +306,71 @@ export const POKER_SFX_PACK: SfxPack = {
   cuesForFx: pokerCuesForFx,
 };
 
+export const OHHELL_SFX = {
+  trump: 'ohhell.trump',
+  bid: 'ohhell.bid',
+  bidsComplete: 'ohhell.bids-complete',
+  trickCollect: 'ohhell.trick-collect',
+  score: 'ohhell.score',
+  matchScore: 'ohhell.match-score',
+} as const;
+
+export const OHHELL_SFX_PACK: SfxPack = {
+  id: 'ohhell',
+  label: 'Oh Hell!',
+  sounds: [
+    sound(OHHELL_SFX.trump, '/audio/sfx/euchre-trump-called.mp3', 0.74, 1, 250),
+    sound(OHHELL_SFX.bid, '/audio/sfx/euchre-order-up.mp3', 0.7, 6, 60),
+    sound(OHHELL_SFX.bidsComplete, '/audio/sfx/gin-knock-rap.mp3', 0.8, 1, 250),
+    sound(OHHELL_SFX.trickCollect, '/audio/sfx/euchre-trick-collect.mp3', 0.76, 2, 100),
+    sound(OHHELL_SFX.score, '/audio/sfx/euchre-score-chime.mp3', 0.68, 8, 50),
+    sound(OHHELL_SFX.matchScore, '/audio/sfx/euchre-march-fanfare.mp3', 0.88, 1, 500),
+  ],
+  cuesForFx: ohhellCuesForFx,
+};
+
+export const SPITE_SFX = {
+  wild: 'spite.wild',
+  complete: 'spite.complete',
+  win: 'spite.win',
+  discard: 'spite.discard',
+  draw: 'spite.draw',
+} as const;
+
+export const SPITE_SFX_PACK: SfxPack = {
+  id: 'spite',
+  label: 'Spite & Malice',
+  sounds: [
+    sound(SPITE_SFX.wild, '/audio/sfx/card-flip.mp3', 0.76, 3, 60),
+    sound(SPITE_SFX.complete, '/audio/sfx/stock-shuffle.mp3', 0.82, 1, 400),
+    sound(SPITE_SFX.win, '/audio/sfx/win-celebration.mp3', 0.88, 1, 1_000),
+    sound(SPITE_SFX.discard, '/audio/sfx/card-discard-flight.mp3', 0.7, 4, 45),
+    sound(SPITE_SFX.draw, '/audio/sfx/card-draw-stock.mp3', 0.72, 4, 60),
+  ],
+  cuesForFx: spiteCuesForFx,
+};
+
+export const SCOPA_SFX = {
+  capture: 'scopa.capture',
+  pose: 'scopa.pose',
+  scopa: 'scopa.scopa',
+  sweep: 'scopa.sweep',
+  score: 'scopa.score',
+} as const;
+
+export const SCOPA_SFX_PACK: SfxPack = {
+  id: 'scopa',
+  label: 'Scopa',
+  sounds: [
+    sound(SCOPA_SFX.capture, '/audio/sfx/euchre-trick-collect.mp3', 0.78, 3, 80),
+    sound(SCOPA_SFX.pose, '/audio/sfx/card-discard-flight.mp3', 0.68, 4, 45),
+    sound(SCOPA_SFX.scopa, '/audio/sfx/president-crown.mp3', 0.86, 1, 400),
+    sound(SCOPA_SFX.sweep, '/audio/sfx/stock-shuffle.mp3', 0.76, 1, 400),
+    sound(SCOPA_SFX.score, '/audio/sfx/euchre-score-chime.mp3', 0.68, 8, 50),
+  ],
+  cuesForFx: scopaCuesForFx,
+};
+
 export const KLONDIKE_SFX_PACK: SfxPack = {
   id: 'klondike',
   label: 'Klondike',
@@ -414,6 +482,9 @@ for (const pack of [
   EUCHRE_SFX_PACK,
   SPADES_SFX_PACK,
   POKER_SFX_PACK,
+  OHHELL_SFX_PACK,
+  SPITE_SFX_PACK,
+  SCOPA_SFX_PACK,
   KLONDIKE_SFX_PACK,
   GIN_SFX_PACK,
   CRIBBAGE_SFX_PACK,

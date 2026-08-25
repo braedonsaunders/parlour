@@ -65,7 +65,20 @@ describe('playerView redaction', () => {
     expect(leaked).toEqual([]);
   });
 
-  it('does not advertise Veil — a match-shaped game cannot run veiled rounds', () => {
-    expect(ohhellGame.veil).toBeUndefined();
+  /**
+   * A friend room is one deal, which is exactly what a veiled round is. The
+   * match arc — the hand-size ladder and the dealer rotation — is what stays
+   * solo-only, and that is a match-layer limit rather than a Veil one.
+   */
+  it('advertises Veil for the single deal a friend room plays', () => {
+    const session = createSession(ohhellGame, { seed: 8_001, config, seats: 4 });
+    expect(ohhellGame.veil).toBeDefined();
+    expect(ohhellGame.veil!.deck(config).cardIds.length).toBeGreaterThan(0);
+    // Hands first, then the card turned for trump — so the trump sits at the
+    // position right after every seat has been dealt.
+    expect(ohhellGame.veil!.publicSetupFrom(4, config)).toBe(4 * session.state.handSize);
+    expect(ohhellGame.veil!.publicSetupReady(['S2'], 4, config)).toBe(true);
+    // A whole-deck deal leaves no card to turn, and that is still ready.
+    expect(ohhellGame.veil!.publicSetupReady([], 4, config)).toBe(true);
   });
 });

@@ -1,5 +1,6 @@
 import {
   Fx,
+  veilSupport,
   type BotPolicy,
   type CardId,
   type FlowAdvance,
@@ -9,6 +10,7 @@ import {
   type MoveCtx,
   type PhaseState,
   type RuleError,
+  type RuleValues,
   type SeatId,
 } from '@parlour/engine';
 import {
@@ -120,6 +122,10 @@ function playFault(state: OhHellState, seat: SeatId, card: CardId): RuleError | 
   if (!hand(state, seat).includes(card)) return err('not-in-hand', `${card} is not in the hand`);
   const led = state.trick?.ledSuit ?? null;
   if (led === null) return null;
+  // A veiled hand is handles, so what a seat could have followed with is not
+  // knowable here. The match-end audit recomputes every hand and catches a
+  // revoke then — detection rather than prevention, as the protocol says.
+  if (state.veiled) return null;
   // Wizards and Jesters follow no suit — they are always welcome in a trick.
   if (isSpecial(card)) return null;
   const fault = followError(
@@ -195,10 +201,16 @@ function dealRound(
   };
 }
 
-function emptyRound(config: OhHellRules, seats: number, dealt: FreshDeal): OhHellState {
+function emptyRound(
+  config: OhHellRules,
+  seats: number,
+  dealt: FreshDeal,
+  veiled = false,
+): OhHellState {
   return {
     rules: config,
     seats,
+    veiled,
     stage: dealt.turnedWizard ? 'trumping' : 'bidding',
     handSize: dealt.handSize,
     dealer: config.dealer,
@@ -382,12 +394,35 @@ function legalMovesForSeat(state: OhHellState, seat: SeatId): LegalMove[] {
     return allowedBids(state, seat).map((value) => ({ id: 'bid', payload: { bid: value } }));
   }
   if (state.stage === 'playing' && state.turn === seat) {
+    // Under Veil only this seat can read its hand, so the move is offered
+    // without a card and the opening travels with it.
+    if (state.veiled) return [{ id: 'playCard' }];
     return hand(state, seat)
       .filter((card) => playFault(state, seat, card) === null)
       .map((card) => ({ id: 'playCard', payload: { card } }));
   }
   return [];
 }
+
+/**
+ * Hands, then the card turned for trump.
+ *
+ * A friend room plays one deal, so there is no redeal move: the hand-size arc
+ * and dealer rotation that make a *match* stay solo-only. The turned trump is
+ * the one public opening, unless the deal consumed the whole deck — the classic
+ * Oh Hell edge case, where there is no card left to turn and the round is
+ * no-trump.
+ */
+const ohhellVeil = veilSupport({
+  deck: (config: RuleValues) => ohhellDeck((config as unknown as OhHellRules).wizards),
+  handSize: (config: RuleValues, seats: number) => {
+    const rules = config as unknown as OhHellRules;
+    return planDeal(rules.handSize, seats, rules.wizards, rules.trumpOnLastRound).handSize;
+  },
+  // One card turned for trump — or none, when the deal consumed the whole deck
+  // and the round is no-trump. The room opens what it can and stops.
+  publicSetup: (opened: readonly CardId[]) => opened.length <= 1,
+});
 
 const flow: GameDef<OhHellState, OhHellRules>['flow'] = {
   start: (state) => phaseFor(state),
@@ -436,14 +471,18 @@ export function createOhHellDef(options: OhHellDefOptions = {}): GameDef<OhHellS
     howToPlay: ohhellHowToPlay,
     configSchema: ohhellConfig,
 
+    veil: ohhellVeil,
+
     setup(ctx) {
       if (!Number.isInteger(ctx.seats) || ctx.seats < MIN_SEATS || ctx.seats > MAX_SEATS) {
         throw new Error(`ohhell needs ${MIN_SEATS} to ${MAX_SEATS} seats`);
       }
       const deck = ohhellDeck(ctx.config.wizards);
-      const order = ctx.rng.shuffle([...deck.cardIds]);
+      // A veiled room deals from the order its ceremony produced, with the
+      // trump card already turned face up at its position in that order.
+      const order = ctx.deckOrder ?? ctx.rng.shuffle([...deck.cardIds]);
       const dealt = dealRound(ctx.config.dealer, ctx.seats, ctx.config, order, ctx.fx);
-      return emptyRound(ctx.config, ctx.seats, dealt);
+      return emptyRound(ctx.config, ctx.seats, dealt, ctx.veiled === true);
     },
 
     moves: {

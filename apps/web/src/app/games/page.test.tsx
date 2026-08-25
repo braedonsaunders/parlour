@@ -1,8 +1,8 @@
 import { act } from 'react';
+import { GAMES } from '@/lib/games';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import GameSelectPage from './page';
-import { GAMES } from '@/lib/games';
 
 // Read from the registry rather than a literal: shipping a game should not
 // mean editing a count in a test that is not about counting.

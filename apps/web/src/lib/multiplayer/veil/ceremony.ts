@@ -25,11 +25,11 @@ import {
   decryptElement,
   generateLayerKey,
   randomPermutation,
-  shuffleLayer,
   type VeilCodebook,
   type VeilLayerKey,
 } from './sra';
 import { hashTagged } from './hash';
+import { shuffleOffThread } from './shuffleClient';
 
 /** One seat's contribution to one epoch, broadcast as a transcript entry. */
 export interface VeilLayerEntry {
@@ -129,6 +129,25 @@ export interface LayerResult {
 }
 
 /**
+ * Draws a layer from a byte stream: the exponent, the permutation, the salt.
+ *
+ * Split out so that laying a layer and *rebuilding* one after a disconnect draw
+ * in exactly the same order from exactly the same places. A seat that returns
+ * derives this again from its own stream and checks the result against the
+ * commitment already in the transcript — which only matches if every draw here
+ * happened identically, so the two must never be allowed to drift apart.
+ */
+export function deriveLayerSecret(
+  epoch: VeilEpoch,
+  random: (length: number) => Uint8Array,
+): VeilLayerSecret {
+  const key = generateLayerKey(random);
+  const order = randomPermutation(epoch.cards.length, random);
+  const salt = toHexString(random(16));
+  return { epoch: epoch.epoch, key, order, salt };
+}
+
+/**
  * Lays this seat's layer on the deck as it stands. `input` is the base deck for
  * the first seat, and the previous seat's published deck after that.
  */
@@ -139,11 +158,16 @@ export async function layShuffleLayer(
   random: (length: number) => Uint8Array,
 ): Promise<LayerResult> {
   if (input.length !== epoch.cards.length) throw new Error('shuffle input is the wrong size');
-  const key = generateLayerKey(random);
-  const order = randomPermutation(input.length, random);
-  const salt = toHexString(random(16));
-  const deck = shuffleLayer(input.map(elementFromHex), key, order).map(elementToHex);
-  const secret: VeilLayerSecret = { epoch: epoch.epoch, key, order, salt };
+  const secret = deriveLayerSecret(epoch, random);
+  // Off the main thread: a whole deck of modular exponentiations blocks
+  // everything, including the heartbeat timer, and a table should not lose a
+  // seat to its own shuffle. Falls back to a chunked in-thread run where there
+  // is no worker to be had — see shuffleClient.
+  const deck = await shuffleOffThread({
+    deck: input,
+    e: secret.key.e.toString(16),
+    order: secret.order,
+  });
   return {
     entry: { epoch: epoch.epoch, seat, deck, commitment: await commitLayer(secret) },
     secret,

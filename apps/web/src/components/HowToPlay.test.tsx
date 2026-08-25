@@ -73,7 +73,7 @@ describe('HowToPlay', () => {
     );
     expect(onClose).toHaveBeenCalledTimes(1);
 
-    act(() => overlay()?.click());
+    act(() => overlay()?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
     expect(onClose).toHaveBeenCalledTimes(2);
 
     act(() => void window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })));

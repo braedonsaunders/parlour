@@ -5,6 +5,8 @@ import {
   isVeilHandle,
   removeFrom,
   stdDeck,
+  isVeiledDealPayload,
+  VEILED_REDEAL_PENDING,
   veilSupport,
   type BotPolicy,
   type CardId,
@@ -489,8 +491,16 @@ function serializeEntry(entry: ScoreEntry): {
 }
 
 const dealNext: Move<CribbageState> = {
-  validate: () => true,
-  apply(state, _seat, _payload, ctx) {
+  validate(state, _seat, payload) {
+    // Reshuffling the spent cards with the session rng deals an order every
+    // seat can replay, which is fine in the open and ruinous under Veil. A
+    // veiled deal waits for the deck the room's ceremony produced.
+    if (state.veiled && !isVeiledDealPayload(payload)) {
+      return { code: VEILED_REDEAL_PENDING, message: 'a veiled deal needs its own shuffled deck' };
+    }
+    return true;
+  },
+  apply(state, _seat, payload, ctx) {
     const spent = [
       ...state.hands.flat(),
       ...state.crib,
@@ -498,7 +508,7 @@ const dealNext: Move<CribbageState> = {
       ...(state.starter ? [state.starter] : []),
       ...state.stock,
     ];
-    const shuffled = ctx.rng.shuffle(spent);
+    const shuffled = isVeiledDealPayload(payload) ? payload.deckOrder : ctx.rng.shuffle(spent);
     ctx.fx.emit(Fx.ShuffleStock, { cards: shuffled.length });
 
     const dealer = nextSeat(state.dealer, state.seats);
@@ -571,6 +581,20 @@ const flow: GameDef<CribbageState, CribbageConfig>['flow'] = {
   start: (state) =>
     phaseFor(state, 'discard', state.dealer, allSeats(state.seats), 'crib discards'),
 
+  /**
+   * The one system event a cribbage game accepts: the next veiled deal.
+   *
+   * An open game deals itself, so nothing is injected. A veiled one waits for
+   * a deck the room's ceremony produced. The move's own validation still runs,
+   * so an injected event cannot deal where the rules would not.
+   */
+  canInject(state, _phase, moveId, payload) {
+    if (moveId !== 'deal.next') {
+      return { code: 'not-injectable', message: `cribbage does not accept injected ${moveId}` };
+    }
+    return dealNext.validate(state, state.dealer, payload);
+  },
+
   legalMoves(state, phase) {
     if (phase.actor === null || state.outcome) return [];
     return legalForSeat(state, phase.actor);
@@ -634,6 +658,9 @@ const flow: GameDef<CribbageState, CribbageConfig>['flow'] = {
     }
 
     if (state.showDone) {
+      // A veiled game waits here: its next deck comes out of a ceremony the
+      // room runs, and it arrives as an injected `deal.next`.
+      if (state.veiled) return { phase: phaseFor(state, 'between-deals', null) };
       return {
         phase: phaseFor(state, 'between-deals', null),
         autoMoves: [{ seat: null, move: 'deal.next', reason: 'dealer rotates' }],
@@ -707,7 +734,14 @@ export function createCribbageDef(
     configSchema: cribbageConfigSchema,
     // Veil, inherited: six cards a seat, nothing opened before the deal — the
     // crib stays dark until the show, and the cut opens its own starter.
-    veil: veilSupport({ deck: DECK, handSize: HAND_DEAL_SIZE, publicSetup: 'none' }),
+    veil: veilSupport({
+      deck: DECK,
+      handSize: HAND_DEAL_SIZE,
+      publicSetup: 'none',
+      // A cribbage game is many deals in one session. Each veiled one needs
+      // its own ceremony, so the room shuffles and hands the deck over.
+      redealMove: 'deal.next',
+    }),
 
     setup(ctx) {
       const { config, seats, fx } = ctx;

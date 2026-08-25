@@ -15,35 +15,28 @@ export const FX_TIMING = {
 } as const;
 
 /**
- * Where a card can fly from or to.
+ * A named table zone, optionally scoped by seat and then by pile.
  *
- * Most zones are shared furniture. Two are addressed by position because the
- * game puts cards in fixed slots rather than one heap:
+ * `stock`, `hand:2`, `payoff:1`, `discard:0:3`, `board:3`, `table`. It was a
+ * closed list of five names, which meant a game with per-seat piles could not
+ * name them: Spite emits `discard:<seat>:<pile>` and `centre:<pile>`, and the
+ * list rejected both — throwing out of `delayUntilFxSettles`, which every solo
+ * table calls to pace its bots, and taking the whole screen down with it.
  *
- * - `board:N` is the Nth community card — the row a hold'em table deals face up
- *   in the middle. It belongs to no seat, which is what separates it from
- *   `seat:N`.
- * - `discard:S:P` is seat S's own discard pile P. Games with one shared discard
- *   keep using the bare `discard`; a game where every seat has several needs to
- *   say which, or a flight lands on somebody else's furniture.
- * - `centre:N` is the Nth shared build pile, and `payoff:S` seat S's face-up
- *   payoff card — both from Spite & Malice, where the whole game is cards
- *   moving between named piles rather than a hand and a heap.
- * - `table` is Scopa's shared face-up spread, which is one zone however many
- *   cards are lying in it.
+ * Widening this loses nothing real. Zone strings only ever become a
+ * `[data-zone="..."]` lookup, and `zonePoint` already falls back to the table
+ * centre when it finds no element, so an unknown zone degrades to a flight
+ * that starts from the middle rather than a crash. The shape check below still
+ * catches a malformed zone, which is what the list was actually buying.
  */
 export type Zone =
   | 'stock'
   | 'discard'
   | 'peg'
-  | `hand:${number}`
-  | `seat:${number}`
-  | `board:${number}`
-  | `discard:${number}:${number}`
-  | 'table'
   | 'centre'
-  | `centre:${number}`
-  | `payoff:${number}`;
+  | 'table'
+  | `${string}:${number}`
+  | `${string}:${number}:${number}`;
 
 type BaseCue = {
   id: string;
@@ -119,23 +112,12 @@ function durationField(event: FxEvent, fallback: number): number {
   return Math.min(value, FX_TIMING.maxBurstMs);
 }
 
+/** Lower-case name, then any number of numeric scopes: `discard:0:3`. */
+const ZONE_SHAPE = /^[a-z][a-z-]*(?::\d+)*$/;
+
 function zoneField(event: FxEvent, field: string): Zone {
   const value = stringField(event, field);
-  if (
-    value === 'stock' ||
-    value === 'discard' ||
-    value === 'peg' ||
-    /^hand:\d+$/.test(value) ||
-    /^seat:\d+$/.test(value) ||
-    /^board:\d+$/.test(value) ||
-    /^discard:\d+:\d+$/.test(value) ||
-    value === 'table' ||
-    value === 'centre' ||
-    /^centre:\d+$/.test(value) ||
-    /^payoff:\d+$/.test(value)
-  ) {
-    return value as Zone;
-  }
+  if (value === 'table' || ZONE_SHAPE.test(value)) return value as Zone;
   throw new Error(`${event.kind} fx has an invalid ${field} zone: ${value}`);
 }
 

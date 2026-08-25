@@ -1,66 +1,70 @@
 import { applyPreset, createSession, type GameSession, type LegalMove } from '@parlour/engine';
 import {
-  PERSONAS,
-  makePersonaBot,
   spiteConfig,
   spiteGame,
+  spiteTierBot,
+  PERSONAS,
+  makePersonaBot,
   type SpiteRules,
   type SpiteState,
 } from '@parlour/game-spite';
 import type { SpiteModeId } from '@/lib/spite/modes';
 import type { BotTier } from '@/stores/setup';
 import { adaptSessionApply, SoloAuthority, type SoloDispatch } from './SoloAuthority';
+import { localSeat } from './seating';
 
 export interface SpitePlayer {
   seat: number;
   name: string;
   avatarId: string;
   isBot: boolean;
-}
-
-export interface SpiteTransportOptions {
-  mode: SpiteModeId;
-  seed: number;
-  player: { name: string; avatarId: string };
-  seats?: number;
-  botTier?: BotTier;
+  personaId?: string;
 }
 
 export interface SpiteSnapshot {
   mode: SpiteModeId;
   players: readonly SpitePlayer[];
   session: GameSession<SpiteState, SpiteRules>;
-  won: boolean | null;
+  winner: number | null;
 }
 
 export type SpiteDispatch = SoloDispatch<SpiteSnapshot>;
 
 /**
- * In-process authority for solo Spite & Malice. One deterministic race to an
- * empty payoff pile; the facade only projects snapshots and seats the house.
+ * In-process authority for solo Spite & Malice.
+ *
+ * A flat session, not a match: one race to empty a payoff pile decides it, so
+ * there are no rounds to compose. Modelled on SpadesTransport.
  */
 export class SpiteTransport {
   private readonly def = spiteGame;
-  private readonly options: SpiteTransportOptions;
-  private readonly cast: readonly { name: string; avatarId: string; personaId: string }[];
+  private readonly options: {
+    mode: SpiteModeId;
+    seats: number;
+    seed: number;
+    player: { name: string; avatarId: string };
+    botTier?: BotTier;
+  };
   private readonly authority: SoloAuthority<
     GameSession<SpiteState, SpiteRules>,
     SpiteSnapshot,
     SpiteState
   >;
 
-  constructor(options: SpiteTransportOptions) {
+  constructor(options: {
+    mode: SpiteModeId;
+    seats: number;
+    config?: SpiteRules;
+    seed: number;
+    player: { name: string; avatarId: string };
+    botTier?: BotTier;
+  }) {
     this.options = options;
-    const seats = options.seats ?? 2;
-    this.cast = castFor(options.botTier ?? 2, seats - 1);
-    const policies = new Map(
-      this.cast.map((member, index) => [index + 1, makePersonaBot(member.personaId)]),
-    );
-
+    const tier = options.botTier ?? 2;
     const session = createSession(this.def, {
       seed: options.seed | 0,
-      config: applyPreset(spiteConfig, options.mode),
-      seats,
+      config: options.config ?? applyPreset(spiteConfig, options.mode),
+      seats: options.seats,
     });
 
     this.authority = new SoloAuthority(
@@ -69,17 +73,24 @@ export class SpiteTransport {
           mode: options.mode,
           players: this.players(),
           session: live,
-          won: live.result === null ? null : live.result.winner === 0,
+          winner: live.state.winner,
         }),
         apply: adaptSessionApply(this.def),
         isPlaying: (live) => live.status === 'playing',
         bots: {
           seed: options.seed,
-          actor: (live) => live.phase.actor,
+          actor: (live) => (live.state.turn === 0 ? null : live.phase.actor),
           legalMoves: (live) => this.def.flow.legalMoves(live.state, live.phase),
           playerView: (live, seat) => this.def.playerView(live.state, seat),
-          policy: (seat) => policies.get(seat) ?? makePersonaBot(PERSONAS[0]!.id),
-          rngFork: (live) => `turn:${live.state.turn}:event:${live.log.length}`,
+          // Only the middle tier carries personality: Easy and Hard stay
+          // uniform so a player choosing them gets what they asked for.
+          policy: (seat: number) =>
+            tier === 2
+              ? makePersonaBot(PERSONAS[(seat - 1) % PERSONAS.length]!.id)
+              : spiteTierBot(tier),
+          rngFork: (live) => `turn:${live.log.length}`,
+          // A Spite turn is many builds then one discard, so a bot's whole turn
+          // is a long run of actions before the human sees the table again.
           untilHumanGuard: 800,
         },
       },
@@ -91,11 +102,10 @@ export class SpiteTransport {
     return this.authority.getSnapshot();
   }
 
-  legalMoves(): readonly LegalMove[] {
+  /** Moves offered to the human seat right now (empty while a bot acts). */
+  legalMoves(seat = 0): readonly LegalMove[] {
     const session = this.authority.getLive();
-    if (session.status !== 'playing') return [];
-    const seat = session.phase.actor;
-    if (seat === null || seat !== 0) return [];
+    if (session.status !== 'playing' || session.state.turn !== seat) return [];
     return this.def.flow.legalMoves(session.state, session.phase);
   }
 
@@ -113,33 +123,21 @@ export class SpiteTransport {
 
   private players(): SpitePlayer[] {
     return [
-      {
-        seat: 0,
-        name: this.options.player.name.trim() || 'You',
-        avatarId: this.options.player.avatarId,
-        isBot: false,
-      },
-      ...this.cast.map((member, index) => ({
-        seat: index + 1,
-        name: member.name,
-        avatarId: member.avatarId,
-        isBot: true,
-      })),
+      localSeat(this.options.player),
+      ...Array.from({ length: this.options.seats - 1 }, (_, index) => {
+        const persona = PERSONAS[index % PERSONAS.length]!;
+        return {
+          seat: index + 1,
+          name: persona.name,
+          avatarId: persona.avatar,
+          isBot: true,
+          personaId: persona.id,
+        };
+      }),
     ];
   }
 }
 
-function castFor(
-  tier: BotTier,
-  count: number,
-): { name: string; avatarId: string; personaId: string }[] {
-  const preferred = PERSONAS.filter((persona) => persona.tier === tier);
-  const rest = PERSONAS.filter((persona) => persona.tier !== tier).sort(
-    (left, right) => Math.abs(left.tier - tier) - Math.abs(right.tier - tier),
-  );
-  return [...preferred, ...rest].slice(0, Math.max(0, count)).map((persona) => ({
-    name: persona.name,
-    avatarId: persona.avatar,
-    personaId: persona.id,
-  }));
+export function spiteConfigForMode(mode: SpiteModeId): SpiteRules {
+  return applyPreset(spiteConfig, mode);
 }

@@ -303,3 +303,87 @@ function payloadRecord(event: FxEvent): Record<string, unknown> | null {
   }
   return event.payload as Record<string, unknown>;
 }
+
+/**
+ * Oh Hell cues.
+ *
+ * Deliberately reuses the Euchre/Spades trick-taking sounds rather than
+ * shipping a fourth near-identical set: a trick collecting sounds like a trick
+ * collecting whichever game is on the table, and the bid/score beats are the
+ * only moments that need their own character.
+ */
+export function ohhellCuesForFx(fx: readonly FxEvent[]): SoundCue[] {
+  return fx.flatMap((event) => {
+    const atMs = Math.max(0, event.at ?? 0);
+    switch (event.kind) {
+      case 'ohhell.trump-turned':
+      case 'ohhell.trump-chosen':
+        return [{ id: 'ohhell.trump', atMs }];
+      case 'ohhell.bid':
+        return [{ id: 'ohhell.bid', atMs }];
+      case 'ohhell.bids-complete':
+        return [{ id: 'ohhell.bids-complete', atMs }];
+      case 'tricks.collect':
+        return [{ id: 'ohhell.trick-collect', atMs: atMs + 120 }];
+      case 'ohhell.round-score':
+        return [{ id: 'ohhell.score', atMs }];
+      case 'ohhell.match-score':
+        return [{ id: 'ohhell.match-score', atMs }];
+      default:
+        return [];
+    }
+  });
+}
+
+/**
+ * Spite & Malice cues.
+ *
+ * The pack's own fx vocabulary plus the shared card kinds. Completing a build
+ * pile is the loudest moment in the game — twelve cards leave the table at
+ * once — so it gets its own sound rather than another card flight.
+ */
+export function spiteCuesForFx(fx: readonly FxEvent[]): SoundCue[] {
+  return fx.flatMap((event) => {
+    const atMs = Math.max(0, event.at ?? 0);
+    switch (event.kind) {
+      case 'spite.wild':
+        return [{ id: 'spite.wild', atMs }];
+      case 'spite.complete':
+        return [{ id: 'spite.complete', atMs }];
+      case 'spite.win':
+        return [{ id: 'spite.win', atMs }];
+      case 'card.discard':
+        return [{ id: 'spite.discard', atMs }];
+      case 'card.draw':
+        return [{ id: 'spite.draw', atMs }];
+      default:
+        return [];
+    }
+  });
+}
+
+/**
+ * Scopa cues.
+ *
+ * A capture and a *scopa* are different events to a player — one takes cards,
+ * the other clears the felt for a point — so they never share a sound.
+ */
+export function scopaCuesForFx(fx: readonly FxEvent[]): SoundCue[] {
+  return fx.flatMap((event) => {
+    const atMs = Math.max(0, event.at ?? 0);
+    switch (event.kind) {
+      case 'scopa.capture':
+        return [{ id: 'scopa.capture', atMs }];
+      case 'scopa.pose':
+        return [{ id: 'scopa.pose', atMs }];
+      case 'scopa.scopa':
+        return [{ id: 'scopa.scopa', atMs }];
+      case 'scopa.sweep':
+        return [{ id: 'scopa.sweep', atMs }];
+      case 'scopa.round-score':
+        return [{ id: 'scopa.score', atMs }];
+      default:
+        return [];
+    }
+  });
+}

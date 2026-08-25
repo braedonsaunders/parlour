@@ -44,7 +44,21 @@ describe('game shelf catalog', () => {
   });
 
   it('all shelf games are playable and route to their setup screens', () => {
+    /*
+     * Games whose pack is finished but whose table is not yet built. `href:
+     * null` is the catalog's own "coming soon" state and the shelf renders it
+     * as a disabled tile with a ribbon.
+     *
+     * Named explicitly so the two cases stay distinguishable: a game that means
+     * to be shelved is listed here, and a game that lost its route by accident
+     * still fails.
+     */
+    const SHELVED = new Set<string>();
     for (const game of GAMES) {
+      if (SHELVED.has(game.id)) {
+        expect(game.href, `${game.id} is shelved`).toBeNull();
+        continue;
+      }
       expect(game.href, game.id).toMatch(/^\//);
     }
     expect(getGame('blitz').href).toBe('/play');

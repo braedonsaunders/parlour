@@ -1,311 +1,396 @@
 'use client';
 
-import { useRef, useState } from 'react';
-import type { FxEvent } from '@parlour/engine';
-import { spiteFace, spiteHowToPlay } from '@parlour/game-spite';
-import { useMatchTension } from '@/lib/audio/tension';
-import { SPITE_MATCH_PACE_MS } from '@/lib/spite/modes';
+import { useEffect, useRef, useState } from 'react';
+import type { FxEvent, LegalMove } from '@parlour/engine';
+import { AvatarBadge } from '@/components/AvatarBadge';
+import { TableMenu } from '@/components/table/TableMenu';
+import { HandRail, HandRailCard } from '@/components/table/HandRail';
 import {
-  buildsForCard,
-  discardsForCard,
-  rankLabel,
-  type SpiteSeatView,
-  type SpiteTableView,
-} from '@/lib/spite/view';
-import { useMusicMood } from '@/stores/audio';
-import { useProfileStore } from '@/stores/profile';
-import { useDealPresentation } from '@/lib/table/deal-presentation';
-import { HandRail, HandRailCard } from '../HandRail';
-import { PlayingCard } from '../PlayingCard';
-import { TableMenu } from '../TableMenu';
-import {
-  TableActionRail,
+  SeatNameplate,
   TableErrorScreen,
-  TableFxLayer,
   TableHud,
   TableLoadingScreen,
   TablePlayfield,
   TableShell,
   TableTitlePill,
-  dealStateAttr,
   useGameTextSurface,
   useTableMenu,
-} from '../shell';
-import { AvatarBadge } from '@/components/AvatarBadge';
+} from '@/components/table/shell';
+import { useTableAudio } from '../fx-animation';
+import { SPITE_SFX_PACK } from '@/lib/audio/sfx';
+import {
+  isTarget,
+  moveForTarget,
+  targetsFor,
+  type SpiteCardView,
+  type SpiteTableView,
+  type SpiteTarget,
+} from '@/lib/spite/view';
 import styles from '@/styles/spite.module.css';
 
-export type SpiteTableScreenProps = {
+export interface SpiteTableScreenProps {
   view: SpiteTableView | null;
+  /** The legal moves the local seat has; the table derives every target from them. */
+  legal?: readonly LegalMove[];
   fx: readonly FxEvent[];
-  fxKey: string | number;
+  fxKey: number | string;
   busy?: boolean;
   error?: string | null;
-  onBuild?: (card: string, pile: number, rank: number) => void;
-  onDiscard?: (card: string, pile: number) => void;
-  /** Fired only after the player confirms quitting from the shared table menu. */
+  onPlay?: (move: LegalMove) => void;
   onQuit?: () => void;
-};
+}
 
-export function SpiteTableScreen(props: SpiteTableScreenProps) {
-  const { view, error } = props;
+export function SpiteTableScreen({
+  view,
+  legal = [],
+  fx,
+  fxKey,
+  busy = false,
+  error = null,
+  onPlay,
+  onQuit,
+}: SpiteTableScreenProps) {
   const rootRef = useRef<HTMLElement>(null);
-  const menu = useTableMenu(props.onQuit);
-  const reducedMotion = useProfileStore((state) => state.settings.reducedMotion);
-  const deal = useDealPresentation(props.fx, props.fxKey, { reduced: reducedMotion });
+  const menu = useTableMenu(onQuit ?? (() => undefined));
+  useTableAudio(fx, fxKey, SPITE_SFX_PACK.id);
 
-  /**
-   * The card the player has picked up, waiting for a destination.
-   *
-   * Spite is a two-part move — take a card, then choose a pile — and the same
-   * card can often go to several centre builds or any of your discards. Picking
-   * the card first and lighting up its destinations is the only way to make
-   * that legible without a drag interaction.
-   */
   const [held, setHeld] = useState<string | null>(null);
 
-  const tense = useMatchTension({
-    expectedMs: SPITE_MATCH_PACE_MS,
-    running: Boolean(view) && view?.activeSeat !== null,
+  /*
+   * A held card is only held while the rules still offer it.
+   *
+   * A Spite turn is many plays long and every play rewrites the legal set, so
+   * this is derived rather than cleared in an effect: setting state from an
+   * effect on every accepted move cascades a render, and a selection that
+   * outlived the move that invalidated it would offer a destination the rules
+   * had already withdrawn.
+   */
+  const liftable = new Set(
+    legal.flatMap((move) => {
+      const card = (move.payload as { card?: unknown } | undefined)?.card;
+      return typeof card === 'string' ? [card] : [];
+    }),
+  );
+  const selected = held !== null && liftable.has(held) ? held : null;
+  const targets = targetsFor(legal, selected);
+
+  useEffect(() => {
+    const cancel = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setHeld(null);
+    };
+    window.addEventListener('keydown', cancel);
+    return () => window.removeEventListener('keydown', cancel);
+  }, []);
+
+  useGameTextSurface(() => {
+    if (error) return { game: 'spite', status: 'error', error };
+    if (!view) return { game: 'spite', status: 'loading', error: null };
+    return {
+      game: 'spite',
+      status: view.status,
+      winner: view.winner,
+      yourTurn: view.isLocalTurn,
+      held: selected,
+      stock: view.stockCount,
+      centre: view.centre.map((pile) => `${pile.needsLabel}<-${pile.top?.label ?? 'empty'}`),
+      hand: view.hand.map((card) => card.label),
+      seats: view.seats.map((seat) => ({
+        seat: seat.seat,
+        name: seat.name,
+        payoffLeft: seat.payoffLeft,
+        hand: seat.handCount,
+      })),
+      error: null,
+    };
   });
-  useMusicMood(tense ? 'tense' : null);
 
-  useGameTextSurface(() => ({
-    game: 'spite',
-    status: error ? 'error' : view ? (deal.dealing ? 'dealing' : 'ready') : 'loading',
-    error,
-  }));
-
-  if (error) return <TableErrorScreen headline="The table lost the thread." message={error} />;
+  if (error) {
+    return <TableErrorScreen headline="The Spite table lost the thread." message={error} />;
+  }
   if (!view) return <TableLoadingScreen copy="Stacking the payoff piles…" />;
 
-  const local = view.players.find((player) => player.seat === view.localSeat);
-  const others = view.players.filter((player) => player.seat !== view.localSeat);
-  const movable = new Set(view.movableCards);
+  const local = view.seats.find((seat) => seat.isLocal) ?? null;
+  const others = view.seats.filter((seat) => !seat.isLocal);
+  const holding = selected !== null;
 
-  const heldBuilds = held ? buildsForCard(view.builds, held) : [];
-  const heldDiscards = held ? discardsForCard(view.discards, held) : [];
-  const buildTargets = new Set(heldBuilds.map((option) => option.pile));
-
-  const take = (card: string) => setHeld((current) => (current === card ? null : card));
-
-  const toCentre = (pile: number) => {
-    const option = heldBuilds.find((candidate) => candidate.pile === pile);
-    if (!option) return;
-    setHeld(null);
-    props.onBuild?.(option.card, option.pile, option.rank);
+  const lift = (card: string) => {
+    if (busy || !view.isLocalTurn || !liftable.has(card)) return;
+    setHeld(selected === card ? null : card);
   };
 
-  const toDiscard = (pile: number) => {
-    const option = heldDiscards.find((candidate) => candidate.pile === pile);
-    if (!option) return;
+  const drop = (target: SpiteTarget) => {
+    if (selected === null) return;
+    const move = moveForTarget(legal, selected, target);
+    if (!move) return;
     setHeld(null);
-    props.onDiscard?.(option.card, option.pile);
+    onPlay?.(move);
   };
 
   return (
-    <TableShell rootRef={rootRef} className={styles.screen} dealState={dealStateAttr(deal)}>
+    <TableShell rootRef={rootRef} className={styles.screen}>
       <TableHud onOpenMenu={menu.open}>
-        <TableTitlePill eyebrow="Spite & Malice" status={view.yourTurn ? 'Your turn' : 'Playing'}>
-          <span className={styles.hudCluster}>
-            <span className={styles.hudStat}>
-              <small>Your pile</small>
-              <strong>{local?.payoffLeft ?? 0}</strong>
-            </span>
-            <span className={styles.hudStat}>
-              <small>Stock</small>
-              <strong>{view.stockCount}</strong>
-            </span>
+        <TableTitlePill eyebrow="Spite & Malice" status={view.stageLabel}>
+          <span className={styles.stock}>
+            stock <b>{view.stockCount}</b>
           </span>
         </TableTitlePill>
       </TableHud>
 
-      <TablePlayfield
-        label="Spite and Malice table"
-        seatCount={view.players.length}
-        feltMark={<span className={styles.feltMark}>♠</span>}
-      >
-        <div className={styles.opponents}>
-          {others.map((player) => (
-            <OpponentSeat key={player.seat} player={player} />
-          ))}
-        </div>
-
-        <div className={styles.centre} aria-label="Centre builds">
-          {view.centre.map((pile) => {
-            const targeted = buildTargets.has(pile.index);
-            return (
-              <button
-                key={pile.index}
-                type="button"
-                className={styles.centrePile}
-                data-target={targeted || undefined}
-                disabled={!targeted}
-                onClick={() => toCentre(pile.index)}
-                aria-label={`Centre pile ${pile.index + 1}, needs ${rankLabel(pile.nextRank)}`}
-              >
-                {pile.top ? (
-                  <PlayingCard card={pile.top} face={spiteFace(pile.top)} compact />
-                ) : (
-                  <span className={styles.centreEmpty}>{rankLabel(pile.nextRank)}</span>
-                )}
-                <small className={styles.needs}>needs {rankLabel(pile.nextRank)}</small>
-              </button>
-            );
-          })}
-        </div>
-
-        <TableFxLayer
-          fx={props.fx}
-          fxKey={props.fxKey}
-          rootRef={rootRef}
-          reduced={reducedMotion}
-          renderCue={() => null}
-        />
-      </TablePlayfield>
-
-      {local && (
-        <div className={styles.localStrip}>
-          <div className={styles.localPiles}>
-            <div className={styles.payoff}>
-              <small>Payoff · {local.payoffLeft}</small>
-              {local.payoffTop ? (
-                <button
-                  type="button"
-                  className={styles.payoffCard}
-                  data-held={held === local.payoffTop || undefined}
-                  disabled={!movable.has(local.payoffTop)}
-                  onClick={() => take(local.payoffTop as string)}
-                >
-                  <PlayingCard card={local.payoffTop} face={spiteFace(local.payoffTop)} compact />
-                </button>
-              ) : (
-                <span className={styles.payoffEmpty}>empty</span>
-              )}
-            </div>
-
-            <div className={styles.discardRow}>
-              {local.discardTops.map((top, pile) => {
-                const canDrop = heldDiscards.some((option) => option.pile === pile);
-                const canTake = top !== null && movable.has(top);
-                return (
-                  <button
-                    key={pile}
-                    type="button"
-                    className={styles.discardPile}
-                    data-target={canDrop || undefined}
-                    data-held={top !== null && held === top ? true : undefined}
-                    disabled={!canDrop && !canTake}
-                    onClick={() => (canDrop ? toDiscard(pile) : top && take(top))}
-                    aria-label={`Discard pile ${pile + 1}, ${local.discardCounts[pile] ?? 0} cards`}
-                  >
-                    {top ? (
-                      <PlayingCard card={top} face={spiteFace(top)} compact />
-                    ) : (
-                      <span className={styles.discardEmpty} />
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <HandRail
-            count={view.hand.length}
-            zone={`hand:${view.localSeat}`}
-            label="Your hand"
-            dealState={deal.dealing ? 'dealing' : 'complete'}
-            fanPlan={view.hand}
-          >
-            {view.hand.map((card, index) => {
-              const canMove = view.yourTurn && movable.has(card);
-              return (
-                <HandRailCard
-                  key={card}
-                  cardId={card}
-                  index={index}
-                  count={view.hand.length}
-                  playable={canMove}
-                >
-                  <PlayingCard
-                    card={card}
-                    disabled={view.yourTurn && !canMove}
-                    actionLabel="Take"
-                    onClick={canMove ? () => take(card) : undefined}
+      <TablePlayfield label="Spite and Malice table" feltMark="S" className={styles.playfield}>
+        <div className={styles.board} data-testid="spite-board" data-holding={holding || undefined}>
+          <ol className={styles.opponents}>
+            {others.map((seat) => (
+              <li key={seat.seat} className={styles.seat} data-turn={seat.isTurn || undefined}>
+                <div className={styles.seatHead}>
+                  <AvatarBadge avatarId={seat.avatarId} size="clamp(2.2rem, 3.6vw, 3rem)" />
+                  <SeatNameplate name={seat.name} isBot={seat.isBot} />
+                </div>
+                <div className={styles.seatPiles}>
+                  <Pile
+                    label={`${seat.payoffLeft} left`}
+                    card={seat.payoffTop}
+                    testid={`spite-payoff-${seat.seat}`}
+                    tone="payoff"
                   />
-                </HandRailCard>
+                  {seat.discards.map((pile) => (
+                    <Pile
+                      key={pile.pile}
+                      label={pile.count > 0 ? String(pile.count) : ''}
+                      card={pile.top}
+                      compact
+                      tone="discard"
+                    />
+                  ))}
+                  <span className={styles.handCount} aria-label={`${seat.handCount} cards in hand`}>
+                    ✋ {seat.handCount}
+                  </span>
+                </div>
+              </li>
+            ))}
+          </ol>
+
+          <ul className={styles.centre} data-testid="spite-centre">
+            {view.centre.map((pile) => {
+              const target: SpiteTarget = { kind: 'centre', pile: pile.pile };
+              const open = isTarget(targets, target);
+              return (
+                <li key={pile.pile}>
+                  <button
+                    type="button"
+                    className={styles.centrePile}
+                    data-legal-target={open || undefined}
+                    data-testid={`spite-centre-${pile.pile}`}
+                    disabled={!open}
+                    onClick={() => drop(target)}
+                    aria-label={
+                      open
+                        ? `Build onto pile ${pile.pile + 1}, which wants ${pile.needsLabel}`
+                        : `Pile ${pile.pile + 1} wants ${pile.needsLabel}`
+                    }
+                  >
+                    <SpiteCard card={pile.top} placeholder={pile.needsLabel} />
+                    <span className={styles.needs}>wants {pile.needsLabel}</span>
+                  </button>
+                </li>
               );
             })}
-          </HandRail>
+          </ul>
+
+          {local ? (
+            <div className={styles.localArea}>
+              <Pile
+                label={`${local.payoffLeft} left`}
+                card={local.payoffTop}
+                testid="spite-payoff-0"
+                tone="payoff"
+                liftable={local.payoffTop !== null && liftable.has(local.payoffTop.card)}
+                held={selected !== null && selected === local.payoffTop?.card}
+                onLift={local.payoffTop ? () => lift(local.payoffTop!.card) : undefined}
+              />
+              <ul className={styles.myDiscards}>
+                {local.discards.map((pile) => {
+                  const target: SpiteTarget = { kind: 'discard', pile: pile.pile };
+                  const open = isTarget(targets, target);
+                  const top = pile.top;
+                  return (
+                    <li key={pile.pile}>
+                      <button
+                        type="button"
+                        className={styles.discardPile}
+                        data-legal-target={open || undefined}
+                        data-held={selected !== null && selected === top?.card ? '' : undefined}
+                        data-testid={`spite-discard-${pile.pile}`}
+                        disabled={!open && !(top && liftable.has(top.card))}
+                        onClick={() => (open ? drop(target) : top ? lift(top.card) : undefined)}
+                        aria-label={
+                          open
+                            ? `Discard here to end your turn (pile ${pile.pile + 1})`
+                            : `Your discard pile ${pile.pile + 1}, ${pile.count} cards`
+                        }
+                      >
+                        <SpiteCard card={top} placeholder="" />
+                        {pile.count > 0 ? (
+                          <span className={styles.pileCount}>{pile.count}</span>
+                        ) : null}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          ) : null}
         </div>
-      )}
 
-      <TableActionRail>
-        {view.matchOver ? (
-          <p className={styles.matchOver}>
-            {view.won === true ? 'You emptied your pile first.' : 'Beaten to it.'}
-          </p>
-        ) : held ? (
-          <p className={styles.prompt}>
-            {heldBuilds.length > 0
-              ? 'Pick a lit centre pile — or one of your discards to end the turn.'
-              : 'Pick a discard pile to end your turn.'}
-            <button type="button" className={styles.cancel} onClick={() => setHeld(null)}>
-              put it back
-            </button>
-          </p>
-        ) : view.yourTurn ? (
-          <p className={styles.prompt}>
-            {view.mustDiscard
-              ? 'Nothing builds — discard to end your turn.'
-              : 'Take a card from your hand, your payoff pile, or a discard.'}
-          </p>
-        ) : (
-          <p className={styles.waiting} aria-live="polite">
-            {props.busy ? 'Waiting for the table…' : 'Dealing…'}
-          </p>
-        )}
-      </TableActionRail>
+        <HandRail count={view.hand.length} zone={`hand:${view.localSeat}`} label="Your hand">
+          {view.hand.map((card, index) => (
+            <HandRailCard
+              key={card.card}
+              cardId={card.card}
+              index={index}
+              count={view.hand.length}
+              playable={liftable.has(card.card)}
+              justDrawn={selected === card.card}
+            >
+              {/*
+                This deck is numbers and wilds, not suits, so the shared
+                PlayingCard has nothing to parse — handed one of these ids it
+                renders the id. The face is drawn here instead, in a real button
+                so the card keeps its tap target and its keyboard path.
+              */}
+              <button
+                type="button"
+                className={styles.handCard}
+                data-held={selected === card.card ? '' : undefined}
+                disabled={busy || !liftable.has(card.card)}
+                onClick={() => lift(card.card)}
+                aria-label={`${selected === card.card ? 'Put back' : 'Pick up'} ${
+                  card.wild ? 'wild' : card.label
+                }`}
+              >
+                <SpiteCard card={card} placeholder="" />
+              </button>
+            </HandRailCard>
+          ))}
+        </HandRail>
+      </TablePlayfield>
 
-      <TableMenu
-        open={menu.isOpen}
-        onClose={menu.close}
-        onQuit={menu.quit}
-        howToPlay={{
-          doc: spiteHowToPlay,
-          title: 'Spite & Malice',
-          subtitle: 'the payoff pile race',
-        }}
-      />
+      {view.status === 'ended' ? (
+        <div className={styles.result} data-testid="spite-result" role="status">
+          <h2>
+            {view.winner === view.localSeat
+              ? 'Payoff pile cleared — you win.'
+              : `${view.seats.find((seat) => seat.seat === view.winner)?.name ?? 'Nobody'} cleared out first.`}
+          </h2>
+        </div>
+      ) : null}
+
+      <TableMenu open={menu.isOpen} onClose={menu.close} onQuit={menu.quit} />
+      <span hidden data-fx-key={String(fxKey)} data-fx-count={fx.length} />
     </TableShell>
   );
 }
 
-function OpponentSeat({ player }: { player: SpiteSeatView }) {
-  return (
-    <div className={styles.seat} data-turn={player.isTurn || undefined}>
-      <div className={styles.seatBadge}>
-        <AvatarBadge avatarId={player.avatarId} size={28} />
-        <span className={styles.seatText}>
-          <strong>{player.name}</strong>
-          <small>{player.payoffLeft} to go</small>
+/**
+ * A card face, or the empty slot it would sit in.
+ *
+ * Drawn here rather than as a `PlayingCard`: this deck is a hundred and forty
+ * four numbers and eighteen wilds, so the shared chassis — which is built out
+ * of a rank and a suit glyph — has nothing to say about it. The layout is the
+ * standard one anyway: an index in opposite corners so the card reads from
+ * either end of a fan, and the rank large in the middle.
+ */
+function SpiteCard({ card, placeholder }: { card: SpiteCardView | null; placeholder: string }) {
+  if (!card) {
+    return (
+      <span className={styles.emptySlot} aria-hidden="true">
+        {placeholder}
+      </span>
+    );
+  }
+
+  if (card.wild) {
+    return (
+      <span className={styles.face} data-wild="">
+        {/* The burst sits inside the mark so it follows it into the fan band
+            rather than staying centred while the wordmark shifts off it. */}
+        <span className={styles.wildMark}>
+          <span className={styles.wildBurst} aria-hidden="true" />
+          {card.standsFor === null ? (
+            <b className={styles.wildWord}>WILD</b>
+          ) : (
+            <>
+              <b className={styles.centreRank}>{card.standsFor}</b>
+              <small className={styles.wildTag}>wild</small>
+            </>
+          )}
         </span>
-      </div>
-      <div className={styles.seatPiles}>
-        {player.payoffTop ? (
-          <PlayingCard card={player.payoffTop} face={spiteFace(player.payoffTop)} compact />
-        ) : (
-          <span className={styles.discardEmpty} />
-        )}
-        {player.discardTops.map((top, pile) => (
-          <span key={pile} className={styles.seatDiscard}>
-            {top ? (
-              <PlayingCard card={top} face={spiteFace(top)} compact />
-            ) : (
-              <span className={styles.discardEmpty} />
-            )}
-          </span>
-        ))}
-      </div>
-    </div>
+      </span>
+    );
+  }
+
+  return (
+    <span className={styles.face}>
+      <i className={styles.corner} data-corner="tl" aria-hidden="true">
+        {card.label}
+      </i>
+      <b className={styles.centreRank}>{card.label}</b>
+      <i className={styles.corner} data-corner="br" aria-hidden="true">
+        {card.label}
+      </i>
+    </span>
+  );
+}
+
+function Pile({
+  label,
+  card,
+  testid,
+  tone,
+  compact = false,
+  liftable = false,
+  held = false,
+  onLift,
+}: {
+  label: string;
+  card: SpiteCardView | null;
+  testid?: string;
+  tone: 'payoff' | 'discard';
+  compact?: boolean;
+  liftable?: boolean;
+  held?: boolean;
+  onLift?: () => void;
+}) {
+  const body = (
+    <>
+      <SpiteCard card={card} placeholder="" />
+      {label ? <span className={styles.pileCount}>{label}</span> : null}
+    </>
+  );
+  if (!onLift) {
+    return (
+      <span
+        className={styles.pile}
+        data-tone={tone}
+        data-compact={compact || undefined}
+        data-testid={testid}
+      >
+        {body}
+      </span>
+    );
+  }
+  return (
+    <button
+      type="button"
+      className={styles.pile}
+      data-tone={tone}
+      data-liftable={liftable || undefined}
+      data-held={held || undefined}
+      data-testid={testid}
+      disabled={!liftable}
+      onClick={onLift}
+      aria-label={liftable ? `Play your payoff card ${card?.label ?? ''}` : `Payoff pile, ${label}`}
+    >
+      {body}
+    </button>
   );
 }

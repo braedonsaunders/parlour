@@ -12,10 +12,10 @@ import type { WildModeId } from '@/lib/wild/modes';
 import type { RatscrewModeId } from '@/lib/ratscrew/modes';
 import type { PresidentModeId } from '@/lib/president/modes';
 import type { OhHellModeId } from '@/lib/ohhell/modes';
-import type { ScopaModeId } from '@/lib/scopa/modes';
-import type { SpiteModeId } from '@/lib/spite/modes';
 import type { PokerModeId } from '@/lib/poker/modes';
 import type { SpadesModeId } from '@/lib/spades/modes';
+import type { ScopaModeId } from '@/lib/scopa/modes';
+import type { SpiteModeId } from '@/lib/spite/modes';
 import type { RecordedSeat } from '@/stores/history';
 
 /** Everything the podium needs about the finished match. */

@@ -14,7 +14,7 @@ const shell = () => container.firstElementChild as HTMLElement;
 const animating = () => shell().classList.contains(styles.enter!);
 
 function render() {
-  act(() => root.render(createElement(PageTransition, { children: 'page' })));
+  act(() => root.render(createElement(PageTransition, null, 'page')));
 }
 
 function finishAnimation() {

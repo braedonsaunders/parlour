@@ -17,6 +17,7 @@ import {
 import type { GinModeId } from '@/lib/gin/modes';
 import type { BotTier } from '@/stores/setup';
 import { adaptSessionApply, SoloAuthority, type SoloDispatch } from './SoloAuthority';
+import { localSeat } from './seating';
 
 /** House opponents — avatar ids match the app's cast so seats read cohesively. */
 const PERSONA_AVATARS = ['peg', 'roo', 'marge', 'benny', 'knuckles', 'pat'] as const;
@@ -134,12 +135,7 @@ export class GinTransport {
       GIN_PERSONAS.findIndex((candidate: PersonaDef) => candidate.id === this.policy.persona.id),
     );
     return [
-      {
-        seat: 0,
-        name: this.options.player.name.trim() || 'You',
-        avatarId: this.options.player.avatarId,
-        isBot: false,
-      },
+      localSeat(this.options.player),
       {
         seat: 1,
         name: this.policy.persona.name,

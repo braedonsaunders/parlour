@@ -1,23 +1,19 @@
 import { createSession, type GameSession } from '@parlour/engine';
 import type { CardId } from '@parlour/engine';
-import { rankLabel } from './cards';
 import { spiteConfig, type SpiteRules } from './config';
 import { spiteGame } from './game';
 import { emptyCentre, type SpiteState } from './state';
 
 export const defaults = spiteConfig.defaults();
 
-/** `card(9)` → 'red-9-0'; `card(1, 'blue', 1)` → 'blue-A-1'. */
-export function card(rank: number, color = 'red', copy = 0): CardId {
-  return `${color}-${rankLabel(rank)}-${copy}`;
+/** `card(9)` → '9-0'; `card(9, 3)` → '9-3'. Twelve copies of every rank. */
+export function card(rank: number, copy = 0): CardId {
+  return `${rank}-${copy}`;
 }
 
-export function king(copy = 0): CardId {
-  return `red-K-${copy}`;
-}
-
-export function joker(n = 0): CardId {
-  return `joker-${n}`;
+/** `wild()` → 'wild-0'. Eighteen in the deck, all identical. */
+export function wild(copy = 0): CardId {
+  return `wild-${copy}`;
 }
 
 /**

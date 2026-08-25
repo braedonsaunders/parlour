@@ -72,6 +72,15 @@ export interface SoloTableOptions<TSnapshot, TDispatch> {
    * nothing, so the opening cascade is not swallowed.
    */
   fxFor?(outcome: TDispatch): readonly FxEvent[];
+  /**
+   * Called after an outcome is accepted, before the next render.
+   *
+   * Blitz needs the raw outcome to accumulate a whole round's fx for its
+   * round-end overlay, which is a different timeline from the per-move `fx`
+   * this hook manages. Rather than leave Blitz on a hand-rolled copy of the
+   * entire runtime — the only page that still had one — it gets this seam.
+   */
+  onAccepted?(outcome: TDispatch): void;
 }
 
 export interface SoloTable<TSnapshot, TDispatch> {
@@ -84,6 +93,15 @@ export interface SoloTable<TSnapshot, TDispatch> {
   /** Escape hatch for games that drive the transport in their own way. */
   accept(outcome: TDispatch): void;
   setError(message: string | null): void;
+  /**
+   * Replaces the snapshot without going through an outcome.
+   *
+   * For transport state that advances without a move: Blitz's timed tables poll
+   * `transport.tick(now)` for the match clock, which returns a snapshot rather
+   * than a dispatch result. Do not reach for this to apply moves — `dispatch`
+   * exists so a rejection still surfaces.
+   */
+  setSnapshot(snapshot: TSnapshot): void;
 }
 
 export function useSoloTable<TSnapshot, TDispatch extends SoloTableDispatch<TSnapshot>>(
@@ -96,6 +114,7 @@ export function useSoloTable<TSnapshot, TDispatch extends SoloTableDispatch<TSna
     localSeat = 0,
     botErrorMessage = 'The bot lost the thread.',
     fxFor,
+    onAccepted,
   } = options;
 
   const [snapshot, setSnapshot] = useState(() => transport.getSnapshot());
@@ -113,8 +132,9 @@ export function useSoloTable<TSnapshot, TDispatch extends SoloTableDispatch<TSna
       setSnapshot(outcome.snapshot);
       setFx(fxFor ? fxFor(outcome) : outcome.fx);
       setFxKey((key) => key + 1);
+      onAccepted?.(outcome);
     },
-    [fxFor],
+    [fxFor, onAccepted],
   );
 
   const dispatch = useCallback(
@@ -142,5 +162,5 @@ export function useSoloTable<TSnapshot, TDispatch extends SoloTableDispatch<TSna
     return () => window.clearTimeout(timer);
   }, [accept, botErrorMessage, botPaceMs, fx, localSeat, round, snapshot, transport]);
 
-  return { snapshot, fx, fxKey, error, dispatch, accept, setError };
+  return { snapshot, fx, fxKey, error, dispatch, accept, setError, setSnapshot };
 }

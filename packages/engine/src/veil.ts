@@ -1,6 +1,6 @@
 /**
  * Veil handles — the engine half of the Parlour Veil privacy protocol
- * (docs/VEILED-DECK-PROTOCOL.md).
+ * (apps/web/src/lib/multiplayer/veil).
  *
  * A veiled room deals *handles* instead of card faces. The public reducer keeps
  * owning turn order, counts, zones and every visible card; it simply never sees
@@ -333,6 +333,45 @@ export interface VeilSupport {
   publicSetupFrom(seats: number, config: RuleValues): number;
   /** true when the cards opened from that index onward are enough to deal */
   publicSetupReady(opened: readonly CardId[], seats: number, config: RuleValues): boolean;
+  /**
+   * The move that deals this game another hand inside the same session, for
+   * games whose match spans several deals.
+   *
+   * A veiled deal is one shuffle ceremony over one deck, so a second hand needs
+   * a second ceremony — which is why a veiled match used to stop after one.
+   * Naming the move here is what lets the room run that ceremony first and hand
+   * the fresh deck to the move, instead of each multi-deal game inventing its
+   * own way to say "not while veiled".
+   */
+  redealMove?: string;
+}
+
+/**
+ * How a veiled game says "I am ready to deal again, and I need a deck for it".
+ *
+ * The room cannot read a game's state to know a hand is over — that is the
+ * whole point of the pack boundary — so the redeal move reports it through the
+ * ordinary validation path instead. Seeing this code, and only this code, is
+ * the host's cue to run a shuffle ceremony and inject the move with the deck it
+ * produced. Any other rule error means the game is not waiting on one.
+ */
+export const VEILED_REDEAL_PENDING = 'no-veiled-deck';
+
+/**
+ * The payload a veiled redeal carries: the deck a ceremony just produced.
+ *
+ * Shared so that every multi-deal game agrees on the shape, and so the deck
+ * lands in the event log where replay can find it — a hand dealt from a deck
+ * that only the dealer knew would not replay anywhere else.
+ */
+export interface VeiledDealPayload {
+  deckOrder: CardId[];
+}
+
+export function isVeiledDealPayload(payload: unknown): payload is VeiledDealPayload {
+  if (payload === null || typeof payload !== 'object') return false;
+  const order = (payload as { deckOrder?: unknown }).deckOrder;
+  return Array.isArray(order) && order.length > 0 && order.every((id) => typeof id === 'string');
 }
 
 /** Ceiling on public setup openings, so a malformed game cannot open the deck. */
@@ -352,8 +391,14 @@ export const MAX_PUBLIC_SETUP_OPENS = 16;
 export interface VeilPack {
   /** the deck this game deals from */
   deck: DeckDef | ((config: RuleValues) => DeckDef);
-  /** cards dealt to each seat before the public setup cards (default 0) */
-  handSize?: number | ((config: RuleValues) => number);
+  /**
+   * Cards dealt to each seat before the public setup cards (default 0).
+   *
+   * Takes the seat count as well as the config because a hand size can depend
+   * on how many seats are sharing the deck — Oh Hell deals as many as the deck
+   * allows, which is a different number at four seats than at seven.
+   */
+  handSize?: number | ((config: RuleValues, seats: number) => number);
   /**
    * Setup cards the room must open in public before `setup` can deal.
    * `'none'` (default) for games where everything starts face down, `'one'`
@@ -361,6 +406,8 @@ export interface VeilPack {
    * until some condition holds (Wildpile needs a number card).
    */
   publicSetup?: 'none' | 'one' | ((opened: readonly CardId[], config: RuleValues) => boolean);
+  /** See {@link VeilSupport.redealMove} — the move that deals another hand. */
+  redealMove?: string;
 }
 
 function resolveDeck(pack: VeilPack, config: RuleValues): DeckDef {
@@ -372,10 +419,11 @@ export function veilSupport(pack: VeilPack): VeilSupport {
   const mode = pack.publicSetup ?? 'none';
   return {
     deck: (config) => resolveDeck(pack, config),
+    redealMove: pack.redealMove,
     publicSetupFrom(seats, config) {
       if (mode === 'none') return resolveDeck(pack, config).cardIds.length;
       const size =
-        typeof pack.handSize === 'function' ? pack.handSize(config) : (pack.handSize ?? 0);
+        typeof pack.handSize === 'function' ? pack.handSize(config, seats) : (pack.handSize ?? 0);
       return seats * size;
     },
     publicSetupReady(opened, _seats, config) {

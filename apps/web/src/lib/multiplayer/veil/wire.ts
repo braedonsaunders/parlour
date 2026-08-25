@@ -23,6 +23,8 @@ const HASH_HEX = 64;
 const ELEMENT_HEX = VEIL_ELEMENT_BYTES * 2;
 const MAX_SEALED_HEX = 8_192;
 const MAX_SHARE_HEX = 1_024;
+/** Ceiling on a replayed round: a header, its layers and every epoch since. */
+const MAX_CATCH_UP_ENTRIES = 1_024;
 
 export type VeilMessage =
   | { type: 'veil.hello'; seat: number; publicKey: string }
@@ -35,7 +37,25 @@ export type VeilMessage =
   | { type: 'veil.recover.request'; epoch: number; lostSeat: number }
   /** one holder's answer, addressed to the requester and never broadcast */
   | { type: 'veil.recover.offer'; epoch: number; lostSeat: number; holder: number; share: string }
-  | { type: 'veil.disclose'; seat: number; secrets: readonly VeilDisclosedSecret[] };
+  | { type: 'veil.disclose'; seat: number; secrets: readonly VeilDisclosedSecret[] }
+  /**
+   * "I dropped and I am back — replay the round to me."
+   *
+   * The transcript is a hash chain: entries are accepted only in sequence and
+   * only when they extend the head, so a returning seat cannot be caught up by
+   * whatever happens to be broadcast next. It needs the header and every entry
+   * from the beginning, which is what {@link VeilCatchUp} carries.
+   */
+  | { type: 'veil.catchup.request' }
+  | { type: 'veil.catchup'; catchUp: VeilCatchUp };
+
+/** A whole round, in order, for a seat that missed it. */
+export interface VeilCatchUp {
+  header: VeilRoundHeader;
+  entries: readonly SignedVeilEntry[];
+  /** every seat's round key, so the returning peer can verify what it replays */
+  keys: readonly { seat: number; publicKey: string }[];
+}
 
 /** A layer secret in transport form — bigints travel as hex, never as numbers. */
 export interface VeilDisclosedSecret {
@@ -261,9 +281,39 @@ export function isVeilMessage(value: unknown): value is VeilMessage {
         value.secrets.length <= 64 &&
         value.secrets.every(isDisclosedSecret)
       );
+    case 'veil.catchup.request':
+      return hasOnlyKeys(value, ['type']);
+    case 'veil.catchup':
+      return hasOnlyKeys(value, ['type', 'catchUp']) && isVeilCatchUp(value.catchUp);
     default:
       return false;
   }
+}
+
+/**
+ * A replay of a whole round. Bounded by what a round can actually contain: one
+ * header, one key per seat, and an entry budget that covers a long match's
+ * epochs without letting a peer stream an unbounded chain at a returning seat.
+ */
+function isVeilCatchUp(value: unknown): value is VeilCatchUp {
+  return (
+    isRecord(value) &&
+    hasOnlyKeys(value, ['header', 'entries', 'keys']) &&
+    isVeilRoundHeader(value.header) &&
+    Array.isArray(value.entries) &&
+    value.entries.length <= MAX_CATCH_UP_ENTRIES &&
+    value.entries.every(isSignedEntry) &&
+    Array.isArray(value.keys) &&
+    value.keys.length <= MAX_SEATS &&
+    value.keys.every(
+      (key: unknown) =>
+        isRecord(key) &&
+        hasOnlyKeys(key, ['seat', 'publicKey']) &&
+        isIndex(key.seat, MAX_SEATS - 1) &&
+        isBoundedString(key.publicKey, MAX_KEY),
+    ) &&
+    new Set(value.keys.map((key) => (key as { seat: number }).seat)).size === value.keys.length
+  );
 }
 
 export function parseVeilMessage(data: string): VeilMessage | null {

@@ -39,10 +39,9 @@ export const MEDIUM_PARAMS: PlayParams = {
 };
 
 export const HARD_PARAMS: PlayParams = {
-  // carte is the most reliable punto, coins the second — weight accordingly
-  coin: 1.4,
+  coin: 1.6,
   settebello: 3,
-  prime: 0.9,
+  prime: 1.3,
   scopa: 1.6,
   risk: 1.5,
   hold: 1.1,

@@ -9,8 +9,8 @@ describe('payoff arithmetic', () => {
     });
     expect(payoffRemaining(session.state, 0)).toBe(3);
     expect(payoffRemaining(session.state, 1)).toBe(0);
-    // 20-card default rules: three left is 85% of the way home.
-    expect(progress(session.state, 0)).toBeCloseTo(1 - 3 / 20);
+    // 30-card default pile: three left is 90% of the way home.
+    expect(progress(session.state, 0)).toBeCloseTo(1 - 3 / 30);
     expect(progress(session.state, 1)).toBe(1);
   });
 

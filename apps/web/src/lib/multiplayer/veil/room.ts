@@ -27,7 +27,8 @@ import { sha256Hex } from './hash';
 import { fromHex, utf8 } from './bytes';
 import type { VeilSession, VeilRecycleEntry } from './session';
 import type { VeilShare } from './ceremony';
-import type { VeilMessage } from './wire';
+import type { VeilCatchUp, VeilMessage } from './wire';
+import type { SignedVeilEntry } from './transcript';
 
 /**
  * Who an opening is for. `surrogate` is a departed seat's card, opened so a bot
@@ -85,6 +86,8 @@ export class VeilRoom {
     private readonly session: VeilSession,
     private readonly link: VeilLink,
     private readonly seats: number,
+    /** told whether a returning seat rebuilt every layer it had laid */
+    private readonly onResume?: (restored: boolean) => void,
   ) {}
 
   /** Announces this seat's round key so the header can be sealed. */
@@ -134,6 +137,67 @@ export class VeilRoom {
     const entry = await this.session.startRecycle(epoch, cards, participants);
     this.link.send({ type: 'veil.entry', entry }, null);
     await this.advanceCeremony(epoch);
+  }
+
+  /**
+   * Asks the table to replay the round to this seat.
+   *
+   * Sent by a peer that has just come back. It cannot be caught up by whatever
+   * is broadcast next — the transcript only accepts entries in sequence, each
+   * extending the accepted head — so it needs the round from the beginning.
+   */
+  requestCatchUp(): void {
+    this.link.send({ type: 'veil.catchup.request' }, null);
+  }
+
+  /** Everything a returning seat needs to rebuild the round, in order. */
+  catchUp(): VeilCatchUp | null {
+    const transcript = this.session.transcriptRef();
+    if (!transcript) return null;
+    return {
+      header: transcript.header,
+      entries: transcript.all(),
+      keys: [...this.keys].map(([seat, publicKey]) => ({ seat, publicKey })),
+    };
+  }
+
+  /**
+   * Replays a round into this seat, then rebuilds the layers it laid before it
+   * dropped.
+   *
+   * Every entry goes through the same validation an entry off the wire does —
+   * a peer offering a catch-up is no more trusted than one broadcasting a
+   * layer, and the hash chain is what makes a forged replay detectable. The
+   * secrets are re-derived and checked against commitments the transcript
+   * already holds, so a resumed seat proves it is the one that laid them.
+   */
+  async adoptCatchUp(catchUp: VeilCatchUp): Promise<boolean> {
+    if (this.session.transcriptRef()) return true;
+    for (const { seat, publicKey } of catchUp.keys) this.keys.set(seat, publicKey);
+    const fault = await this.session.adoptRound(catchUp.header);
+    if (fault) throw new Error(`veil catch-up header rejected: ${fault}`);
+    for (const entry of catchUp.entries) await this.absorbEntry(entry);
+    let restored = true;
+    for (const epoch of this.session.laidEpochs()) {
+      if (!(await this.session.restoreLayerSecret(epoch))) restored = false;
+    }
+    return restored;
+  }
+
+  /** One transcript entry, chain-checked and dispatched to the ceremony. */
+  private async absorbEntry(entry: SignedVeilEntry): Promise<void> {
+    const transcript = this.session.transcriptRef();
+    const chainFault = await transcript?.accept(entry);
+    if (chainFault) throw new Error(`veil transcript rejected an entry: ${chainFault.message}`);
+    if (entry.kind === 'ceremony.recycle') {
+      await this.session.acceptRecycle(entry.payload as VeilRecycleEntry);
+      return;
+    }
+    if (entry.kind !== 'ceremony.layer') return;
+    const fault = this.session.acceptLayer(
+      entry.payload as Parameters<VeilSession['acceptLayer']>[0],
+    );
+    if (fault) throw new Error(`veil ceremony rejected a layer: ${fault.message}`);
   }
 
   private async distributeRecovery(epoch: number): Promise<void> {
@@ -375,19 +439,19 @@ export class VeilRoom {
         if (fault) throw new Error(`veil header rejected: ${fault}`);
         return;
       }
-      case 'veil.entry': {
-        const transcript = this.session.transcriptRef();
-        const chainFault = await transcript?.accept(message.entry);
-        if (chainFault) throw new Error(`veil transcript rejected an entry: ${chainFault.message}`);
-        if (message.entry.kind === 'ceremony.recycle') {
-          await this.session.acceptRecycle(message.entry.payload as VeilRecycleEntry);
-          return;
-        }
-        if (message.entry.kind !== 'ceremony.layer') return;
-        const fault = this.session.acceptLayer(
-          message.entry.payload as Parameters<VeilSession['acceptLayer']>[0],
-        );
-        if (fault) throw new Error(`veil ceremony rejected a layer: ${fault.message}`);
+      case 'veil.entry':
+        await this.absorbEntry(message.entry);
+        return;
+      case 'veil.catchup.request': {
+        // Anyone at the table can answer: the chain is self-verifying, so a
+        // replay from a dishonest peer fails on the first altered entry.
+        const catchUp = this.catchUp();
+        if (catchUp) this.link.send({ type: 'veil.catchup', catchUp }, peerId);
+        return;
+      }
+      case 'veil.catchup': {
+        const restored = await this.adoptCatchUp(message.catchUp);
+        this.onResume?.(restored);
         return;
       }
       case 'veil.peel': {

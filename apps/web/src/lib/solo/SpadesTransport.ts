@@ -8,6 +8,7 @@ import {
 } from '@parlour/game-spades';
 import type { SpadesModeId } from '@/lib/spades/modes';
 import { adaptSessionApply, SoloAuthority, type SoloDispatch } from './SoloAuthority';
+import { houseSeats, winningTeamOf } from './seating';
 
 /** Your partner sits across the table at seat 2; opponents flank at 1 and 3. */
 const SPADES_CAST = [
@@ -68,9 +69,9 @@ export class SpadesTransport {
       {
         snapshot: (live): SpadesSnapshot => ({
           mode: options.mode,
-          players: this.players(),
+          players: houseSeats(options.player, SPADES_CAST),
           session: live,
-          matchWinnerTeam: matchWinnerTeamOf(live),
+          matchWinnerTeam: winningTeamOf(live),
         }),
         apply: adaptSessionApply(this.def),
         isPlaying: (live) => live.status === 'playing',
@@ -111,27 +112,4 @@ export class SpadesTransport {
   playBotsUntilHuman(): SpadesDispatch[] {
     return this.authority.playBotsUntilHuman();
   }
-
-  private players(): SpadesSoloPlayer[] {
-    return [
-      {
-        seat: 0,
-        name: this.options.player.name.trim() || 'You',
-        avatarId: this.options.player.avatarId,
-        isBot: false,
-      },
-      ...SPADES_CAST.map((cast, index) => ({
-        seat: index + 1,
-        name: cast.name,
-        avatarId: cast.avatarId,
-        isBot: true,
-      })),
-    ];
-  }
-}
-
-function matchWinnerTeamOf(session: GameSession<SpadesState, SpadesRules>): 0 | 1 | null {
-  if (session.result === null) return null;
-  const rankOne = session.result.rankings.find((rank) => rank.rank === 1);
-  return rankOne ? ((rankOne.seat % 2) as 0 | 1) : null;
 }

@@ -9,6 +9,7 @@ import {
 import type { CribbageModeId } from '@/lib/cribbage/modes';
 import type { CribbageBotTier } from '@/stores/cribbageSetup';
 import { adaptMatchApply, SoloAuthority, type SoloDispatch } from './SoloAuthority';
+import { localSeat } from './seating';
 
 const BOT_FOR_TIER = {
   1: { name: 'Doc Skunk', avatarId: 'rust', personaId: 'doc-skunk' },
@@ -127,13 +128,7 @@ export class CribbageTransport {
   private players(): CribbagePlayer[] {
     const bot = BOT_FOR_TIER[this.options.botTier];
     return [
-      {
-        seat: 0,
-        name: this.options.player.name.trim() || 'You',
-        avatarId: this.options.player.avatarId,
-        personaId: 'local-player',
-        isBot: false,
-      },
+      { ...localSeat(this.options.player), personaId: 'local-player' },
       { seat: 1, ...bot, isBot: true },
     ];
   }

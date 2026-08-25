@@ -11,12 +11,21 @@ export type OpponentFanProps = {
   renderCard: (card: { index: number; rotation: number }) => ReactNode;
 };
 
-/** The capped, evenly-splayed fan of face-down backs above an opponent's plate. */
+/**
+ * The capped, evenly-splayed fan of face-down backs above an opponent's plate.
+ *
+ * It positions ABSOLUTELY, so it only works inside a seat that is itself
+ * positioned and has left room above it — the fixed compass-point layouts
+ * satisfy both by construction. A table that flows its seats instead has to
+ * opt out, and `data-opponent-fan` is how: `styles.opponentCards` is a hashed
+ * CSS-module class, so another stylesheet cannot reach it by name and fails
+ * silently if it tries.
+ */
 export function OpponentFan({ count, max, spread, renderCard }: OpponentFanProps) {
   const visible = Math.min(count, max);
   const step = visible > 1 ? spread / (visible - 1) : 0;
   return (
-    <div className={styles.opponentCards} aria-label={`${count} hidden cards`}>
+    <div className={styles.opponentCards} data-opponent-fan aria-label={`${count} hidden cards`}>
       {Array.from({ length: visible }, (_, index) => (
         <Fragment key={index}>
           {renderCard({ index, rotation: (index - (visible - 1) / 2) * step })}

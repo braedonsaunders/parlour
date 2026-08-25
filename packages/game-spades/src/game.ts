@@ -1,5 +1,8 @@
 import {
   Fx,
+  isVeiledDealPayload,
+  veilSupport,
+  VEILED_REDEAL_PENDING,
   type BotPolicy,
   type CardId,
   type FlowAdvance,
@@ -109,9 +112,10 @@ function dealFreshHand(dealer: SeatId, order: readonly CardId[], fx: MoveCtx['fx
   return { hands, dealer, turn: leftOfDealer(dealer) };
 }
 
-function emptyMatch(config: SpadesRules): SpadesState {
+function emptyMatch(config: SpadesRules, veiled = false): SpadesState {
   return {
     rules: config,
+    veiled,
     overtime: false,
     scores: [0, 0],
     bags: [0, 0],
@@ -164,7 +168,16 @@ function leadViolation(state: SpadesState, seat: SeatId, card: CardId): RuleErro
   if (state.trick !== null) return null;
   if (!isSpade(card)) return null;
   if (state.spadesBroken) return null;
+  // An all-spades hand may lead one. Under Veil the authority sees handles, so
+  // this passes only when the seat has opened its whole hand alongside the
+  // move — the claim is the opening, exactly as Hearts does for hearts.
   if (allSpades(hand(state, seat))) return null;
+  if (state.veiled) {
+    return err(
+      'bad-claim',
+      'leading spades before they are broken under Veil needs an opened all-spades claim',
+    );
+  }
   return err('spades-not-broken', 'spades have not been broken yet');
 }
 
@@ -175,6 +188,10 @@ function decided(state: Pick<SpadesState, 'scores' | 'rules' | 'overtime'>) {
 function followViolation(state: SpadesState, seat: SeatId, card: CardId): RuleError | null {
   const led = state.trick?.ledSuit;
   if (!led) return null;
+  // A veiled hand is handles, so what a seat could have followed with is not
+  // knowable here. The match-end audit recomputes every hand and catches a
+  // revoke then — detection rather than prevention, as the protocol says.
+  if (state.veiled) return null;
   const fault = followError({ ledSuit: led, hand: hand(state, seat), card }, spadesTrickRules());
   return fault ? err('must-follow-suit', 'you must follow suit') : null;
 }
@@ -399,10 +416,20 @@ const scoreHandMove: Move<SpadesState> = {
 };
 
 const nextHand: Move<SpadesState> = {
-  validate: () => true,
-  apply(state, _seat, _payload, ctx) {
+  validate(state, _seat, payload) {
+    // A spades match is many hands in one session. An open room deals the next
+    // one from the session rng; a veiled room cannot, because that order is
+    // replayable by every seat, so it waits for a deck the room shuffled.
+    if (state.veiled && !isVeiledDealPayload(payload)) {
+      return { code: VEILED_REDEAL_PENDING, message: 'a veiled hand needs its own shuffled deck' };
+    }
+    return true;
+  },
+  apply(state, _seat, payload, ctx) {
     const dealer = nextSeat(state.dealer);
-    const order = ctx.rng.shuffle([...DECK.cardIds]);
+    const order = isVeiledDealPayload(payload)
+      ? payload.deckOrder
+      : ctx.rng.shuffle([...DECK.cardIds]);
     const dealt = dealFreshHand(dealer, order, ctx.fx);
     return freshHand(
       { ...state, handNo: state.handNo + 1, dealer },
@@ -442,6 +469,10 @@ function legalMovesForSeat(state: SpadesState, seat: SeatId): LegalMove[] {
   }
 
   if (state.stage === 'playing' && state.turn === seat) {
+    // Under Veil the legal set is the seat's own business: it can read its hand
+    // and nobody else can, so the move is offered without a card and the
+    // opening travels with it.
+    if (state.veiled) return [{ id: 'playCard' }];
     const cards = hand(state, seat).filter((card) => {
       if (leadViolation(state, seat, card)) return false;
       if (followViolation(state, seat, card)) return false;
@@ -455,6 +486,18 @@ function legalMovesForSeat(state: SpadesState, seat: SeatId): LegalMove[] {
 
 const flow: GameDef<SpadesState, SpadesRules>['flow'] = {
   start: (state) => phaseFor(state),
+
+  /**
+   * The one system event a spades match accepts: the next veiled deal. The
+   * move's own validation still runs, so an injected event cannot deal a hand
+   * the rules would refuse.
+   */
+  canInject(state, _phase, moveId, payload) {
+    if (moveId !== 'nextHand') {
+      return { code: 'not-injectable', message: `spades does not accept injected ${moveId}` };
+    }
+    return nextHand.validate(state, state.dealer, payload);
+  },
 
   legalMoves(state, phase) {
     if (phase.actor === null) return [];
@@ -470,6 +513,9 @@ const flow: GameDef<SpadesState, SpadesRules>['flow'] = {
     if (ended && state.stage === 'hand-over') return { phase: phaseFor(state), ended };
 
     if (state.stage === 'hand-over') {
+      // A veiled room waits: its next deck comes out of a ceremony the room
+      // runs, and arrives as an injected `nextHand`.
+      if (state.veiled) return { phase: phaseFor(state) };
       return {
         phase: phaseFor(state),
         autoMoves: [{ seat: null, move: 'nextHand', reason: 'next deal' }],
@@ -506,13 +552,27 @@ export function createSpadesDef(options: SpadesDefOptions = {}): GameDef<SpadesS
     id: GAME_ID,
     howToPlay: spadesHowToPlay,
     configSchema: spadesConfig,
+    // Thirteen cards a seat, nothing turned face up before play, and a fresh
+    // ceremony per hand because a match runs to a point target.
+    veil: veilSupport({
+      deck: DECK,
+      handSize: TRICKS_PER_HAND,
+      publicSetup: 'none',
+      redealMove: 'nextHand',
+    }),
 
     setup(ctx) {
       if (!Number.isInteger(ctx.seats) || ctx.seats !== SPADES_SEATS) {
         throw new Error(`spades needs exactly ${SPADES_SEATS} seats`);
       }
-      const order = ctx.rng.shuffle([...DECK.cardIds]);
-      return freshHand(emptyMatch(ctx.config), dealFreshHand(0, order, ctx.fx), null);
+      // A veiled room deals from the order its shuffle ceremony produced; an
+      // open one shuffles here, on a seed every seat contributed to.
+      const order = ctx.deckOrder ?? ctx.rng.shuffle([...DECK.cardIds]);
+      return freshHand(
+        emptyMatch(ctx.config, ctx.veiled === true),
+        dealFreshHand(0, order, ctx.fx),
+        null,
+      );
     },
 
     moves: {

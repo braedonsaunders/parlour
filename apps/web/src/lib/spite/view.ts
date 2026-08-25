@@ -1,6 +1,41 @@
-import type { GameSession, LegalMove } from '@parlour/engine';
-import type { SpiteRules, SpiteState } from '@parlour/game-spite';
-import type { SpiteModeId } from '@/lib/spite/modes';
+import type { LegalMove } from '@parlour/engine';
+import {
+  isWildCard,
+  orderSpiteHand,
+  payoffRemaining,
+  rankLabel,
+  spiteFace,
+  type SpiteState,
+} from '@parlour/game-spite';
+import { getSpiteMode, type SpiteModeId } from '@/lib/spite/modes';
+import type { SpiteSnapshot } from '@/lib/solo/SpiteTransport';
+
+/**
+ * Everything the Spite & Malice table draws, derived once.
+ *
+ * The board is busier than any other on the shelf — a payoff pile, four shared
+ * builds and four personal discards per seat — so the selection model is the
+ * important part: pick a card up, and the view names every place it can go.
+ * The screen renders that answer and never recomputes legality itself.
+ */
+
+/** Where a held card came from. Discard piles need their index. */
+export type SpiteSource =
+  | { kind: 'hand'; card: string }
+  | { kind: 'payoff'; card: string }
+  | { kind: 'discard'; card: string; pile: number };
+
+/** Where a held card may go. */
+export type SpiteTarget = { kind: 'centre'; pile: number } | { kind: 'discard'; pile: number };
+
+export interface SpiteCardView {
+  card: string;
+  /** The numeral the card shows: its own rank, or the one a played wild took. */
+  label: string;
+  wild: boolean;
+  /** For a played wild, the rank it was declared as. */
+  standsFor: number | null;
+}
 
 export interface SpiteSeatView {
   seat: number;
@@ -9,169 +44,169 @@ export interface SpiteSeatView {
   isLocal: boolean;
   isBot: boolean;
   isTurn: boolean;
-  handCount: number;
-  /** cards left on the payoff pile — the race is to empty this */
+  /** Cards still to shed — the whole race, and the only score that matters. */
   payoffLeft: number;
-  /** the face-up card on top of the payoff pile, or null when it is empty */
-  payoffTop: string | null;
-  /** top card of each personal discard pile, null where the pile is empty */
-  discardTops: readonly (string | null)[];
-  discardCounts: readonly number[];
+  payoffTop: SpiteCardView | null;
+  handCount: number;
+  /** Top card of each personal discard pile, plus how deep it is. */
+  discards: readonly { pile: number; top: SpiteCardView | null; count: number }[];
 }
 
 export interface SpiteCentreView {
-  index: number;
-  /** the card showing, or null on an empty build */
-  top: string | null;
-  /** the rank this pile will accept next; 1 is an ace on an empty pile */
-  nextRank: number;
+  pile: number;
+  top: SpiteCardView | null;
   count: number;
-}
-
-/** One legal build: this card onto that centre pile. */
-export interface SpiteBuildOption {
-  card: string;
-  pile: number;
-  rank: number;
-}
-
-/** One legal discard: this card onto that personal pile. */
-export interface SpiteDiscardOption {
-  card: string;
-  pile: number;
+  /** The rank this pile will accept next; 1 on an empty pile. */
+  needs: number;
+  needsLabel: string;
 }
 
 export interface SpiteTableView {
-  players: readonly SpiteSeatView[];
+  mode: SpiteModeId;
+  modeName: string;
   localSeat: number;
-  activeSeat: number | null;
+  seats: readonly SpiteSeatView[];
   centre: readonly SpiteCentreView[];
   stockCount: number;
-  hand: readonly string[];
-  builds: readonly SpiteBuildOption[];
-  discards: readonly SpiteDiscardOption[];
-  /** every card the local seat could move right now, from any source */
-  movableCards: readonly string[];
-  yourTurn: boolean;
-  /** true when the only thing left to do is end the turn with a discard */
-  mustDiscard: boolean;
-  matchOver: boolean;
-  won: boolean | null;
+  /** The local seat's hand, in presentation order. */
+  hand: readonly SpiteCardView[];
+  isLocalTurn: boolean;
+  /** Cards the local seat could pick up right now, from anywhere. */
+  liftable: readonly string[];
+  status: 'playing' | 'ended';
   winner: number | null;
-  mode: SpiteModeId;
-  rules: SpiteRules;
+  stageLabel: string;
 }
 
-export interface SpiteSnapshot {
-  mode: SpiteModeId;
-  players: readonly { seat: number; name: string; avatarId: string; isBot: boolean }[];
-  session: GameSession<SpiteState, SpiteRules>;
-  won: boolean | null;
+function cardView(card: string | undefined, state: SpiteState): SpiteCardView | null {
+  if (card === undefined) return null;
+  const face = spiteFace(card);
+  const wild = isWildCard(card);
+  const declared = state.wildRanks[card];
+  const standsFor = wild && typeof declared === 'number' ? declared : null;
+  return {
+    card,
+    // A wild that has been played reads as the rank it took, because that is
+    // what the pile now demands off it; one still in hand has no number at all.
+    label: wild ? (standsFor === null ? '' : String(standsFor)) : face.short || face.label,
+    wild,
+    standsFor,
+  };
 }
 
-function payloadOf(move: LegalMove): Record<string, unknown> {
-  return (move.payload as Record<string, unknown> | undefined) ?? {};
+/** Every card the local seat may pick up, derived from the legal-move list. */
+function liftableCards(legal: readonly LegalMove[]): string[] {
+  const out = new Set<string>();
+  for (const move of legal) {
+    const card = (move.payload as { card?: unknown } | undefined)?.card;
+    if (typeof card === 'string') out.add(card);
+  }
+  return [...out];
 }
 
-/** Rank as it reads on a card: 1 is an ace, 12 a queen. */
-export function rankLabel(rank: number): string {
-  if (rank === 1) return 'A';
-  if (rank === 11) return 'J';
-  if (rank === 12) return 'Q';
-  if (rank === 10) return '10';
-  return String(rank);
-}
-
-export function buildsForCard(
-  builds: readonly SpiteBuildOption[],
-  card: string,
-): SpiteBuildOption[] {
-  return builds.filter((option) => option.card === card);
-}
-
-export function discardsForCard(
-  discards: readonly SpiteDiscardOption[],
-  card: string,
-): SpiteDiscardOption[] {
-  return discards.filter((option) => option.card === card);
-}
-
-/**
- * Pure snapshot → render model for the Spite & Malice table. `legal` must be
- * the moves offered to the viewing seat; pass [] while others act.
- */
 export function spiteTableView(
   snapshot: SpiteSnapshot,
   legal: readonly LegalMove[],
   localSeat = 0,
 ): SpiteTableView {
-  const session = snapshot.session;
-  const state = session.state;
-  const playing = session.status === 'playing';
-  const yourTurn = playing && state.turn === localSeat;
-  const offered = yourTurn ? legal : [];
+  const state = snapshot.session.state;
+  const mode = getSpiteMode(snapshot.mode);
+  const isLocalTurn = snapshot.session.status === 'playing' && state.turn === localSeat;
 
-  const builds: SpiteBuildOption[] = offered
-    .filter((move) => move.id === 'build')
-    .map((move) => {
-      const payload = payloadOf(move);
-      return {
-        card: String(payload.card ?? ''),
-        pile: Number(payload.pile ?? 0),
-        rank: Number(payload.rank ?? 0),
-      };
-    })
-    .filter((option) => option.card.length > 0);
+  const seats: SpiteSeatView[] = snapshot.players.map((player) => ({
+    seat: player.seat,
+    name: player.name,
+    avatarId: player.avatarId,
+    isLocal: player.seat === localSeat,
+    isBot: player.isBot,
+    isTurn: state.turn === player.seat,
+    payoffLeft: payoffRemaining(state, player.seat),
+    payoffTop: cardView(state.payoffs[player.seat]?.[0], state),
+    handCount: state.hands[player.seat]?.length ?? 0,
+    discards: (state.discards[player.seat] ?? []).map((pile, index) => ({
+      pile: index,
+      top: cardView(pile[0], state),
+      count: pile.length,
+    })),
+  }));
 
-  const discards: SpiteDiscardOption[] = offered
-    .filter((move) => move.id === 'discard')
-    .map((move) => {
-      const payload = payloadOf(move);
-      return { card: String(payload.card ?? ''), pile: Number(payload.pile ?? 0) };
-    })
-    .filter((option) => option.card.length > 0);
+  const centre: SpiteCentreView[] = state.centre.map((pile, index) => ({
+    pile: index,
+    top: cardView(pile.cards[0], state),
+    count: pile.cards.length,
+    needs: pile.nextRank,
+    needsLabel: rankLabel(pile.nextRank),
+  }));
 
-  const players: SpiteSeatView[] = snapshot.players.map((player) => {
-    const seat = player.seat;
-    const payoff = state.payoffs[seat] ?? [];
-    const piles = state.discards[seat] ?? [];
-    return {
-      seat,
-      name: player.name,
-      avatarId: player.avatarId,
-      isLocal: seat === localSeat,
-      isBot: player.isBot,
-      isTurn: playing && state.turn === seat,
-      handCount: (state.hands[seat] ?? []).length,
-      payoffLeft: payoff.length,
-      // Index 0 is the top, and it is the one card of the pile anyone can see.
-      payoffTop: payoff[0] === undefined || payoff[0] === '??' ? null : payoff[0],
-      discardTops: piles.map((pile) => pile[0] ?? null),
-      discardCounts: piles.map((pile) => pile.length),
-    };
-  });
+  const hand = orderSpiteHand(state.hands[localSeat] ?? [], {})
+    .map((card) => cardView(card, state))
+    .filter((card): card is SpiteCardView => card !== null);
+
+  const leader = seats.reduce(
+    (best, seat) => (best === null || seat.payoffLeft < best.payoffLeft ? seat : best),
+    null as SpiteSeatView | null,
+  );
 
   return {
-    players,
-    localSeat,
-    activeSeat: playing ? state.turn : null,
-    centre: state.centre.map((pile, index) => ({
-      index,
-      top: pile.cards[0] ?? null,
-      nextRank: pile.nextRank,
-      count: pile.cards.length,
-    })),
-    stockCount: state.stock.length,
-    hand: (state.hands[localSeat] ?? []).filter((card) => card !== '??'),
-    builds,
-    discards,
-    movableCards: [...new Set([...builds, ...discards].map((option) => option.card))],
-    yourTurn,
-    mustDiscard: yourTurn && builds.length === 0 && discards.length > 0,
-    matchOver: session.status !== 'playing',
-    won: snapshot.won,
-    winner: state.winner,
     mode: snapshot.mode,
-    rules: state.rules,
+    modeName: mode.name,
+    localSeat,
+    seats,
+    centre,
+    stockCount: state.stock.length,
+    hand,
+    isLocalTurn,
+    liftable: isLocalTurn ? liftableCards(legal) : [],
+    status: snapshot.session.status === 'ended' ? 'ended' : 'playing',
+    winner: state.winner,
+    stageLabel:
+      snapshot.session.status === 'ended'
+        ? 'match over'
+        : `${leader ? `${leader.name} leads · ` : ''}${
+            seats.find((seat) => seat.isLocal)?.payoffLeft ?? 0
+          } to shed`,
   };
+}
+
+/**
+ * Where a held card may legally go.
+ *
+ * Derived from the same legal-move list the engine produced, so the table can
+ * never offer a destination the rules would refuse — and never hide one they
+ * would allow.
+ */
+export function targetsFor(
+  legal: readonly LegalMove[],
+  card: string | null,
+): readonly SpiteTarget[] {
+  if (card === null) return [];
+  const out: SpiteTarget[] = [];
+  for (const move of legal) {
+    const payload = move.payload as { card?: unknown; pile?: unknown } | undefined;
+    if (payload?.card !== card || typeof payload.pile !== 'number') continue;
+    if (move.id === 'build') out.push({ kind: 'centre', pile: payload.pile });
+    if (move.id === 'discard') out.push({ kind: 'discard', pile: payload.pile });
+  }
+  return out;
+}
+
+/** The move that plays `card` onto `target`, or null when there is none. */
+export function moveForTarget(
+  legal: readonly LegalMove[],
+  card: string,
+  target: SpiteTarget,
+): LegalMove | null {
+  const wanted = target.kind === 'centre' ? 'build' : 'discard';
+  return (
+    legal.find((move) => {
+      const payload = move.payload as { card?: unknown; pile?: unknown } | undefined;
+      return move.id === wanted && payload?.card === card && payload.pile === target.pile;
+    }) ?? null
+  );
+}
+
+export function isTarget(targets: readonly SpiteTarget[], target: SpiteTarget): boolean {
+  return targets.some(
+    (candidate) => candidate.kind === target.kind && candidate.pile === target.pile,
+  );
 }

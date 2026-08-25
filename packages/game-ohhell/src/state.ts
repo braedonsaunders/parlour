@@ -10,6 +10,13 @@ export type OhHellStage = 'trumping' | 'bidding' | 'playing' | 'over';
  * rewriting `rules.handSize` / `rules.dealer` before each round opens.
  */
 export interface OhHellState {
+  /**
+   * True when the hands are veil handles rather than faces.
+   *
+   * Following suit cannot be checked against handles, so it is audited after
+   * the round instead of enforced live — see apps/web/src/lib/multiplayer/veil.
+   */
+  veiled: boolean;
   rules: OhHellRules;
   seats: number;
   stage: OhHellStage;

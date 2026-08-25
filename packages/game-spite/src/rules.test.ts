@@ -1,18 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import { createFx, Fx, makeRng, sessionApply } from '@parlour/engine';
-import { QUEEN } from './cards';
+import { LAST_RANK } from './cards';
 import { spiteGame } from './game';
-import { defaults, card, fixture, joker, king } from './test-util';
+import { defaults, card, fixture, wild } from './test-util';
 
 describe('centre pile completion', () => {
   const buried = [card(10), card(11)];
-  const stockBefore = [card(2, 'blue'), card(3, 'green')];
+  const stockBefore = [card(2, 1), card(3, 2)];
 
   function ready() {
     return fixture({
       hands: [[card(12), card(5)], []],
       centre: [
-        { cards: [...buried], nextRank: QUEEN },
+        { cards: [...buried], nextRank: LAST_RANK },
         { cards: [], nextRank: 1 },
         { cards: [], nextRank: 1 },
         { cards: [], nextRank: 1 },
@@ -27,7 +27,7 @@ describe('centre pile completion', () => {
     const played = sessionApply(spiteGame, ready(), 0, 'build', {
       card: card(12),
       pile: 0,
-      rank: QUEEN,
+      rank: LAST_RANK,
     });
     expect(played.rejected).toBeUndefined();
     const state = played.session.state;
@@ -43,7 +43,7 @@ describe('centre pile completion', () => {
     const played = sessionApply(spiteGame, ready(), 0, 'build', {
       card: card(12),
       pile: 0,
-      rank: QUEEN,
+      rank: LAST_RANK,
     });
     const flights = played.fx.filter(
       (event) =>
@@ -59,13 +59,13 @@ describe('centre pile completion', () => {
     const played = sessionApply(spiteGame, ready(), 0, 'build', {
       card: card(12),
       pile: 0,
-      rank: QUEEN,
+      rank: LAST_RANK,
     });
     const state = played.session.state;
 
     const withAce = sessionApply(
       spiteGame,
-      { ...played.session, state: { ...state, hands: [[card(1), king()], []] } },
+      { ...played.session, state: { ...state, hands: [[card(1), wild()], []] } },
       0,
       'build',
       { card: card(1), pile: 0, rank: 1 },
@@ -75,13 +75,13 @@ describe('centre pile completion', () => {
 
     const withWild = sessionApply(
       spiteGame,
-      { ...played.session, state: { ...state, hands: [[king(), card(9)], []] } },
+      { ...played.session, state: { ...state, hands: [[wild(), card(9)], []] } },
       0,
       'build',
-      { card: king(), pile: 0, rank: 1 },
+      { card: wild(), pile: 0, rank: 1 },
     );
     expect(withWild.rejected).toBeUndefined();
-    expect(withWild.session.state.wildRanks[king()]).toBe(1);
+    expect(withWild.session.state.wildRanks[wild()]).toBe(1);
   });
 
   it('clears the retired pile’s wild claims along with its cards', () => {
@@ -90,17 +90,17 @@ describe('centre pile completion', () => {
     const opened = sessionApply(spiteGame, ready(), 0, 'build', {
       card: card(12),
       pile: 0,
-      rank: QUEEN,
+      rank: LAST_RANK,
     });
     const state = opened.session.state;
     const wildPiled = sessionApply(
       spiteGame,
-      { ...opened.session, state: { ...state, hands: [[king(), card(9)], []] } },
+      { ...opened.session, state: { ...state, hands: [[wild(), card(9)], []] } },
       0,
       'build',
-      { card: king(), pile: 0, rank: 1 },
+      { card: wild(), pile: 0, rank: 1 },
     );
-    expect(wildPiled.session.state.wildRanks[king()]).toBe(1);
+    expect(wildPiled.session.state.wildRanks[wild()]).toBe(1);
 
     const completed = sessionApply(
       spiteGame,
@@ -108,26 +108,26 @@ describe('centre pile completion', () => {
         ...wildPiled.session,
         state: {
           ...wildPiled.session.state,
-          hands: [[card(QUEEN)], []],
+          hands: [[card(LAST_RANK)], []],
           centre: wildPiled.session.state.centre.map((pile, index) =>
-            index === 0 ? { cards: [king()], nextRank: QUEEN } : pile,
+            index === 0 ? { cards: [wild()], nextRank: LAST_RANK } : pile,
           ),
         },
       },
       0,
       'build',
-      { card: card(QUEEN), pile: 0, rank: QUEEN },
+      { card: card(LAST_RANK), pile: 0, rank: LAST_RANK },
     );
     expect(completed.rejected).toBeUndefined();
     expect(completed.session.state.centre[0]).toEqual({ cards: [], nextRank: 1 });
-    expect(completed.session.state.wildRanks[king()]).toBeUndefined();
+    expect(completed.session.state.wildRanks[wild()]).toBeUndefined();
   });
 });
 
 describe('wild ranks are recorded, not inferred', () => {
   it('records what a wild stands for and demands exactly N+1 next', () => {
     const session = fixture({
-      hands: [[king(), card(3), card(2)], []],
+      hands: [[wild(), card(3), card(2)], []],
       centre: [
         { cards: [], nextRank: 1 },
         { cards: [], nextRank: 1 },
@@ -140,16 +140,16 @@ describe('wild ranks are recorded, not inferred', () => {
     });
 
     const played = sessionApply(spiteGame, session, 0, 'build', {
-      card: king(),
+      card: wild(),
       pile: 0,
       rank: 1,
     });
     expect(played.rejected).toBeUndefined();
-    expect(played.session.state.wildRanks[king()]).toBe(1);
+    expect(played.session.state.wildRanks[wild()]).toBe(1);
     expect(played.session.state.centre[0]).toMatchObject({ nextRank: 2 });
     expect(played.fx).toContainEqual({
       kind: 'spite.wild',
-      payload: { seat: 0, pile: 0, card: king(), rank: 1 },
+      payload: { seat: 0, pile: 0, card: wild(), rank: 1 },
     });
 
     // The two fits the fresh demand; the three does not.
@@ -175,7 +175,7 @@ describe('wild ranks are recorded, not inferred', () => {
     const rules = { ...defaults, jokersWild: true, kingsWild: false };
     const session = fixture(
       {
-        hands: [[joker(3), card(7)], []],
+        hands: [[wild(3), card(7)], []],
         payoffs: [[], []],
         stock: [],
         started: true,
@@ -183,29 +183,30 @@ describe('wild ranks are recorded, not inferred', () => {
       rules,
     );
     const played = sessionApply(spiteGame, session, 0, 'build', {
-      card: joker(3),
+      card: wild(3),
       pile: 1,
       rank: 1,
     });
     expect(played.rejected).toBeUndefined();
-    expect(played.session.state.wildRanks[joker(3)]).toBe(1);
+    expect(played.session.state.wildRanks[wild(3)]).toBe(1);
   });
 
   it('refuses a wild claiming a rank outside the build range', () => {
-    const session = fixture({ hands: [[king()], []], payoffs: [[], []], stock: [] });
+    const session = fixture({ hands: [[wild()], []], payoffs: [[], []], stock: [] });
     const rejected = sessionApply(spiteGame, session, 0, 'build', {
-      card: king(),
+      card: wild(),
       pile: 0,
-      rank: KING_RANK,
+      rank: OFF_LADDER_RANK,
     });
     expect(rejected.rejected?.code).toBe('bad-rank');
   });
 });
 
-const KING_RANK = 13;
+/** One past the top of the ladder: no wild may ever stand for it. */
+const OFF_LADDER_RANK = 13;
 
 describe('mid-turn refill', () => {
-  const deepStock = Array.from({ length: 12 }, (_, i) => card(i + 1, 'blue'));
+  const deepStock = Array.from({ length: 12 }, (_, i) => card(i + 1, 1));
 
   it('refills to five and keeps the turn when the hand empties', () => {
     const rules = { ...defaults, refillMidTurn: true };
@@ -285,9 +286,9 @@ describe('mid-turn refill', () => {
 
 describe('winning', () => {
   it('wins the instant the last payoff card lands, mid-turn, without a discard', () => {
-    const lastPayoff = card(1, 'blue');
+    const lastPayoff = card(1, 1);
     const session = fixture({
-      hands: [[card(2, 'green'), card(8)], []],
+      hands: [[card(2, 2), card(8)], []],
       payoffs: [[lastPayoff], [card(6), card(7)]],
       stock: [],
       started: true,
@@ -388,7 +389,7 @@ describe('dry-stock gather', () => {
         [[], []],
       ],
       centre: [
-        { cards: [card(3, 'blue'), card(2, 'blue'), card(1, 'blue')], nextRank: 4 },
+        { cards: [card(3, 1), card(2, 1), card(1, 1)], nextRank: 4 },
         { cards: [], nextRank: 1 },
         { cards: [], nextRank: 1 },
         { cards: [], nextRank: 1 },
@@ -400,7 +401,7 @@ describe('dry-stock gather', () => {
 
     const { state: refilled, fx } = applyDrawUp(state, 1, 'start');
     expect(refilled.centre).toEqual(Array.from({ length: 4 }, () => ({ cards: [], nextRank: 1 })));
-    for (const swept of [card(3, 'blue'), card(2, 'blue'), card(1, 'blue')]) {
+    for (const swept of [card(3, 1), card(2, 1), card(1, 1)]) {
       expect(refilled.stock.concat(refilled.hands[1] ?? [])).toContain(swept);
     }
     expect(refilled.hands[1]?.length).toBeGreaterThan(0);

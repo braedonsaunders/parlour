@@ -2,6 +2,8 @@
 
 import {
   isActingSeat,
+  resolveVeiledState,
+  stateContainsCardId,
   type CardRecycle,
   type FxEvent,
   type GameSession,
@@ -10,12 +12,6 @@ import {
   type SeatId,
 } from '@parlour/engine';
 import {
-  roomGame,
-  type MultiplayerGameId,
-  type MultiplayerGameSession,
-  type RoomAuthority,
-} from '@/lib/games/roomRegistry';
-import {
   P2PTransport,
   type AppliedPacket,
   type PresenceEvent,
@@ -23,9 +19,10 @@ import {
   type RoomSecurity,
   type RoomSettings,
 } from '@/lib/multiplayer';
-import { resolveVeiledState, stateContainsCardId } from '@parlour/engine';
 import {
   auditSummary,
+  layerStream,
+  loadRoundMaterial,
   recoveryPolicyFor,
   VeilRoom,
   VeilSession,
@@ -36,8 +33,23 @@ import { botTurnKey } from './botSeats';
 import { NostrSignaling, type RoomAnnouncement } from '@/lib/multiplayer/NostrSignaling';
 import { createDealNonce, dealCommitment, DealSeedRound } from '@/lib/multiplayer/dealSeed';
 import { validateRoomCode } from '@/lib/rooms/code';
+import { hasValidSeatCount } from '@/lib/rooms/seatRange';
+import type { MultiplayerGameId } from '@/lib/rooms/gameIds';
+import {
+  roomGame,
+  seatRefusal,
+  type MultiplayerGameSession,
+  type RoomGamePack,
+  type RoomRuntime,
+  type SessionAuthority,
+} from '@/lib/rooms/gameRegistry';
 
-export type { MultiplayerGameId, MultiplayerGameSession } from '@/lib/games/roomRegistry';
+export type { MultiplayerGameId } from '@/lib/rooms/gameIds';
+export type {
+  MultiplayerGameSession,
+  RoomGamePack,
+  SessionAuthority,
+} from '@/lib/rooms/gameRegistry';
 
 /** What the room badge shows about privacy — see lib/multiplayer/veil. */
 export type MultiplayerSecurity = {
@@ -91,6 +103,8 @@ type SessionDependencies = {
   seed?: number;
   heartbeatIntervalMs?: number;
   heartbeatTimeoutMs?: number;
+  /** how long a veiled round holds a dropped seat open before recovering it */
+  reconnectGraceMs?: number;
 };
 
 type Listener = () => void;
@@ -104,18 +118,23 @@ type Listener = () => void;
  */
 const DEAL_ROUND_TIMEOUT_MS = 10_000;
 
-type SessionAuthority = RoomAuthority;
+/**
+ * How long a veiled round holds a seat open for a player who dropped.
+ *
+ * Long enough to cover a phone changing networks, a locked screen or a reload,
+ * because the alternative to waiting is opening their hand to the rest of the
+ * table. Finite, because a round cannot wait forever on somebody who has gone.
+ */
+const RECONNECT_GRACE_MS = 45_000;
 
+/**
+ * Opening a room takes no privacy tier, because nobody is asked for one.
+ * {@link tierFor} derives it from the game the room is for.
+ */
 type CreateRoomOptions = {
   seats: number;
   gameId?: MultiplayerGameId;
   config?: RuleValues;
-  /**
-   * `open` (the default) is fast and gives every peer the whole game state.
-   * `veil` hides hands from every peer at the cost of a shuffle ceremony and a
-   * real disconnect trade-off.
-   */
-  security?: RoomSecurity;
 };
 
 function securityFor(
@@ -143,14 +162,26 @@ export class MultiplayerRoomSession {
   private veil: { session: VeilSession; room: VeilRoom } | null = null;
   /** Ordered DataChannel delivery still needs ordered async crypto completion. */
   private veilInbox: Promise<void> = Promise.resolve();
+  /**
+   * The in-flight veil attachment.
+   *
+   * Attaching became asynchronous when a seat started restoring its material
+   * instead of minting it, so dealing has to wait for it: `start` can otherwise
+   * be pressed while the room's own key is still being read back.
+   */
+  private veilAttach: Promise<void> | null = null;
   private seed = 0;
   /** This seat's shuffle share, minted once per room and revealed at the deal. */
   private dealNonce: string | null = null;
   private dealRound = new DealSeedRound();
   private sequence = 0;
   private recycleActionPending = false;
+  /** a veiled redeal ceremony already under way, so it cannot start twice */
+  private redealPending = false;
   /** bot turns already scheduled, keyed by log position, so none fires twice */
   private readonly scheduledBotTurns = new Set<string>();
+  /** seats being held open for a player who dropped, keyed by seat */
+  private readonly pendingReturns = new Map<number, ReturnType<typeof setTimeout>>();
   private snapshot: MultiplayerRoomSnapshot = {
     room: null,
     gameId: null,
@@ -180,12 +211,13 @@ export class MultiplayerRoomSession {
   };
 
   async create(options: CreateRoomOptions): Promise<RoomHandle> {
-    const gameId = options.gameId ?? 'blitz';
-    const settings = roomGame(gameId).resolveSettings({
-      gameId,
+    // Seat and security validation both live in resolveRoomSettings now, so a
+    // room this client creates goes through exactly the checks a room it joins
+    // does. The two used to be separate chains and could disagree.
+    const settings = resolveRoomSettings({
+      gameId: options.gameId ?? 'blitz',
       seats: options.seats,
       config: options.config ?? {},
-      security: options.security ?? 'open',
     });
     this.prepare(settings);
     try {
@@ -197,7 +229,8 @@ export class MultiplayerRoomSession {
         connection: 'connected',
         isHost: true,
       });
-      if (settings.security === 'veil') this.attachVeil(settings, this.seed);
+      if (settings.security === 'veil')
+        this.veilAttach = this.attachVeil(settings, this.seed).catch(() => undefined);
       this.commitDealShare();
       return room;
     } catch (error) {
@@ -225,9 +258,7 @@ export class MultiplayerRoomSession {
     let announcement: RoomAnnouncement | null = null;
     try {
       announcement = await signaling.resolve(verdict.code, expectedHost);
-      const settings = roomGame(announcement.settings.gameId).resolveSettings(
-        announcement.settings,
-      );
+      const settings = resolveRoomSettings(announcement.settings);
       this.prepare(settings, signaling);
       const room = await this.transport!.join(verdict.code, announcement, expectedHost);
       const assignedSeat = this.transport!.seatForPeerId(room.peerId);
@@ -254,7 +285,10 @@ export class MultiplayerRoomSession {
         seats: joinedSeats.sort((a, b) => a.seat - b.seat),
       });
       if (settings.security === 'veil' && assignedSeat !== null && !this.veil) {
-        this.attachVeil(settings, this.authority?.getSession().seed ?? this.seed);
+        this.veilAttach = this.attachVeil(
+          settings,
+          this.authority?.getSession().seed ?? this.seed,
+        ).catch(() => undefined);
       }
       return room;
     } catch (error) {
@@ -307,11 +341,7 @@ export class MultiplayerRoomSession {
 
     const seed = await this.dealRound.resolve(code, seats);
     this.seed = seed;
-    const runtime = roomGame(settings.gameId).createRuntime({
-      settings,
-      seed,
-      onSeatBot: (seat, bot) => this.acceptSeatBot(seat, bot),
-    });
+    const runtime = createRoomRuntime(settings, seed, (seat, bot) => this.acceptSeatBot(seat, bot));
     this.authority.importSnapshot(runtime.authority.exportSnapshot());
     this.transport.publishSnapshot();
     this.update({
@@ -403,10 +433,12 @@ export class MultiplayerRoomSession {
    * happen at room creation: the table has to be full first.
    */
   private async dealVeiled(): Promise<void> {
+    // The room may still be reading its own material back off the shelf.
+    await this.veilAttach;
     const veil = this.veil;
     const settings = this.snapshot.settings;
     if (!veil || !settings || !this.transport) throw new Error('the veiled room is not ready');
-    const support = roomGame(settings.gameId).veilSupport();
+    const support = packFor(settings).veilSupport();
     if (!support) throw new Error(`${settings.gameId} cannot run a veiled room`);
 
     await waitForVeilKeys(veil.room);
@@ -422,12 +454,12 @@ export class MultiplayerRoomSession {
     }
     const plan = veil.session.dealPlan(support, opened);
 
-    const runtime = roomGame(settings.gameId).createRuntime({
+    const runtime = createRoomRuntime(
       settings,
-      seed: this.seed,
-      onSeatBot: (seat, bot) => this.acceptSeatBot(seat, bot),
-      deckOrder: plan.deckOrder,
-    });
+      this.seed,
+      (seat, bot) => this.acceptSeatBot(seat, bot),
+      plan.deckOrder,
+    );
     this.authority!.importSnapshot(runtime.authority.exportSnapshot());
     this.transport.publishSnapshot();
     this.update({
@@ -443,17 +475,24 @@ export class MultiplayerRoomSession {
   }
 
   /** Builds this seat's Veil state and points it at the mesh. */
-  private attachVeil(settings: RoomSettings, seed: number): void {
+  private async attachVeil(settings: RoomSettings, seed: number): Promise<void> {
     const transport = this.transport;
     if (!transport) return;
     this.seed = seed;
+    const roomCode = this.snapshot.room?.code ?? 'ROOM';
+    // Restored if this seat has been in this room before, minted if not. This
+    // one line is what turns a disconnect into something a player can walk back
+    // from: the same key signs, and the same layers derive.
+    const material = await loadRoundMaterial(roomCode, this.profile.profileId);
     const session = new VeilSession({
-      roomCode: this.snapshot.room?.code ?? 'ROOM',
+      roomCode,
       seed,
       seat: this.snapshot.localSeat ?? 0,
       seats: settings.seats,
       gameId: settings.gameId,
       config: settings.config,
+      identity: material.identity,
+      layerRandom: (epoch) => layerStream(material.masterSeed, roomCode, epoch),
     });
     const room = new VeilRoom(
       session,
@@ -463,6 +502,7 @@ export class MultiplayerRoomSession {
         seatForPeer: (peerId) => transport.seatForPeerId(peerId),
       },
       settings.seats,
+      (restored) => this.onVeilResume(restored),
     );
     transport.onVeil((peerId, message) => {
       this.veilInbox = this.veilInbox
@@ -479,8 +519,17 @@ export class MultiplayerRoomSession {
           });
         });
     });
+    // Loading the material was the first await in this method, so the room may
+    // have been left or replaced while it ran. Announcing into a closed
+    // transport would throw where nobody is waiting to catch it.
+    if (this.transport !== transport) return;
     this.veil = { session, room };
-    void room.announce();
+    await room.announce();
+    if (this.transport !== transport) return;
+    // Ask the table to replay the round. A room that has not dealt yet has
+    // nothing to send and simply does not answer, so this costs a lobby
+    // nothing and is the whole story for a seat that is coming back.
+    room.requestCatchUp();
   }
 
   private publishCeremonyProgress(): void {
@@ -558,14 +607,80 @@ export class MultiplayerRoomSession {
 
   /** Public cards that this move must exchange for a fresh hidden stock. */
   private recyclableCards(move: string): readonly string[] | null {
-    if (!this.veil || !this.authority || !this.snapshot.settings) return null;
-    return roomGame(this.snapshot.settings.gameId).recyclableCards(
-      this.authority.getSession().state,
-      move,
-    );
+    const settings = this.snapshot.settings;
+    if (!this.veil || !this.authority || !settings) return null;
+    return packFor(settings).recyclableStock(this.authority.getSession().state, move);
   }
 
   /** Runs one new epoch and returns the unpaired exchange the engine logs. */
+  /**
+   * Deals a veiled game's next hand, once it says it is waiting for one.
+   *
+   * A match that spans several deals needs a ceremony per deal, and an open
+   * room simply deals itself the next hand from the session rng — which under
+   * Veil would hand every seat a readable deck halfway through a private match.
+   * So the game says it is waiting — `pack.redealPending` — and the host
+   * shuffles a fresh epoch and injects the move with the deck it produced.
+   *
+   * Host-only, because injection is: two peers shuffling at once would open two
+   * epochs for the same hand and neither would be the one that was dealt.
+   */
+  private maybeDealVeiledHand(): void {
+    if (!this.snapshot.isHost || !this.veil || !this.authority || this.redealPending) return;
+    const settings = this.snapshot.settings;
+    if (!settings) return;
+    const pack = roomGame(settings.gameId);
+    const move = pack.redealMove;
+    if (!move || !pack.redealPending(this.authority.getSession().state)) return;
+
+    this.redealPending = true;
+    void this.shuffleNextHand()
+      .then((deckOrder) => this.inject(move, { deckOrder }))
+      .catch((error: unknown) => {
+        this.update({
+          error: error instanceof Error ? error.message : 'The next hand could not be shuffled',
+        });
+      })
+      .finally(() => {
+        this.redealPending = false;
+      });
+  }
+
+  /**
+   * Runs a whole shuffle ceremony for the next hand and returns its deck.
+   *
+   * The same shape as the opening deal: open an epoch over the deck, let every
+   * connected seat lay a layer, turn the game's setup cards face up, and read
+   * the order off the epoch. The handles are numbered from where the last epoch
+   * stopped, so a second hand can never reissue a card the first one spent.
+   */
+  private async shuffleNextHand(): Promise<readonly string[]> {
+    const veil = this.veil;
+    const settings = this.snapshot.settings;
+    if (!veil || !settings) throw new Error('this room is not running Veil');
+    const support = roomGame(settings.gameId).veilSupport();
+    if (!support) throw new Error(`${settings.gameId} cannot run a veiled room`);
+
+    const epoch = (veil.session.liveEpochs().at(-1) ?? -1) + 1;
+    const participants = this.snapshot.seats
+      .filter((seat) => seat.connected && !seat.bot)
+      .map((seat) => seat.seat)
+      .sort((left, right) => left - right);
+    if (participants.length === 0) throw new Error('no connected seat can shuffle the next hand');
+
+    await veil.room.startRecycle(epoch, support.deck(settings.config).cardIds, participants);
+    await waitForCeremony(veil.session, epoch, participants.length, () =>
+      this.publishCeremonyProgress(),
+    );
+
+    const from = veil.session.publicSetupPositions(support, 0);
+    const opened: string[] = [];
+    for (let step = 0; step < 8 && !veil.session.publicSetupSatisfied(support, opened); step++) {
+      opened.push(await veil.room.open(epoch, from + step, 'public'));
+    }
+    return veil.session.redealPlan(epoch, support, opened).deckOrder;
+  }
+
   private async reveil(cards: readonly string[]): Promise<CardRecycle> {
     const veil = this.veil;
     if (!veil) throw new Error('this room is not running Veil');
@@ -659,6 +774,77 @@ export class MultiplayerRoomSession {
    * has no honest threshold — two seats — the round pauses instead, and the
    * message says exactly why rather than blaming the network.
    */
+  /**
+   * Holds a seat open for a player who dropped, and only recovers it if they
+   * stay gone.
+   *
+   * The order matters more than the delay. Recovery rebuilds a seat's layer out
+   * of other people's shares, which means whoever holds them can read every
+   * card that seat was dealt — the protocol reports it as the privacy loss it
+   * is. A player who simply reconnects rebuilds that same layer themselves, out
+   * of material nobody else ever had. So waiting is not politeness, it is the
+   * difference between a round that stays private and one that does not.
+   */
+  private awaitReturnThenRecover(seat: number): void {
+    if (this.pendingReturns.has(seat)) return;
+    // Marked gone now, recovered later. A seat only offers its share of a
+    // missing layer for a seat it agrees has gone, so if each peer waited out
+    // its own hold before agreeing, whoever asked first would be asking peers
+    // that had not noticed yet and would collect nothing. Noticing is driven by
+    // presence, which every peer sees; the hold only delays acting on it.
+    this.veil?.room.markSeatLost(seat);
+    this.update({
+      security: {
+        ...this.snapshot.security,
+        paused: `Seat ${seat + 1} dropped. Waiting for them to come back…`,
+      },
+    });
+    const timer = setTimeout(() => {
+      this.pendingReturns.delete(seat);
+      void this.recoverLostSeat(seat);
+    }, this.dependencies.reconnectGraceMs ?? RECONNECT_GRACE_MS);
+    this.pendingReturns.set(seat, timer);
+  }
+
+  /** A seat came back before the room gave up on it. */
+  private cancelPendingReturn(seat: number): void {
+    const timer = this.pendingReturns.get(seat);
+    if (timer === undefined) return;
+    clearTimeout(timer);
+    this.pendingReturns.delete(seat);
+    this.veil?.room.markSeatPresent(seat);
+    // Their layer came back with them, so nothing was opened and the round
+    // simply continues.
+    if (this.snapshot.security.paused?.includes(`Seat ${seat + 1}`)) {
+      this.update({ security: { ...this.snapshot.security, paused: null } });
+      this.driveBotSeats();
+    }
+  }
+
+  /**
+   * What this seat does when the table replays the round to it.
+   *
+   * `restored` false means the material this browser needed is gone — cleared
+   * storage, a different device — so it cannot rebuild the layers it laid. It
+   * says so instead of playing on with a layer that is not the one the
+   * transcript accepted, and the table recovers the seat the older way.
+   */
+  private onVeilResume(restored: boolean): void {
+    if (!restored) {
+      this.update({
+        error:
+          'Your shuffle layers could not be rebuilt on this device, so the table has to reopen ' +
+          'your cards to continue. The round is no longer private for this seat.',
+      });
+      return;
+    }
+    this.update({
+      error: null,
+      security: { ...this.snapshot.security, paused: null },
+    });
+    void this.openMyHandles();
+  }
+
   private async recoverLostSeat(seat: number): Promise<void> {
     const veil = this.veil;
     if (!veil || seat === this.snapshot.localSeat) return;
@@ -709,9 +895,11 @@ export class MultiplayerRoomSession {
       ? resolveVeiledState(session.state, this.veil.session.knownFaces())
       : session.state;
 
-    const turns = roomGame(this.snapshot.settings.gameId).botTurns(session, view, botSeats);
+    // The pack owns the cast back to its own (State, Config). This used to be
+    // three `as never`s here, which erased the very types that make it safe.
+    const turns = packFor(this.snapshot.settings).botTurns({ session, view, botSeats });
     for (const turn of turns) {
-      const key = botTurnKey(session as never, turn.seat);
+      const key = botTurnKey(session, turn.seat);
       if (this.scheduledBotTurns.has(key)) continue;
       this.scheduledBotTurns.add(key);
       setTimeout(() => void this.submitBotTurn(key, turn.seat, turn.move), turn.thinkMs);
@@ -817,11 +1005,7 @@ export class MultiplayerRoomSession {
     if (this.transport) throw new Error('this session already has an active room');
     const seed = normalizeSeed(this.dependencies.seed ?? randomSeed());
     this.seed = seed;
-    const runtime = roomGame(settings.gameId).createRuntime({
-      settings,
-      seed,
-      onSeatBot: (seat, bot) => this.acceptSeatBot(seat, bot),
-    });
+    const runtime = createRoomRuntime(settings, seed, (seat, bot) => this.acceptSeatBot(seat, bot));
     this.authority = runtime.authority;
     this.transport = new P2PTransport({
       authority: this.authority,
@@ -895,6 +1079,9 @@ export class MultiplayerRoomSession {
     } else {
       this.driveBotSeats();
     }
+    // A hand that just settled may leave a veiled match waiting for its next
+    // deck. Nothing else notices, because dealing is the room's job here.
+    this.maybeDealVeiledHand();
   }
 
   private acceptPresence(presence: PresenceEvent): void {
@@ -920,6 +1107,7 @@ export class MultiplayerRoomSession {
     if (presence.kind === 'peer.joined' || presence.kind === 'seat.reclaimed') {
       const isLocal = presence.peerId === this.snapshot.room?.peerId;
       this.veil?.room.markSeatPresent(presence.seat);
+      this.cancelPendingReturn(presence.seat);
       const existing = this.snapshot.seats.filter((seat) => seat.seat !== presence.seat);
       const joined: MultiplayerSeat = isLocal
         ? { ...this.profile, seat: presence.seat, connected: true, bot: false }
@@ -958,7 +1146,10 @@ export class MultiplayerRoomSession {
         this.snapshot.localSeat !== null &&
         this.snapshot.room
       ) {
-        this.attachVeil(this.snapshot.settings, this.authority?.getSession().seed ?? this.seed);
+        this.veilAttach = this.attachVeil(
+          this.snapshot.settings,
+          this.authority?.getSession().seed ?? this.seed,
+        ).catch(() => undefined);
       }
       return;
     }
@@ -969,8 +1160,10 @@ export class MultiplayerRoomSession {
         ),
       });
       // A veiled room cannot keep dealing while a departed seat's layer is
-      // missing, so ask the room to rebuild it — or say plainly that it cannot.
-      if (this.veil) void this.recoverLostSeat(presence.seat);
+      // missing. Wait for them first: a player who comes back rebuilds their
+      // own layer and nobody's hand is opened, which recovery cannot say.
+      // Recovery is what happens when they do not come back.
+      if (this.veil) this.awaitReturnThenRecover(presence.seat);
       else this.driveBotSeats();
     }
   }
@@ -1079,6 +1272,18 @@ function stateHolds(state: unknown, handle: string): boolean {
 }
 
 /**
+ * The pack a room's settings name.
+ *
+ * This used to end in `return createBlitzDef()`. A room announcement arrives
+ * over the network from a peer that may be running a different build, so an
+ * unrecognised id is exactly the case that must fail — loading some other
+ * game's rules for it is the one outcome worse than refusing the room.
+ */
+function packFor(settings: RoomSettings): RoomGamePack {
+  return roomGame(settings.gameId);
+}
+
+/**
  * Waits for the ceremony to reach `laid` layers. Peers publish their layers
  * over the mesh, so the host has to let those land before laying the next one.
  */
@@ -1103,4 +1308,45 @@ async function waitForVeilKeys(room: VeilRoom): Promise<void> {
     await new Promise((resolve) => setTimeout(resolve, 50));
   }
   throw new Error('the shuffle ceremony stalled — a seat never published its key');
+}
+
+/**
+ * The strongest tier a game can honestly run — derived, never requested.
+ *
+ * Nobody chooses this. A pack that ships a veil block and can actually run it
+ * hides hands, so its rooms do; anything else plays the open tier with the
+ * collaborative deal, and the badge says which is in force. Deriving it from
+ * the game rather than reading it off the announcement also means a joining
+ * peer computes the same answer as the host from the same game id, so a forged
+ * announcement cannot talk a room down into the open tier.
+ */
+function tierFor(pack: RoomGamePack): RoomSecurity {
+  return pack.veilSupport() && !pack.veilRefusal ? 'veil' : 'open';
+}
+
+/**
+ * Canonicalises a room's settings, or refuses them.
+ *
+ * The nine-branch chain this replaces restated each pack's config schema, seat
+ * rule and Veil stance inline. The registry owns all three now, so this is the
+ * policy that applies to every game rather than nine copies of it.
+ */
+function resolveRoomSettings(settings: RoomSettings): RoomSettings {
+  const pack = roomGame(settings.gameId);
+  if (!hasValidSeatCount(pack.id, settings.seats)) throw new Error(seatRefusal(pack));
+  return {
+    gameId: pack.id,
+    seats: settings.seats,
+    config: pack.resolveConfig(settings.config),
+    security: tierFor(pack),
+  };
+}
+
+function createRoomRuntime(
+  settings: RoomSettings,
+  seed: number,
+  onSeatBot: (seat: number, bot: boolean) => void,
+  deckOrder?: readonly string[],
+): RoomRuntime {
+  return roomGame(settings.gameId).createRuntime({ settings, seed, onSeatBot, deckOrder });
 }

@@ -1,325 +1,325 @@
 'use client';
 
-import { useRef, type CSSProperties } from 'react';
+import { useRef } from 'react';
 import type { FxEvent } from '@parlour/engine';
-import { ohhellHowToPlay } from '@parlour/game-ohhell';
-import { useMatchTension } from '@/lib/audio/tension';
-import { OHHELL_MATCH_PACE_MS } from '@/lib/ohhell/modes';
+import { PlayingCard } from '@/components/table/PlayingCard';
+import { TableMenu } from '@/components/table/TableMenu';
+import { HandRail, HandRailCard } from '@/components/table/HandRail';
+import { AvatarBadge } from '@/components/AvatarBadge';
+import { OHHELL_SFX_PACK } from '@/lib/audio/sfx';
+import { useTableAudio } from '../fx-animation';
 import {
-  SUIT_GLYPHS,
-  cardBadge,
-  type OhHellSeatView,
-  type OhHellTableView,
-} from '@/lib/ohhell/view';
-import { useMusicMood } from '@/stores/audio';
-import { useProfileStore } from '@/stores/profile';
-import { useDealPresentation } from '@/lib/table/deal-presentation';
-import { HandRail, HandRailCard } from '../HandRail';
-import { PlayingCard } from '../PlayingCard';
-import { TableMenu } from '../TableMenu';
-import {
-  TableActionRail,
+  OpponentFan,
+  SeatNameplate,
   TableErrorScreen,
-  TableFxLayer,
   TableHud,
   TableLoadingScreen,
   TablePlayfield,
   TableShell,
   TableTitlePill,
-  dealStateAttr,
   useGameTextSurface,
   useTableMenu,
-} from '../shell';
-import { AvatarBadge } from '@/components/AvatarBadge';
+} from '@/components/table/shell';
+import type { OhHellTableView } from '@/lib/ohhell/view';
 import styles from '@/styles/ohhell.module.css';
 
-export type OhHellTableScreenProps = {
+export interface OhHellTableScreenProps {
   view: OhHellTableView | null;
   fx: readonly FxEvent[];
-  fxKey: string | number;
+  fxKey: number | string;
   busy?: boolean;
   error?: string | null;
   onBid?: (bid: number) => void;
-  onPlay?: (card: string) => void;
   onChooseTrump?: (suit: string) => void;
-  /** Fired only after the player confirms quitting from the shared table menu. */
+  onPlay?: (card: string) => void;
+  onNextRound?: () => void;
   onQuit?: () => void;
+}
+
+const SUIT_GLYPH: Record<string, string> = {
+  spades: '♠',
+  hearts: '♥',
+  diamonds: '♦',
+  clubs: '♣',
 };
 
-export function OhHellTableScreen(props: OhHellTableScreenProps) {
-  const { view, error } = props;
+export function OhHellTableScreen({
+  view,
+  fx,
+  fxKey,
+  busy = false,
+  error = null,
+  onBid,
+  onChooseTrump,
+  onPlay,
+  onNextRound,
+  onQuit,
+}: OhHellTableScreenProps) {
   const rootRef = useRef<HTMLElement>(null);
-  const menu = useTableMenu(props.onQuit);
-  const reducedMotion = useProfileStore((state) => state.settings.reducedMotion);
-  const deal = useDealPresentation(props.fx, props.fxKey, { reduced: reducedMotion });
+  const menu = useTableMenu(onQuit ?? (() => undefined));
+  useTableAudio(fx, fxKey, OHHELL_SFX_PACK.id);
 
-  const tense = useMatchTension({
-    expectedMs: OHHELL_MATCH_PACE_MS,
-    running: Boolean(view) && view?.activeSeat !== null,
+  useGameTextSurface(() => {
+    if (error) return { game: 'ohhell', status: 'error', error };
+    if (!view) return { game: 'ohhell', status: 'loading', error: null };
+    return {
+      game: 'ohhell',
+      status: view.matchOver ? 'ended' : 'playing',
+      round: view.round,
+      rounds: view.rounds,
+      handSize: view.handSize,
+      stage: view.stage,
+      trump: view.trumpSuit,
+      bidTotal: view.bidTotal,
+      tricksAvailable: view.handSize,
+      decision: view.decision,
+      hand: [...view.hand],
+      trick: view.trick.map((play) => `${play.seat}:${play.card}`),
+      seats: view.seats.map((seat) => ({
+        seat: seat.seat,
+        name: seat.name,
+        bid: seat.bid,
+        tricks: seat.tricksWon,
+        score: seat.score,
+        standing: seat.standing,
+        dealer: seat.isDealer,
+      })),
+      error: null,
+    };
   });
-  useMusicMood(tense ? 'tense' : null);
 
-  useGameTextSurface(() => ({
-    game: 'ohhell',
-    status: error ? 'error' : view ? (deal.dealing ? 'dealing' : 'ready') : 'loading',
-    error,
-  }));
+  if (error) {
+    return <TableErrorScreen headline="The Oh Hell table lost the thread." message={error} />;
+  }
+  if (!view) return <TableLoadingScreen copy="Turning a card for trump…" />;
 
-  if (error) return <TableErrorScreen headline="The table lost the thread." message={error} />;
-  if (!view) return <TableLoadingScreen copy="Cutting for the deal…" />;
-
-  const others = view.players.filter((player) => player.seat !== view.localSeat);
-  const local = view.players.find((player) => player.seat === view.localSeat);
-  const legal = new Set(view.legalCards);
+  const local = view.seats.find((seat) => seat.isLocal) ?? null;
+  const others = view.seats.filter((seat) => !seat.isLocal);
+  const playable = new Set(view.playable);
 
   return (
-    <TableShell rootRef={rootRef} className={styles.screen} dealState={dealStateAttr(deal)}>
+    <TableShell rootRef={rootRef} className={styles.screen}>
       <TableHud onOpenMenu={menu.open}>
-        <TableTitlePill eyebrow="Oh Hell" status={view.stageLabel}>
-          <span className={styles.hudCluster}>
-            <span className={styles.hudStat}>
-              <small>Round</small>
-              <strong>
-                {view.roundNo}/{view.totalRounds}
-              </strong>
-            </span>
-            <span className={styles.hudStat}>
-              <small>Cards</small>
-              <strong>{view.handSize}</strong>
-            </span>
-            <span className={styles.hudStat}>
-              <small>Trump</small>
-              <strong className={styles.trumpGlyph} data-suit={view.trumpSuit ?? 'none'}>
-                {view.trumpSuit ? (SUIT_GLYPHS[view.trumpSuit] ?? '?') : 'none'}
-              </strong>
-            </span>
+        <TableTitlePill eyebrow="Oh Hell!" status={view.stageLabel}>
+          <span className={styles.contract} data-testid="ohhell-contract">
+            bid <b>{view.bidTotal}</b> of <b>{view.handSize}</b>
+            {view.bidTotal === view.handSize ? (
+              <em className={styles.evenWarning}> · nobody is safe</em>
+            ) : null}
           </span>
         </TableTitlePill>
       </TableHud>
 
-      <TablePlayfield
-        label="Oh Hell table"
-        seatCount={view.players.length}
-        feltMark={
-          <span className={styles.feltMark}>
-            {view.trumpSuit ? SUIT_GLYPHS[view.trumpSuit] : '♠'}
-          </span>
-        }
-      >
-        <div className={styles.seatRing}>
-          {others.map((player, index) => (
-            <OpponentSeat key={player.seat} player={player} slot={index} of={others.length} />
-          ))}
-        </div>
+      <TablePlayfield label="Oh Hell table" feltMark="O" className={styles.playfield}>
+        <div className={styles.board} data-testid="ohhell-board">
+          <ol className={styles.seats}>
+            {others.map((seat) => (
+              <li
+                key={seat.seat}
+                className={styles.seat}
+                data-active={seat.seat === view.activeSeat || undefined}
+              >
+                <OpponentFan
+                  count={seat.handCount}
+                  max={6}
+                  spread={22}
+                  renderCard={({ rotation }) => (
+                    <PlayingCard faceDown compact rotation={rotation} />
+                  )}
+                />
+                <AvatarBadge avatarId={seat.avatarId} size="clamp(2.6rem, 4.4vw, 3.6rem)" />
+                <SeatNameplate name={seat.name} isBot={seat.isBot} />
+                <ScorePips seat={seat} handSize={view.handSize} />
+              </li>
+            ))}
+          </ol>
 
-        <div className={styles.centre}>
-          <div className={styles.trickZone} aria-label="Current trick">
-            {view.trick.length === 0 ? (
-              <span className={styles.trickEmpty}>
-                {view.stage === 'bidding' ? 'Everyone bids first' : 'Lead a card'}
-              </span>
-            ) : (
-              view.trick.map((play) => (
-                <span key={play.card} className={styles.trickCard} data-flight-target={play.card}>
-                  <PlayingCard card={play.card} compact />
-                  <small>{view.players[play.seat]?.name ?? `Seat ${play.seat + 1}`}</small>
+          <div className={styles.centre}>
+            <div className={styles.trump} data-testid="ohhell-trump">
+              {view.trumpCard ? (
+                <PlayingCard card={view.trumpCard} compact />
+              ) : (
+                <span className={styles.noTrump} aria-label="No trump this round">
+                  no
+                  <br />
+                  trump
                 </span>
-              ))
-            )}
-          </div>
-          {view.trumpCard && (
-            <div className={styles.trumpCard}>
-              <small>Turned</small>
-              <PlayingCard card={view.trumpCard} compact />
+              )}
+              <span className={styles.trumpLabel}>
+                {view.trumpSuit ? `${SUIT_GLYPH[view.trumpSuit] ?? ''} trump` : 'no trump'}
+              </span>
             </div>
-          )}
+
+            <ul className={styles.trick} data-testid="ohhell-trick">
+              {view.trick.map((play) => (
+                <li
+                  key={`${play.seat}:${play.card}`}
+                  data-seat={play.seat}
+                  data-local={play.isLocal || undefined}
+                >
+                  <PlayingCard card={play.card} compact />
+                </li>
+              ))}
+            </ul>
+          </div>
+          {view.decision === 'bid' ? (
+            <BidRail
+              options={view.bidOptions}
+              forbidden={view.forbiddenBid}
+              handSize={view.handSize}
+              busy={busy}
+              onBid={onBid}
+            />
+          ) : null}
+
+          {view.decision === 'trump' ? (
+            <div className={styles.actionRail} role="group" aria-label="Name trump">
+              <p className={styles.railPrompt}>The flip turned a Wizard — name trump.</p>
+              <div className={styles.railButtons}>
+                {view.trumpChoices.map((suit) => (
+                  <button
+                    key={suit}
+                    type="button"
+                    className={styles.trumpButton}
+                    disabled={busy}
+                    onClick={() => onChooseTrump?.(suit)}
+                    aria-label={`Name ${suit} trump`}
+                  >
+                    <span aria-hidden="true">{SUIT_GLYPH[suit] ?? ''}</span>
+                    <small>{suit}</small>
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
+          {local ? (
+            <div className={styles.localRow}>
+              <AvatarBadge avatarId={local.avatarId} size="clamp(2.6rem, 4.4vw, 3.6rem)" />
+              <SeatNameplate name={local.name} />
+              <ScorePips seat={local} handSize={view.handSize} />
+            </div>
+          ) : null}
         </div>
 
-        <TableFxLayer
-          fx={props.fx}
-          fxKey={props.fxKey}
-          rootRef={rootRef}
-          reduced={reducedMotion}
-          renderCue={() => null}
-        />
+        <HandRail count={view.hand.length} zone={`hand:${view.localSeat}`} label="Your hand">
+          {view.hand.map((card, index) => (
+            <HandRailCard
+              key={card}
+              cardId={card}
+              index={index}
+              count={view.hand.length}
+              playable={playable.has(card)}
+            >
+              <PlayingCard
+                card={card}
+                actionLabel="Play"
+                disabled={busy || !playable.has(card)}
+                onClick={playable.has(card) ? () => onPlay?.(card) : undefined}
+              />
+            </HandRailCard>
+          ))}
+        </HandRail>
+
+        {view.roundOver && !view.matchOver ? (
+          <div className={styles.roundEnd} data-testid="ohhell-round-end">
+            <h2>Round {view.round} scored</h2>
+            <ul>
+              {view.seats.map((seat) => (
+                <li key={seat.seat} data-standing={seat.standing}>
+                  <b>{seat.name}</b> bid {seat.bid ?? 0}, took {seat.tricksWon} ·{' '}
+                  <span>{seat.score}</span>
+                </li>
+              ))}
+            </ul>
+            <button type="button" className={styles.nextRound} onClick={() => onNextRound?.()}>
+              Deal round {Math.min(view.round + 1, view.rounds)}
+            </button>
+          </div>
+        ) : null}
       </TablePlayfield>
 
-      {local && (
-        <div className={styles.localStrip}>
-          <SeatBadge player={local} />
-          <HandRail
-            count={view.hand.length}
-            zone={`hand:${view.localSeat}`}
-            label="Your hand"
-            dealState={deal.dealing ? 'dealing' : 'complete'}
-            fanPlan={view.hand}
-          >
-            {view.hand.map((card, index) => {
-              const playable = view.decision === 'play' && legal.has(card);
-              return (
-                <HandRailCard
-                  key={card}
-                  cardId={card}
-                  index={index}
-                  count={view.hand.length}
-                  playable={playable}
-                >
-                  <PlayingCard
-                    card={card}
-                    disabled={view.decision === 'play' && !playable}
-                    actionLabel="Play"
-                    onClick={playable ? () => props.onPlay?.(card) : undefined}
-                  />
-                </HandRailCard>
-              );
-            })}
-          </HandRail>
-        </div>
-      )}
-
-      <TableActionRail>
-        <Decision
-          view={view}
-          busy={props.busy}
-          onBid={props.onBid}
-          onChooseTrump={props.onChooseTrump}
-        />
-      </TableActionRail>
-
-      <TableMenu
-        open={menu.isOpen}
-        onClose={menu.close}
-        onQuit={menu.quit}
-        howToPlay={{ doc: ohhellHowToPlay, title: 'Oh Hell', subtitle: 'the bidding game' }}
-      />
+      <TableMenu open={menu.isOpen} onClose={menu.close} onQuit={menu.quit} />
+      <span hidden data-fx-key={String(fxKey)} data-fx-count={fx.length} />
     </TableShell>
   );
 }
 
-function OpponentSeat({ player, slot, of }: { player: OhHellSeatView; slot: number; of: number }) {
-  const style = {
-    ['--seat-slot' as string]: String(slot),
-    ['--seat-of' as string]: String(of),
-  } as CSSProperties;
-  return (
-    <div className={styles.seat} style={style} data-turn={player.isTurn || undefined}>
-      <div className={styles.seatCards} aria-hidden="true">
-        {Array.from({ length: Math.min(player.handCount, 7) }, (_, index) => (
-          <PlayingCard key={index} faceDown compact />
-        ))}
-      </div>
-      <SeatBadge player={player} />
-    </div>
-  );
-}
-
-function SeatBadge({ player }: { player: OhHellSeatView }) {
-  return (
-    <div className={styles.seatBadge}>
-      <AvatarBadge avatarId={player.avatarId} size={28} />
-      <span className={styles.seatText}>
-        <strong>{player.name}</strong>
-        <small>{player.score} pts</small>
-      </span>
-      {player.bid !== null && (
-        <span
-          className={styles.bidChip}
-          data-made={player.onTrack || undefined}
-          data-over={player.tricksWon > player.bid || undefined}
-          aria-label={`bid ${player.bid}, took ${player.tricksWon}`}
-        >
-          {player.tricksWon}/{player.bid}
-        </span>
-      )}
-      {player.isDealer && (
-        <span className={styles.dealerChip} aria-label="Dealer">
-          D
-        </span>
-      )}
-    </div>
-  );
-}
-
 /**
- * The bid rail, the trump picker, or a line saying whose turn it is.
+ * A seat's bid, its tricks so far, and its running score.
  *
- * Only one of the three can ever be live, because the engine offers exactly one
- * kind of move at a time — so this reads the decision rather than the stage.
+ * `standing` is what makes the row worth reading: in Oh Hell being *over* your
+ * bid is as bad as being under, and a table that only shows tricks taken makes
+ * the player do that subtraction every trick.
  */
-function Decision({
-  view,
-  busy,
-  onBid,
-  onChooseTrump,
+function ScorePips({
+  seat,
+  handSize,
 }: {
-  view: OhHellTableView;
-  busy?: boolean;
-  onBid?: (bid: number) => void;
-  onChooseTrump?: (suit: string) => void;
+  seat: OhHellTableView['seats'][number];
+  handSize: number;
 }) {
-  if (view.matchOver) {
-    return (
-      <p className={styles.matchOver}>
-        {view.won === true ? 'You take the match.' : 'The match goes to the table.'}
-      </p>
-    );
-  }
-
-  if (view.decision === 'trump') {
-    return (
-      <div className={styles.decision}>
-        <p className={styles.prompt}>A Wizard turned — name trump.</p>
-        <div className={styles.suitRow}>
-          {view.trumpOptions.map((suit) => (
-            <button
-              key={suit}
-              type="button"
-              className={`${styles.suitButton} btn-fat`}
-              data-suit={suit}
-              onClick={() => onChooseTrump?.(suit)}
-            >
-              {SUIT_GLYPHS[suit] ?? suit}
-            </button>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  if (view.decision === 'bid') {
-    return (
-      <div className={styles.decision}>
-        <p className={styles.prompt}>
-          How many tricks?
-          {view.forbiddenBid !== null && (
-            <span className={styles.hook}> · {view.forbiddenBid} is hooked</span>
-          )}
-        </p>
-        <div className={styles.bidRow}>
-          {view.bidOptions.map((bid) => (
-            <button
-              key={bid}
-              type="button"
-              className={`${styles.bidButton} btn-fat`}
-              onClick={() => onBid?.(bid)}
-            >
-              {bid}
-            </button>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  if (view.decision === 'play') {
-    return <p className={styles.prompt}>Your lead — pick a card.</p>;
-  }
-
   return (
-    <p className={styles.waiting} aria-live="polite">
-      {busy ? 'Waiting for the table…' : 'Dealing…'}
+    <p
+      className={styles.pips}
+      data-standing={seat.standing}
+      data-testid={`ohhell-seat-${seat.seat}`}
+    >
+      <span className={styles.bid}>
+        {seat.bid === null ? '—' : seat.bid}
+        <small>bid</small>
+      </span>
+      <span className={styles.tricks}>
+        {seat.tricksWon}
+        <small>of {handSize}</small>
+      </span>
+      <span className={styles.score}>
+        {seat.score}
+        <small>pts</small>
+      </span>
     </p>
   );
 }
 
-export { cardBadge };
+function BidRail({
+  options,
+  forbidden,
+  handSize,
+  busy,
+  onBid,
+}: {
+  options: readonly number[];
+  forbidden: number | null;
+  handSize: number;
+  busy: boolean;
+  onBid?: (bid: number) => void;
+}) {
+  return (
+    <div className={styles.actionRail} role="group" aria-label="Place your bid">
+      <p className={styles.railPrompt}>
+        How many of the {handSize} will you take?
+        {forbidden === null ? null : (
+          <em className={styles.hooked}>
+            {' '}
+            {forbidden} is hooked — the dealer cannot make it even.
+          </em>
+        )}
+      </p>
+      <div className={styles.railButtons}>
+        {options.map((bid) => (
+          <button
+            key={bid}
+            type="button"
+            className={styles.bidButton}
+            disabled={busy}
+            onClick={() => onBid?.(bid)}
+            aria-label={`Bid ${bid}`}
+            data-testid={`ohhell-bid-${bid}`}
+          >
+            {bid}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}

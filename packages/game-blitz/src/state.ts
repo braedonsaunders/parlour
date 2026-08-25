@@ -53,7 +53,7 @@ export interface BlitzState {
    * True when the round is dealt under Veil: hands hold opaque handles instead
    * of faces. The table can no longer see a 31, so a blitz arrives as a claim
    * that opens the claimant's hand, and the showdown is preceded by a reveal
-   * phase. See docs/VEILED-DECK-PROTOCOL.md §5.
+   * phase. See apps/web/src/lib/multiplayer/veil.
    */
   veiled: boolean;
 }

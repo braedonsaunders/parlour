@@ -1,6 +1,33 @@
-import type { GameSession, LegalMove } from '@parlour/engine';
-import type { RoundSummary, ScopaRules, ScopaStage, ScopaState } from '@parlour/game-scopa';
-import type { ScopaModeId } from '@/lib/scopa/modes';
+import type { LegalMove } from '@parlour/engine';
+import {
+  captureValue,
+  isSettebello,
+  orderScopaHand,
+  ownerOf,
+  playsInTeams,
+  suitOfCard,
+} from '@parlour/game-scopa';
+import { getScopaMode, type ScopaModeId } from '@/lib/scopa/modes';
+import type { ScopaSnapshot } from '@/lib/solo/ScopaTransport';
+
+/**
+ * Everything the Scopa table draws, derived once.
+ *
+ * The decision this view exists for is the *sum capture*: when your card
+ * matches several combinations of table cards, choosing which one to take is a
+ * real move, not a detail. Every combination is a distinct legal move in the
+ * pack, so the table offers them as distinct choices rather than auto-picking.
+ */
+
+export interface ScopaCardView {
+  card: string;
+  label: string;
+  suit: string;
+  value: number;
+  /** Coins are worth a point as a suit; the seven of coins is worth its own. */
+  denari: boolean;
+  settebello: boolean;
+}
 
 export interface ScopaSeatView {
   seat: number;
@@ -8,138 +35,144 @@ export interface ScopaSeatView {
   avatarId: string;
   isLocal: boolean;
   isBot: boolean;
-  isDealer: boolean;
   isTurn: boolean;
+  isDealer: boolean;
   handCount: number;
-  /** cards taken so far this round — public in Scopa, everyone saw them go */
+  /** Cards this seat has captured; public in Scopa, everyone saw them taken. */
   captured: number;
   scope: number;
+  /** Team id at four and six seats, the seat itself otherwise. */
+  owner: number;
   score: number;
 }
 
-/** One legal way to play a single card from hand. */
+/** One way to play the held card: which table cards it would take. */
 export interface ScopaPlayOption {
-  card: string;
-  /** table cards this play would take; empty means posing the card instead */
+  move: LegalMove;
   take: readonly string[];
+  /** A pose leaves the card on the table and takes nothing. */
+  pose: boolean;
+  /** Clearing the table is a scopa, and worth calling out before you commit. */
+  scopa: boolean;
 }
 
 export interface ScopaTableView {
-  players: readonly ScopaSeatView[];
+  mode: ScopaModeId;
+  modeName: string;
   localSeat: number;
-  activeSeat: number | null;
-  stage: ScopaStage;
-  stageLabel: string;
-  roundNo: number;
-  dealer: number;
-  /** face-up cards waiting to be taken */
-  table: readonly string[];
+  seats: readonly ScopaSeatView[];
+  /** Face-up cards waiting to be captured or swept. */
+  table: readonly ScopaCardView[];
+  hand: readonly ScopaCardView[];
   stockCount: number;
-  hand: readonly string[];
-  /** every legal play, grouped by the hand card that makes it */
-  options: readonly ScopaPlayOption[];
-  /** hand cards with at least one legal play right now */
-  playableCards: readonly string[];
-  /** true while it is this device's turn to play */
-  yourTurn: boolean;
-  lastRound: RoundSummary | null;
+  roundNo: number;
   target: number;
-  matchOver: boolean;
-  won: boolean | null;
-  mode: ScopaModeId;
-  rules: ScopaRules;
+  teams: boolean;
+  isLocalTurn: boolean;
+  /** Cards the local seat may play right now. */
+  playable: readonly string[];
+  status: 'playing' | 'ended';
+  stageLabel: string;
 }
 
-export interface ScopaSnapshot {
-  mode: ScopaModeId;
-  players: readonly { seat: number; name: string; avatarId: string; isBot: boolean }[];
-  session: GameSession<ScopaState, ScopaRules>;
-  won: boolean | null;
+function cardView(card: string): ScopaCardView {
+  const value = captureValue(card);
+  return {
+    card,
+    label: String(value),
+    suit: suitOfCard(card),
+    value,
+    denari: suitOfCard(card) === 'denari',
+    settebello: isSettebello(card),
+  };
 }
 
-const STAGE_LABELS: Readonly<Record<ScopaStage, string>> = {
-  playing: 'Playing',
-  'round-over': 'Round over',
-};
-
-function payloadOf(move: LegalMove): Record<string, unknown> {
-  return (move.payload as Record<string, unknown> | undefined) ?? {};
-}
-
-/**
- * Every option for one card, ordered so the table reads sensibly: the biggest
- * capture first, and posing the card last. A player choosing between takes is
- * almost always choosing the one that clears the most.
- */
-export function optionsForCard(
-  options: readonly ScopaPlayOption[],
-  card: string,
-): ScopaPlayOption[] {
-  return options
-    .filter((option) => option.card === card)
-    .sort((left, right) => right.take.length - left.take.length);
-}
-
-/**
- * Pure snapshot → render model for the Scopa table. `legal` must be the moves
- * offered to the viewing seat; pass [] while others act.
- */
 export function scopaTableView(
   snapshot: ScopaSnapshot,
   legal: readonly LegalMove[],
   localSeat = 0,
 ): ScopaTableView {
-  const session = snapshot.session;
-  const state = session.state;
-  const playing = session.status === 'playing';
-  const yourTurn = playing && state.turn === localSeat && state.stage === 'playing';
-  const offered = yourTurn ? legal : [];
+  const state = snapshot.session.state;
+  const mode = getScopaMode(snapshot.mode);
+  const teams = playsInTeams(state.seats);
+  const isLocalTurn = snapshot.session.status === 'playing' && state.turn === localSeat;
 
-  const options: ScopaPlayOption[] = offered
-    .filter((move) => move.id === 'playCard')
-    .map((move) => {
-      const payload = payloadOf(move);
-      const take = Array.isArray(payload.take) ? (payload.take as string[]) : [];
-      return { card: String(payload.card ?? ''), take };
-    })
-    .filter((option) => option.card.length > 0);
-
-  const players: ScopaSeatView[] = snapshot.players.map((player) => {
-    const seat = player.seat;
+  const seats: ScopaSeatView[] = snapshot.players.map((player) => {
+    const owner = ownerOf(player.seat, state.seats);
     return {
-      seat,
+      seat: player.seat,
       name: player.name,
       avatarId: player.avatarId,
-      isLocal: seat === localSeat,
+      isLocal: player.seat === localSeat,
       isBot: player.isBot,
-      isDealer: seat === state.dealer,
-      isTurn: playing && state.turn === seat && state.stage === 'playing',
-      handCount: (state.hands[seat] ?? []).length,
-      captured: (state.captures[seat] ?? []).length,
-      scope: state.scope[seat] ?? 0,
-      score: state.scores[seat] ?? 0,
+      isTurn: state.turn === player.seat,
+      isDealer: state.dealer === player.seat,
+      handCount: state.hands[player.seat]?.length ?? 0,
+      captured: state.captures[player.seat]?.length ?? 0,
+      scope: state.scope[player.seat] ?? 0,
+      owner,
+      score: state.scores[owner] ?? 0,
     };
   });
 
+  const playable = isLocalTurn
+    ? [
+        ...new Set(
+          legal.flatMap((move) => {
+            const card = (move.payload as { card?: unknown } | undefined)?.card;
+            return typeof card === 'string' ? [card] : [];
+          }),
+        ),
+      ]
+    : [];
+
   return {
-    players,
-    localSeat,
-    activeSeat: playing && state.stage === 'playing' ? state.turn : null,
-    stage: state.stage,
-    stageLabel: STAGE_LABELS[state.stage],
-    roundNo: state.roundNo,
-    dealer: state.dealer,
-    table: [...state.table],
-    stockCount: state.stock.length,
-    hand: (state.hands[localSeat] ?? []).filter((card) => card !== '??'),
-    options,
-    playableCards: [...new Set(options.map((option) => option.card))],
-    yourTurn,
-    lastRound: state.summary ?? state.lastRound,
-    target: state.rules.target,
-    matchOver: session.status !== 'playing',
-    won: snapshot.won,
     mode: snapshot.mode,
-    rules: state.rules,
+    modeName: mode.name,
+    localSeat,
+    seats,
+    table: state.table.map(cardView),
+    hand: orderScopaHand(state.hands[localSeat] ?? [], {}).map(cardView),
+    stockCount: state.stock.length,
+    roundNo: state.roundNo,
+    target: state.rules.target,
+    teams,
+    isLocalTurn,
+    playable,
+    status: snapshot.session.status === 'ended' ? 'ended' : 'playing',
+    stageLabel:
+      snapshot.session.status === 'ended'
+        ? 'match over'
+        : `round ${state.roundNo} · first to ${state.rules.target}`,
   };
+}
+
+/**
+ * Every way the held card can be played, richest capture first.
+ *
+ * A single-card match is forced by the rules, so when one exists the pack emits
+ * only that; otherwise the list is every sum combination plus the pose. Sorting
+ * by how much it takes puts the consequential choice at the front without
+ * hiding the modest one.
+ */
+export function playOptionsFor(
+  legal: readonly LegalMove[],
+  card: string | null,
+  tableSize: number,
+): readonly ScopaPlayOption[] {
+  if (card === null) return [];
+  const options: ScopaPlayOption[] = [];
+  for (const move of legal) {
+    const payload = move.payload as { card?: unknown; take?: unknown } | undefined;
+    if (payload?.card !== card) continue;
+    const take = Array.isArray(payload.take) ? (payload.take as string[]) : [];
+    options.push({
+      move,
+      take,
+      pose: take.length === 0,
+      // Taking every card on the table clears the felt: that is the scopa.
+      scopa: take.length > 0 && take.length === tableSize,
+    });
+  }
+  return options.sort((left, right) => right.take.length - left.take.length);
 }

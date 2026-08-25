@@ -1,277 +1,294 @@
 'use client';
 
-import { useRef, useState, type CSSProperties } from 'react';
-import type { FxEvent } from '@parlour/engine';
-import { scopaHowToPlay } from '@parlour/game-scopa';
-import { useMatchTension } from '@/lib/audio/tension';
-import { SCOPA_MATCH_PACE_MS } from '@/lib/scopa/modes';
+import { useEffect, useRef, useState } from 'react';
+import type { FxEvent, LegalMove } from '@parlour/engine';
+import { AvatarBadge } from '@/components/AvatarBadge';
+import { TableMenu } from '@/components/table/TableMenu';
+import { HandRail, HandRailCard } from '@/components/table/HandRail';
 import {
-  optionsForCard,
-  type ScopaPlayOption,
-  type ScopaSeatView,
-  type ScopaTableView,
-} from '@/lib/scopa/view';
-import { useMusicMood } from '@/stores/audio';
-import { useProfileStore } from '@/stores/profile';
-import { useDealPresentation } from '@/lib/table/deal-presentation';
-import { HandRail, HandRailCard } from '../HandRail';
-import { PlayingCard } from '../PlayingCard';
-import { TableMenu } from '../TableMenu';
-import {
-  TableActionRail,
+  SeatNameplate,
   TableErrorScreen,
-  TableFxLayer,
   TableHud,
   TableLoadingScreen,
   TablePlayfield,
   TableShell,
   TableTitlePill,
-  dealStateAttr,
   useGameTextSurface,
   useTableMenu,
-} from '../shell';
-import { AvatarBadge } from '@/components/AvatarBadge';
+} from '@/components/table/shell';
+import { useTableAudio } from '../fx-animation';
+import { SCOPA_SFX_PACK } from '@/lib/audio/sfx';
+import { playOptionsFor, type ScopaCardView, type ScopaTableView } from '@/lib/scopa/view';
 import styles from '@/styles/scopa.module.css';
 
-export type ScopaTableScreenProps = {
+export interface ScopaTableScreenProps {
   view: ScopaTableView | null;
+  legal?: readonly LegalMove[];
   fx: readonly FxEvent[];
-  fxKey: string | number;
+  fxKey: number | string;
   busy?: boolean;
   error?: string | null;
-  onPlay?: (card: string, take: readonly string[]) => void;
-  /** Fired only after the player confirms quitting from the shared table menu. */
+  onPlay?: (move: LegalMove) => void;
   onQuit?: () => void;
+}
+
+const SUIT_GLYPH: Record<string, string> = {
+  denari: '●',
+  coppe: '♥',
+  spade: '♠',
+  bastoni: '♣',
 };
 
-export function ScopaTableScreen(props: ScopaTableScreenProps) {
-  const { view, error } = props;
+export function ScopaTableScreen({
+  view,
+  legal = [],
+  fx,
+  fxKey,
+  busy = false,
+  error = null,
+  onPlay,
+  onQuit,
+}: ScopaTableScreenProps) {
   const rootRef = useRef<HTMLElement>(null);
-  const menu = useTableMenu(props.onQuit);
-  const reducedMotion = useProfileStore((state) => state.settings.reducedMotion);
-  const deal = useDealPresentation(props.fx, props.fxKey, { reduced: reducedMotion });
+  const menu = useTableMenu(onQuit ?? (() => undefined));
+  useTableAudio(fx, fxKey, SCOPA_SFX_PACK.id);
 
-  /**
-   * The card the player has picked up but not yet committed.
+  const [held, setHeld] = useState<string | null>(null);
+
+  /*
+   * A held card is only held while the rules still offer it.
    *
-   * Scopa is the one table on the shelf where choosing a card is not the whole
-   * move: the same card can often take several different sets off the table, so
-   * a card with one option plays immediately and a card with more waits here
-   * while the player picks which pile to sweep.
+   * Derived rather than cleared in an effect: setting state from an effect on
+   * every accepted move cascades a render, and a selection that outlived the
+   * move that invalidated it would offer a capture the table no longer has.
    */
-  const [pending, setPending] = useState<string | null>(null);
+  const playable = new Set(view?.playable ?? []);
+  const selected = held !== null && playable.has(held) ? held : null;
+  const options = playOptionsFor(legal, selected, view?.table.length ?? 0);
 
-  const tense = useMatchTension({
-    expectedMs: SCOPA_MATCH_PACE_MS,
-    running: Boolean(view) && view?.activeSeat !== null,
+  useEffect(() => {
+    const cancel = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setHeld(null);
+    };
+    window.addEventListener('keydown', cancel);
+    return () => window.removeEventListener('keydown', cancel);
+  }, []);
+
+  useGameTextSurface(() => {
+    if (error) return { game: 'scopa', status: 'error', error };
+    if (!view) return { game: 'scopa', status: 'loading', error: null };
+    return {
+      game: 'scopa',
+      status: view.status,
+      round: view.roundNo,
+      target: view.target,
+      yourTurn: view.isLocalTurn,
+      held: selected,
+      table: view.table.map((card) => card.card),
+      hand: view.hand.map((card) => card.card),
+      options: options.map((option) => (option.pose ? 'pose' : option.take.join('+'))),
+      seats: view.seats.map((seat) => ({
+        seat: seat.seat,
+        name: seat.name,
+        score: seat.score,
+        captured: seat.captured,
+        scope: seat.scope,
+      })),
+      error: null,
+    };
   });
-  useMusicMood(tense ? 'tense' : null);
 
-  useGameTextSurface(() => ({
-    game: 'scopa',
-    status: error ? 'error' : view ? (deal.dealing ? 'dealing' : 'ready') : 'loading',
-    error,
-  }));
+  if (error) {
+    return <TableErrorScreen headline="The Scopa table lost the thread." message={error} />;
+  }
+  if (!view) return <TableLoadingScreen copy="Turning four cards onto the felt…" />;
 
-  if (error) return <TableErrorScreen headline="The table lost the thread." message={error} />;
-  if (!view) return <TableLoadingScreen copy="Laying out the table…" />;
-
-  const others = view.players.filter((player) => player.seat !== view.localSeat);
-  const local = view.players.find((player) => player.seat === view.localSeat);
-  const playable = new Set(view.playableCards);
-  const choices = pending ? optionsForCard(view.options, pending) : [];
-  const highlighted = new Set(choices.length === 1 ? choices[0]!.take : []);
-
-  const commit = (option: ScopaPlayOption) => {
-    setPending(null);
-    props.onPlay?.(option.card, option.take);
-  };
-
-  const pickCard = (card: string) => {
-    const forCard = optionsForCard(view.options, card);
-    if (forCard.length === 1) commit(forCard[0]!);
-    else setPending((current) => (current === card ? null : card));
-  };
+  const local = view.seats.find((seat) => seat.isLocal) ?? null;
+  const others = view.seats.filter((seat) => !seat.isLocal);
+  // Every table card any offered capture would take; the rest dim while held.
+  const reachable = new Set(options.flatMap((option) => option.take));
 
   return (
-    <TableShell rootRef={rootRef} className={styles.screen} dealState={dealStateAttr(deal)}>
+    <TableShell rootRef={rootRef} className={styles.screen}>
       <TableHud onOpenMenu={menu.open}>
         <TableTitlePill eyebrow="Scopa" status={view.stageLabel}>
-          <span className={styles.hudCluster}>
-            <span className={styles.hudStat}>
-              <small>Round</small>
-              <strong>{view.roundNo}</strong>
-            </span>
-            <span className={styles.hudStat}>
-              <small>To win</small>
-              <strong>{view.target}</strong>
-            </span>
-            <span className={styles.hudStat}>
-              <small>Stock</small>
-              <strong>{view.stockCount}</strong>
-            </span>
+          <span className={styles.stock}>
+            stock <b>{view.stockCount}</b>
           </span>
         </TableTitlePill>
       </TableHud>
 
-      <TablePlayfield
-        label="Scopa table"
-        seatCount={view.players.length}
-        feltMark={<span className={styles.feltMark}>♦</span>}
-      >
-        <div className={styles.seatRing}>
-          {others.map((player, index) => (
-            <OpponentSeat key={player.seat} player={player} slot={index} of={others.length} />
-          ))}
+      <TablePlayfield label="Scopa table" feltMark="S" className={styles.playfield}>
+        <div
+          className={styles.board}
+          data-testid="scopa-board"
+          data-holding={selected !== null || undefined}
+        >
+          <ol className={styles.seats}>
+            {others.map((seat) => (
+              <li key={seat.seat} className={styles.seat} data-turn={seat.isTurn || undefined}>
+                <AvatarBadge avatarId={seat.avatarId} size="clamp(2.2rem, 3.8vw, 3.2rem)" />
+                <SeatNameplate name={seat.name} isBot={seat.isBot} />
+                <p className={styles.pips} data-testid={`scopa-seat-${seat.seat}`}>
+                  <span>
+                    {seat.score}
+                    <small>pts</small>
+                  </span>
+                  <span>
+                    {seat.captured}
+                    <small>taken</small>
+                  </span>
+                  <span>
+                    {seat.handCount}
+                    <small>hand</small>
+                  </span>
+                </p>
+              </li>
+            ))}
+          </ol>
+
+          <ul className={styles.table} data-testid="scopa-table" aria-label="Cards on the table">
+            {view.table.map((card) => (
+              <li key={card.card}>
+                <ScopaCard
+                  card={card}
+                  dim={selected !== null && !reachable.has(card.card)}
+                  testid={`scopa-table-${card.card}`}
+                />
+              </li>
+            ))}
+            {view.table.length === 0 ? (
+              <li className={styles.tableEmpty} aria-label="The table is empty">
+                felt is clear
+              </li>
+            ) : null}
+          </ul>
+
+          {selected !== null && options.length > 0 ? (
+            <div className={styles.chooser} role="group" aria-label="Choose what to take">
+              {/*
+                The sum capture is the decision this table exists for. When a
+                card matches several combinations the rules treat each as its
+                own move, so each gets its own button rather than the table
+                guessing which one you meant.
+              */}
+              <p className={styles.chooserPrompt}>
+                {options.length === 1
+                  ? options[0]!.pose
+                    ? 'Nothing matches — lay it down.'
+                    : 'One capture available.'
+                  : `${options.length} ways to play it.`}
+              </p>
+              <div className={styles.chooserButtons}>
+                {options.map((option) => (
+                  <button
+                    key={option.pose ? 'pose' : option.take.join('+')}
+                    type="button"
+                    className={styles.takeButton}
+                    data-pose={option.pose || undefined}
+                    data-scopa={option.scopa || undefined}
+                    data-testid={option.pose ? 'scopa-pose' : `scopa-take-${option.take.join('+')}`}
+                    disabled={busy}
+                    onClick={() => {
+                      setHeld(null);
+                      onPlay?.(option.move);
+                    }}
+                  >
+                    {option.pose ? (
+                      <span>lay it down</span>
+                    ) : (
+                      <>
+                        <span>
+                          take {option.take.map((card) => captureLabel(card)).join(' + ')}
+                        </span>
+                        {option.scopa ? <em>scopa!</em> : null}
+                      </>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
+          {local ? (
+            <div className={styles.localRow}>
+              <AvatarBadge avatarId={local.avatarId} size="clamp(2.2rem, 3.8vw, 3.2rem)" />
+              <SeatNameplate name={local.name} />
+              <p className={styles.pips} data-testid="scopa-seat-0">
+                <span>
+                  {local.score}
+                  <small>pts</small>
+                </span>
+                <span>
+                  {local.captured}
+                  <small>taken</small>
+                </span>
+                <span>
+                  {local.scope}
+                  <small>scope</small>
+                </span>
+              </p>
+            </div>
+          ) : null}
         </div>
 
-        <div className={styles.tableCards} aria-label="Cards on the table">
-          {view.table.length === 0 ? (
-            <span className={styles.tableEmpty}>The table is clear</span>
-          ) : (
-            view.table.map((card) => (
-              <span
-                key={card}
-                className={styles.tableCard}
-                data-flight-target={card}
-                data-taking={highlighted.has(card) || undefined}
+        <HandRail count={view.hand.length} zone={`hand:${view.localSeat}`} label="Your hand">
+          {view.hand.map((card, index) => (
+            <HandRailCard
+              key={card.card}
+              cardId={card.card}
+              index={index}
+              count={view.hand.length}
+              playable={playable.has(card.card)}
+              justDrawn={selected === card.card}
+            >
+              <button
+                type="button"
+                className={styles.handCard}
+                data-held={selected === card.card ? '' : undefined}
+                disabled={busy || !playable.has(card.card)}
+                onClick={() => setHeld(selected === card.card ? null : card.card)}
+                aria-label={`${selected === card.card ? 'Put back' : 'Choose'} ${captureLabel(card.card)}`}
               >
-                <PlayingCard card={card} compact />
-              </span>
-            ))
-          )}
-        </div>
-
-        <TableFxLayer
-          fx={props.fx}
-          fxKey={props.fxKey}
-          rootRef={rootRef}
-          reduced={reducedMotion}
-          renderCue={() => null}
-        />
+                <ScopaCard card={card} />
+              </button>
+            </HandRailCard>
+          ))}
+        </HandRail>
       </TablePlayfield>
 
-      {local && (
-        <div className={styles.localStrip}>
-          <SeatBadge player={local} />
-          <HandRail
-            count={view.hand.length}
-            zone={`hand:${view.localSeat}`}
-            label="Your hand"
-            dealState={deal.dealing ? 'dealing' : 'complete'}
-            fanPlan={view.hand}
-          >
-            {view.hand.map((card, index) => {
-              const canPlay = view.yourTurn && playable.has(card);
-              return (
-                <HandRailCard
-                  key={card}
-                  cardId={card}
-                  index={index}
-                  count={view.hand.length}
-                  playable={canPlay}
-                >
-                  <PlayingCard
-                    card={card}
-                    disabled={view.yourTurn && !canPlay}
-                    actionLabel="Play"
-                    onClick={canPlay ? () => pickCard(card) : undefined}
-                  />
-                </HandRailCard>
-              );
-            })}
-          </HandRail>
-        </div>
-      )}
-
-      <TableActionRail>
-        {view.matchOver ? (
-          <p className={styles.matchOver}>
-            {view.won === true ? 'You take the match.' : 'The match goes to the table.'}
-          </p>
-        ) : pending && choices.length > 1 ? (
-          <div className={styles.choices}>
-            <p className={styles.prompt}>Take which?</p>
-            <div className={styles.choiceRow}>
-              {choices.map((option, index) => (
-                <button
-                  key={`${option.card}-${index}`}
-                  type="button"
-                  className={`${styles.choice} btn-fat`}
-                  onClick={() => commit(option)}
-                >
-                  {option.take.length === 0 ? (
-                    <span className={styles.choiceLabel}>Lay it down</span>
-                  ) : (
-                    <span className={styles.choiceCards}>
-                      {option.take.map((card) => (
-                        <PlayingCard key={card} card={card} compact />
-                      ))}
-                    </span>
-                  )}
-                </button>
-              ))}
-            </div>
-            <button type="button" className={styles.cancel} onClick={() => setPending(null)}>
-              pick a different card
-            </button>
-          </div>
-        ) : view.yourTurn ? (
-          <p className={styles.prompt}>Play a card — match a card, or the sum of several.</p>
-        ) : (
-          <p className={styles.waiting} aria-live="polite">
-            {props.busy ? 'Waiting for the table…' : 'Dealing…'}
-          </p>
-        )}
-      </TableActionRail>
-
-      <TableMenu
-        open={menu.isOpen}
-        onClose={menu.close}
-        onQuit={menu.quit}
-        howToPlay={{ doc: scopaHowToPlay, title: 'Scopa', subtitle: 'the fishing game' }}
-      />
+      <TableMenu open={menu.isOpen} onClose={menu.close} onQuit={menu.quit} />
+      <span hidden data-fx-key={String(fxKey)} data-fx-count={fx.length} />
     </TableShell>
   );
 }
 
-function OpponentSeat({ player, slot, of }: { player: ScopaSeatView; slot: number; of: number }) {
-  const style = {
-    ['--seat-slot' as string]: String(slot),
-    ['--seat-of' as string]: String(of),
-  } as CSSProperties;
-  return (
-    <div className={styles.seat} style={style} data-turn={player.isTurn || undefined}>
-      <div className={styles.seatCards} aria-hidden="true">
-        {Array.from({ length: Math.min(player.handCount, 5) }, (_, index) => (
-          <PlayingCard key={index} faceDown compact />
-        ))}
-      </div>
-      <SeatBadge player={player} />
-    </div>
-  );
+/** "7 of coins" reads better than a card id in a button or a label. */
+function captureLabel(card: string): string {
+  const [suit, value] = card.split('-');
+  return `${value ?? ''}${SUIT_GLYPH[suit ?? ''] ?? ''}`;
 }
 
-function SeatBadge({ player }: { player: ScopaSeatView }) {
+function ScopaCard({
+  card,
+  dim = false,
+  testid,
+}: {
+  card: ScopaCardView;
+  dim?: boolean;
+  testid?: string;
+}) {
   return (
-    <div className={styles.seatBadge}>
-      <AvatarBadge avatarId={player.avatarId} size={28} />
-      <span className={styles.seatText}>
-        <strong>{player.name}</strong>
-        <small>
-          {player.score} pts · {player.captured} taken
-        </small>
-      </span>
-      {player.scope > 0 && (
-        <span className={styles.scopeChip} aria-label={`${player.scope} scope`}>
-          {player.scope}★
-        </span>
-      )}
-      {player.isDealer && (
-        <span className={styles.dealerChip} aria-label="Dealer">
-          D
-        </span>
-      )}
-    </div>
+    <span
+      className={styles.face}
+      data-suit={card.suit}
+      data-dim={dim || undefined}
+      data-settebello={card.settebello || undefined}
+      data-testid={testid}
+      aria-label={`${card.value} of ${card.suit}`}
+    >
+      <b>{card.label}</b>
+      <small aria-hidden="true">{SUIT_GLYPH[card.suit] ?? ''}</small>
+    </span>
   );
 }

@@ -126,7 +126,7 @@ export interface ApplyMeta {
   atMs?: number;
   /**
    * Veil openings applied immediately before this move (spec:
-   * docs/VEILED-DECK-PROTOCOL.md). Each pair swaps an opaque handle for the
+   * apps/web/src/lib/multiplayer/veil). Each pair swaps an opaque handle for the
    * card face behind it. The runtime records them on the event, so a replay
    * reproduces the same board without ever learning a card that stayed hidden.
    */

@@ -1,4 +1,4 @@
-import { isWildCard, QUEEN, spiteFace } from '../cards';
+import { isWildCard, LAST_RANK, spiteFace } from '../cards';
 import type { LegalMove } from '@parlour/engine';
 import type { CardId } from '@parlour/engine';
 import type { SpiteState } from '../state';
@@ -81,7 +81,7 @@ export function nearestNeedDistance(view: SpiteState, card: CardId): number {
   }
   // An Ace always has a home once some pile retires, so never score it hopeless.
   best = Math.min(best, Math.abs(value - 1));
-  return Number.isFinite(best) ? best : QUEEN;
+  return Number.isFinite(best) ? best : LAST_RANK;
 }
 
 /**

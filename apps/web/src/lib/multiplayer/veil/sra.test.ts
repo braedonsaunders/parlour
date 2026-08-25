@@ -19,6 +19,7 @@ import {
   modPow,
   randomPermutation,
   shuffleLayer,
+  shuffleLayerAsync,
   VEIL_PRIME,
 } from './sra';
 
@@ -177,5 +178,19 @@ describe('the shuffle itself', () => {
     // second seat's layer is still on, and its permutation is unknown.
     const peeledByMe = afterTheirs.map((element) => decryptElement(element, mine));
     expect(peeledByMe.every((element) => decodeCard(book, element) === null)).toBe(true);
+  });
+
+  /**
+   * The ceremony yields to the event loop between chunks so a long shuffle
+   * cannot starve the heartbeat timer and get a seat declared gone. That is
+   * only safe if it shuffles to exactly the same deck.
+   */
+  it('shuffles identically whether or not it pauses to let timers run', async () => {
+    const book = await buildCodebook('round', CARDS);
+    const deck = CARDS.map((card) => book.elementOf.get(card)!);
+    const key = generateLayerKey();
+    const order = randomPermutation(CARDS.length);
+
+    expect(await shuffleLayerAsync(deck, key, order)).toEqual(shuffleLayer(deck, key, order));
   });
 });
