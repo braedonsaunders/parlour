@@ -16,8 +16,9 @@ import type { VeilRecycleEntry } from './session';
 
 const MAX_SEATS = 8;
 const MAX_DECK = 256;
-const MAX_KEY = 256;
-const MAX_SIGNATURE = 256;
+/** P-256 SPKI is 91 bytes (122 base64url); extra headroom covers WebKit exports. */
+const MAX_KEY = 512;
+const MAX_SIGNATURE = 512;
 const MAX_ID = 128;
 const HASH_HEX = 64;
 const ELEMENT_HEX = VEIL_ELEMENT_BYTES * 2;
@@ -324,4 +325,96 @@ export function parseVeilMessage(data: string): VeilMessage | null {
   } catch {
     return null;
   }
+}
+
+/**
+ * Why a veil envelope or its inner message failed the schema, for the player
+ * facing "malformed packet" report. Bounded and field-named, never a dump of
+ * untrusted payload bytes.
+ */
+export function veilWireFault(value: unknown): string {
+  if (!isRecord(value)) return 'veil';
+  if (value.type === 'veil') {
+    if (
+      !hasOnlyKeys(value, ['type', 'to', 'message']) &&
+      !hasOnlyKeys(value, ['type', 'message'])
+    ) {
+      return 'veil envelope';
+    }
+    if (value.to !== undefined && value.to !== null && !isBoundedString(value.to, MAX_ID)) {
+      return 'veil.to';
+    }
+    return veilInnerFault(value.message);
+  }
+  if (typeof value.type === 'string' && value.type.startsWith('veil.')) {
+    return veilInnerFault(value);
+  }
+  return keysLabel(value);
+}
+
+function keysLabel(value: Record<string, unknown>): string {
+  const type =
+    typeof value.type === 'string' ? value.type.replace(/[^a-zA-Z0-9.]/g, '').slice(0, 32) : '';
+  return type || 'veil';
+}
+
+function veilInnerFault(value: unknown): string {
+  if (!isRecord(value) || typeof value.type !== 'string') return 'veil.message';
+  const type = value.type.replace(/[^a-zA-Z0-9.]/g, '').slice(0, 32) || 'veil';
+  if (isVeilMessage(value)) return type;
+  switch (value.type) {
+    case 'veil.header':
+      return isRecord(value.header) ? headerFault(value.header) : 'veil.header';
+    case 'veil.entry':
+      return isRecord(value.entry) ? entryFault(value.entry) : 'veil.entry';
+    case 'veil.hello':
+      if (!isBoundedString(value.publicKey, MAX_KEY)) return 'veil.hello.key';
+      return 'veil.hello';
+    default:
+      return type;
+  }
+}
+
+function headerFault(header: Record<string, unknown>): string {
+  if (!hasOnlyKeys(header, ['roundId', 'gameId', 'rulesHash', 'seats', 'keys', 'deck'])) {
+    return 'veil.header.keys';
+  }
+  if (!isHex(header.rulesHash, HASH_HEX)) return 'veil.header.rulesHash';
+  if (!Array.isArray(header.keys) || header.keys.length !== header.seats) {
+    return 'veil.header.seats';
+  }
+  if (header.keys.some((key) => !isBoundedString(key, MAX_KEY))) return 'veil.header.key';
+  if (new Set(header.keys as string[]).size !== header.keys.length) {
+    return 'veil.header.duplicate-key';
+  }
+  if (!Array.isArray(header.deck) || header.deck.length === 0 || header.deck.length > MAX_DECK) {
+    return 'veil.header.deck';
+  }
+  if (header.deck.some((card) => !isBoundedString(card, MAX_ID))) return 'veil.header.card';
+  if (new Set(header.deck as string[]).size !== header.deck.length) {
+    return 'veil.header.duplicate-card';
+  }
+  return 'veil.header';
+}
+
+function entryFault(entry: Record<string, unknown>): string {
+  if (!isSignedEntry(entry)) {
+    if (
+      entry.kind === 'ceremony.layer' &&
+      isRecord(entry.payload) &&
+      Array.isArray(entry.payload.deck)
+    ) {
+      const bad = entry.payload.deck.find((card) => !isHex(card, ELEMENT_HEX));
+      if (bad !== undefined) return 'veil.entry.deck';
+    }
+    if (typeof entry.previous === 'string' && !isHex(entry.previous, HASH_HEX)) {
+      return 'veil.entry.previous';
+    }
+    if (typeof entry.hash === 'string' && !isHex(entry.hash, HASH_HEX)) return 'veil.entry.hash';
+    if (typeof entry.signature === 'string' && !isBoundedString(entry.signature, MAX_SIGNATURE)) {
+      return 'veil.entry.signature';
+    }
+    return 'veil.entry';
+  }
+  return 'veil.entry';
 }

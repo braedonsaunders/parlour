@@ -233,7 +233,7 @@ export class P2PTransport implements Transport {
    */
   sendVeil(message: VeilMessage, to: string | null = null): void {
     this.assertReady();
-    const envelope: WireMessage = { type: 'veil', to, message };
+    const envelope: WireMessage = { type: 'veil', to: to ?? null, message };
     if (to === null) this.broadcast(envelope);
     else this.sendTo(to, envelope);
   }
@@ -390,6 +390,7 @@ export class P2PTransport implements Transport {
     const link = this.links.get(peerId);
     if (!link) return;
     link.channel = channel;
+    channel.binaryType = 'arraybuffer';
     channel.onopen = () => {
       // A peer that reaches an open channel has spent none of its redials: the
       // cap is there for a peer that has left, not one on a flaky phone.

@@ -67,6 +67,12 @@ const validMessages = [
   { type: 'sync.request', expectedSeq: 2 },
   { type: 'sync.snapshot', snapshot: migration },
   { type: 'emote', emote: 'gg' },
+  {
+    type: 'veil',
+    to: null,
+    message: { type: 'veil.hello', seat: 0, publicKey: 'k0' },
+  },
+  { type: 'veil', message: { type: 'veil.catchup.request' } },
 ] as const;
 
 describe('wire message schema', () => {
@@ -209,9 +215,42 @@ describe('wire ingress dispatch', () => {
   it('rejects non-text channel payloads at the same boundary', () => {
     const receive = vi.fn();
     const report = vi.fn();
-    dispatchWireData(new ArrayBuffer(4), receive, report);
+    dispatchWireData({}, receive, report);
     expect(receive).not.toHaveBeenCalled();
     expect(report).toHaveBeenCalledWith('Malformed multiplayer packet');
+  });
+
+  it('decodes an ArrayBuffer text frame instead of calling it malformed', () => {
+    const receive = vi.fn();
+    const report = vi.fn();
+    const body = JSON.stringify({ type: 'heartbeat', sentAt: 1 });
+    dispatchWireData(new TextEncoder().encode(body), receive, report);
+    expect(report).not.toHaveBeenCalled();
+    expect(receive).toHaveBeenCalledWith({ type: 'heartbeat', sentAt: 1 });
+  });
+
+  it('names the inner veil message when a start packet fails the schema', () => {
+    const report = vi.fn();
+    dispatchWireData(
+      JSON.stringify({
+        type: 'veil',
+        to: null,
+        message: {
+          type: 'veil.header',
+          header: {
+            roundId: 'AB2Z:1:0',
+            gameId: 'blitz',
+            rulesHash: 'a'.repeat(64),
+            seats: 2,
+            keys: ['same', 'same'],
+            deck: ['S1', 'S2'],
+          },
+        },
+      }),
+      vi.fn(),
+      report,
+    );
+    expect(report).toHaveBeenCalledWith('Malformed multiplayer packet (veil.header.duplicate-key)');
   });
 
   it('reports async receiver rejection without an unhandled promise', async () => {

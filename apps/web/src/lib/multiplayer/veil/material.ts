@@ -48,6 +48,12 @@ export interface VeilRoundMaterial {
   /** hex, the root every layer in this room is derived from */
   masterSeed: string;
   identity: VeilIdentity;
+  /**
+   * True when this seat already had keys for the room. A first sit-down must
+   * not ask the table to replay a round that has not started — older builds
+   * treat `veil.catchup.request` as a malformed packet.
+   */
+  resumed: boolean;
 }
 
 interface StoredMaterial {
@@ -104,6 +110,7 @@ export async function loadRoundMaterial(
           owner,
           masterSeed: stored.masterSeed,
           identity: await restoreIdentity(stored.privateKey, stored.publicKey),
+          resumed: true,
         };
       }
     } catch {
@@ -115,6 +122,7 @@ export async function loadRoundMaterial(
     owner,
     masterSeed: randomSeed(),
     identity: await createIdentity(),
+    resumed: false,
   };
   await saveRoundMaterial(material);
   return material;

@@ -58,6 +58,8 @@ describe('a seat that comes back', () => {
   it('keeps its master seed and its signing key across a reload', async () => {
     const first = await loadRoundMaterial(ROOM, OWNER);
     const second = await loadRoundMaterial(ROOM, OWNER);
+    expect(first.resumed).toBe(false);
+    expect(second.resumed).toBe(true);
     expect(second.masterSeed).toBe(first.masterSeed);
     expect(second.identity.publicKey).toBe(first.identity.publicKey);
   });

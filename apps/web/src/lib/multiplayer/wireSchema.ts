@@ -1,7 +1,7 @@
 import type { AppliedEvent, FxEvent, SeatId } from '@parlour/engine';
 import { isDealDigest } from './dealSeed';
 import { EMOTES } from './emotes';
-import { isVeilMessage, type VeilMessage } from './veil/wire';
+import { isVeilMessage, veilWireFault, type VeilMessage } from './veil/wire';
 import type {
   AppliedPacket,
   Emote,
@@ -461,8 +461,9 @@ function isWireMessage(value: unknown): value is WireMessage {
       return hasOnlyKeys(value, ['type', 'nonce']) && isDealDigest(value.nonce);
     case 'veil':
       return (
-        hasOnlyKeys(value, ['type', 'to', 'message']) &&
-        (value.to === null || isBoundedString(value.to)) &&
+        (hasOnlyKeys(value, ['type', 'to', 'message']) ||
+          hasOnlyKeys(value, ['type', 'message'])) &&
+        (value.to === undefined || value.to === null || isBoundedString(value.to)) &&
         isVeilMessage(value.message)
       );
     default:
@@ -493,9 +494,21 @@ function rejectionMessage(error: unknown): string {
  * input on its way to the screen, so it is bounded and stripped to the shape a
  * real message type has.
  */
+function wireText(data: unknown): string | null {
+  if (typeof data === 'string') return data;
+  if (data instanceof ArrayBuffer) return new TextDecoder().decode(data);
+  if (ArrayBuffer.isView(data)) {
+    return new TextDecoder().decode(data as ArrayBufferView);
+  }
+  return null;
+}
+
 function describeMalformed(data: string): string {
   try {
     const value: unknown = JSON.parse(data);
+    if (isRecord(value) && value.type === 'veil') {
+      return `Malformed multiplayer packet (${veilWireFault(value)})`;
+    }
     if (isRecord(value) && typeof value.type === 'string') {
       const type = value.type.replace(/[^a-zA-Z0-9.]/g, '').slice(0, 32);
       if (type) return `Malformed multiplayer packet (${type})`;
@@ -518,13 +531,21 @@ export function dispatchWireData(
       // A consumer error must not turn hostile input into an uncaught channel callback.
     }
   };
-  if (typeof data !== 'string') {
+  const text = wireText(data);
+  if (text === null) {
+    if (typeof Blob !== 'undefined' && data instanceof Blob) {
+      void data.text().then(
+        (blobText) => dispatchWireData(blobText, receive, report),
+        () => safeReport('Malformed multiplayer packet'),
+      );
+      return;
+    }
     safeReport('Malformed multiplayer packet');
     return;
   }
-  const message = parseWire(data);
+  const message = parseWire(text);
   if (!message) {
-    safeReport(describeMalformed(data));
+    safeReport(describeMalformed(text));
     return;
   }
   try {

@@ -526,10 +526,11 @@ export class MultiplayerRoomSession {
     this.veil = { session, room };
     await room.announce();
     if (this.transport !== transport) return;
-    // Ask the table to replay the round. A room that has not dealt yet has
-    // nothing to send and simply does not answer, so this costs a lobby
-    // nothing and is the whole story for a seat that is coming back.
-    room.requestCatchUp();
+    // Only a seat that already sat here needs the transcript replayed. A
+    // first join used to broadcast `veil.catchup.request` in the lobby;
+    // builds that predate that message refuse it as a malformed packet,
+    // which is exactly "join works, host start dies" when one peer is older.
+    if (material.resumed) room.requestCatchUp();
   }
 
   private publishCeremonyProgress(): void {
