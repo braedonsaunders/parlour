@@ -2,14 +2,15 @@ import { gsap } from 'gsap';
 import { describe, expect, it, vi } from 'vitest';
 import {
   POWER2_IN,
-  POWER2_OUT,
   SINE_IN_OUT,
   gsapPower2In,
   gsapPower2InOut,
   gsapPower2Out,
 } from './waapi-eases';
 import {
+  FLIGHT_XY_SAMPLES,
   cancelWaapiAnimations,
+  flightXy,
   isCardFlightCue,
   planCardFlight,
   playCardFlight,
@@ -56,6 +57,12 @@ function px(transform: string): number {
   return Number(match?.[0]);
 }
 
+function translateXy(transform: string): { x: number; y: number } {
+  const match = /translate\(\s*([-+]?\d*\.?\d+)px\s*,\s*([-+]?\d*\.?\d+)px\s*\)/.exec(transform);
+  expect(match, `expected translate(x, y) in ${transform}`).toBeTruthy();
+  return { x: Number(match?.[1]), y: Number(match?.[2]) };
+}
+
 function gsapX(spec: CardFlightSpec, t: number): number {
   return spec.fromX + (spec.toX - spec.fromX) * gsapPower2InOut(t);
 }
@@ -97,33 +104,31 @@ describe('isCardFlightCue', () => {
 });
 
 describe('planCardFlight', () => {
-  it('splits x onto power2.inOut halves and y onto the 48/52 arc', () => {
-    const x = layer(planCardFlight(land), 'element', 0);
-    const y = layer(planCardFlight(land), 'element', 1);
-    expect(x?.options.composite).toBe('add');
-    expect(y?.options.composite).toBe('add');
-    expect(x?.options.delay).toBe(80);
-    expect(x?.options.duration).toBe(200);
-    expect(x?.options.fill).toBe('forwards');
+  it('puts x and y on one replace translate so WebKit cannot drop the x motion', () => {
+    const xy = layer(planCardFlight(land), 'element', 0);
+    expect(xy?.options.composite).not.toBe('add');
+    expect(xy?.options.delay).toBe(80);
+    expect(xy?.options.duration).toBe(200);
+    expect(xy?.options.fill).toBe('forwards');
+    expect(xy?.keyframes).toHaveLength(FLIGHT_XY_SAMPLES + 1);
 
-    expect(px(transformAt(x!.keyframes, 0))).toBeCloseTo(gsapX(land, 0), 10);
-    expect(px(transformAt(x!.keyframes, 0.5))).toBeCloseTo(gsapX(land, 0.5), 10);
-    expect(px(transformAt(x!.keyframes, 1))).toBeCloseTo(gsapX(land, 1), 10);
-    expect(x!.keyframes[0]?.easing).toBe(POWER2_IN);
-    expect(x!.keyframes[1]?.easing).toBe(POWER2_OUT);
-
-    expect(px(transformAt(y!.keyframes, 0))).toBeCloseTo(gsapY(land, 0), 10);
-    expect(px(transformAt(y!.keyframes, 0.48))).toBeCloseTo(gsapY(land, 0.48), 10);
-    expect(px(transformAt(y!.keyframes, 1))).toBeCloseTo(gsapY(land, 1), 10);
-    expect(y!.keyframes[0]?.easing).toBe(POWER2_OUT);
-    expect(y!.keyframes[1]?.easing).toBe(POWER2_IN);
+    const start = translateXy(transformAt(xy!.keyframes, 0));
+    const mid = translateXy(transformAt(xy!.keyframes, 0.5));
+    const end = translateXy(transformAt(xy!.keyframes, 1));
+    expect(start).toEqual(flightXy(land, 0));
+    expect(mid.x).toBeCloseTo(gsapX(land, 0.5), 10);
+    expect(mid.y).toBeCloseTo(gsapY(land, 0.5), 10);
+    expect(end).toEqual(flightXy(land, 1));
+    expect(start.x).not.toBe(0);
+    expect(end.x).not.toBe(0);
   });
 
   it('uses power2.inOut on the descent of a hand-off, split at mid-arc', () => {
-    const y = layer(planCardFlight(handoff), 'element', 1);
-    expect(px(transformAt(y!.keyframes, 0.74))).toBeCloseTo(gsapY(handoff, 0.74), 10);
-    expect(y!.keyframes[1]?.easing).toBe(POWER2_IN);
-    expect(y!.keyframes[2]?.easing).toBe(POWER2_OUT);
+    expect(flightXy(handoff, 0.74).y).toBeCloseTo(gsapY(handoff, 0.74), 10);
+    const xy = layer(planCardFlight(handoff), 'element', 0);
+    const at = xy!.keyframes.find((frame) => frame.offset === 0.75);
+    expect(at, 'missing 0.75 sample').toBeTruthy();
+    expect(translateXy(String(at?.transform)).y).toBeCloseTo(flightXy(handoff, 0.75).y, 10);
   });
 
   it('keeps the same rotate/scale flight ease and the two settle shapes', () => {
@@ -155,12 +160,12 @@ describe('planCardFlight', () => {
   });
 
   it('holds the flyer visible until the GSAP hide time, then fades or snaps', () => {
-    const pile = layer(planCardFlight(land), 'element', 2);
+    const pile = layer(planCardFlight(land), 'element', 1);
     expect(pile?.keyframes).toEqual([
       { opacity: 1, offset: 0, easing: 'step-end' },
       { opacity: 0, offset: 1 },
     ]);
-    const seat = layer(planCardFlight(handoff), 'element', 2);
+    const seat = layer(planCardFlight(handoff), 'element', 1);
     expect(seat?.keyframes[1]?.offset).toBeCloseTo((0.2 + 0.08 * 0.45) / 0.28, 10);
     expect(seat?.keyframes[1]?.easing).toBe(POWER2_IN);
   });
@@ -188,7 +193,10 @@ describe('playCardFlight', () => {
 
     const animations = playCardFlight({ element, card, trail, glint }, land);
     expect(calls.length).toBeGreaterThanOrEqual(5);
-    expect(calls.some((call) => call.options.composite === 'add')).toBe(true);
+    expect(calls.every((call) => call.options.composite !== 'add')).toBe(true);
+    expect(
+      calls.some((call) => String(call.keyframes[0]?.transform ?? '').includes('translate(')),
+    ).toBe(true);
     expect(calls.every((call) => call.options.fill === 'forwards')).toBe(true);
     expect(calls.every((call) => call.options.delay === 80)).toBe(false);
     expect(calls.filter((call) => call.el === glint)[0]?.options.delay).toBe(80 + 200);
@@ -197,5 +205,25 @@ describe('playCardFlight', () => {
     expect(cancel).toHaveBeenCalledTimes(animations.length);
     expect(element.getAttribute('style')).toBeNull();
     expect(card.getAttribute('style')).toBeNull();
+  });
+
+  it('hides the flyer after every layer finishes so a leftover cannot sit at left:0', async () => {
+    const element = document.createElement('div');
+    const card = document.createElement('span');
+    const trail = document.createElement('i');
+    const glint = document.createElement('i');
+    for (const node of [element, card, trail, glint]) {
+      node.animate = (() =>
+        ({
+          cancel: vi.fn(),
+          finished: Promise.resolve({} as Animation),
+        }) as unknown as Animation) as typeof node.animate;
+    }
+
+    playCardFlight({ element, card, trail, glint }, land);
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(element.style.visibility).toBe('hidden');
+    expect(element.style.opacity).toBe('0');
   });
 });

@@ -6,6 +6,9 @@ import {
   POWER2_OUT,
   SINE_IN_OUT,
   gsapBackOut,
+  gsapPower2In,
+  gsapPower2InOut,
+  gsapPower2Out,
   power2InOutMid,
 } from '@/lib/table/waapi-eases';
 
@@ -81,10 +84,11 @@ function flightOptions(
 }
 
 /**
- * X and Y are separate `transform` animations with `composite: 'add'` so each
- * can keep its own GSAP ease. They compose as translate(x, y) on top of the
- * flyer's CSS `translate: -50% -50%`, which is how GSAP's `x` / `y` sat on
- * `.flyingCard` today.
+ * One `translate(x, y)` on the flyer, sampled so X and Y can keep their own
+ * GSAP eases. Two additive `transform` animations used to do that, but WebKit
+ * drops `composite: 'add'` on `transform` — X never leaves 0, so every
+ * opponent deal parks a cutoff card on the left edge until the next burst
+ * unmounts the leftover flyers.
  */
 export function planCardFlight(spec: CardFlightSpec): PlannedFlight[] {
   const flight = spec.flightDuration;
@@ -93,13 +97,8 @@ export function planCardFlight(spec: CardFlightSpec): PlannedFlight[] {
   const planned: PlannedFlight[] = [
     {
       layer: 'element',
-      keyframes: xKeyframes(spec),
-      options: flightOptions(spec, flight, { composite: 'add' }),
-    },
-    {
-      layer: 'element',
-      keyframes: yKeyframes(spec),
-      options: flightOptions(spec, flight, { composite: 'add' }),
+      keyframes: xyKeyframes(spec),
+      options: flightOptions(spec, flight),
     },
     {
       layer: 'element',
@@ -148,42 +147,66 @@ export function playCardFlight(targets: CardFlightTargets, spec: CardFlightSpec)
     if (!node || typeof node.animate !== 'function') continue;
     animations.push(node.animate(step.keyframes, step.options));
   }
+  hideFlyerWhenSettled(targets.element, animations);
   return animations;
+}
+
+function hideFlyerWhenSettled(element: HTMLElement, animations: readonly Animation[]): void {
+  const finished = animations.flatMap((animation) =>
+    animation.finished !== undefined ? [animation.finished] : [],
+  );
+  if (finished.length === 0) return;
+  void Promise.all(finished)
+    .then(() => {
+      element.style.visibility = 'hidden';
+      element.style.opacity = '0';
+    })
+    .catch(() => {
+      /* cancelled — leave the node alone so cleanup can revert */
+    });
 }
 
 export function cancelWaapiAnimations(animations: readonly Animation[]): void {
   for (const animation of animations) animation.cancel();
 }
 
-function xKeyframes(spec: CardFlightSpec): Keyframe[] {
-  const midX = power2InOutMid(spec.fromX, spec.toX);
-  return [
-    { transform: `translateX(${spec.fromX}px)`, offset: 0, easing: POWER2_IN },
-    { transform: `translateX(${midX}px)`, offset: 0.5, easing: POWER2_OUT },
-    { transform: `translateX(${spec.toX}px)`, offset: 1 },
-  ];
+/** Samples per flight so the arc stays smooth without additive transforms. */
+export const FLIGHT_XY_SAMPLES = 16;
+
+function xyKeyframes(spec: CardFlightSpec): Keyframe[] {
+  const frames: Keyframe[] = [];
+  for (let i = 0; i <= FLIGHT_XY_SAMPLES; i += 1) {
+    const t = i / FLIGHT_XY_SAMPLES;
+    const { x, y } = flightXy(spec, t);
+    frames.push({ transform: `translate(${x}px, ${y}px)`, offset: t });
+  }
+  return frames;
 }
 
-function yKeyframes(spec: CardFlightSpec): Keyframe[] {
-  const up: Keyframe = {
-    transform: `translateY(${spec.fromY}px)`,
-    offset: 0,
-    easing: POWER2_OUT,
-  };
+export function flightXy(spec: CardFlightSpec, t: number): { x: number; y: number } {
+  return { x: flightX(spec, t), y: flightY(spec, t) };
+}
+
+function flightX(spec: CardFlightSpec, t: number): number {
+  return spec.fromX + (spec.toX - spec.fromX) * gsapPower2InOut(t);
+}
+
+function flightY(spec: CardFlightSpec, t: number): number {
+  if (t <= 0.48) {
+    const local = t / 0.48;
+    return spec.fromY + (spec.arcPeak - spec.fromY) * gsapPower2Out(local);
+  }
   if (spec.handoff) {
     const midY = power2InOutMid(spec.arcPeak, spec.toY);
-    return [
-      up,
-      { transform: `translateY(${spec.arcPeak}px)`, offset: 0.48, easing: POWER2_IN },
-      { transform: `translateY(${midY}px)`, offset: 0.74, easing: POWER2_OUT },
-      { transform: `translateY(${spec.toY}px)`, offset: 1 },
-    ];
+    if (t <= 0.74) {
+      const local = (t - 0.48) / 0.26;
+      return spec.arcPeak + (midY - spec.arcPeak) * gsapPower2In(local);
+    }
+    const local = (t - 0.74) / 0.26;
+    return midY + (spec.toY - midY) * gsapPower2Out(local);
   }
-  return [
-    up,
-    { transform: `translateY(${spec.arcPeak}px)`, offset: 0.48, easing: POWER2_IN },
-    { transform: `translateY(${spec.toY}px)`, offset: 1 },
-  ];
+  const local = (t - 0.48) / 0.52;
+  return spec.arcPeak + (spec.toY - spec.arcPeak) * gsapPower2In(local);
 }
 
 function opacityKeyframes(spec: CardFlightSpec, total: number): Keyframe[] {
