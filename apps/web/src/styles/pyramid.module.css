@@ -37,9 +37,10 @@
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   gap: 0.45rem;
+  padding-top: 0.45rem;
   max-width: 46rem;
   margin-inline: auto;
-  overflow: hidden;
+  overflow: visible;
   container-type: size;
   /* 7 overlapped rows + locked stock row: 4.16 card-heights + ~1.8rem chrome. */
   --py-card: min(4.6rem, calc((100cqw - 6 * var(--py-gap)) / 7), calc((100cqh - 2.6rem) / 6.15));
@@ -56,7 +57,7 @@
   height: calc(var(--py-card-h) + 1.35rem);
   min-height: calc(var(--py-card-h) + 1.35rem);
   max-height: calc(var(--py-card-h) + 1.35rem);
-  overflow: hidden;
+  overflow: visible;
 }
 
 .pileWrap {
@@ -121,16 +122,17 @@ button.pileButton,
   filter: none;
 }
 
-.board [data-just-drawn] > [data-card-chassis] {
+.board [data-just-drawn] {
+  border-radius: 0.75rem;
   box-shadow:
     0 0 0 3px var(--py-fresh),
     0 0 22px rgba(126, 224, 176, 0.5);
 }
 
-.pyramidCard[data-playable='true'] > [data-card-chassis],
-.pyramidCard[data-selected] > [data-card-chassis],
-.pileButton[data-playable='true'] [data-card-chassis],
-.pileButton[data-selected] [data-card-chassis] {
+.pyramidCard[data-playable='true'],
+.pyramidCard[data-selected],
+.pileButton[data-playable='true'],
+.pileButton[data-selected] {
   box-shadow:
     0 0 0 3px var(--py-select),
     0 0 22px rgba(255, 196, 106, 0.45);
@@ -209,6 +211,11 @@ button.pileButton,
   padding: 0;
   border: 0;
   background: transparent;
+}
+
+.cardSlot,
+.emptySlot {
+  pointer-events: none;
 }
 
 .pyramidCard :global(button.card:not(:disabled):hover) {

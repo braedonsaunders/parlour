@@ -583,8 +583,10 @@
 button.card {
   cursor: pointer;
 }
-button.card:not(:disabled):hover {
-  transform: translateY(-11px) rotate(var(--card-rotation)) scale(1.04);
+@media (hover: hover) and (pointer: fine) {
+  button.card:not(:disabled):hover {
+    transform: translateY(-11px) rotate(var(--card-rotation)) scale(1.04);
+  }
 }
 .cardCompact {
   width: clamp(3rem, 4.2vw, 4rem);

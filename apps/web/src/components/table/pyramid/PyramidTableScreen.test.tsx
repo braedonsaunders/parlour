@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -138,6 +140,12 @@ describe('PyramidTableScreen', () => {
         ?.click(),
     );
     expect(onDispatch).toHaveBeenCalledWith('pyramid.pair', { a: { row: 6, col: 0 }, b: 'waste' });
+  });
+
+  it('lets clicks pass through empty pyramid slots onto the card above', () => {
+    const css = readFileSync(join(process.cwd(), 'src/styles/pyramid.module.css'), 'utf8');
+    expect(css).toMatch(/\.emptySlot\s*\{[^}]*pointer-events:\s*none;/s);
+    expect(css).toMatch(/\.board\s*\{[^}]*overflow:\s*visible;/s);
   });
 
   it('keeps the bottom row free so the opening cards can be tapped', () => {

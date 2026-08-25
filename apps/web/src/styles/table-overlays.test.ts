@@ -217,4 +217,10 @@ describe('table compositor diet', () => {
       /filter:/,
     );
   });
+
+  it('keeps the card hover lift off touch so the tap target does not slide away', () => {
+    expect(table).toMatch(
+      /@media \(hover:\s*hover\) and \(pointer:\s*fine\)\s*\{[\s\S]*?button\.card:not\(:disabled\):hover\s*\{[^}]*translateY\(-11px\)/,
+    );
+  });
 });
