@@ -123,7 +123,7 @@ instead of being bolted on.
 
 - **Moves are pure reducers** that emit an ordered **fx timeline**. The UI animates _only_ from fx events — never by diffing state. That's why deals cascade and cards arc instead of teleporting.
 - **Real-time and turn-based share one runtime.** A slap window, an out-of-turn jump-in, and an ordinary trick are all the same kind of move to the engine.
-- **Veiled decks are an engine primitive.** A veiled room deals opaque handles instead of card faces; reveals record their mapping in the log so replay still reproduces the round exactly.
+- **Veiled decks are an engine primitive.** The protocol can deal opaque handles and record reveals in the log. Friend rooms do not use it — they play the open collaborative deal, the same replay on every peer.
 - **Games are packages, not engine branches.** Every game on the shelf was written against the public engine API.
 
 | A new game inherits for free | |

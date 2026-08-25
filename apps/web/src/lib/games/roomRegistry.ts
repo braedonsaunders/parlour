@@ -1,4 +1,7 @@
 /**
+ * Stale draft. Live rooms use `apps/web/src/lib/rooms/gameRegistry.ts`.
+ * Friend rooms deal open; do not add a privacy tier here.
+ *
  * The room-side game registry — one entry per game, replacing four parallel
  * `gameId === '…'` ladders.
  *
@@ -87,7 +90,7 @@ import {
   type GinMatchState,
 } from '@parlour/game-gin';
 import { EngineAuthority } from '@/lib/multiplayer/EngineAuthority';
-import type { AuthorityAdapter, RoomSecurity, RoomSettings } from '@/lib/multiplayer/types';
+import type { AuthorityAdapter, RoomSettings } from '@/lib/multiplayer/types';
 import { botTurns, type BotTurn } from '@/app/_multiplayer/botSeats';
 import { seatRangeFor, type SeatRange } from '@/lib/rooms/seatRange';
 
@@ -236,17 +239,12 @@ function defineRoomGame<S, C extends RuleValues>(pack: RoomGamePack<S, C>): Room
       if (pack.seatsRefusal && settings.seats !== pack.seatsRefusal.seats) {
         throw new Error(pack.seatsRefusal.message);
       }
-      const asked: RoomSecurity = settings.security === 'veil' ? 'veil' : 'open';
-      // Say no out loud rather than quietly downgrading. Advertising a
-      // cryptographic tier the engine does not back would be a lie told to the
-      // one person relying on it.
-      if (asked === 'veil' && veilRefusal) throw new Error(veilRefusal);
       const resolved = pack.configSchema.resolve(settings.config as Partial<C>);
       return {
         gameId,
         seats: settings.seats,
         config: pack.roomConfig ? pack.roomConfig(resolved) : resolved,
-        security: veilRefusal ? 'open' : asked,
+        security: 'open',
       };
     },
 

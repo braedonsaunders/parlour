@@ -24,25 +24,26 @@ network. ESLint fails the build on all four.
 
 ## 3. Add a room registry entry — only if it has multiplayer
 
-`apps/web/src/lib/games/roomRegistry.ts`:
+`apps/web/src/lib/rooms/gameRegistry.ts`:
 
 ```ts
-defineRoomGame<MyState, MyRules>({
-  gameId: 'mygame',
-  def: createMyDef,
+definePack<MyState, MyRules>({
+  id: 'mygame',
+  name: 'My Game',
   configSchema: myConfig,
+  createDef: createMyDef,
   // optional:
-  veilRefusal: 'why this game cannot run a veiled room',
-  seatsRefusal: { seats: 2, message: 'MyGame rooms need exactly two seats' },
-  roomConfig: (config) => ({ ...config, someRoomOnlyNarrowing: 1 }),
-  recycleOn: 'draw', // the move that can exhaust the stock under Veil
+  clampConfig: (config) => ({ ...config, someRoomOnlyNarrowing: 1 }),
+  recyclableStock: (state, move) => (move === 'draw' ? spentDiscard(state) : null),
 });
 ```
 
+Friend rooms deal in the open — one replayable log for every title. Veil stays
+on the engine as unused protocol; do not add a room-level privacy tier.
+
 Add its seat ring to `apps/web/src/lib/rooms/seatRange.ts`. That is the whole
 multiplayer surface: settings validation, session construction, the engine
-authority, bot turns for dropped seats, and the veil recycle rule all come from
-this one object.
+authority, and bot turns for dropped seats all come from this one object.
 
 ## 4. Add a table pack
 

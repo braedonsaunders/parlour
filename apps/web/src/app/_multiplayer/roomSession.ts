@@ -131,7 +131,7 @@ const RECONNECT_GRACE_MS = 45_000;
 
 /**
  * Opening a room takes no privacy tier, because nobody is asked for one.
- * {@link tierFor} derives it from the game the room is for.
+ * {@link tierFor} is always open: friend rooms share one replayable deal.
  */
 type CreateRoomOptions = {
   seats: number;
@@ -1623,17 +1623,16 @@ async function waitForVeilKeys(room: VeilRoom): Promise<void> {
 }
 
 /**
- * The strongest tier a game can honestly run — derived, never requested.
+ * Friend rooms play the engine's open rules.
  *
- * Nobody chooses this. A pack that ships a veil block and can actually run it
- * hides hands, so its rooms do; anything else plays the open tier with the
- * collaborative deal, and the badge says which is in force. Deriving it from
- * the game rather than reading it off the announcement also means a joining
- * peer computes the same answer as the host from the same game id, so a forged
- * announcement cannot talk a room down into the open tier.
+ * Veil is still in the tree as a protocol — packs may ship a veil block, and
+ * the ceremony tests still cover it — but it is not the deal path. Jump-ins,
+ * draws, recycles, showdowns and clocks are one replay for every game when
+ * hands are not hidden. A joining peer computes the same answer from the game
+ * id, so an announcement cannot talk a room into a tier the host is not running.
  */
-function tierFor(pack: RoomGamePack): RoomSecurity {
-  return pack.veilSupport() && !pack.veilRefusal ? 'veil' : 'open';
+function tierFor(): RoomSecurity {
+  return 'open';
 }
 
 /**
@@ -1650,7 +1649,7 @@ function resolveRoomSettings(settings: RoomSettings): RoomSettings {
     gameId: pack.id,
     seats: settings.seats,
     config: pack.resolveConfig(settings.config),
-    security: tierFor(pack),
+    security: tierFor(),
   };
 }
 

@@ -302,19 +302,25 @@ describe('multiplayer route composition', () => {
   });
 
   /**
-   * Every shipped game is veiled, so every room takes its unpredictability from
-   * the ceremony. The collaborative deal is the floor underneath that — what an
-   * open room does when a pack ships no veil block — and it is covered where it
-   * lives, in dealSeed.test.ts. What matters here is that no game is left on a
-   * different path.
+   * Friend rooms share one deal path — open replay — so no game is left on a
+   * private ceremony. Veil stays in the packs as unused protocol.
    */
-  it('runs every room game veiled, with none left in the open tier', () => {
-    // Read off the registry rather than a list kept here, so game eleven is
-    // covered the day it is added instead of the day somebody remembers.
+  it('deals every friend room in the open, so no game is on a private path', async () => {
     for (const gameId of MULTIPLAYER_GAME_IDS) {
       const pack = ROOM_GAMES[gameId];
-      expect(pack.veilSupport(), `${gameId} should ship a veil block`).not.toBeNull();
-      expect(pack.veilRefusal, `${gameId} should not refuse Veil`).toBeNull();
+      const seats = pack.seats.min;
+      const host = new MultiplayerRoomSession(
+        { name: 'Host', avatarId: 'ember', profileId: `open-tier-${gameId}` },
+        {
+          signaling: new MockSignalingBroker().signaling(`open-tier-${gameId}`),
+          peerConnection: new MockRtcNetwork().factory(`open-tier-${gameId}`),
+          seed: 3,
+        },
+      );
+      sessions.push(host);
+      await host.create({ gameId, seats });
+      expect(host.getSnapshot().settings?.security, gameId).toBe('open');
+      expect(host.getSnapshot().security.tier, gameId).toBe('open');
     }
   });
 
@@ -606,22 +612,22 @@ describe('multiplayer route composition', () => {
     expect(expectedRoomGameId()).toBeNull();
   });
 
-  it('runs the live Veil ceremony with each peer in its assigned seat', async () => {
+  it('opens the table on both peers with the same replayable hands', async () => {
     const broker = new MockSignalingBroker();
     const rtc = new MockRtcNetwork();
     const host = new MultiplayerRoomSession(
-      { name: 'Host', avatarId: 'ember', profileId: 'veil-host' },
+      { name: 'Host', avatarId: 'ember', profileId: 'open-deal-host' },
       {
-        signaling: broker.signaling('veil-host-peer'),
-        peerConnection: rtc.factory('veil-host'),
+        signaling: broker.signaling('open-deal-host-peer'),
+        peerConnection: rtc.factory('open-deal-host'),
         seed: 44,
       },
     );
     const guest = new MultiplayerRoomSession(
-      { name: 'Guest', avatarId: 'mint', profileId: 'veil-guest' },
+      { name: 'Guest', avatarId: 'mint', profileId: 'open-deal-guest' },
       {
-        signaling: broker.signaling('veil-guest-peer'),
-        peerConnection: rtc.factory('veil-guest'),
+        signaling: broker.signaling('open-deal-guest-peer'),
+        peerConnection: rtc.factory('open-deal-guest'),
         seed: 8,
       },
     );
@@ -636,8 +642,6 @@ describe('multiplayer route composition', () => {
     await host.start();
     await eventually(
       () => {
-        expect(host.getSnapshot().security.ceremony.ready).toBe(true);
-        expect(guest.getSnapshot().security.ceremony.ready).toBe(true);
         expect(host.getSnapshot().stage).toBe('table');
         expect(guest.getSnapshot().stage).toBe('table');
         const hostState = multiplayerSession<BlitzState, BlitzConfig>(
@@ -648,43 +652,33 @@ describe('multiplayer route composition', () => {
           guest.getSnapshot(),
           'blitz',
         )!.state;
-        expect(hostState.hands[0]!.some(isVeilHandle)).toBe(false);
-        expect(hostState.hands[1]!.every(isVeilHandle)).toBe(true);
-        expect(guestState.hands[1]!.some(isVeilHandle)).toBe(false);
-        expect(guestState.hands[0]!.every(isVeilHandle)).toBe(true);
+        expect(hostState.hands.flat().some(isVeilHandle)).toBe(false);
+        expect(guestState.hands.flat().some(isVeilHandle)).toBe(false);
+        expect(stateHash(guestState)).toBe(stateHash(hostState));
       },
       1_000,
       10,
     );
   }, 120_000);
 
-  /**
-   * The two-seat disconnect used to be the end of a veiled round: recovery
-   * needs somebody else to hold key material, and at two seats the only
-   * somebody is your opponent. A player who comes back rebuilds their own layer
-   * from their own material, so the round continues and nobody's hand is
-   * opened — which is what these assertions are really checking.
-   */
-  it('resumes a two-seat veiled round when the dropped player comes back', async () => {
+  it('awards a two-seat walkover when the opponent leaves mid-round', async () => {
     const broker = new MockSignalingBroker();
     const rtc = new MockRtcNetwork();
     const host = new MultiplayerRoomSession(
-      { name: 'Host', avatarId: 'ember', profileId: 'resume-host' },
+      { name: 'Host', avatarId: 'ember', profileId: 'walkover-host' },
       {
-        signaling: broker.signaling('resume-host-peer'),
-        peerConnection: rtc.factory('resume-host'),
+        signaling: broker.signaling('walkover-host-peer'),
+        peerConnection: rtc.factory('walkover-host'),
         seed: 77,
-        // Fast enough to notice a real drop inside a test, slow enough that a
-        // ceremony hogging the event loop is not mistaken for one.
         heartbeatIntervalMs: 20,
         heartbeatTimeoutMs: 2_000,
       },
     );
     const guest = new MultiplayerRoomSession(
-      { name: 'Guest', avatarId: 'mint', profileId: 'resume-guest' },
+      { name: 'Guest', avatarId: 'mint', profileId: 'walkover-guest' },
       {
-        signaling: broker.signaling('resume-guest-peer'),
-        peerConnection: rtc.factory('resume-guest'),
+        signaling: broker.signaling('walkover-guest-peer'),
+        peerConnection: rtc.factory('walkover-guest'),
         seed: 5,
         heartbeatIntervalMs: 20,
         heartbeatTimeoutMs: 2_000,
@@ -696,67 +690,20 @@ describe('multiplayer route composition', () => {
     await guest.join(room.code);
     await eventually(() => expect(guest.getSnapshot().localSeat).toBe(1));
     await host.start();
-    await eventually(
-      () => {
-        expect(host.getSnapshot().security.ceremony.ready).toBe(true);
-        expect(guest.getSnapshot().security.ceremony.ready).toBe(true);
-      },
-      1_000,
-      10,
-    );
+    await eventually(() => {
+      expect(host.getSnapshot().stage).toBe('table');
+      expect(guest.getSnapshot().stage).toBe('table');
+    });
 
-    // The guest's browser goes away mid-round.
     guest.close();
     await eventually(
       () => {
         expect(host.getSnapshot().seats.find((seat) => seat.seat === 1)?.connected).toBe(false);
-        // Held open, not recovered: the round is waiting for them, and no
-        // hand has been reopened to keep it moving.
-        expect(host.getSnapshot().security.paused).toMatch(/come back/i);
-        expect(host.getSnapshot().security.recoveredSeats).toEqual([]);
-      },
-      500,
-      10,
-    );
-
-    // Same profile, new browser session — a reload, or a phone that dropped.
-    const rejoined = new MultiplayerRoomSession(
-      { name: 'Guest', avatarId: 'mint', profileId: 'resume-guest' },
-      {
-        signaling: broker.signaling('resume-guest-back'),
-        peerConnection: rtc.factory('resume-back'),
-        seed: 6,
-        heartbeatIntervalMs: 20,
-        heartbeatTimeoutMs: 2_000,
-      },
-    );
-    sessions.push(rejoined);
-    await rejoined.join(room.code);
-
-    await eventually(
-      () => {
-        expect(rejoined.getSnapshot().localSeat).toBe(1);
-        // The round is live again on both sides, and nothing was recovered.
+        expect(host.getSnapshot().session?.result?.reason).toBe('opponent-left');
+        expect(host.getSnapshot().session?.result?.winner).toBe(0);
         expect(host.getSnapshot().security.paused).toBeNull();
-        expect(host.getSnapshot().security.recoveredSeats).toEqual([]);
-        expect(rejoined.getSnapshot().security.recoveredSeats).toEqual([]);
       },
       500,
-      10,
-    );
-
-    // And the seat can still read its own cards and nobody else's, which is
-    // only true if it rebuilt the very layer it laid before it dropped.
-    await eventually(
-      () => {
-        const state = multiplayerSession<BlitzState, BlitzConfig>(
-          rejoined.getSnapshot(),
-          'blitz',
-        )!.state;
-        expect(state.hands[1]!.some(isVeilHandle)).toBe(false);
-        expect(state.hands[0]!.every(isVeilHandle)).toBe(true);
-      },
-      1_000,
       10,
     );
   }, 120_000);
@@ -926,7 +873,7 @@ describe('multiplayer route composition', () => {
     );
   }, 120_000);
 
-  it('declines a veiled jump-in when this seat has no exact match', async () => {
+  it('declines a jump-in when this seat has no exact match', async () => {
     const broker = new MockSignalingBroker();
     const rtc = new MockRtcNetwork();
     const host = new MultiplayerRoomSession(
@@ -1400,11 +1347,7 @@ describe('multiplayer route composition', () => {
       await eventually(() => expect(peers[seat]!.getSnapshot().localSeat).toBe(seat), 200, 5);
     }
     await host.start();
-    await eventually(
-      () => expect(host.getSnapshot().security.ceremony.ready).toBe(true),
-      1_000,
-      10,
-    );
+    await eventually(() => expect(host.getSnapshot().stage).toBe('table'), 1_000, 10);
 
     host.send('draw.stock');
     await eventually(() =>
@@ -1433,14 +1376,10 @@ describe('multiplayer route composition', () => {
           connected: false,
           bot: true,
         });
-        // Recovered only after the hold expired, and named for it: the seat's
-        // cards are readable from here on and the badge does not hide that.
-        expect(host.getSnapshot().security.recoveredSeats).toContain(1);
+        // Open rooms do not pause for key material. The empty chair is a bot
+        // and the log stays intact. Whether the takeover bot has played yet is
+        // timing, so it is not asserted here.
         expect(host.getSnapshot().security.paused).toBeNull();
-        // The round is playable again — the log is intact and the table is not
-        // stuck on a layer nobody holds. Whether a takeover bot has *played* by
-        // now is timing, so it is not asserted here; botSeats covers the choice
-        // and veil/recovery.test.ts covers rebuilding the layer.
         expect(
           multiplayerSession<BlitzState, BlitzConfig>(host.getSnapshot(), 'blitz')!.log.length,
         ).toBeGreaterThanOrEqual(beforeDrop);
@@ -1777,7 +1716,7 @@ describe('crazy eights rooms on the shared stack', () => {
     }
   });
 
-  it('states the eights ring and deals its rounds veiled', async () => {
+  it('states the eights ring and deals its rounds in the open', async () => {
     const broker = new MockSignalingBroker();
     const rtc = new MockRtcNetwork();
     const host = new MultiplayerRoomSession(
@@ -1791,12 +1730,8 @@ describe('crazy eights rooms on the shared stack', () => {
     sessions.push(host);
     await expect(host.create({ gameId: 'eights', seats: 1 })).rejects.toThrow(/seat 2–6/);
     await expect(host.create({ gameId: 'eights', seats: 7 })).rejects.toThrow(/seat 2–6/);
-    // A round is priced from every hand's face value, which used to be the
-    // reason Crazy Eights could not be veiled. It settles behind a reveal
-    // phase now — every seat still holding cards opens them before the round
-    // is scored — so the table keeps the veil it advertises.
     await host.create({ gameId: 'eights', seats: 4 });
-    expect(host.getSnapshot().security.tier).toBe('veil');
+    expect(host.getSnapshot().security.tier).toBe('open');
   });
 });
 
@@ -1918,17 +1853,12 @@ describe('spades rooms on the shared stack', () => {
     );
   });
 
-  // Engine v1 Veil is gone. Saying so out loud beats quietly downgrading a
-  // player who explicitly asked for cryptographic play.
-  // Nobody asks for a tier any more, and every shipped game now ships a veil
-  // block — spades was the last one without. So every room is a veiled room,
-  // and no game is left on a different path.
-  it('runs spades veiled like every other game', () => {
+  it('keeps a veil block on the pack, unused by friend rooms', () => {
     expect(createSpadesDef().veil).toBeDefined();
     expect(createSpadesDef().veil!.redealMove).toBe('nextHand');
   });
 
-  it('resolves a spades room as veiled, with the pack defaults filled in', async () => {
+  it('resolves a spades room as open, with the pack defaults filled in', async () => {
     const host = new MultiplayerRoomSession(
       { name: 'Host', avatarId: 'ember', profileId: 'spades-open' },
       {
@@ -1940,8 +1870,7 @@ describe('spades rooms on the shared stack', () => {
     sessions.push(host);
     await host.create({ gameId: 'spades', seats: 4 });
     const settings = host.getSnapshot().settings!;
-    // Spades ships a veil block now, so its rooms are veiled like the rest.
-    expect(settings.security).toBe('veil');
+    expect(settings.security).toBe('open');
     expect(settings.seats).toBe(4);
     expect(settings.config).toMatchObject({ targetScore: 500, nil: true, bags: true });
   });
@@ -1987,7 +1916,7 @@ describe('spades rooms on the shared stack', () => {
     expect(session.config.bags).toBe(false);
   });
 
-  it('advertises the veiled tier it actually runs', async () => {
+  it('advertises the open tier it actually runs', async () => {
     const host = new MultiplayerRoomSession(
       { name: 'Host', avatarId: 'ember', profileId: 'spades-badge' },
       {
@@ -1999,10 +1928,7 @@ describe('spades rooms on the shared stack', () => {
     sessions.push(host);
     await host.create({ gameId: 'spades', seats: 4 });
     const security = host.getSnapshot().security;
-    expect(security.tier).toBe('veil');
-    // The badge has to state the tier in force. It once said "open" for spades
-    // because the pack had no veil block; claiming either one the room is not
-    // running is the failure this guards.
-    expect(`${security.label} ${security.detail}`.toLowerCase()).not.toContain('fair deal');
+    expect(security.tier).toBe('open');
+    expect(`${security.label} ${security.detail}`.toLowerCase()).toContain('fair deal');
   });
 });
