@@ -34,7 +34,12 @@ import {
   type SpadesState,
 } from '@parlour/game-spades';
 import { spadesModeForRules } from '@/lib/spades/modes';
-import { wildpileConfig, type WildpileRules, type WildpileState } from '@parlour/game-wildpile';
+import {
+  wildpileConfig,
+  wildpileFace,
+  type WildpileRules,
+  type WildpileState,
+} from '@parlour/game-wildpile';
 import { afterEach, describe, expect, it } from 'vitest';
 import { EngineAuthority } from '@/lib/multiplayer';
 import { NostrSignaling, type SignalPayload } from '@/lib/multiplayer/NostrSignaling';
@@ -907,12 +912,94 @@ describe('multiplayer route composition', () => {
 
     await eventually(
       () => {
-        expect(
-          multiplayerSession<WildpileState, WildpileRules>(host.getSnapshot(), 'wildpile')?.log
-            .length,
-        ).toBe(before + 1);
+        const after = multiplayerSession<WildpileState, WildpileRules>(
+          host.getSnapshot(),
+          'wildpile',
+        )!;
+        expect(after.log.length).toBeGreaterThan(before);
+        expect(after.log.some((event) => event.move === 'playCard')).toBe(true);
         expect(host.getSnapshot().error).toBeNull();
         expect(guest.getSnapshot().error).toBeNull();
+      },
+      1_000,
+      10,
+    );
+  }, 120_000);
+
+  it('declines a veiled jump-in when this seat has no exact match', async () => {
+    const broker = new MockSignalingBroker();
+    const rtc = new MockRtcNetwork();
+    const host = new MultiplayerRoomSession(
+      { name: 'Host', avatarId: 'ember', profileId: 'wild-jump-host' },
+      {
+        signaling: broker.signaling('wild-jump-host-peer'),
+        peerConnection: rtc.factory('host'),
+        seed: 91,
+      },
+    );
+    const guest = new MultiplayerRoomSession(
+      { name: 'Guest', avatarId: 'mint', profileId: 'wild-jump-guest' },
+      {
+        signaling: broker.signaling('wild-jump-guest-peer'),
+        peerConnection: rtc.factory('guest'),
+        seed: 7,
+      },
+    );
+    sessions.push(host, guest);
+
+    const room = await host.create({
+      gameId: 'wildpile',
+      seats: 2,
+      config: applyPreset(wildpileConfig, 'party'),
+    });
+    await guest.join(room.code);
+    await eventually(() => expect(guest.getSnapshot().localSeat).toBe(1));
+    await host.start();
+    await eventually(() => {
+      expect(host.getSnapshot().stage).toBe('table');
+      expect(guest.getSnapshot().stage).toBe('table');
+    });
+    await eventually(
+      () => {
+        const hostHand =
+          multiplayerSession<WildpileState, WildpileRules>(host.getSnapshot(), 'wildpile')?.state
+            .hands[0] ?? [];
+        const guestHand =
+          multiplayerSession<WildpileState, WildpileRules>(guest.getSnapshot(), 'wildpile')?.state
+            .hands[1] ?? [];
+        expect(hostHand.every((card) => !isVeilHandle(card))).toBe(true);
+        expect(guestHand.every((card) => !isVeilHandle(card))).toBe(true);
+      },
+      1_000,
+      10,
+    );
+
+    const actor = multiplayerSession<WildpileState, WildpileRules>(host.getSnapshot(), 'wildpile')!
+      .phase.actor;
+    const speaker = actor === 0 ? host : guest;
+    const other = actor === 0 ? guest : host;
+    const live = multiplayerSession<WildpileState, WildpileRules>(
+      speaker.getSnapshot(),
+      'wildpile',
+    )!;
+    const play = live.def.flow.legalMoves(live.state, live.phase).find((move) => {
+      if (move.id !== 'playCard') return false;
+      const card = (move.payload as { card?: string } | undefined)?.card;
+      return Boolean(card) && !wildpileFace(card!).meta.kind.startsWith('wild');
+    });
+    expect(play).toBeDefined();
+    speaker.send(play!.id, play!.payload);
+
+    await eventually(
+      () => {
+        const after = multiplayerSession<WildpileState, WildpileRules>(
+          other.getSnapshot(),
+          'wildpile',
+        )!;
+        expect(after.state.interrupt).toBeNull();
+        expect(after.phase.phase).toBe('play');
+        expect(other.getSnapshot().error).toBeNull();
+        expect(host.getSnapshot().error).toBeNull();
       },
       1_000,
       10,

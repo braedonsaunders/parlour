@@ -67,10 +67,14 @@ function payloadSeat(move: LegalMove): number | null {
   return typeof seat === 'number' ? seat : null;
 }
 
-function localDecision(phase: string): WildDecision {
+function localDecision(phase: string, offered: readonly LegalMove[]): WildDecision | null {
   if (phase === 'choose-color') return 'choose-color';
   if (phase === 'choose-target') return 'choose-target';
-  if (phase === 'interrupt') return 'jump-in';
+  if (phase === 'interrupt') {
+    // Veil opens this window to every seat. Only prompt when this hand can
+    // actually jump; a no-match is declined by the room, not the banner.
+    return offered.some((move) => move.id === 'playCard') ? 'jump-in' : null;
+  }
   return 'play';
 }
 
@@ -109,7 +113,7 @@ export function wildTableView(
     pendingDraw: state.pendingDraw,
     phaseLabel: wildPhaseLabel(snapshot.mode, state.pendingDraw),
     hand: state.hands[localSeat] ?? [],
-    decision: isLocalTurn ? localDecision(session.phase.phase) : null,
+    decision: isLocalTurn ? localDecision(session.phase.phase, offered) : null,
     lastCardArmed: state.calledLastCard[localSeat] ?? false,
     drawnCard: state.turn === localSeat ? state.drawnCard : null,
     challenge: challengeView(snapshot, localSeat),

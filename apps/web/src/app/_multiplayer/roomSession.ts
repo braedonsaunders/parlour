@@ -2,6 +2,7 @@
 
 import {
   isActingSeat,
+  isVeilHandle,
   resolveVeiledState,
   stateContainsCardId,
   type CardRecycle,
@@ -177,6 +178,8 @@ export class MultiplayerRoomSession {
   private dealRound = new DealSeedRound();
   private sequence = 0;
   private recycleActionPending = false;
+  /** A no-match jump-in is declined from here, so it cannot re-enter send. */
+  private autoDeclinePending = false;
   /** a veiled redeal ceremony already under way, so it cannot start twice */
   private redealPending = false;
   private openPending = false;
@@ -810,12 +813,24 @@ export class MultiplayerRoomSession {
     if (typeof named === 'string') wanted.add(named);
     if (wanted.size === 0) return {};
 
-    const byCard = new Map<string, string>();
-    for (const [handle, card] of veil.session.knownFaces()) byCard.set(card, handle);
+    const known = veil.session.knownFaces();
+    const liveByCard = new Map<string, string>();
+    for (const [handle, card] of known) {
+      // Recycle leaves stale handle→face rows behind. Only a handle still on
+      // the board can be opened; the last retired mapping would skip the live
+      // one and the engine would refuse a perfectly legal playCard.
+      if (stateHolds(state, handle)) liveByCard.set(card, handle);
+    }
     const reveals: (readonly [string, string])[] = [];
     for (const card of wanted) {
-      const handle = byCard.get(card);
-      if (handle && stateHolds(state, handle)) reveals.push([handle, card]);
+      if (isVeilHandle(card) && stateHolds(state, card)) {
+        const face = known.get(card);
+        if (face) reveals.push([card, face]);
+        continue;
+      }
+      if (stateHolds(state, card) && !isVeilHandle(card)) continue;
+      const handle = liveByCard.get(card);
+      if (handle) reveals.push([handle, card]);
     }
     return reveals.length > 0 ? { reveals } : {};
   }
@@ -1110,6 +1125,37 @@ export class MultiplayerRoomSession {
   private refreshView(): void {
     if (!this.authority) return;
     this.update({ session: this.presented(this.authority.getSession()) });
+    this.maybeAutoDeclineJump();
+  }
+
+  /**
+   * Veil jump-in is offered to every seat because the table cannot see hands.
+   * Once this seat has peeled and has no exact match, decline here — do not
+   * leave a "jump in?" prompt, and do not let a colour-match playCard land
+   * while the window is still open (that is the illegal-move the table printed).
+   */
+  private maybeAutoDeclineJump(): void {
+    if (
+      this.autoDeclinePending ||
+      !this.authority ||
+      !this.transport ||
+      this.snapshot.localSeat === null ||
+      this.snapshot.security.paused
+    ) {
+      return;
+    }
+    const session = this.presented(this.authority.getSession());
+    if (session.status !== 'playing' || session.phase.actor !== this.snapshot.localSeat) return;
+    const legal = session.def.flow.legalMoves(session.state as never, session.phase);
+    if (!legal.some((move) => move.id === 'declineJump')) return;
+    if (legal.some((move) => move.id === 'playCard')) return;
+    if (seatHandStillVeiled(session.state, this.snapshot.localSeat)) return;
+    this.autoDeclinePending = true;
+    try {
+      this.send('declineJump');
+    } finally {
+      this.autoDeclinePending = false;
+    }
   }
 
   private presented(session: MultiplayerGameSession): MultiplayerGameSession {
@@ -1245,6 +1291,7 @@ export class MultiplayerRoomSession {
     // board. Nothing else notices, because both are the room's job here.
     this.maybeDealVeiledHand();
     this.maybeOpenVeiledCards();
+    this.maybeAutoDeclineJump();
   }
 
   private acceptPresence(presence: PresenceEvent): void {
@@ -1514,6 +1561,14 @@ export function multiplayerSession<S, C extends RuleValues>(
 
 function stateHolds(state: unknown, handle: string): boolean {
   return stateContainsCardId(state, handle);
+}
+
+function seatHandStillVeiled(state: unknown, seat: number): boolean {
+  if (typeof state !== 'object' || state === null || !('hands' in state)) return false;
+  const hands = (state as { hands?: unknown }).hands;
+  if (!Array.isArray(hands)) return false;
+  const mine = hands[seat];
+  return Array.isArray(mine) && mine.some((card) => isVeilHandle(card));
 }
 
 /**
