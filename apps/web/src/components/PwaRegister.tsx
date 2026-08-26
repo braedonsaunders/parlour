@@ -69,7 +69,10 @@ export function PwaRegister() {
         });
         watchRegistration(nextRegistration, true);
         lastUpdateCheck = Date.now();
-        void nextRegistration.update().catch(() => undefined);
+        // `register()` already checks the script. Asking the same registration
+        // to update before its first install has settled can make WebKit queue
+        // an identical second worker, which looks like an update on a device
+        // that has never run Parlour before.
       } catch (error: unknown) {
         console.warn('[parlour] service worker registration failed', error);
       }
@@ -121,7 +124,7 @@ export function PwaRegister() {
     <aside
       aria-live="polite"
       aria-atomic="true"
-      className="pointer-events-none fixed left-1/2 top-[max(0.75rem,env(safe-area-inset-top))] z-[80] flex w-[min(92vw,30rem)] -translate-x-1/2 flex-col gap-2"
+      className="pointer-events-none fixed left-[max(0.75rem,env(safe-area-inset-left))] top-[max(0.75rem,env(safe-area-inset-top))] z-[80] flex w-[min(calc(100vw-5.5rem),30rem)] flex-col gap-2"
     >
       {!online ? (
         <div

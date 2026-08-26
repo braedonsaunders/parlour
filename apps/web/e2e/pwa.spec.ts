@@ -48,6 +48,68 @@ test('the service worker is served and registers', async ({ page, browserName })
   expect(registered).toBe(true);
 });
 
+test('a fresh service-worker install does not claim that an update is waiting', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await page.waitForLoadState('load');
+
+  // Registration itself performs the first script check. A second update call
+  // while that install is settling used to queue an identical waiting worker,
+  // especially in WebKit, and put a false update toast over the app chrome.
+  await page.waitForTimeout(1_500);
+  await expect(page.getByTestId('pwa-update-status')).toHaveCount(0);
+});
+
+test('a real update toast leaves the table menu hit-testable', async ({ page }) => {
+  await page.addInitScript(() => {
+    const worker = Object.assign(new EventTarget(), {
+      state: 'installing',
+      scriptURL: `${location.origin}/sw.js`,
+      postMessage: () => undefined,
+    });
+    const registration = Object.assign(new EventTarget(), {
+      active: worker,
+      installing: null as typeof worker | null,
+      waiting: null as typeof worker | null,
+      update: async () => undefined,
+    });
+    const serviceWorker = Object.assign(new EventTarget(), {
+      controller: worker,
+      register: async () => {
+        window.setTimeout(() => {
+          registration.installing = worker;
+          registration.dispatchEvent(new Event('updatefound'));
+          window.setTimeout(() => {
+            worker.state = 'installed';
+            worker.dispatchEvent(new Event('statechange'));
+          }, 0);
+        }, 0);
+        return registration;
+      },
+    });
+    Object.defineProperty(navigator, 'serviceWorker', {
+      configurable: true,
+      value: serviceWorker,
+    });
+  });
+
+  await page.goto('/hearts/table/');
+  await expect(page.getByTestId('pwa-update-status')).toBeVisible();
+  const menu = page.getByRole('button', { name: /table menu/i });
+  await expect(menu).toBeVisible();
+
+  const hitIsMenu = await menu.evaluate((button) => {
+    const box = button.getBoundingClientRect();
+    const hit = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
+    return hit === button || (hit !== null && button.contains(hit));
+  });
+  expect(hitIsMenu).toBe(true);
+
+  await menu.click();
+  await expect(page.getByTestId('table-menu')).toBeVisible();
+});
+
 test('the offline shell is cached after a first visit', async ({ page, context, browserName }) => {
   test.skip(browserName === 'webkit', 'WebKit blocks service workers on plain http origins');
 

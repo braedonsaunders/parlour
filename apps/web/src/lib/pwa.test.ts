@@ -89,7 +89,8 @@ describe('installable offline shell', () => {
     const register = readFileSync(join(process.cwd(), 'src/components/PwaRegister.tsx'), 'utf8');
     expect(register).toContain("register('/sw.js', {");
     expect(register).toContain("updateViaCache: 'none'");
-    expect(register).toContain('void nextRegistration.update()');
+    expect(register).not.toContain('void nextRegistration.update()');
+    expect(register).toContain('void registration.update()');
 
     const globalError = readFileSync(join(process.cwd(), 'src/app/global-error.tsx'), 'utf8');
     expect(globalError).toContain('recoverPwa()');
