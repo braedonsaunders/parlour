@@ -117,6 +117,19 @@ async function joinRoomByCode(page: Page, code: string): Promise<void> {
 }
 
 /**
+ * Waits until this page is actually sitting at a dealt table.
+ *
+ * Not `table-menu`: that test id belongs to the menu OVERLAY, which renders
+ * only while the menu is open (`if (!open) return null`). Using it as an
+ * at-the-table signal asserted that a menu nobody opened was on screen, and it
+ * failed every scenario here while the game underneath was dealing perfectly.
+ */
+async function expectAtTable(page: Page, timeout = 20_000): Promise<void> {
+  const hand = page.locator('[role="list"][data-zone]').first();
+  await expect(hand.locator('[role="listitem"]').first()).toBeVisible({ timeout });
+}
+
+/**
  * Fills every empty chair with a bot and starts the match.
  *
  * Each add-bot click has to round-trip through the signalling bus before
@@ -144,7 +157,7 @@ async function fillBotsAndStart(page: Page): Promise<void> {
   await expect(start).toBeEnabled({ timeout: 10_000 });
   await start.click();
 
-  await expect(page.getByTestId('table-menu')).toBeVisible({ timeout: 20_000 });
+  await expectAtTable(page, 20_000);
   const hand = page.locator('[role="list"][data-zone]').first();
   await expect(hand.locator('[role="listitem"]').first()).toBeVisible({ timeout: 15_000 });
 }
@@ -272,9 +285,7 @@ test.describe('multi-context friend room (hermetic)', () => {
 
   test('D1c — the collaborative deal reaches both contexts after start', async () => {
     await fillBotsAndStart(host.page);
-    await expect(guest.page.getByTestId('table-menu')).toBeVisible({
-      timeout: CONNECT_TIMEOUT_MS,
-    });
+    await expectAtTable(guest.page, CONNECT_TIMEOUT_MS);
     await host.page.waitForTimeout(DEAL_SETTLE_MS);
     await guest.page.waitForTimeout(DEAL_SETTLE_MS);
 
@@ -300,8 +311,8 @@ test.describe('multi-context friend room (hermetic)', () => {
       await guest.page.waitForTimeout(2_000);
     }
 
-    await expect(host.page.getByTestId('table-menu')).toBeVisible({ timeout: 5_000 });
-    await expect(guest.page.getByTestId('table-menu')).toBeVisible({ timeout: 5_000 });
+    await expectAtTable(host.page, 5_000);
+    await expectAtTable(guest.page, 5_000);
     await expect(host.page.getByRole('alert')).toHaveCount(0, { timeout: 5_000 });
     await expect(guest.page.getByRole('alert')).toHaveCount(0, { timeout: 5_000 });
   });
@@ -336,8 +347,8 @@ test.describe('multiplayer resilience (hermetic)', () => {
     await host.context.close();
 
     // Both guests stay on the table — no lobby dissolution, no error alert.
-    await expect(guest1.page.getByTestId('table-menu')).toBeVisible({ timeout: 20_000 });
-    await expect(guest2.page.getByTestId('table-menu')).toBeVisible({ timeout: 20_000 });
+    await expectAtTable(guest1.page, 20_000);
+    await expectAtTable(guest2.page, 20_000);
     await expect(guest1.page.getByRole('alert')).toHaveCount(0, { timeout: 20_000 });
 
     // The host's seat (0) is now driven by a bot on whichever peer won.
@@ -370,7 +381,7 @@ test.describe('multiplayer resilience (hermetic)', () => {
 
     // The host sees seat 2 become a bot, and the table stays alive.
     await expect(seatIsBot(host.page, 2)).toBeVisible({ timeout: 20_000 });
-    await expect(host.page.getByTestId('table-menu')).toBeVisible({ timeout: 5_000 });
+    await expectAtTable(host.page, 5_000);
     await expect(host.page.getByRole('alert')).toHaveCount(0, { timeout: 5_000 });
 
     await host.context.close();
@@ -482,9 +493,7 @@ test.describe('multiplayer resilience (hermetic)', () => {
     await joinRoomByCode(guest.page, code);
     await fillBotsAndStart(host.page);
 
-    await expect(guest.page.getByTestId('table-menu')).toBeVisible({
-      timeout: CONNECT_TIMEOUT_MS,
-    });
+    await expectAtTable(guest.page, CONNECT_TIMEOUT_MS);
     await host.page.waitForTimeout(DEAL_SETTLE_MS);
     await guest.page.waitForTimeout(DEAL_SETTLE_MS);
 
@@ -528,8 +537,8 @@ test.describe('multiplayer resilience (hermetic)', () => {
     await guest.page.getByTestId('play-again').click();
 
     // Both return to the table at the same code, no new lobby.
-    await expect(host.page.getByTestId('table-menu')).toBeVisible({ timeout: 30_000 });
-    await expect(guest.page.getByTestId('table-menu')).toBeVisible({ timeout: 30_000 });
+    await expectAtTable(host.page, 30_000);
+    await expectAtTable(guest.page, 30_000);
 
     await host.context.close();
     await guest.context.close();
