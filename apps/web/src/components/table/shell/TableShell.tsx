@@ -5,7 +5,10 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
+  useRef,
   useState,
+  type FocusEvent as ReactFocusEvent,
   type KeyboardEvent as ReactKeyboardEvent,
   type ReactNode,
   type RefObject,
@@ -36,10 +39,35 @@ export function useTableAnnouncer(): Announce {
 /** The `<main>` chassis shared by every table screen. */
 export function TableShell({ rootRef, className, dealState, children }: TableShellProps) {
   const [announcement, setAnnouncement] = useState<Announcement>({ id: 0, text: '' });
+  const lastFocusedElement = useRef<HTMLElement | null>(null);
   const announce = useCallback<Announce>((text) => {
     if (text.length === 0) return;
     setAnnouncement((current) => ({ id: current.id + 1, text }));
   }, []);
+
+  const rememberFocus = useCallback((event: ReactFocusEvent<HTMLElement>) => {
+    if (event.target instanceof HTMLElement) lastFocusedElement.current = event.target;
+  }, []);
+
+  useLayoutEffect(() => {
+    const root = rootRef.current;
+    const previous = lastFocusedElement.current;
+    if (!root || !previous || previous.isConnected) return;
+
+    const active = document.activeElement;
+    if (active && active !== document.body && active !== document.documentElement) return;
+
+    // WebKit loses its sequential-navigation starting point when a focused
+    // decision rail is removed. Keep keyboard players in the table by handing
+    // them to the newly playable hand, or to the table itself when play has
+    // passed to another seat.
+    const destination =
+      root.querySelector<HTMLElement>('[data-hand-card] button:not(:disabled)[tabindex="0"]') ??
+      root.querySelector<HTMLElement>('[data-hand-card] button:not(:disabled)') ??
+      root;
+    destination.focus();
+    lastFocusedElement.current = destination;
+  });
 
   // Scoped to the shell rather than the app: a table earns the battery, a menu
   // does not. Leaving the table unmounts this and hands the screen back.
@@ -52,6 +80,8 @@ export function TableShell({ rootRef, className, dealState, children }: TableShe
         className={className ? `${styles.screen} ${className}` : styles.screen}
         data-table-screen
         data-deal-state={dealState}
+        tabIndex={-1}
+        onFocusCapture={rememberFocus}
         onKeyDown={moveTableFocus}
       >
         {children}

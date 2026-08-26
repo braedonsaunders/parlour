@@ -84,6 +84,40 @@ describe('TableScreenFrame', () => {
     expect(play).toHaveBeenCalledOnce();
   });
 
+  it('hands focus to the playable hand when a focused decision rail closes', () => {
+    const frame = (decision: 'bid' | 'play') => (
+      <TableScreenFrame
+        rootRef={{ current: null }}
+        hud={null}
+        menu={{ isOpen: false, open: vi.fn(), close: vi.fn(), quit: vi.fn() }}
+      >
+        {decision === 'bid' ? (
+          <button type="button" data-testid="bid">
+            Bid two
+          </button>
+        ) : (
+          <div role="list" data-zone="hand:0" aria-label="Your hand">
+            <div data-hand-card>
+              <button type="button" tabIndex={0}>
+                Play ace
+              </button>
+            </div>
+          </div>
+        )}
+      </TableScreenFrame>
+    );
+
+    act(() => root.render(frame('bid')));
+    const bid = container.querySelector<HTMLButtonElement>('[data-testid="bid"]')!;
+    bid.focus();
+    expect(document.activeElement).toBe(bid);
+
+    act(() => root.render(frame('play')));
+    expect(document.activeElement).toBe(
+      container.querySelector<HTMLButtonElement>('[data-hand-card] button'),
+    );
+  });
+
   it('moves from a solitaire source to a pointer-equivalent target', () => {
     const move = vi.fn();
     act(() =>
