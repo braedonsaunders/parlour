@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -211,6 +211,44 @@ describe('portrait hands', () => {
 
   it('sizes the portrait card from the viewport so any hand fits the width', () => {
     expect(portrait).toMatch(/--hand-card-width:\s*clamp\([^)]*vw[^)]*\)/);
+  });
+});
+
+describe('the hand belongs to the shared rail', () => {
+  const GAME_STYLESHEETS = readdirSync(join(process.cwd(), 'src/styles')).filter(
+    (file) => file.endsWith('.module.css') && file !== 'table.module.css',
+  );
+
+  it('solves the rail width from the card count rather than a fixed number', () => {
+    // The count is what makes a hand hard. A rail that ignores it collapses
+    // thirteen cards to slivers, which is what sent one game off to size its
+    // own — and left the other twelve with the problem.
+    expect(declarationsFor('.localHand')).toMatch(/--hand-rail-span:[^;]*var\(--fan-n\)/);
+    expect(declarationsFor('.localHand')).toMatch(
+      /width:\s*min\(var\(--hand-rail-span\),\s*var\(--hand-rail-max\)\)/,
+    );
+  });
+
+  /*
+   * A new game should get the fan, the spacing and the arc for free. Every one
+   * of these knobs is a shared decision, so a game stylesheet that sets one has
+   * started a second implementation of the hand — and the two will drift, which
+   * is exactly how Spades came to expose 44px of each card while Hearts, with
+   * the same thirteen, exposed 38px. Reading these is fine and expected.
+   */
+  it.each(GAME_STYLESHEETS)('%s does not size the hand itself', (file) => {
+    const css = readFileSync(join(process.cwd(), 'src/styles', file), 'utf8');
+    const handRules = [...css.matchAll(/\[data-zone\^='hand:'\][^{]*\{([^}]*)\}/g)].map(
+      (match) => match[1]!,
+    );
+
+    for (const rule of handRules) {
+      expect(rule, `${file} sets the shared card width`).not.toMatch(/--hand-card-width:/);
+      expect(rule, `${file} sets the shared rail width`).not.toMatch(/--hand-rail-/);
+      expect(rule, `${file} sets the shared rail's own width`).not.toMatch(/[^-]width:/);
+    }
+    expect(css, `${file} restyles a shared hand card`).not.toMatch(/\[data-hand-card\][^{]*\{/);
+    expect(css, `${file} restyles the shared fan`).not.toMatch(/\[data-hand-fan\][^{]*\{/);
   });
 });
 

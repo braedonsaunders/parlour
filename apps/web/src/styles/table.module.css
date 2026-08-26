@@ -363,18 +363,38 @@
   transform: rotate(var(--card-rotation));
 }
 
+/*
+ * One rail holds every hand in the app, so it has to solve for the hardest one
+ * without any game telling it to.
+ *
+ * `calculateFanStep` caps the step at 0.48x the card, and otherwise divides the
+ * rail between the cards. Which of those two wins decides how much of each card
+ * a player can see and hit — and with thirteen cards in a fixed-width rail the
+ * division wins and every card collapses to about 23px. The instinct is to
+ * shrink the card, but that is backwards: a smaller card lowers the cap too.
+ * The answer is a rail that grows with what it holds, so the division stays
+ * above the cap and the cap is what governs.
+ *
+ * So the span is a function of the card count and the orientation supplies only
+ * its own ceiling. Spades used to carry this arithmetic privately, which meant
+ * Spades exposed 44px of each card while Hearts — the same thirteen cards —
+ * exposed 38px. A game should inherit the hand it deserves without knowing any
+ * of this exists; nothing below this line is a per-game decision.
+ */
 .localHand {
   --fan-n: 3;
   --fan-un: 0.334;
   --fan-step: 0px;
   --hand-card-width: clamp(5.6rem, 8vw, 7.2rem);
+  --hand-rail-span: calc(9rem + var(--fan-n) * 3.4rem);
+  --hand-rail-max: 92vw;
   position: absolute;
   z-index: 10;
   left: 50%;
   bottom: -0.35rem;
   display: flex;
   justify-content: center;
-  width: min(52rem, 74vw);
+  width: min(var(--hand-rail-span), var(--hand-rail-max));
   height: 13rem;
   transform: translateX(-50%);
   pointer-events: none;
@@ -1057,11 +1077,11 @@ button.card {
      readable in one look, and a lifted playable card needs somewhere to go. */
   .localHand {
     --hand-card-width: clamp(4.3rem, 15.5vw, 5.1rem);
+    /* The fan's outermost cards rotate past the rail, so its ceiling stops
+       short of the screen to leave the arc its gutters. At full width the
+       corner cards sit on the bezel. */
+    --hand-rail-max: calc(100vw - 2rem);
     bottom: calc(env(safe-area-inset-bottom) + 0.9rem);
-    /* The rail is the width the fan solves inside, and the outermost cards
-       rotate beyond it — so it stops short of the screen to leave the arc its
-       gutters. At full width the corner cards sit on the bezel. */
-    width: min(30rem, calc(100vw - 2rem));
     height: 11.5rem;
   }
   /* The fan's outermost cards rotate away from centre, so the widest part of
@@ -1117,9 +1137,15 @@ button.card {
   .seat3 {
     top: 44%;
   }
+  /* Scaling the rail to fit a 390px-tall phone shrank the tap targets with it,
+     which is the one thing a hand cannot afford. Take the height out of the
+     card instead and dock it lower: the fan keeps its true size, so a card
+     stays as easy to hit here as anywhere. Spades proved this privately; it
+     belongs to every game. */
   .localHand {
-    bottom: -4rem;
-    transform: translateX(-50%) scale(0.82);
+    --hand-card-width: 5.75rem;
+    bottom: -2.4rem;
+    transform: translateX(-50%);
   }
   .ownerStatusRail {
     left: max(4.75rem, calc(env(safe-area-inset-left) + 3.75rem));
