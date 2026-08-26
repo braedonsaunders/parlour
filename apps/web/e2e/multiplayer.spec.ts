@@ -29,6 +29,7 @@
 
 import { expect, test, type Browser, type BrowserContext, type Page } from '@playwright/test';
 import { HermeticSignalingBroker } from './hermetic-signaling';
+import type { RoomSignaling } from '../src/lib/multiplayer/NostrSignaling';
 
 /**
  * The base game for multiplayer tests. Wild is the simplest multiplayer game
@@ -132,6 +133,92 @@ async function fillBotsAndStart(page: Page): Promise<void> {
 function seatIsBot(page: Page, seat: number) {
   return page.locator(`[data-seat="${seat}"] small`).filter({ hasText: 'bot' });
 }
+
+/**
+ * Bridge isolation diagnostic.
+ *
+ * Runs FIRST, before any room scenario, so a bridge failure reports here
+ * instead of surfacing as "code is undefined" thirteen tests later. It
+ * exercises all four directions without touching the app:
+ *
+ *   1. page → Node: `announce` stores a room the broker can resolve.
+ *   2. Node → page: `resolve` returns the announcement through the binding.
+ *   3. page → Node: `send` delivers a signal to a subscribed peer.
+ *   4. Node → page: `subscribe` invokes the page-side callback.
+ *
+ * If this describe fails, the bridge is broken and the room scenarios below
+ * cannot pass. If it passes but D1a still reports "no code", the bridge is
+ * fine and the gap is in the app's read of `window.__PARLOUR_E2E_SIGNALING__`.
+ */
+test.describe('bridge isolation diagnostic', () => {
+  test('the injected global round-trips every signalling direction', async ({ browser }) => {
+    const broker = new HermeticSignalingBroker();
+    const context = await browser.newContext();
+    const page = await context.newPage();
+    const key = peerKey('diag');
+    await broker.install(page, key);
+
+    // Navigate so the init script runs — the same condition the app meets.
+    await page.goto('/');
+
+    // 1. The global exists with a real public key.
+    const shape = await page.evaluate(() => {
+      const g = (window as unknown as { __PARLOUR_E2E_SIGNALING__?: unknown })
+        .__PARLOUR_E2E_SIGNALING__;
+      if (!g || typeof g !== 'object') return { ok: false, reason: 'missing' };
+      const pk = (g as { publicKey?: unknown }).publicKey;
+      return typeof pk === 'string' && pk.length === 64
+        ? { ok: true, publicKey: pk }
+        : { ok: false, reason: `bad publicKey: ${String(pk)}` };
+    });
+    expect(shape.ok, JSON.stringify(shape)).toBe(true);
+
+    // 2. page → Node announce, then Node-side resolve.
+    await page.evaluate(() =>
+      (
+        window as unknown as { __PARLOUR_E2E_SIGNALING__: RoomSignaling }
+      ).__PARLOUR_E2E_SIGNALING__.announce('ZZZZ', {
+        gameId: 'wildpile',
+        seats: 2,
+        config: {},
+      }),
+    );
+    expect(broker.resolve('ZZZZ')?.hostPubkey).toBe(key);
+
+    // 3. page → Node resolve returns the announcement.
+    const resolved = await page.evaluate(() =>
+      (
+        window as unknown as { __PARLOUR_E2E_SIGNALING__: RoomSignaling }
+      ).__PARLOUR_E2E_SIGNALING__.resolve('ZZZZ'),
+    );
+    expect(resolved.hostPubkey).toBe(key);
+
+    // 4. Node → page: subscribe on a second seat, then deliver to it.
+    const context2 = await browser.newContext();
+    const page2 = await context2.newPage();
+    const key2 = peerKey('diag-2');
+    await broker.install(page2, key2);
+    await page2.goto('/');
+
+    const delivery = page2.evaluate(
+      () =>
+        new Promise<string>((resolve) => {
+          (
+            window as unknown as { __PARLOUR_E2E_SIGNALING__: RoomSignaling }
+          ).__PARLOUR_E2E_SIGNALING__.subscribe('ZZZZ', (author, payload) =>
+            resolve(`${author}:${payload.type}`),
+          );
+        }),
+    );
+    // Give the subscribe message a beat to reach Node, then deliver.
+    await page2.waitForTimeout(200);
+    broker.deliver('sender-key', 'ZZZZ', key2, { type: 'offer', sdp: 'x' });
+    await expect(delivery).resolves.toBe('sender-key:offer');
+
+    await context.close();
+    await context2.close();
+  });
+});
 
 test.describe('multi-context friend room (hermetic)', () => {
   test.describe.configure({ mode: 'serial', timeout: 180_000 });
