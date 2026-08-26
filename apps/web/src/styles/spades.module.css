@@ -727,68 +727,151 @@
 }
 
 /* --- portrait ------------------------------------------------------------
-   Thirteen cards cannot be fanned with honest tap targets in a portrait
-   viewport, and shrinking them until they "fit" would just be a worse lie
-   than saying so. Ask for a rotate instead. Desktop-width portrait windows
-   are fine — this is aimed at phones.
+   A fan cannot expose thirteen honest targets across a phone, but a linear
+   hand can. Keep the cards full-size and let the rail pan; focused cards also
+   scroll into view through the browser's native focus behaviour.
    ------------------------------------------------------------------------- */
-
-.rotateNotice {
-  display: none;
-}
-
 @media (orientation: portrait) and (max-width: 820px) {
-  .rotateNotice {
-    position: fixed;
-    inset: 0;
-    z-index: 80;
+  .screen [data-zone^='hand:'] {
+    --hand-card-width: 4.5rem;
+    right: 0;
+    bottom: calc(env(safe-area-inset-bottom) + 0.1rem);
+    left: 0;
     display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 0.9rem;
-    padding: 2rem;
-    text-align: center;
-    background: radial-gradient(120% 90% at 50% 40%, rgba(9, 20, 27, 0.97), rgba(9, 20, 27, 0.99));
+    justify-content: flex-start;
+    width: 100%;
+    height: 7.5rem;
+    padding-block: 0.4rem 0.2rem;
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-inline: contain;
+    scroll-padding-inline: 0.75rem;
+    scroll-snap-type: x proximity;
+    scrollbar-width: thin;
+    touch-action: pan-x;
+    transform: none;
+    pointer-events: auto;
+    background: linear-gradient(0deg, rgba(9, 20, 27, 0.76), rgba(9, 20, 27, 0));
   }
 
-  .rotateNotice strong {
-    font-family: var(--font-display, inherit);
-    font-size: 1.35rem;
-    font-weight: 900;
-    color: #fdf6ea;
+  .screen [data-zone^='hand:'] > div {
+    position: relative;
+    inset: auto;
+    display: flex;
+    flex: 0 0 auto;
+    gap: 0.35rem;
+    width: max-content;
+    min-width: 100%;
+    height: 100%;
+    padding-inline: max(0.75rem, env(safe-area-inset-left));
+    transform: none;
   }
 
-  .rotateNotice p {
-    max-width: 22rem;
-    font-size: 0.86rem;
-    line-height: 1.5;
-    color: rgba(253, 246, 234, 0.72);
+  /* Motion writes a transient inline transform on these slots. In the fan it
+     is useful; in a scroll row it changes the scroll width while a card lands,
+     so portrait deliberately settles the slot in normal flow. */
+  .screen [data-hand-card] {
+    position: relative !important;
+    top: 0;
+    left: auto;
+    flex: 0 0 var(--hand-card-width);
+    width: var(--hand-card-width);
+    min-width: 2.75rem;
+    margin-left: 0;
+    scroll-snap-align: center;
+    transform: none !important;
   }
 
-  .rotateMark {
-    font-size: 2.6rem;
-    line-height: 1;
-    animation: spades-rotate-hint 2.4s ease-in-out infinite;
+  .screen [data-hand-fan] {
+    transform: none;
   }
-}
 
-@keyframes spades-rotate-hint {
-  0%,
-  100% {
-    transform: rotate(-12deg);
+  .screen [data-hand-card][data-playable='true'] [data-hand-fan] {
+    transform: translateY(-0.45rem);
   }
-  50% {
-    transform: rotate(72deg);
+
+  .bidRail {
+    bottom: calc(env(safe-area-inset-bottom) + 8rem);
+    width: calc(100vw - 1rem);
+    max-width: 28rem;
+    gap: 0.35rem;
+    padding: 0.55rem 0.65rem;
   }
-}
 
-:global(.reduce-motion) .rotateMark {
-  animation: none;
-}
+  .bidPrompt {
+    font-size: 0.68rem;
+  }
 
-@media (prefers-reduced-motion: reduce) {
-  .rotateMark {
-    animation: none;
+  .bidPrompt span {
+    display: none;
+  }
+
+  .bidOptions {
+    min-width: 0;
+    flex: 1 1 12rem;
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    scroll-snap-type: x proximity;
+    scrollbar-width: thin;
+  }
+
+  .bidChip {
+    min-width: 2.75rem;
+    min-height: 2.75rem;
+    flex: 0 0 2.75rem;
+    scroll-snap-align: center;
+  }
+
+  .nilAction {
+    flex: 0 0 auto;
+  }
+
+  .hudCluster {
+    max-width: calc(100vw - 5.5rem);
+    gap: 0.2rem;
+  }
+
+  .teamScores {
+    gap: 0.2rem;
+  }
+
+  .teamChip {
+    gap: 0.2rem;
+    padding: 0.2rem 0.4rem;
+  }
+
+  .scoreTarget {
+    display: none;
+  }
+
+  .brokenFlag {
+    top: 10.25rem;
+    padding: 0.2rem 0.55rem;
+    font-size: 0.56rem;
+  }
+
+  .trickZone {
+    top: 43%;
+    transform: translate(-50%, -50%) scale(0.82);
+  }
+
+  .lastHand {
+    top: 10.25rem;
+    left: 0.65rem;
+    width: calc(100vw - 1.3rem);
+    max-height: min(36vh, 14rem);
+  }
+
+  .lastHand[data-expanded='false'] {
+    top: 10.25rem;
+    left: 0.65rem;
+    width: 8.5rem;
+  }
+
+  .handSheet {
+    top: 43%;
+    min-width: min(20rem, calc(100vw - 1.5rem));
   }
 }

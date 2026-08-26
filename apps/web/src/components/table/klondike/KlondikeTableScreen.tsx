@@ -505,12 +505,6 @@ function ReadyKlondikeTable({
           </button>
         ) : null}
       </TableActionRail>
-
-      <div className={styles.rotateNotice} data-testid="klondike-rotate-notice" role="status">
-        <span aria-hidden="true">▭</span>
-        <strong>Turn the table sideways</strong>
-        <p>Seven solitaire columns need a landscape table.</p>
-      </div>
     </TableScreenFrame>
   );
 }

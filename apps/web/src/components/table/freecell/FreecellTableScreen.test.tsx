@@ -188,12 +188,11 @@ describe('FreecellTableScreen', () => {
     expect(FREECELL_STYLES).toContain('[data-card-chassis]');
   });
 
-  it('keeps a portrait rotate affordance and permanent win/move status in the DOM', () => {
+  it('keeps the playable board and permanent win status in portrait-ready DOM', () => {
     const { view } = table();
     render({ ...view, stage: 'won', canFinish: false }, { elapsedMs: 92_000 });
-    expect(
-      container.querySelector('[data-testid="freecell-rotate-notice"]')!.textContent,
-    ).toContain('Turn the table sideways');
+    expect(container.querySelector('[data-testid="freecell-rotate-notice"]')).toBeNull();
+    expect(container.querySelector('[data-testid="freecell-board"]')).not.toBeNull();
     expect(container.querySelector('[data-testid="freecell-win"]')!.textContent).toContain(
       'Table cleared',
     );

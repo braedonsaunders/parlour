@@ -313,12 +313,6 @@ function ReadyGolfTable({
           </span>
         )}
       </TableActionRail>
-
-      <div className={styles.rotateNotice} data-testid="golf-rotate-notice" role="status">
-        <span aria-hidden="true">▭</span>
-        <strong>Turn the table sideways</strong>
-        <p>Seven golf columns need a landscape table.</p>
-      </div>
     </TableScreenFrame>
   );
 }

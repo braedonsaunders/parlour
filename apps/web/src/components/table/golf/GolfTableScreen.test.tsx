@@ -131,4 +131,12 @@ describe('GolfTableScreen', () => {
     act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })));
     expect(textSurface().hint).toBeNull();
   });
+
+  it('keeps all seven columns playable in portrait-ready DOM', () => {
+    const { view } = table();
+    render(view);
+    expect(container.querySelector('[data-testid="golf-rotate-notice"]')).toBeNull();
+    expect(container.querySelector('[data-testid="golf-board"]')).not.toBeNull();
+    expect(container.querySelectorAll('[data-testid^="golf-column-"]')).toHaveLength(7);
+  });
 });

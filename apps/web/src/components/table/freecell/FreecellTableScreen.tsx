@@ -464,12 +464,6 @@ function ReadyFreecellTable({
           </button>
         ) : null}
       </TableActionRail>
-
-      <div className={styles.rotateNotice} data-testid="freecell-rotate-notice" role="status">
-        <span aria-hidden="true">▭</span>
-        <strong>Turn the table sideways</strong>
-        <p>Eight open columns need a landscape table.</p>
-      </div>
     </TableScreenFrame>
   );
 }

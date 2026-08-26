@@ -62,12 +62,24 @@ test('leaving a table returns to its shelf page', async ({ page }) => {
   await expect(page).toHaveURL(/\/hearts\/?$/, { timeout: 15_000 });
 });
 
-test('a four-hand table asks a portrait phone to turn sideways', async ({ page, browserName }) => {
+test('a four-hand table keeps its full hand reachable on a portrait phone', async ({
+  page,
+  browserName,
+}) => {
   test.skip(browserName !== 'webkit', 'the phone-portrait projects are the WebKit ones');
 
-  // Thirteen cards across four seats does not fit a portrait phone, so Spades
-  // covers the table rather than dealing something unreadable. Worth pinning:
-  // this is the one screen whose whole job is to be in the way.
   await page.goto('/spades/table/');
-  await expect(page.getByTestId('spades-rotate-notice')).toBeVisible({ timeout: 15_000 });
+  const hand = page.locator('[role="list"][data-zone^="hand:"]').first();
+  await expect(hand.locator('[data-hand-card]')).toHaveCount(13, { timeout: 15_000 });
+  await expect(page.getByTestId('spades-rotate-notice')).toHaveCount(0);
+
+  // Portrait keeps honest card-sized targets and moves the overflow into one
+  // deliberate horizontal rail. Prove the far end is reachable rather than
+  // merely present beyond the viewport.
+  const scroll = await hand.evaluate((rail) => {
+    rail.scrollLeft = rail.scrollWidth;
+    return { left: rail.scrollLeft, viewport: rail.clientWidth, content: rail.scrollWidth };
+  });
+  expect(scroll.content).toBeGreaterThan(scroll.viewport);
+  expect(scroll.left).toBeGreaterThan(0);
 });

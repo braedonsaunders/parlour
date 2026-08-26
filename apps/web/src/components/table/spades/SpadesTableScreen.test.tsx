@@ -944,13 +944,13 @@ describe('SpadesTableScreen calm motion', () => {
 });
 
 describe('SpadesTableScreen orientation', () => {
-  it('asks for landscape rather than pretending thirteen cards fit in portrait', () => {
+  it('keeps all thirteen cards in a portrait-ready hand rail', () => {
     act(() =>
       root.render(createElement(SpadesTableScreen, { view: playingView(), fx: [], fxKey: 'k' })),
     );
-    const notice = container.querySelector('[data-testid="spades-rotate-notice"]')!;
-    expect(notice).not.toBeNull();
-    expect(notice.textContent).toContain('sideways');
+    expect(container.querySelector('[data-testid="spades-rotate-notice"]')).toBeNull();
+    expect(container.querySelectorAll('[data-hand-card]')).toHaveLength(13);
+    expect(container.querySelector('[data-zone="hand:0"]')).not.toBeNull();
   });
 });
 

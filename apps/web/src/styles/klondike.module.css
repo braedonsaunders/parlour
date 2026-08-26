@@ -422,10 +422,6 @@ button.pileButton {
     sans-serif;
 }
 
-.rotateNotice {
-  display: none;
-}
-
 @media (orientation: landscape) and (max-height: 560px) {
   .screen {
     --kl-card: clamp(3.3rem, 6.6vw, 3.85rem);
@@ -483,61 +479,75 @@ button.pileButton {
 }
 
 @media (orientation: portrait) and (max-width: 700px) {
-  .board,
-  .actions,
-  .hintBanner,
-  .winPanel {
-    visibility: hidden;
-    pointer-events: none;
+  .screen {
+    --kl-card: 3.5rem;
+    --kl-down-step: 0.65rem;
+    --kl-up-step: 1.05rem;
   }
 
-  .rotateNotice {
-    position: absolute;
-    z-index: 45;
-    inset: 0;
-    display: grid;
-    place-content: center;
-    justify-items: center;
-    gap: 0.7rem;
-    padding: 2rem;
-    background: radial-gradient(circle at 50% 42%, rgba(48, 111, 90, 0.96), rgba(7, 31, 30, 0.99));
-    color: #fff1d5;
-    text-align: center;
+  /* Seven columns retain a readable card and move together with stock and
+     foundations. Splitting these into separate scrollers makes source and
+     destination positions drift apart while a card is selected. */
+  .board {
+    inset: 5.15rem 0 4.8rem;
+    gap: 0.65rem;
+    max-width: none;
+    margin: 0;
+    padding-left: max(0.65rem, env(safe-area-inset-left));
+    padding-right: max(0.65rem, env(safe-area-inset-right));
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-inline: contain;
+    scroll-snap-type: x proximity;
+    scrollbar-width: thin;
   }
 
-  .rotateNotice span {
-    font-size: 4rem;
-    animation: klondikeRotate 2.4s ease-in-out infinite;
+  .topRow,
+  .tableau {
+    min-width: 34rem;
   }
 
-  .rotateNotice strong {
-    font:
-      800 1.7rem/1.1 var(--font-display),
-      sans-serif;
+  .topRow {
+    gap: 0.65rem;
+    min-height: calc(var(--kl-card) * 1.4 + 0.7rem);
   }
 
-  .rotateNotice p {
-    max-width: 18rem;
-    color: rgba(255, 241, 213, 0.75);
+  .stockWaste,
+  .foundations,
+  .tableau {
+    gap: 0.4rem;
   }
-}
 
-@keyframes klondikeRotate {
-  0%,
-  100% {
-    rotate: -12deg;
+  .runPicker {
+    max-width: 8rem;
   }
-  50% {
-    rotate: 78deg;
+
+  .pileWrap,
+  .tableauColumn {
+    scroll-snap-align: start;
   }
-}
 
-:global(.reduce-motion) .rotateNotice span {
-  animation: none;
-}
+  .titlePill {
+    min-width: 0;
+    max-width: calc(100vw - 6.5rem);
+  }
 
-@media (prefers-reduced-motion: reduce) {
-  .rotateNotice span {
-    animation: none;
+  .metrics {
+    font-size: 0.58rem;
+  }
+
+  .actions {
+    right: auto;
+    left: 0.65rem;
+    bottom: max(0.45rem, env(safe-area-inset-bottom));
+    max-width: calc(100vw - 1.3rem);
+  }
+
+  .hintBanner {
+    right: 0.7rem;
+    bottom: max(3.45rem, calc(env(safe-area-inset-bottom) + 3.1rem));
+    left: auto;
+    max-width: calc(100vw - 1.4rem);
+    translate: 0 0;
   }
 }

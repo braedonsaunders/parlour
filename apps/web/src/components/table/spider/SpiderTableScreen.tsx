@@ -406,12 +406,6 @@ function ReadySpiderTable({
           </span>
         )}
       </TableActionRail>
-
-      <div className={styles.rotateNotice} data-testid="spider-rotate-notice" role="status">
-        <span aria-hidden="true">▭</span>
-        <strong>Turn the table sideways</strong>
-        <p>Ten solitaire columns need a landscape table.</p>
-      </div>
     </TableScreenFrame>
   );
 }

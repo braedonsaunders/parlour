@@ -160,19 +160,6 @@ export function SpadesTableScreen(props: SpadesTableScreenProps) {
           <BidRail view={view} onBid={props.onBid} onBidNil={props.onBidNil} />
         )}
       </TablePlayfield>
-
-      {/* Thirteen cards cannot be fanned with honest tap targets on a portrait
-          phone. Saying so is better than shipping a hand nobody can hit. */}
-      <div className={styles.rotateNotice} data-testid="spades-rotate-notice" role="status">
-        <span className={styles.rotateMark} aria-hidden="true">
-          ♠
-        </span>
-        <strong>Turn your phone sideways</strong>
-        <p>
-          Spades deals thirteen cards to a hand. Landscape gives every card a tap target you can
-          actually hit — portrait would leave them slivers.
-        </p>
-      </div>
     </TableScreenFrame>
   );
 }

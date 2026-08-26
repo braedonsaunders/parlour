@@ -195,12 +195,11 @@ describe('SpiderTableScreen', () => {
     expect(SPIDER_STYLES).toMatch(/\.emptyColumn\s*\{[^}]*pointer-events:\s*none;/s);
   });
 
-  it('keeps a portrait rotate affordance and permanent win/move status in the DOM', () => {
+  it('keeps the playable board and permanent win status in portrait-ready DOM', () => {
     const { view } = table();
     render({ ...view, stage: 'won', canFinish: false }, { elapsedMs: 92_000 });
-    expect(container.querySelector('[data-testid="spider-rotate-notice"]')!.textContent).toContain(
-      'Turn the table sideways',
-    );
+    expect(container.querySelector('[data-testid="spider-rotate-notice"]')).toBeNull();
+    expect(container.querySelector('[data-testid="spider-board"]')).not.toBeNull();
     expect(container.querySelector('[data-testid="spider-win"]')!.textContent).toContain(
       'Table cleared',
     );
