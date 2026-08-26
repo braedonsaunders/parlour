@@ -2,7 +2,7 @@
 
 <img src="docs/parlour-logo.svg" alt="parlour" width="640" />
 
-### Fifteen card games. One cozy table. Your friends join with four letters.
+### Nineteen card games. One cozy table. Your friends join with four letters.
 
 No account. No download. No server. Send a room code and you're dealing in seconds —
 on your phone, your laptop, or a native desktop app.
@@ -32,7 +32,7 @@ server to lag, no account to create, and nothing stored about you. Real life is 
 - The host closes their laptop? **The table elects a new host** and keeps dealing.
 - Dropped connection? **Rejoin with the same code** and land exactly where you left off.
 
-## The shelf — fifteen games, all playable
+## The shelf — nineteen games, all playable
 
 <img src="docs/shots/shelf-fable.png" alt="The parlour game shelf" width="100%" />
 
@@ -53,6 +53,10 @@ server to lag, no account to create, and nothing stored about you. Real life is 
 | **Spite & Malice**           | Race to empty your payoff pile and bury what your neighbour needs.                        |
 | **Spades**                   | Bid books with a partner, break spades, mind the bags.                                    |
 | **Klondike**                 | The solitaire everyone knows, dealt from a seed you can share.                            |
+| **Freecell** · the open solitaire | Every card face-up from the deal — four free cells, no luck but the shuffle.         |
+| **Spider** · the two-deck solitaire | Peel eight suited runs off 104 cards before the table buries you.                  |
+| **Pyramid** · pair to thirteen | Pair cards that sum to thirteen and topple the pyramid one match at a time.             |
+| **Golf** · the fast solitaire | Play ±1 onto the hole and clear the grass in as few passes as you can.                   |
 
 House rules are real settings, not forks: every game ships rule toggles and named presets you can set
 when you create the room.
@@ -204,7 +208,7 @@ parlour/
 - [x] Local profiles, lifetime stats, friend head-to-head history, PWA
 - [x] P2P multiplayer — room codes, share links, host election, bot takeover, rejoin
 - [x] Installable PWA and native macOS, Windows, and Linux releases
-- [x] Fifteen games built entirely on the public engine API
+- [x] Nineteen games built entirely on the public engine API
 - [x] Veiled-deck primitives in the engine
 - [ ] Platform paydown — shared table shell, room registry, harder CI
 - [ ] Daily-seeded Klondike / FreeCell
