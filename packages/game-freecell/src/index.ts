@@ -23,6 +23,7 @@ export {
 } from './cards';
 export { freecellConfig, freecellConfig as config, type FreecellRules } from './config';
 export { dailySeed, isDailyKey } from './daily';
+export { solverHintFor } from './hint-plan';
 export {
   solveFreecell,
   isWinnableDeal,

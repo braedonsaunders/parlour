@@ -491,6 +491,15 @@ interface RankedHint {
   kind: HintKind;
 }
 
+/** Spoken hint for any move the engine would accept, so the solver can name one too. */
+export function describeHintMove(state: FreecellPlayerView, move: LegalMove): string {
+  const ranked = rankHint(state, move);
+  if (ranked) return hintReason(state, move, ranked.kind);
+  if (move.id === 'foundation.toTableau') return hintReason(state, move, 'foundation-return');
+  if (move.id === 'tableau.move') return hintReason(state, move, 'shift');
+  return 'Play that card.';
+}
+
 export function hintFor(state: FreecellPlayerView): FreecellHint | null {
   let best: RankedHint | null = null;
   for (const move of legalMovesFor(state)) {

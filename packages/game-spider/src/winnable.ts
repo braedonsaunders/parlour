@@ -38,9 +38,13 @@ function nextCandidate(seed: number): number {
  * Walks candidate seeds from `startSeed` until the solver proves one winnable.
  *
  * The measured proof rates (see the report that shipped `solver.ts`) decide
- * how much of this is a promise and how much is a filter: at one suit almost
- * every deal solves, at four suits nearly none of them prove inside the
- * node budget, and the finder answers `winnable: false` rather than guess.
+ * how much of this is a promise and how much is a filter: at one suit the
+ * search proves ~10% of deals, at two suits ~27%, at four suits 0/30. The
+ * 1-suit rate against the 2-suit rate tells you the heuristic is weak on
+ * long same-colour runs, not that one-suit deals are hard; at 4 suits a
+ * 12-candidate pass would burn six million nodes on a phone to learn nothing.
+ * The filter is therefore deliberately not wired into the app. It stays a
+ * library tool, and it only ever claims a deal after `solved`.
  */
 export function findWinnableSeed(
   startSeed: number,
