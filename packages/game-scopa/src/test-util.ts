@@ -85,6 +85,7 @@ export function makeState(opts: MakeStateOpts = {}): ScopaState {
   return {
     rules: scopaConfig.resolve({}),
     seats,
+    veiled: false,
     roundNo: 1,
     dealer: 0,
     hands: opts.hands ?? Array.from({ length: seats }, () => []),

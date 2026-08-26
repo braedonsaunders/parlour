@@ -47,6 +47,8 @@ export interface RoundSummary {
 export interface ScopaState {
   rules: ScopaRules;
   seats: number;
+  /** true when dealt under Veil — float-moves through nextRound require a ceremony */
+  veiled: boolean;
   /** 1-based round counter */
   roundNo: number;
   dealer: SeatId;
