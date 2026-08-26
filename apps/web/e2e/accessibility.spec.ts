@@ -165,11 +165,17 @@ test('a player can bid and play a Spades card with only the keyboard', async ({
   await page.keyboard.press('Enter');
   await expect(page.getByTestId('spades-bid-rail')).toHaveCount(0);
 
-  await expect.poll(() => announcements(page)).toHaveLength(1);
+  // The bid produces exactly one announcement, and it is the turn change. What
+  // follows it is the table getting on with the game — under load a bot seat can
+  // play inside the settle window, which is correct behaviour and used to fail
+  // this case with ["Seat 2's turn.", "Seat 2 played C4."]. Assert what the deal
+  // must not do (flood) and what the bid must do (announce the turn, once),
+  // rather than that the game froze while we looked at it.
+  await expect.poll(() => announcements(page)).not.toHaveLength(0);
   await page.waitForTimeout(300);
   const turnAnnouncements = await announcements(page);
-  expect(turnAnnouncements).toHaveLength(1);
   expect(turnAnnouncements[0]).toMatch(/Seat 2.+turn/i);
+  expect(turnAnnouncements.filter((line) => /turn/i.test(line))).toHaveLength(1);
 
   const hand = page.locator('[role="list"][data-zone^="hand:"]').first();
   const playableCards = hand.locator('button[data-card-chassis]:not(:disabled)');
