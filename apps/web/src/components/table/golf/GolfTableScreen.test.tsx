@@ -5,6 +5,7 @@ import { rulesForGolfMode } from '@/lib/golf/modes';
 import { golfTableView, type GolfTableView } from '@/lib/golf/view';
 import { GolfTransport } from '@/lib/solo/GolfTransport';
 import { DEFAULT_PROFILE_SETTINGS, useProfileStore } from '@/stores/profile';
+import { moveTableFocusTo, pressTableKey } from '@/components/table/shell/keyboard-test-utils';
 import { GolfTableScreen } from './GolfTableScreen';
 
 let container: HTMLDivElement;
@@ -61,6 +62,9 @@ describe('GolfTableScreen', () => {
     const { view } = table();
     render(view);
     expect(container.querySelectorAll('[data-testid^="golf-column-"]')).toHaveLength(7);
+    expect(container.querySelector('[data-testid="golf-undo"]')?.textContent).toBe(
+      'Undo · 0 moves',
+    );
     const serialised = JSON.stringify(textSurface());
     expect(serialised).not.toContain('seed');
     expect(serialised).not.toContain('??');
@@ -99,7 +103,7 @@ describe('GolfTableScreen', () => {
     expect(container.querySelector('[data-testid="golf-daily"]')).toBeNull();
   });
 
-  it('plays a glowing column foot in one tap', () => {
+  it('plays a glowing column foot with arrows and Enter', () => {
     let chosen: { view: GolfTableView; from: number; card: string } | undefined;
     for (let seed = 1; seed <= 80 && !chosen; seed++) {
       const { view } = table(seed);
@@ -117,7 +121,11 @@ describe('GolfTableScreen', () => {
     );
     expect(foot).not.toBeNull();
     expect(foot!.getAttribute('data-card')).toBe(chosen!.card);
-    act(() => foot!.querySelector<HTMLButtonElement>('button')!.click());
+    const stock = container.querySelector<HTMLButtonElement>('[data-testid="golf-stock"]')!;
+    const footButton = foot!.querySelector<HTMLButtonElement>('button')!;
+    act(() => stock.focus());
+    moveTableFocusTo(footButton);
+    pressTableKey(footButton, 'Enter');
     expect(onDispatch).toHaveBeenCalledWith('tableau.play', { from: chosen!.from });
   });
 

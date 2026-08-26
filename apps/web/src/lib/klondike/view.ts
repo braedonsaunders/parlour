@@ -29,6 +29,7 @@ export interface KlondikeTableView {
   tableau: KlondikePlayerView['tableau'];
   legal: readonly LegalMove[];
   canUndo: boolean;
+  undoDepth: number;
   canFinish: boolean;
   hint: KlondikeHint | null;
 }
@@ -51,6 +52,7 @@ export function klondikeTableView(
     tableau: state.tableau,
     legal,
     canUndo: snapshot.canUndo,
+    undoDepth: snapshot.undoDepth,
     canFinish: snapshot.canFinish,
     hint: snapshot.hint,
   };

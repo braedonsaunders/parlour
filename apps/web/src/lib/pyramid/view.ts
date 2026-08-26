@@ -22,6 +22,7 @@ export interface PyramidTableView {
   pyramid: readonly (readonly (string | null)[])[];
   legal: readonly LegalMove[];
   canUndo: boolean;
+  undoDepth: number;
   hint: PyramidHint | null;
 }
 
@@ -45,6 +46,7 @@ export function pyramidTableView(
     pyramid: state.pyramid,
     legal,
     canUndo: snapshot.canUndo,
+    undoDepth: snapshot.undoDepth,
     hint: snapshot.hint,
   };
 }

@@ -21,6 +21,7 @@ function view(legal: readonly LegalMove[]): GolfTableView {
     tableau: [['S7'], ['C10'], [], [], [], [], []],
     legal,
     canUndo: false,
+    undoDepth: 0,
     hint: null,
   };
 }
