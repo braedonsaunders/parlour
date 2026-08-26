@@ -3,6 +3,8 @@ import { join } from 'node:path';
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { Fx } from '@parlour/engine';
+import { PyramidFx } from '@parlour/game-pyramid';
 import { rulesForPyramidMode } from '@/lib/pyramid/modes';
 import { pyramidTableView, type PyramidTableView } from '@/lib/pyramid/view';
 import { PyramidTransport } from '@/lib/solo/PyramidTransport';
@@ -142,10 +144,34 @@ describe('PyramidTableScreen', () => {
     expect(onDispatch).toHaveBeenCalledWith('pyramid.pair', { a: { row: 6, col: 0 }, b: 'waste' });
   });
 
-  it('lets clicks pass through empty pyramid slots onto the card above', () => {
+  it('lets clicks pass through every emptied row onto the full exposed card', () => {
     const css = readFileSync(join(process.cwd(), 'src/styles/pyramid.module.css'), 'utf8');
+    expect(css).toMatch(/\.row\s*\{[^}]*pointer-events:\s*none;/s);
+    expect(css).toMatch(/\.pyramidCard\s*\{[^}]*pointer-events:\s*auto;/s);
     expect(css).toMatch(/\.emptySlot\s*\{[^}]*pointer-events:\s*none;/s);
     expect(css).toMatch(/\.board\s*\{[^}]*overflow:\s*visible;/s);
+  });
+
+  it('animates a waste King with the same card flight used for tableau removals', () => {
+    const { view } = table();
+    render(
+      { ...view, waste: ['C5'] },
+      {
+        fx: [
+          { kind: PyramidFx.Remove, payload: { card: 'D13', from: 'waste', to: 'waste' } },
+          {
+            kind: Fx.DealCard,
+            payload: { card: 'D13', from: 'waste', to: 'waste', faceDown: false, dur: 200 },
+          },
+        ],
+        fxKey: 'waste-king',
+      },
+    );
+    expect(container.querySelectorAll('[data-card-flight]')).toHaveLength(1);
+    expect(
+      container.querySelector('[data-card-flight] [aria-label="K of diamonds"]'),
+    ).not.toBeNull();
+    expect(container.querySelector('[data-just-drawn]')).toBeNull();
   });
 
   it('keeps the bottom row free so the opening cards can be tapped', () => {

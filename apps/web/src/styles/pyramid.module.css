@@ -197,6 +197,7 @@ button.pileButton,
   justify-content: center;
   gap: var(--py-gap);
   margin-top: calc(var(--py-step) - var(--py-card-h));
+  pointer-events: none;
 }
 
 .row:first-child {
@@ -211,6 +212,10 @@ button.pileButton,
   padding: 0;
   border: 0;
   background: transparent;
+}
+
+.pyramidCard {
+  pointer-events: auto;
 }
 
 .cardSlot,

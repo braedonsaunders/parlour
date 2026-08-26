@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import type { FxEvent } from '@parlour/engine';
-import { isFree, pyramidCatalog } from '@parlour/game-pyramid';
+import { isFree, PyramidFx, pyramidCatalog } from '@parlour/game-pyramid';
 import { PlayingCard } from '@/components/table/PlayingCard';
 import {
   TableActionRail,
@@ -57,22 +57,16 @@ export function PyramidTableScreen(props: PyramidTableScreenProps) {
   const deal = usePyramidDealPresentation(props.fx, props.fxKey, reducedMotion);
   const view = props.view;
   const moveNo = view?.moves ?? -1;
-  const wasteTop = view?.waste.at(-1) ?? null;
-  const [drawn, setDrawn] = useState<{ move: number; card: string | null }>({
-    move: moveNo,
-    card: null,
-  });
-  const previousWaste = useRef<{ move: number; card: string | null }>({
-    move: moveNo,
-    card: wasteTop,
-  });
-  useEffect(() => {
-    const before = previousWaste.current;
-    previousWaste.current = { move: moveNo, card: wasteTop };
-    if (moveNo === before.move || wasteTop === null || wasteTop === before.card) return;
-    setDrawn({ move: moveNo, card: wasteTop });
-  }, [moveNo, wasteTop]);
-  const justDrawn = drawn.move === moveNo ? drawn.card : null;
+  const justDrawn = useMemo(() => {
+    for (let index = props.fx.length - 1; index >= 0; index -= 1) {
+      const event = props.fx[index];
+      if (event?.kind !== PyramidFx.StockDraw) continue;
+      if (typeof event.payload !== 'object' || event.payload === null) return null;
+      const card = (event.payload as { card?: unknown }).card;
+      return typeof card === 'string' ? card : null;
+    }
+    return null;
+  }, [props.fx]);
 
   const [selectionState, setSelectionState] = useState<{
     move: number;

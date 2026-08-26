@@ -1,4 +1,3 @@
-import { createElement } from 'react';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { readFileSync, readdirSync } from 'node:fs';
@@ -25,15 +24,13 @@ describe('TableScreenFrame', () => {
     const open = vi.fn();
     act(() =>
       root.render(
-        createElement(
-          TableScreenFrame,
-          {
-            rootRef: { current: null },
-            hud: createElement('span', { 'data-testid': 'hud-copy' }, 'Round one'),
-            menu: { isOpen: false, open, close: vi.fn(), quit: vi.fn() },
-          },
-          createElement('section', { 'data-testid': 'felt-copy' }, 'Felt'),
-        ),
+        <TableScreenFrame
+          rootRef={{ current: null }}
+          hud={<span data-testid="hud-copy">Round one</span>}
+          menu={{ isOpen: false, open, close: vi.fn(), quit: vi.fn() }}
+        >
+          <section data-testid="felt-copy">Felt</section>
+        </TableScreenFrame>,
       ),
     );
 

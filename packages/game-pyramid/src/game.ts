@@ -278,16 +278,14 @@ const removeKing: Move<PyramidState> = {
     const input = removePayload(payload) as RemovePayload;
     const next = takeCard(state, input.from);
     const from = zoneOf(input.from);
-    ctx.fx.emit(PyramidFx.Remove, { card: next.card, from });
-    if (input.from !== 'waste') {
-      ctx.fx.emit(Fx.DealCard, {
-        card: next.card,
-        from,
-        to: 'waste',
-        faceDown: false,
-        dur: 200,
-      });
-    }
+    ctx.fx.emit(PyramidFx.Remove, { card: next.card, from, to: 'waste' });
+    ctx.fx.emit(Fx.DealCard, {
+      card: next.card,
+      from,
+      to: 'waste',
+      faceDown: false,
+      dur: 200,
+    });
     return acceptedAction({ ...state, pyramid: next.pyramid, waste: next.waste }, ctx);
   },
 };

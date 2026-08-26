@@ -62,6 +62,25 @@ describe('Pyramid moves', () => {
     expect(removed.session.state.pyramid[6]![0]).toBeNull();
     expect(removed.fx.map((event) => event.kind)).toContain('pyramid.remove');
 
+    const wasteKing = emptyState({ waste: ['H4', 'D13'] });
+    const wasteRemoved = sessionApply(
+      pyramidGame,
+      sessionWithState(wasteKing),
+      0,
+      'pyramid.remove',
+      { from: 'waste' },
+    );
+    expect(wasteRemoved.rejected).toBeUndefined();
+    expect(wasteRemoved.session.state.waste).toEqual(['H4']);
+    expect(wasteRemoved.fx).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: 'card.fly',
+          payload: expect.objectContaining({ card: 'D13', from: 'waste', to: 'waste' }),
+        }),
+      ]),
+    );
+
     const pair = emptyState();
     pair.pyramid[6]![0] = 'H12';
     pair.pyramid[6]![1] = 'D1';
