@@ -22,7 +22,7 @@
  * on the seat that produced it.
  */
 
-import type { CardId } from '@parlour/engine';
+import type { CardId, SeatId } from '@parlour/engine';
 import { sha256Hex } from './hash';
 import { fromHex, utf8 } from './bytes';
 import type { VeilSession, VeilRecycleEntry } from './session';
@@ -111,8 +111,25 @@ export class VeilRoom {
   }
 
   /** True once every seat's key has arrived and a header can be built. */
+  /**
+   * Seats that lay a layer this round. Null until the room says otherwise,
+   * which means every seat — the shape a table with no house bots has.
+   */
+  private participants: readonly SeatId[] | null = null;
+
+  /** Names the seats that will shuffle. Seats left out publish no key. */
+  setParticipants(seats: readonly SeatId[] | null): void {
+    this.participants = seats ? seats.slice().sort((left, right) => left - right) : null;
+  }
+
+  private layingSeats(): SeatId[] {
+    return this.participants
+      ? [...this.participants]
+      : Array.from({ length: this.seats }, (_, seat) => seat);
+  }
+
   get keysReady(): boolean {
-    return this.keys.size === this.seats;
+    return this.layingSeats().every((seat) => this.keys.has(seat));
   }
 
   keyList(): string[] {
@@ -121,7 +138,7 @@ export class VeilRoom {
 
   /** Host-only: seals and broadcasts the round header. */
   async publishHeader(deck: readonly CardId[]): Promise<void> {
-    const header = await this.session.openRound(this.keyList(), deck);
+    const header = await this.session.openRound(this.keyList(), deck, this.layingSeats());
     this.link.send({ type: 'veil.header', header }, null);
   }
 

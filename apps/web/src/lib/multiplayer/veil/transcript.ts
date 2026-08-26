@@ -38,6 +38,19 @@ export interface VeilRoundHeader {
   keys: readonly string[];
   /** the deck this round shuffles, in canonical order */
   deck: readonly string[];
+  /**
+   * Seats that lay a layer in this round, in seat order.
+   *
+   * Every seat, unless the table has house bots. A bot holds no key and cannot
+   * shuffle, so a round that waited on one would never open — which is why a
+   * bot seat used to force the whole room onto open play. Excluding them costs
+   * nothing the room was not already paying: the host opens a bot's hand to
+   * play it either way.
+   *
+   * Optional so a header written before this field still adopts, in which case
+   * every seat participates, which is what those rounds meant.
+   */
+  participants?: readonly number[];
 }
 
 export async function entryHash(entry: VeilEntry): Promise<string> {

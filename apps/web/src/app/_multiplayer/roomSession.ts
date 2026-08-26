@@ -445,11 +445,16 @@ export class MultiplayerRoomSession {
       throw error;
     }
     try {
-      const houseBots = this.snapshot.seats.some((seat) => seat.bot);
-      if (this.snapshot.security.tier === 'veil' && !houseBots) {
+      if (this.snapshot.security.tier === 'veil') {
         // A veiled deal takes its unpredictability from the ceremony itself —
-        // every seat lays a layer on a deck nobody can read — so it needs no
-        // separate seed round, and it publishes the real position at the end.
+        // every shuffling seat lays a layer on a deck nobody can read — so it
+        // needs no separate seed round, and it publishes the real position at
+        // the end.
+        //
+        // House bots no longer force this room onto open play. They hold no key
+        // and sit the ceremony out; the humans still each hold a layer, so no
+        // single player can read the deck, and the host opens a bot's hand to
+        // play it exactly as it already did.
         await this.dealVeiled();
       } else {
         // An open room had no "the host dealt" signal at all, which is why a
@@ -458,15 +463,7 @@ export class MultiplayerRoomSession {
         // snapshot a veiled deal sends, and peers adopt an unsolicited one only
         // while their own log is still empty, so it opens the table for everyone
         // without being able to rewrite a round in progress.
-        //
-        // House bots also take this path: they have no Veil key, so a ceremony
-        // that waited on every seat would hang, and the host already sees their
-        // cards.
         await this.dealOpen();
-        if (houseBots) {
-          const seats = this.snapshot.settings?.seats ?? this.snapshot.seats.length;
-          this.update({ security: securityFor('open', seats, 'open') });
-        }
       }
       this.transport?.holdLobby(false);
       this.update({ stage: 'table', error: null });
@@ -723,10 +720,18 @@ export class MultiplayerRoomSession {
     const support = packFor(settings).veilSupport();
     if (!support) throw new Error(`${settings.gameId} cannot run a veiled room`);
 
+    // House bots hold no key and cannot shuffle, so they sit the ceremony out.
+    // The host opens their hands to play them either way, which is the same
+    // deal an open table already makes — and the humans still each hold a layer,
+    // so no single player can read the deck.
+    const laying = this.ceremonySeats();
+    if (laying.length === 0) throw new Error('no seat at this table can shuffle');
+    veil.room.setParticipants(laying);
+
     await waitForVeilKeys(veil.room);
     await veil.room.publishHeader(support.deck(settings.config).cardIds);
     await veil.room.advanceCeremony();
-    await waitForCeremony(veil.session, 0, settings.seats, () => this.publishCeremonyProgress());
+    await waitForCeremony(veil.session, 0, laying.length, () => this.publishCeremonyProgress());
 
     // Open the cards the game starts face up (Blitz's discard, Wild's starter).
     const from = veil.session.publicSetupPositions(support, 0);
@@ -762,7 +767,7 @@ export class MultiplayerRoomSession {
       fxKey: this.snapshot.fxKey + 1,
       security: {
         ...this.snapshot.security,
-        ceremony: { laid: settings.seats, seats: settings.seats, ready: true },
+        ceremony: { laid: laying.length, seats: laying.length, ready: true },
       },
     });
     void this.openMyHandles();

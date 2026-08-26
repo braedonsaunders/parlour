@@ -71,9 +71,16 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
-function hasOnlyKeys(value: Record<string, unknown>, keys: readonly string[]): boolean {
+function hasOnlyKeys(
+  value: Record<string, unknown>,
+  keys: readonly string[],
+  optional: readonly string[] = [],
+): boolean {
   const own = Object.keys(value);
-  return own.length === keys.length && keys.every((key) => Object.hasOwn(value, key));
+  return (
+    keys.every((key) => Object.hasOwn(value, key)) &&
+    own.every((key) => keys.includes(key) || optional.includes(key))
+  );
 }
 
 function isBoundedString(value: unknown, max: number): value is string {
@@ -107,19 +114,55 @@ function isDeck(value: unknown): value is string[] {
   );
 }
 
+/** Absent (every seat shuffles) or a sorted, distinct, in-range seat list. */
+function isParticipantList(value: unknown, seats: number): boolean {
+  if (value === undefined) return true;
+  if (!Array.isArray(value) || value.length === 0 || value.length > seats) return false;
+  const list = value as number[];
+  return (
+    list.every((seat) => isIndex(seat, seats) || seat === 0) &&
+    list.every((seat) => Number.isInteger(seat) && seat >= 0 && seat < seats) &&
+    new Set(list).size === list.length &&
+    list.every((seat, index) => index === 0 || seat > list[index - 1]!)
+  );
+}
+
+/**
+ * A seat that shuffles carries a real key; a seat that does not carries none.
+ *
+ * The empty slot is what a house bot leaves behind. Uniqueness is checked over
+ * the shuffling seats only, because several bots would otherwise collide on the
+ * same empty string and sink an honest header.
+ */
+function hasShuffleKeys(keys: unknown[], participants: unknown, seats: number): boolean {
+  const laying = Array.isArray(participants)
+    ? (participants as number[])
+    : Array.from({ length: seats }, (_, seat) => seat);
+  const shuffling = laying.map((seat) => keys[seat]);
+  return (
+    shuffling.every((key) => isBoundedString(key, MAX_KEY)) &&
+    new Set(shuffling as string[]).size === shuffling.length &&
+    keys.every((key, seat) => laying.includes(seat) || key === '')
+  );
+}
+
 export function isVeilRoundHeader(value: unknown): value is VeilRoundHeader {
   return (
     isRecord(value) &&
-    hasOnlyKeys(value, ['roundId', 'gameId', 'rulesHash', 'seats', 'keys', 'deck']) &&
+    hasOnlyKeys(
+      value,
+      ['roundId', 'gameId', 'rulesHash', 'seats', 'keys', 'deck'],
+      ['participants'],
+    ) &&
     isBoundedString(value.roundId, MAX_ID) &&
     isBoundedString(value.gameId, MAX_ID) &&
     isHex(value.rulesHash, HASH_HEX) &&
     isIndex(value.seats, MAX_SEATS) &&
     (value.seats as number) >= 2 &&
+    isParticipantList(value.participants, value.seats as number) &&
     Array.isArray(value.keys) &&
     value.keys.length === value.seats &&
-    value.keys.every((key) => isBoundedString(key, MAX_KEY)) &&
-    new Set(value.keys as string[]).size === value.keys.length &&
+    hasShuffleKeys(value.keys, value.participants, value.seats as number) &&
     Array.isArray(value.deck) &&
     value.deck.length > 0 &&
     value.deck.length <= MAX_DECK &&

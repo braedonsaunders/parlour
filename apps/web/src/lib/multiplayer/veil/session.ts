@@ -162,10 +162,27 @@ export class VeilSession {
    * game, the resolved rules and the deck, so a room cannot re-configure itself
    * after the shuffle and claim the transcript still applies.
    */
-  async openRound(keys: readonly string[], deck: readonly CardId[]): Promise<VeilRoundHeader> {
-    if (keys.length !== this.options.seats) throw new Error('every seat must publish a key');
+  /**
+   * Seals the opening round.
+   *
+   * `participants` names the seats that will lay a layer, defaulting to all of
+   * them. A table with house bots passes only its human seats: a bot publishes
+   * no key and cannot shuffle, so waiting on one would stall the round forever.
+   * Only participants are required to have published a key — the header still
+   * carries a slot per seat so its shape does not depend on who is playing.
+   */
+  async openRound(
+    keys: readonly string[],
+    deck: readonly CardId[],
+    participants?: readonly SeatId[],
+  ): Promise<VeilRoundHeader> {
     if (!Array.isArray(keys) || !Array.isArray(deck)) {
       throw new Error('a veiled round needs every seat key and the full deck');
+    }
+    if (keys.length !== this.options.seats) throw new Error('every seat must publish a key');
+    const laying = this.validateParticipants(participants ?? this.allSeats());
+    if (laying.some((seat) => !keys[seat])) {
+      throw new Error('every seat that shuffles must publish a key');
     }
     const header: VeilRoundHeader = {
       roundId: roundIdFor(this.options.roomCode, this.options.seed, 0),
@@ -174,9 +191,10 @@ export class VeilSession {
       seats: this.options.seats,
       keys: keys.slice(),
       deck: deck.slice(),
+      participants: laying,
     };
     this.transcript = await VeilTranscript.open(header);
-    await this.beginEpoch(0, deck, this.allSeats());
+    await this.beginEpoch(0, deck, laying);
     return header;
   }
 
@@ -186,10 +204,17 @@ export class VeilSession {
     if (header.seats !== this.options.seats) return 'the room has a different number of seats';
     if (header.rulesHash !== (await hashTagged('rules', this.options.config)))
       return 'the room is running different rules';
-    if (header.keys[this.options.seat] !== this.identity?.publicKey)
+    const laying = header.participants ?? this.allSeats();
+    // A seat that shuffles must be in the header under its own key. A seat that
+    // does not — a house bot, or this peer watching one — has nothing to prove.
+    if (
+      laying.includes(this.options.seat) &&
+      header.keys[this.options.seat] !== this.identity?.publicKey
+    ) {
       return 'the header does not carry this seat’s key';
+    }
     this.transcript = await VeilTranscript.open(header);
-    await this.beginEpoch(0, header.deck, this.allSeats());
+    await this.beginEpoch(0, header.deck, laying);
     return null;
   }
 
