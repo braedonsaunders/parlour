@@ -6,6 +6,7 @@ import { decidePlay, type PlayParams } from './play';
 export { decideBid, type BidParams } from './bid';
 export { decidePlay, type PlayParams } from './play';
 export { expectedTricks, ownHand } from './evaluate';
+export { searchBot } from './search';
 
 export interface BotProfile {
   bid: BidParams;
