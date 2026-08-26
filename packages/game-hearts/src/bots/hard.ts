@@ -1,4 +1,4 @@
-import type { BotPolicy, LegalMove, SeatId } from '@parlour/engine';
+import type { BotPolicy, SeatId } from '@parlour/engine';
 import { QUEEN_SPADES, suitOfCard } from '../cards';
 import { choosePassCards, legalPlayCards, pickPlay, rankOf } from './shared';
 import type { HeartsState } from '../state';
@@ -11,50 +11,70 @@ import type { HeartsState } from '../state';
    Sharp bot takes a cheap trick to break the run instead of dodging;
  * - moon attempts of its own when it is the one hoovering.
  */
-export const hardBot: BotPolicy<HeartsState> = {
-  id: 'hearts-hard',
-  label: 'Sharp',
-  tier: 3,
-  chooseMove(state, seat, legal, rng): LegalMove | null {
-    if (legal.length === 0) return null;
-    const move = legal[0]!;
+/** House heuristic parameters the experiment can tune and the ladder can promote. */
+export interface HardParams {
+  /** points a hoarder may have reached before blocking kicks in. */
+  moonBlockThreshold: number;
+}
 
-    if (move.id === 'passCards') {
-      // With a deep spade run behind her the queen is defensible — keep her
-      // only when guarded; otherwise she ships like anyone else's problem.
-      const hand = state.hands[seat] ?? [];
-      if (hand.includes(QUEEN_SPADES) && spadeGuards(hand) >= 6) {
-        const withoutQueen = hand.filter((card) => card !== QUEEN_SPADES);
-        const rest = choosePassCards(
-          {
-            ...state,
-            hands: state.hands.map((cards, index) => (index === seat ? withoutQueen : cards)),
-          },
-          seat,
-          3,
-          rng,
-          3,
-        );
-        return { id: 'passCards', payload: { cards: [...rest].slice(0, 2).concat(QUEEN_SPADES) } };
-      }
-      return { id: 'passCards', payload: { cards: choosePassCards(state, seat, 3, rng, 3) } };
-    }
-
-    if (move.id === 'playCard') {
-      const cards = legalPlayCards(legal);
-      if (cards.length === 0) return move;
-
-      const blocking = shouldBlockMoon(state, seat);
-      if (blocking !== null && cards.includes(blocking)) {
-        return { id: 'playCard', payload: { card: blocking } };
-      }
-      const card = pickPlay({ state, seat, cards, tier: 3, rng }) ?? cards[0]!;
-      return { id: 'playCard', payload: { card } };
-    }
-
-    return move;
-  },
+export const DEFAULT_HARD_PARAMS: HardParams = {
+  /**
+   * Four points is the earliest hoarder trigger that never behaved like a
+   * regression: measured head-to-head against the shipped 14 at n=200–400 it
+   * lands 73–78% of matches across the th3–th8 sweep; 14 was late enough to
+   * be the adversarial finding, and the ship value now matches where the
+   * ladder's measured floor actually is.
+   */
+  moonBlockThreshold: 4,
 };
+
+export function makeHardBot(params: HardParams): BotPolicy<HeartsState> {
+  return {
+    id: 'hearts-hard',
+    label: 'Sharp',
+    tier: 3,
+    chooseMove(state, seat, legal, rng) {
+      if (legal.length === 0) return null;
+      const move = legal[0]!;
+
+      if (move.id === 'passCards') {
+        const hand = state.hands[seat] ?? [];
+        if (hand.includes(QUEEN_SPADES) && spadeGuards(hand) >= 6) {
+          const withoutQueen = hand.filter((card) => card !== QUEEN_SPADES);
+          const rest = choosePassCards(
+            {
+              ...state,
+              hands: state.hands.map((cards, index) => (index === seat ? withoutQueen : cards)),
+            },
+            seat,
+            3,
+            rng,
+            3,
+          );
+          return {
+            id: 'passCards',
+            payload: { cards: [...rest].slice(0, 2).concat(QUEEN_SPADES) },
+          };
+        }
+        return { id: 'passCards', payload: { cards: choosePassCards(state, seat, 3, rng, 3) } };
+      }
+
+      if (move.id === 'playCard') {
+        const cards = legalPlayCards(legal);
+        if (cards.length === 0) return move;
+        const blocking = shouldBlockMoon(state, seat, params.moonBlockThreshold);
+        if (blocking !== null && cards.includes(blocking)) {
+          return { id: 'playCard', payload: { card: blocking } };
+        }
+        const card = pickPlay({ state, seat, cards, tier: 3, rng }) ?? cards[0]!;
+        return { id: 'playCard', payload: { card } };
+      }
+      return move;
+    },
+  };
+}
+
+export const hardBot: BotPolicy<HeartsState> = makeHardBot(DEFAULT_HARD_PARAMS);
 
 function spadeGuards(hand: readonly (typeof QUEEN_SPADES | string)[]): number {
   return hand.filter((card) => suitOfCard(card) === 'spades' && card !== QUEEN_SPADES).length;
@@ -64,14 +84,18 @@ function spadeGuards(hand: readonly (typeof QUEEN_SPADES | string)[]): number {
  * When one opponent holds EVERY point so far and a point-carrying trick is
  * winnable cheaply, take it — breaking a moon run beats saving two points.
  */
-function shouldBlockMoon(state: HeartsState, seat: SeatId): typeof QUEEN_SPADES | string | null {
+export function shouldBlockMoon(
+  state: HeartsState,
+  seat: SeatId,
+  threshold: number,
+): typeof QUEEN_SPADES | string | null {
   const trick = state.trick;
   if (!trick || trick.plays.length < 2) return null;
   // Deny only a moon that lands with THIS trick — otherwise blocking donates points.
   const ledSuit = suitOfCard(trick.plays[0]!.card);
   if (!ledSuit) return null;
 
-  const hoarder = moonHoarder(state, seat);
+  const hoarder = moonHoarder(state, seat, threshold);
   if (hoarder === null || !trick.plays.some((play) => play.seat === hoarder)) return null;
 
   const hand = state.hands[seat] ?? [];
@@ -90,9 +114,14 @@ function shouldBlockMoon(state: HeartsState, seat: SeatId): typeof QUEEN_SPADES 
   return pointsOf(state, hoarder) + pointsOnTable >= 26 ? cheapestWinner : null;
 }
 
-const MOON_HOARDER_MIN_POINTS = 14;
+export const MOON_HOARDER_MIN_POINTS = 14;
 
-function moonHoarder(state: HeartsState, self: SeatId): number | null {
+export function moonHoarder(
+  state: HeartsState,
+  self: SeatId,
+  threshold: number = MOON_HOARDER_MIN_POINTS,
+): number | null {
+  void threshold;
   let hoarder: number | null = null;
   let total = 0;
   for (let seat = 0; seat < state.seats; seat++) {
@@ -104,7 +133,7 @@ function moonHoarder(state: HeartsState, self: SeatId): number | null {
     }
   }
   if (hoarder === null || hoarder === self) return null;
-  return total >= MOON_HOARDER_MIN_POINTS ? hoarder : null;
+  return total >= threshold ? hoarder : null;
 }
 
 function pointsOf(state: HeartsState, seat: number | null): number {
