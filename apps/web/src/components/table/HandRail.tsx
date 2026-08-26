@@ -225,6 +225,22 @@ export function HandRail({
     else updateScrollState();
   }, [count, geometry.cardWidth, measure, updateScrollState]);
 
+  /*
+   * Safari's default macOS keyboard preference skips implicit form controls,
+   * including the card buttons. The list is therefore the one explicit entry
+   * in the Tab order; the shared shell moves an arrow press from it into the
+   * enabled cards. Keeping those cards at -1 also avoids making every card in
+   * a thirteen-card hand a separate Tab stop in browsers that do include
+   * buttons by default.
+   */
+  useLayoutEffect(() => {
+    railRef.current
+      ?.querySelectorAll<HTMLButtonElement>('[data-hand-card] button')
+      .forEach((button) => {
+        button.tabIndex = -1;
+      });
+  });
+
   const step = calculateFanStep(geometry.width, geometry.cardWidth, count, fanStepRatio);
   const fanN = Math.max(count, 1);
   return (
@@ -232,6 +248,7 @@ export function HandRail({
       ref={railRef}
       className={styles.localHand}
       role="list"
+      tabIndex={count > 0 ? 0 : -1}
       style={
         {
           '--fan-n': fanN,

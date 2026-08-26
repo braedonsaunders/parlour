@@ -72,7 +72,7 @@ describe('hand rail keyboard surface', () => {
     container.remove();
   });
 
-  it('keeps list semantics and exactly one tab stop per playable card — the nested button', () => {
+  it('keeps list semantics and exposes one keyboard entry point for the whole hand', () => {
     act(() => {
       root.render(
         <HandRail count={2} zone="hand:0" label="Your hand">
@@ -92,6 +92,7 @@ describe('hand rail keyboard surface', () => {
 
     const rail = container.querySelector('[role="list"]');
     expect(rail?.getAttribute('aria-label')).toBe('Your hand');
+    expect((rail as HTMLElement | null)?.tabIndex).toBe(0);
     expect(container.querySelectorAll('[role="listitem"]')).toHaveLength(2);
 
     const playableItem = container.querySelector('[data-hand-card][data-playable="true"]');
@@ -108,8 +109,10 @@ describe('hand rail keyboard surface', () => {
       return tabIndex !== '-1';
     });
     expect(tabStops).toHaveLength(1);
-    expect(tabStops[0]?.tagName).toBe('BUTTON');
-    expect(tabStops[0]?.getAttribute('aria-label')).toBe('Discard ace of spades');
+    expect(tabStops[0]).toBe(rail);
+    expect(
+      container.querySelector<HTMLButtonElement>('[aria-label="Discard ace of spades"]')?.tabIndex,
+    ).toBe(-1);
   });
 
   it('marks a long hand as scrollable and tracks both reachable ends', () => {

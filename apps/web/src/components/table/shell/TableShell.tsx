@@ -76,8 +76,11 @@ function moveTableFocus(event: ReactKeyboardEvent<HTMLElement>): void {
   const target = event.target;
   const root = event.currentTarget;
   const handCard = target.closest<HTMLElement>('[data-hand-card]');
+  const hand =
+    handCard?.closest<HTMLElement>('[role="list"]') ??
+    (target.matches('[role="list"][data-zone^="hand:"]') ? target : null);
   const zone = target.closest<HTMLElement>('[data-zone]');
-  if (!handCard && !zone) return;
+  if (!hand && !zone) return;
 
   if (event.key === 'Enter' && isTableControl(target)) {
     event.preventDefault();
@@ -86,12 +89,20 @@ function moveTableFocus(event: ReactKeyboardEvent<HTMLElement>): void {
   }
   if (!NAVIGATION_KEYS.has(event.key)) return;
 
-  const hand = handCard?.closest<HTMLElement>('[role="list"]');
   const controls = tableControls(hand ?? root).filter((control) => {
     if (hand)
       return control.closest('[role="list"]') === hand && control.closest('[data-hand-card]');
     return control.closest('[data-zone]') !== null;
   });
+  if (target === hand) {
+    const enterFromEnd =
+      event.key === 'End' || event.key === 'ArrowLeft' || event.key === 'ArrowUp';
+    const entry = enterFromEnd ? controls.at(-1) : controls[0];
+    if (!entry) return;
+    event.preventDefault();
+    entry.focus();
+    return;
+  }
   const current = controls.indexOf(target);
   if (current < 0 || controls.length < 2) return;
 

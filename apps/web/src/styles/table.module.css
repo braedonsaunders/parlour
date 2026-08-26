@@ -380,6 +380,12 @@
   pointer-events: none;
 }
 
+.localHand:focus-visible {
+  outline: 3px solid var(--hearth-core);
+  outline-offset: -3px;
+  border-radius: 1.25rem;
+}
+
 .handTrack {
   position: absolute;
   inset: 0;

@@ -114,7 +114,7 @@ test('a player can move a Klondike card to its foundation with only the keyboard
   await page.waitForTimeout(250);
   const [announcement] = await announcements(page);
   expect(announcement).toMatch(
-    /Moved Ace of diamonds from tableau column 4 to diamonds foundation/,
+    /ace of diamonds moved from tableau column 4 to the diamonds foundation\. 2 of diamonds revealed in tableau column 4\./i,
   );
   await expect(announcer).toHaveText(announcement!);
 });
@@ -146,8 +146,11 @@ test('a player can bid and play a Spades card with only the keyboard', async ({ 
   await expect(playableCards.first()).toBeVisible({ timeout: 15_000 });
   await expect(hand.locator('[data-hand-card]')).toHaveCount(13);
 
+  await tabTo(page, hand);
+  await expect(hand).toBeFocused();
+  await page.keyboard.press('ArrowRight');
   const firstPlayable = playableCards.first();
-  await tabTo(page, firstPlayable);
+  await expect(firstPlayable).toBeFocused();
   const playableCount = await playableCards.count();
   const initialCard = await firstPlayable.getAttribute('aria-label');
   await page.keyboard.press('ArrowRight');
@@ -169,7 +172,7 @@ test('the table menu and nested rules sheet trap and restore keyboard focus', as
   await page.keyboard.press('Enter');
 
   const menu = page.getByTestId('table-menu').getByRole('dialog');
-  const resume = menu.getByRole('button', { name: /back to table/i });
+  const resume = menu.getByRole('button', { name: /back to the table/i });
   await expect(menu).toBeVisible();
   await expect(resume).toBeFocused();
 
