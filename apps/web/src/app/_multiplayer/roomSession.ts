@@ -250,6 +250,32 @@ export class MultiplayerRoomSession {
   private autoDeclinePending = false;
   /** a veiled redeal ceremony already under way, so it cannot start twice */
   private redealPending = false;
+  /**
+   * Next epoch number to hand out, never reused.
+   *
+   * Both the next-hand ceremony and a mid-hand stock recycle used to derive
+   * their epoch from `liveEpochs()` at the top of the call and then await
+   * `startRecycle`. That leaves a window where two ceremonies read the same
+   * highest epoch and both claim it. It never mattered while the next hand was
+   * only shuffled on demand — nothing else was in flight — and it matters now
+   * that the next hand is shuffled ahead of time, while a hand is still being
+   * played and can still recycle its stock.
+   */
+  private epochCursor = 0;
+  /**
+   * A ceremony run before the hand that needs it.
+   *
+   * The whole point: a ceremony costs one to three seconds, and a hand takes
+   * tens of seconds to play. Run it during the hand and the next deal is
+   * already sitting there when the hand ends, so the cost is never on a path a
+   * player is waiting on. `participants` is captured because a seat that drops
+   * between priming and dealing takes its layer with it — that run is spent,
+   * and the deal falls back to shuffling on demand.
+   */
+  private primedDeck: {
+    participants: readonly number[];
+    deck: Promise<readonly string[]>;
+  } | null = null;
   private openPending = false;
   /** One host deal at a time when players leave the podium together. */
   private rematchPending = false;
@@ -740,6 +766,7 @@ export class MultiplayerRoomSession {
       },
     });
     void this.openMyHandles();
+    this.primeNextHand();
   }
 
   /** Builds this seat's Veil state and points it at the mesh. */
@@ -903,8 +930,12 @@ export class MultiplayerRoomSession {
     if (!move || !pack.redealPending(this.authority.getSession().state)) return;
 
     this.redealPending = true;
-    void this.shuffleNextHand()
+    // Already shuffled during the hand that just ended, unless the table
+    // changed shape underneath it — in which case shuffle now, as before.
+    const deck = this.takePrimedDeck() ?? this.shuffleNextHand();
+    void deck
       .then((deckOrder) => this.inject(move, { deckOrder }))
+      .then(() => this.primeNextHand())
       .catch((error: unknown) => {
         this.update({
           error: error instanceof Error ? error.message : 'The next hand could not be shuffled',
@@ -969,18 +1000,62 @@ export class MultiplayerRoomSession {
    * the order off the epoch. The handles are numbered from where the last epoch
    * stopped, so a second hand can never reissue a card the first one spent.
    */
-  private async shuffleNextHand(): Promise<readonly string[]> {
+  /** Hands out a fresh epoch, monotonic even while another ceremony is in flight. */
+  private allocateEpoch(): number {
+    const live = this.veil?.session.liveEpochs() ?? [];
+    const highest = live.length > 0 ? Math.max(...live) : -1;
+    this.epochCursor = Math.max(this.epochCursor, highest + 1);
+    return this.epochCursor++;
+  }
+
+  /** Seats that can lay a layer: connected, and not a bot holding no key. */
+  private ceremonySeats(): number[] {
+    return this.snapshot.seats
+      .filter((seat) => seat.connected && !seat.bot)
+      .map((seat) => seat.seat)
+      .sort((left, right) => left - right);
+  }
+
+  /**
+   * Starts the next hand's ceremony now, while this hand is still being played.
+   *
+   * Failure is deliberately swallowed: a primed run is an optimisation, and the
+   * on-demand path is still there to shuffle when the hand actually ends. What
+   * must never happen is a rejected background promise taking the match with it.
+   */
+  private primeNextHand(): void {
+    if (!this.snapshot.isHost || !this.veil || this.primedDeck) return;
+    const settings = this.snapshot.settings;
+    if (!settings || !roomGame(settings.gameId).redealMove) return;
+    const participants = this.ceremonySeats();
+    if (participants.length === 0) return;
+
+    const deck = this.shuffleNextHand(participants);
+    deck.catch(() => undefined);
+    this.primedDeck = { participants, deck };
+  }
+
+  /** The primed deck when it is still valid for the seats now at the table. */
+  private takePrimedDeck(): Promise<readonly string[]> | null {
+    const primed = this.primedDeck;
+    this.primedDeck = null;
+    if (!primed) return null;
+    const now = this.ceremonySeats();
+    const same =
+      primed.participants.length === now.length &&
+      primed.participants.every((seat, index) => seat === now[index]);
+    return same ? primed.deck : null;
+  }
+
+  private async shuffleNextHand(seats?: readonly number[]): Promise<readonly string[]> {
     const veil = this.veil;
     const settings = this.snapshot.settings;
     if (!veil || !settings) throw new Error('this room is not running Veil');
     const support = roomGame(settings.gameId).veilSupport();
     if (!support) throw new Error(`${settings.gameId} cannot run a veiled room`);
 
-    const epoch = (veil.session.liveEpochs().at(-1) ?? -1) + 1;
-    const participants = this.snapshot.seats
-      .filter((seat) => seat.connected && !seat.bot)
-      .map((seat) => seat.seat)
-      .sort((left, right) => left - right);
+    const epoch = this.allocateEpoch();
+    const participants = seats ?? this.ceremonySeats();
     if (participants.length === 0) throw new Error('no connected seat can shuffle the next hand');
 
     await veil.room.startRecycle(epoch, support.deck(settings.config).cardIds, participants);
@@ -999,11 +1074,8 @@ export class MultiplayerRoomSession {
   private async reveil(cards: readonly string[]): Promise<CardRecycle> {
     const veil = this.veil;
     if (!veil) throw new Error('this room is not running Veil');
-    const epoch = (veil.session.liveEpochs().at(-1) ?? -1) + 1;
-    const participants = this.snapshot.seats
-      .filter((seat) => seat.connected && !seat.bot)
-      .map((seat) => seat.seat)
-      .sort((a, b) => a - b);
+    const epoch = this.allocateEpoch();
+    const participants = this.ceremonySeats();
     if (participants.length === 0) throw new Error('no connected seat can re-veil the stock');
 
     await veil.room.startRecycle(epoch, cards, participants);
