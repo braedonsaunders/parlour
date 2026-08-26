@@ -35,6 +35,20 @@ export {
   type SpiderHint,
 } from './game';
 export { spiderHowToPlay } from './howto';
+export {
+  solveSpider,
+  isWinnableDeal,
+  spiderDealFor,
+  type SolveOptions,
+  type SolveResult,
+  type SolveOutcome,
+  type SolveWeights,
+} from './solver';
+export {
+  findWinnableSeed,
+  type WinnableSearchOptions,
+  type WinnableSeed,
+} from './winnable';
 export type {
   HiddenSpiderCard,
   SpiderColumn,
