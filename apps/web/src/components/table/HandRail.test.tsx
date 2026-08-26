@@ -116,7 +116,7 @@ describe('hand rail keyboard surface', () => {
     ).toBe(0);
   });
 
-  it('marks a long hand as scrollable and tracks both reachable ends', () => {
+  it('holds a thirteen-card hand as one fan, with nothing to scroll', () => {
     act(() => {
       root.render(
         <HandRail count={13} zone="hand:0" label="Your hand">
@@ -130,37 +130,21 @@ describe('hand rail keyboard surface', () => {
     });
 
     const rail = container.querySelector<HTMLElement>('[role="list"]')!;
-    const track = rail.querySelector<HTMLElement>('[data-hand-scroll]')!;
-    Object.defineProperties(track, {
-      clientWidth: { configurable: true, value: 320 },
-      scrollWidth: { configurable: true, value: 960 },
-      scrollLeft: { configurable: true, value: 0, writable: true },
-    });
-
-    act(() => window.dispatchEvent(new Event('resize')));
-    expect(rail.dataset.scrollState).toBe('start');
-    expect(rail.querySelectorAll('[data-scroll-cue]')).toHaveLength(2);
-
-    act(() => {
-      track.scrollLeft = 320;
-      track.dispatchEvent(new Event('scroll', { bubbles: true }));
-    });
-    expect(rail.dataset.scrollState).toBe('middle');
-
-    act(() => {
-      track.scrollLeft = 640;
-      track.dispatchEvent(new Event('scroll', { bubbles: true }));
-    });
-    expect(rail.dataset.scrollState).toBe('end');
     expect(rail.querySelectorAll('[role="listitem"]')).toHaveLength(13);
+    // A scroll container, a scroll cue or a scroll-state attribute would each
+    // mean some part of the hand is off-screen. The owner's rule is that the
+    // fan compresses instead: every card visible, in one look, always.
+    expect(rail.querySelector('[data-hand-scroll]')).toBeNull();
+    expect(rail.querySelectorAll('[data-scroll-cue]')).toHaveLength(0);
+    expect(rail.dataset.scrollState).toBeUndefined();
   });
 
-  it('starts at the first card when a dealt hand first becomes scrollable', () => {
+  it('re-solves the fan step when the device rotates', () => {
     act(() => {
       root.render(
-        <HandRail count={13} zone="hand:0" label="Your hand">
-          {Array.from({ length: 13 }, (_, index) => (
-            <HandRailCard key={index} cardId={`card-${index}`} index={index} count={13} playable>
+        <HandRail count={7} zone="hand:0" label="Your hand">
+          {Array.from({ length: 7 }, (_, index) => (
+            <HandRailCard key={index} cardId={`card-${index}`} index={index} count={7} playable>
               <button type="button">Card {index + 1}</button>
             </HandRailCard>
           ))}
@@ -169,23 +153,64 @@ describe('hand rail keyboard surface', () => {
     });
 
     const rail = container.querySelector<HTMLElement>('[role="list"]')!;
-    const track = rail.querySelector<HTMLElement>('[data-hand-scroll]')!;
-    Object.defineProperties(track, {
-      clientWidth: { configurable: true, value: 320 },
-      scrollWidth: { configurable: true, value: 320, writable: true },
-      scrollLeft: { configurable: true, value: 0, writable: true },
-    });
+    const firstCard = rail.querySelector<HTMLElement>('[data-hand-card]')!;
+    Object.defineProperty(rail, 'clientWidth', { configurable: true, value: 390 });
+    Object.defineProperty(firstCard, 'offsetWidth', { configurable: true, value: 70 });
     act(() => window.dispatchEvent(new Event('resize')));
-    expect(rail.dataset.scrollState).toBe('none');
+    const portraitStep = rail.style.getPropertyValue('--fan-step');
 
-    // WebKit can carry this stale centred offset across the underflow/overflow
-    // layout change while the thirteen cards arrive.
-    Object.defineProperty(track, 'scrollWidth', { configurable: true, value: 960 });
-    track.scrollLeft = 640;
-    act(() => window.dispatchEvent(new Event('resize')));
+    // Landscape is both a wider rail and a bigger card; the step must follow
+    // both or the hand lands at the previous orientation's spacing.
+    Object.defineProperty(rail, 'clientWidth', { configurable: true, value: 820 });
+    Object.defineProperty(firstCard, 'offsetWidth', { configurable: true, value: 115 });
+    act(() => window.dispatchEvent(new Event('orientationchange')));
 
-    expect(track.scrollLeft).toBe(0);
-    expect(rail.dataset.scrollState).toBe('start');
+    expect(rail.style.getPropertyValue('--fan-step')).not.toBe(portraitStep);
+    expect(Number.parseFloat(rail.style.getPropertyValue('--fan-step'))).toBeGreaterThan(
+      Number.parseFloat(portraitStep),
+    );
+  });
+});
+
+describe('portrait hands', () => {
+  const portrait = (() => {
+    const start = styles.indexOf('@media (orientation: portrait) {');
+    expect(start, 'portrait block exists').toBeGreaterThan(-1);
+    let depth = 0;
+    for (let index = styles.indexOf('{', start); index < styles.length; index += 1) {
+      if (styles[index] === '{') depth += 1;
+      if (styles[index] === '}') {
+        depth -= 1;
+        if (depth === 0) return styles.slice(start, index + 1);
+      }
+    }
+    throw new Error('unterminated portrait block');
+  })();
+
+  /*
+   * These four assertions are the ones that were missing. A previous batch
+   * turned portrait into a horizontally scrolling row with `overflow-y: hidden`,
+   * which cut the top off every lifted playable card and hid nine of thirteen
+   * cards behind a swipe — and it rewrote the tests that would have caught it.
+   * The owner's requirement predates that change and still stands: the deck is
+   * compressed so it never scrolls, and nothing is ever cut off.
+   */
+  it('never turns the hand into something that scrolls', () => {
+    expect(portrait).not.toMatch(/overflow-x:\s*auto/);
+    expect(portrait).not.toMatch(/scroll-snap-type/);
+  });
+
+  it('never clips the rail, because a lifted playable card has to go somewhere', () => {
+    expect(portrait).not.toMatch(/overflow-y:\s*hidden/);
+  });
+
+  it('keeps the fan transform rather than flattening the hand into a row', () => {
+    expect(portrait).not.toMatch(/transform:\s*none\s*!important/);
+    expect(portrait).not.toMatch(/\.handFan\s*\{[^}]*transform:\s*translateY/s);
+  });
+
+  it('sizes the portrait card from the viewport so any hand fits the width', () => {
+    expect(portrait).toMatch(/--hand-card-width:\s*clamp\([^)]*vw[^)]*\)/);
   });
 });
 

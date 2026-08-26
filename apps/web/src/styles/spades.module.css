@@ -731,12 +731,18 @@
    keep its unusually long bid rail and score furniture clear of it.
    ------------------------------------------------------------------------- */
 @media (orientation: portrait) and (max-width: 820px) {
+  /* Spades widens the rail and grows the card unconditionally, to buy a 44px
+     step out of the fan's own cap. That arithmetic assumes a landscape table:
+     on a phone `min(48rem, 100vw)` is the whole screen and a 5.75rem card
+     pushes the fan's rotated corners past both edges. Portrait hands the two
+     numbers back to the shared rail, which solves them from the viewport. */
   .screen [data-zone^='hand:'] {
-    --hand-card-width: 4.5rem;
+    --hand-card-width: clamp(4.3rem, 15.5vw, 5.1rem);
+    width: min(30rem, calc(100vw - 2rem));
   }
 
   .bidRail {
-    bottom: calc(env(safe-area-inset-bottom) + 8rem);
+    bottom: calc(env(safe-area-inset-bottom) + 12.3rem);
     width: calc(100vw - 1rem);
     max-width: 28rem;
     gap: 0.35rem;
@@ -751,22 +757,21 @@
     display: none;
   }
 
+  /* Fourteen bids plus Nil do not fit one phone-width row, so they wrap onto a
+     second. They used to pan, which put half the legal bids behind a swipe on
+     the one screen where the player has to choose exactly one of them. */
   .bidOptions {
     min-width: 0;
-    flex: 1 1 12rem;
-    flex-wrap: nowrap;
-    justify-content: flex-start;
-    overflow-x: auto;
-    overscroll-behavior-inline: contain;
-    scroll-snap-type: x proximity;
-    scrollbar-width: thin;
+    flex: 1 1 100%;
+    flex-wrap: wrap;
+    justify-content: center;
+    row-gap: 0.35rem;
   }
 
   .bidChip {
     min-width: 2.75rem;
     min-height: 2.75rem;
     flex: 0 0 2.75rem;
-    scroll-snap-align: center;
   }
 
   .nilAction {

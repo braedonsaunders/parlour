@@ -132,10 +132,8 @@ export function HandRailCard({
 /** A cards-only fan; player HUD and controls belong in the table's side gutters. */
 /** The rail and card widths a fan step is computed from. Only the viewport moves these. */
 type FanGeometry = { width: number; cardWidth: number };
-type HandScrollState = 'none' | 'start' | 'middle' | 'end';
 
 const NO_GEOMETRY: FanGeometry = { width: 0, cardWidth: 0 };
-const SCROLL_EDGE_EPSILON = 1;
 
 export function HandRail({
   count,
@@ -149,33 +147,7 @@ export function HandRail({
 }: HandRailProps) {
   const receiving = useFanReceiving();
   const railRef = useRef<HTMLDivElement>(null);
-  const trackRef = useRef<HTMLDivElement>(null);
-  const wasScrollableRef = useRef(false);
   const [geometry, setGeometry] = useState<FanGeometry>(NO_GEOMETRY);
-  const [scrollState, setScrollState] = useState<HandScrollState>('none');
-
-  const updateScrollState = useCallback(() => {
-    const track = trackRef.current;
-    if (!track) return;
-    const maxScroll = Math.max(0, track.scrollWidth - track.clientWidth);
-    const scrollable = maxScroll > SCROLL_EDGE_EPSILON;
-    // The deal grows a centred short row into an overflowing one. WebKit can
-    // preserve the centred row's old anchor as an arbitrary middle/end offset,
-    // so the first transition to overflow has one canonical starting point.
-    // Once the player has a scrollable rail, later draws and plays preserve the
-    // position they chose.
-    if (scrollable && !wasScrollableRef.current) track.scrollLeft = 0;
-    wasScrollableRef.current = scrollable;
-    const left = Math.max(0, track.scrollLeft);
-    const next: HandScrollState = !scrollable
-      ? 'none'
-      : left <= SCROLL_EDGE_EPSILON
-        ? 'start'
-        : maxScroll - left <= SCROLL_EDGE_EPSILON
-          ? 'end'
-          : 'middle';
-    setScrollState((current) => (current === next ? current : next));
-  }, []);
 
   // What the fan step needs from the DOM is the rail's width and one card's
   // width, and neither of those depends on how many cards are in the hand —
@@ -201,20 +173,22 @@ export function HandRail({
         ? current
         : next,
     );
-    updateScrollState();
-  }, [updateScrollState]);
+  }, []);
 
   useLayoutEffect(() => {
     const rail = railRef.current;
-    const track = trackRef.current;
     if (!rail) return;
     measure();
+    // Rotating the device changes both the rail's width and the card's, and the
+    // step has to be resolved from the new pair before the next paint or the
+    // fan lands at the old orientation's spacing.
     window.addEventListener('resize', measure, { passive: true });
+    window.addEventListener('orientationchange', measure, { passive: true });
     const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
     observer?.observe(rail);
-    if (track) observer?.observe(track);
     return () => {
       window.removeEventListener('resize', measure);
+      window.removeEventListener('orientationchange', measure);
       observer?.disconnect();
     };
   }, [measure]);
@@ -223,8 +197,7 @@ export function HandRail({
   // arrive — and only the first — earns one extra measurement.
   useLayoutEffect(() => {
     if (count > 0 && geometry.cardWidth === 0) measure();
-    else updateScrollState();
-  }, [count, geometry.cardWidth, measure, updateScrollState]);
+  }, [count, geometry.cardWidth, measure]);
 
   /*
    * A hand is one composite stop, not thirteen sequential stops. Put that stop
@@ -264,7 +237,6 @@ export function HandRail({
       data-fan-plan={fanPlan?.join(',') || undefined}
       data-fan-ratio={fanStepRatio}
       data-fan-lift={liftCard || undefined}
-      data-scroll-state={scrollState}
       // The fan's spread is a pure function of this count, published so a card
       // in flight can work out the angle of the slot it is aiming at by
       // arithmetic rather than by reading a computed transform back out of the
@@ -272,30 +244,9 @@ export function HandRail({
       data-fan-count={fanN}
       aria-label={label}
     >
-      <div
-        ref={trackRef}
-        className={styles.handTrack}
-        data-hand-scroll
-        onScroll={updateScrollState}
-      >
+      <div className={styles.handTrack} data-hand-track>
         {children}
       </div>
-      {/* Phone scrollbars disappear as soon as the gesture ends. These edge
-          cues stay put until the player has actually reached that end. */}
-      <span
-        className={`${styles.handScrollCue} ${styles.handScrollCueBack}`}
-        data-scroll-cue="back"
-        aria-hidden="true"
-      >
-        ‹
-      </span>
-      <span
-        className={`${styles.handScrollCue} ${styles.handScrollCueForward}`}
-        data-scroll-cue="forward"
-        aria-hidden="true"
-      >
-        ›
-      </span>
     </div>
   );
 }
