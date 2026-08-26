@@ -1,4 +1,5 @@
 .stage {
+  --podium-avatar-size: 56px;
   display: flex;
   width: 100%;
   flex-direction: column;
@@ -131,4 +132,88 @@
   background: radial-gradient(circle at 32% 28%, #ffe9c4, #f2b06a 55%, #b46a24);
   border: 1px solid rgba(120, 57, 29, 0.55);
   opacity: 0;
+}
+
+@media (orientation: landscape) and (max-height: 560px) {
+  .stage {
+    --podium-avatar-size: clamp(2rem, 9vh, 2.35rem);
+    min-height: 0;
+    flex: 1;
+    justify-content: center;
+    gap: 0.45rem;
+    padding: max(0.45rem, env(safe-area-inset-top)) 1rem 0.2rem;
+    overflow: hidden;
+  }
+
+  .headline {
+    flex-shrink: 0;
+  }
+
+  .headline h1 {
+    font-size: clamp(1.35rem, 4.5vw, 2rem);
+    line-height: 1;
+  }
+
+  .overline {
+    font-size: 0.55rem;
+    letter-spacing: 0.22em;
+  }
+
+  .modeLine {
+    margin-top: 0.12rem;
+    font-size: 0.68rem;
+    line-height: 1;
+  }
+
+  .plaqueRow {
+    display: grid;
+    grid-template-columns: repeat(var(--podium-seat-count), minmax(0, 1fr));
+    align-items: stretch;
+    width: 100%;
+    gap: 0.4rem;
+    padding-top: 0.6rem;
+  }
+
+  .plaque {
+    width: 100%;
+    min-width: 0;
+    max-width: 12.5rem;
+    justify-self: center;
+    gap: 0.2rem;
+    padding: 0.75rem 0.3rem 0.4rem;
+    border-width: 1px;
+    border-radius: 1rem;
+  }
+
+  .plaque[data-winner] {
+    transform: translateY(-2px) scale(1.01);
+  }
+
+  .plaqueName {
+    font-size: 0.72rem;
+    line-height: 1;
+  }
+
+  .medal {
+    top: -0.55rem;
+    padding: 0.1rem 0.4rem;
+    border-width: 1px;
+    font-size: 0.58rem;
+  }
+
+  .statsRow {
+    gap: 0.35rem;
+    margin-top: 0;
+  }
+
+  .statsRow dt {
+    font-size: 0.45rem;
+    line-height: 1;
+    letter-spacing: 0.06em;
+  }
+
+  .statsRow dd {
+    font-size: 0.8rem;
+    line-height: 1;
+  }
 }

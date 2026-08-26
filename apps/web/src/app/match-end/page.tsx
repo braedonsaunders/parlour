@@ -13,6 +13,7 @@ import { deriveRivalry, hasRivalryToShow } from '@/lib/match/rivalry';
 import { useHistoryStore } from '@/stores/history';
 import { useMatchFlowStore } from '@/stores/matchFlow';
 import { useProfileStore } from '@/stores/profile';
+import styles from './matchEnd.module.css';
 
 export default function MatchEndPage() {
   const router = useRouter();
@@ -48,7 +49,7 @@ export default function MatchEndPage() {
   }, [fallbackRoute, playAgainHandler, router]);
 
   return (
-    <main className="flex min-h-dvh flex-col items-center justify-safe-center overflow-y-auto">
+    <main className={styles.page} data-testid="match-end-page">
       {snapshot ? (
         <>
           <MatchPodium snapshot={snapshot}>
@@ -60,22 +61,22 @@ export default function MatchEndPage() {
               />
             )}
           </MatchPodium>
-          <div className="relative z-10 flex justify-center gap-3 px-4 pb-[max(2rem,env(safe-area-inset-bottom))]">
+          <div className={styles.actions}>
             <button
               type="button"
               onClick={playAgain}
-              className="btn-fat w-56 text-lg"
+              className={`btn-fat ${styles.primary}`}
               data-testid="play-again"
             >
               {t('matchEnd.playAgain')}
             </button>
-            <Link href="/" className="btn-fat btn-fat--ghost w-32 text-lg">
+            <Link href="/" className={`btn-fat btn-fat--ghost ${styles.back}`}>
               {t('common.back')}
             </Link>
           </div>
         </>
       ) : (
-        <div className="panel-soft mx-6 max-w-md p-8 text-center">
+        <div className={`panel-soft mx-6 max-w-md p-8 text-center ${styles.empty}`}>
           <h1 className="font-display text-2xl font-extrabold text-hearth-50">
             {t('matchEnd.none')}
           </h1>

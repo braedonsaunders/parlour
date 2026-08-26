@@ -602,7 +602,7 @@
   gap: 0.5rem;
   width: min(24rem, 88vw);
   padding: 0.9rem 1.1rem;
-  transform: translateX(-50%);
+  translate: -50% 0;
   text-align: center;
 }
 
@@ -986,5 +986,36 @@
     min-width: 4.6rem;
     margin-right: 0.45rem;
     padding-inline: 0.55rem;
+  }
+}
+
+@media (orientation: landscape) and (max-height: 560px) {
+  .challengePrompt {
+    top: 50%;
+    bottom: auto;
+    grid-template-columns: minmax(0, 1fr) auto;
+    justify-items: start;
+    width: min(40rem, calc(100vw - 2rem - env(safe-area-inset-left) - env(safe-area-inset-right)));
+    padding: 0.7rem 0.85rem;
+    translate: -50% -50%;
+    text-align: left;
+  }
+
+  .challengePrompt strong,
+  .challengePrompt small {
+    grid-column: 1;
+  }
+
+  .challengeActions {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    align-self: center;
+    flex-wrap: nowrap;
+  }
+
+  .challengeActions button {
+    padding: 0.55rem 0.85rem;
+    font-size: 0.78rem;
+    white-space: nowrap;
   }
 }

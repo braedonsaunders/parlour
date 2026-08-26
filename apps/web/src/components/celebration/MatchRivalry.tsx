@@ -36,7 +36,10 @@ export function MatchRivalry({
           youAvatarId={youAvatarId}
         />
       ) : (
-        <ul className={styles.rows}>
+        <ul
+          className={styles.rows}
+          style={{ ['--rivalry-count' as string]: rivalry.standings.length }}
+        >
           {rivalry.standings.map((standing) => (
             <Row key={standing.key} standing={standing} sitting={sitting} />
           ))}
@@ -65,14 +68,16 @@ function Duel({
       </p>
       <div className={styles.duel}>
         <div className={styles.duelSide}>
-          {youAvatarId && <AvatarBadge avatarId={youAvatarId} size={44} />}
+          {youAvatarId && (
+            <AvatarBadge avatarId={youAvatarId} size="var(--rivalry-duel-avatar-size, 44px)" />
+          )}
           <span className={styles.duelName}>{youName}</span>
         </div>
         <span className={styles.duelScore} data-testid="rivalry-score">
           {scoreline(primary)}
         </span>
         <div className={styles.duelSide}>
-          <AvatarBadge avatarId={standing.avatarId} size={44} />
+          <AvatarBadge avatarId={standing.avatarId} size="var(--rivalry-duel-avatar-size, 44px)" />
           <span className={styles.duelName}>{standing.name}</span>
         </div>
       </div>
@@ -87,7 +92,7 @@ function Row({ standing, sitting }: { standing: RivalStanding; sitting: boolean 
   const primary = sitting ? standing.sitting : standing.allTime;
   return (
     <li className={styles.row} data-testid={`rivalry-row-${standing.key}`}>
-      <AvatarBadge avatarId={standing.avatarId} size={34} />
+      <AvatarBadge avatarId={standing.avatarId} size="var(--rivalry-row-avatar-size, 34px)" />
       <span className={styles.rowName}>{standing.name}</span>
       <span className={styles.rowScore}>{scoreline(primary)}</span>
       {sitting && <span className={styles.rowNote}>all time {scoreline(standing.allTime)}</span>}

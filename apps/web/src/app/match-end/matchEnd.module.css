@@ -1,0 +1,67 @@
+.page {
+  display: flex;
+  width: 100%;
+  min-height: 100dvh;
+  min-height: var(--app-height);
+  flex-direction: column;
+  align-items: center;
+  justify-content: safe center;
+  overflow-y: auto;
+}
+
+.actions {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 0 1rem max(2rem, env(safe-area-inset-bottom));
+}
+
+.primary.primary {
+  width: 14rem;
+  font-size: 1.125rem;
+}
+
+.back.back {
+  width: 8rem;
+  font-size: 1.125rem;
+}
+
+@media (orientation: landscape) and (max-height: 560px) {
+  .page {
+    height: var(--app-height);
+    min-height: 0;
+    justify-content: center;
+    overflow: hidden;
+  }
+
+  .actions {
+    width: 100%;
+    flex-shrink: 0;
+    gap: 0.5rem;
+    padding: 0 max(0.75rem, env(safe-area-inset-right)) max(0.45rem, env(safe-area-inset-bottom))
+      max(0.75rem, env(safe-area-inset-left));
+  }
+
+  .primary.primary,
+  .back.back {
+    min-height: 2.5rem;
+    padding: 0.42rem 1rem;
+    font-size: 0.82rem;
+  }
+
+  .primary.primary {
+    width: auto;
+    min-width: 9rem;
+  }
+
+  .back.back {
+    width: auto;
+    min-width: 5.5rem;
+  }
+
+  .empty {
+    padding: 1rem;
+  }
+}

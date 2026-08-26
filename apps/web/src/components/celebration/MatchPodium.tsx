@@ -30,6 +30,9 @@ export function MatchPodium({
     const stage = stageRef.current;
     if (!stage) return;
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const compactLandscape = window.matchMedia(
+      '(orientation: landscape) and (max-height: 560px)',
+    ).matches;
 
     const ctx = gsap.context(() => {
       const timeline = gsap.timeline({ defaults: { ease: 'back.out(1.7)' } });
@@ -37,10 +40,10 @@ export function MatchPodium({
       timeline.from(
         `.${styles.plaque}`,
         {
-          y: 64,
+          y: compactLandscape ? 8 : 64,
           opacity: 0,
           duration: 0.42,
-          stagger: 0.09,
+          stagger: compactLandscape ? 0.05 : 0.09,
         },
         '-=0.05',
       );
@@ -93,7 +96,10 @@ export function MatchPodium({
         <p className={styles.modeLine}>{modeLine(snapshot)}</p>
       </header>
 
-      <ol className={styles.plaqueRow}>
+      <ol
+        className={styles.plaqueRow}
+        style={{ ['--podium-seat-count' as string]: entries.length }}
+      >
         {entries.map((entry, index) => (
           <li
             key={entry.seat}
@@ -115,7 +121,10 @@ export function MatchPodium({
             >
               {ordinal(entry.rank)}
             </span>
-            <AvatarBadge avatarId={avatarOf(snapshot, entry.seat)} size={56} />
+            <AvatarBadge
+              avatarId={avatarOf(snapshot, entry.seat)}
+              size="var(--podium-avatar-size, 56px)"
+            />
             <span className={styles.plaqueName}>
               {entry.name}
               {entry.seat === snapshot.localSeat && ' (you)'}

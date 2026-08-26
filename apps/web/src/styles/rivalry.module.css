@@ -1,4 +1,6 @@
 .panel {
+  --rivalry-duel-avatar-size: 44px;
+  --rivalry-row-avatar-size: 34px;
   width: min(34rem, 100%);
   padding: 1rem 1.15rem 1.1rem;
   border-radius: var(--radius-fat);
@@ -127,5 +129,78 @@
 @media (prefers-reduced-motion: reduce) {
   .panel {
     animation: none;
+  }
+}
+
+@media (orientation: landscape) and (max-height: 560px) {
+  .panel {
+    --rivalry-duel-avatar-size: 2rem;
+    --rivalry-row-avatar-size: 1.75rem;
+    width: min(46rem, 100%);
+    flex-shrink: 0;
+    padding: 0.38rem 0.65rem 0.45rem;
+    border-width: 1px;
+    border-radius: 1rem;
+  }
+
+  .overline {
+    font-size: 0.5rem;
+    letter-spacing: 0.18em;
+  }
+
+  .verdict {
+    margin-top: 0.1rem;
+    font-size: 0.8rem;
+    line-height: 1;
+  }
+
+  .duel {
+    gap: 0.5rem;
+    margin-top: 0.25rem;
+  }
+
+  .duelSide {
+    flex-direction: row;
+    justify-content: center;
+    gap: 0.25rem;
+  }
+
+  .duelName {
+    font-size: 0.65rem;
+  }
+
+  .duelScore {
+    font-size: 1.35rem;
+  }
+
+  .rows {
+    grid-template-columns: repeat(var(--rivalry-count), minmax(0, 1fr));
+    gap: 0.35rem;
+    margin-top: 0.3rem;
+  }
+
+  .row {
+    min-width: 0;
+    gap: 0.25rem;
+    padding: 0.2rem 0.35rem;
+    border-radius: 0.65rem;
+  }
+
+  .rowName {
+    font-size: 0.65rem;
+  }
+
+  .rowScore {
+    font-size: 0.75rem;
+  }
+
+  .rowNote {
+    display: none;
+  }
+
+  .footnote {
+    margin-top: 0.18rem;
+    font-size: 0.55rem;
+    line-height: 1;
   }
 }
