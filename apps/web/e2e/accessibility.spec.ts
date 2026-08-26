@@ -5,11 +5,20 @@ type AnnouncementWindow = Window & {
   __parlourLastAnnouncement?: string;
 };
 
-async function tabTo(page: Page, target: Locator, key: 'Tab' | 'Shift+Tab' = 'Tab') {
+function tabKey(browserName: string, reverse = false): string {
+  const modifier = browserName === 'webkit' ? 'Alt+' : '';
+  return `${modifier}${reverse ? 'Shift+' : ''}Tab`;
+}
+
+async function pressTab(page: Page, browserName: string, reverse = false) {
+  await page.keyboard.press(tabKey(browserName, reverse));
+}
+
+async function tabTo(page: Page, target: Locator, browserName: string) {
   await target.waitFor({ state: 'visible' });
   for (let press = 0; press < 120; press += 1) {
     if (await target.evaluate((element) => element === document.activeElement)) return;
-    await page.keyboard.press(key);
+    await pressTab(page, browserName);
   }
   throw new Error(`keyboard focus never reached ${await target.toString()}`);
 }
@@ -61,6 +70,7 @@ async function announcements(page: Page): Promise<string[]> {
 
 test('a player can move a Klondike card to its foundation with only the keyboard', async ({
   page,
+  browserName,
 }) => {
   test.setTimeout(45_000);
   await installAnnouncementRecorder(page);
@@ -80,18 +90,18 @@ test('a player can move a Klondike card to its foundation with only the keyboard
   await page.goto('/klondike/');
 
   const relaxed = page.getByTestId('klondike-relaxed');
-  await tabTo(page, relaxed);
+  await tabTo(page, relaxed, browserName);
   await page.keyboard.press('Enter');
   await expect(relaxed).toHaveAttribute('aria-checked', 'true');
 
   const winnableOnly = page.getByTestId('klondike-winnable-only');
-  await tabTo(page, winnableOnly);
+  await tabTo(page, winnableOnly, browserName);
   await expect(winnableOnly).toHaveAttribute('aria-checked', 'true');
   await page.keyboard.press('Enter');
   await expect(winnableOnly).toHaveAttribute('aria-checked', 'false');
 
   const start = page.getByTestId('start-klondike');
-  await tabTo(page, start);
+  await tabTo(page, start, browserName);
   await page.keyboard.press('Enter');
   await expect(page).toHaveURL(/\/klondike\/table\/?$/, { timeout: 15_000 });
 
@@ -103,7 +113,7 @@ test('a player can move a Klondike card to its foundation with only the keyboard
   expect(await announcements(page), 'the opening deal must not flood the live region').toEqual([]);
 
   await resetAnnouncements(page);
-  await tabTo(page, source);
+  await tabTo(page, source, browserName);
   await page.keyboard.press('Enter');
   await expect(target).toBeEnabled();
   await arrowTo(page, target, 'ArrowLeft');
@@ -119,7 +129,10 @@ test('a player can move a Klondike card to its foundation with only the keyboard
   await expect(announcer).toHaveText(announcement!);
 });
 
-test('a player can bid and play a Spades card with only the keyboard', async ({ page }) => {
+test('a player can bid and play a Spades card with only the keyboard', async ({
+  page,
+  browserName,
+}) => {
   test.setTimeout(45_000);
   await installAnnouncementRecorder(page);
   await page.emulateMedia({ reducedMotion: 'reduce' });
@@ -129,7 +142,7 @@ test('a player can bid and play a Spades card with only the keyboard', async ({ 
   const bidTwo = page.locator('[data-testid="spades-bid"][data-bid="2"]');
   await expect(bidOne).toBeVisible({ timeout: 15_000 });
   await resetAnnouncements(page);
-  await tabTo(page, bidOne);
+  await tabTo(page, bidOne, browserName);
   await page.keyboard.press('ArrowRight');
   await expect(bidTwo).toBeFocused();
   await page.keyboard.press('Enter');
@@ -146,7 +159,7 @@ test('a player can bid and play a Spades card with only the keyboard', async ({ 
   await expect(playableCards.first()).toBeVisible({ timeout: 15_000 });
   await expect(hand.locator('[data-hand-card]')).toHaveCount(13);
 
-  await tabTo(page, hand);
+  await tabTo(page, hand, browserName);
   await expect(hand).toBeFocused();
   await page.keyboard.press('ArrowRight');
   const firstPlayable = playableCards.first();
@@ -165,10 +178,13 @@ test('a player can bid and play a Spades card with only the keyboard', async ({ 
   expect(initialCard).toMatch(/^Play /);
 });
 
-test('the table menu and nested rules sheet trap and restore keyboard focus', async ({ page }) => {
+test('the table menu and nested rules sheet trap and restore keyboard focus', async ({
+  page,
+  browserName,
+}) => {
   await page.goto('/klondike/table/');
   const menuTrigger = page.getByRole('button', { name: /table menu/i });
-  await tabTo(page, menuTrigger);
+  await tabTo(page, menuTrigger, browserName);
   await page.keyboard.press('Enter');
 
   const menu = page.getByTestId('table-menu').getByRole('dialog');
@@ -189,24 +205,24 @@ test('the table menu and nested rules sheet trap and restore keyboard focus', as
     );
   expect(focusableCount).toBeGreaterThan(1);
   for (let press = 0; press < focusableCount + 2; press += 1) {
-    await page.keyboard.press('Tab');
+    await pressTab(page, browserName);
     expect(await menu.evaluate((dialog) => dialog.contains(document.activeElement))).toBe(true);
   }
   for (let press = 0; press < focusableCount + 2; press += 1) {
-    await page.keyboard.press('Shift+Tab');
+    await pressTab(page, browserName, true);
     expect(await menu.evaluate((dialog) => dialog.contains(document.activeElement))).toBe(true);
   }
 
   const rulesTrigger = menu.getByTestId('how-to-play-klondike');
-  await tabTo(page, rulesTrigger);
+  await tabTo(page, rulesTrigger, browserName);
   await page.keyboard.press('Enter');
   const rules = page.getByTestId('how-to-play');
   const closeRules = page.getByTestId('close-how-to-play');
   await expect(rules).toBeVisible();
   await expect(closeRules).toBeFocused();
-  await page.keyboard.press('Tab');
+  await pressTab(page, browserName);
   await expect(closeRules).toBeFocused();
-  await page.keyboard.press('Shift+Tab');
+  await pressTab(page, browserName, true);
   await expect(closeRules).toBeFocused();
 
   await page.keyboard.press('Escape');

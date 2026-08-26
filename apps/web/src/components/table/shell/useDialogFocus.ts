@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, type RefObject } from 'react';
+import { useEffect, useRef, type RefObject } from 'react';
 
 const FOCUSABLE = [
   'a[href]',
@@ -18,9 +18,18 @@ function focusableInside(dialog: HTMLElement): HTMLElement[] {
   );
 }
 
+const modalStack: HTMLElement[] = [];
+
+function registerModal(dialog: HTMLElement): () => void {
+  modalStack.push(dialog);
+  return () => {
+    const index = modalStack.lastIndexOf(dialog);
+    if (index >= 0) modalStack.splice(index, 1);
+  };
+}
+
 function isTopModal(dialog: HTMLElement): boolean {
-  const dialogs = document.querySelectorAll<HTMLElement>('[role="dialog"][aria-modal="true"]');
-  return dialogs[dialogs.length - 1] === dialog;
+  return modalStack.at(-1) === dialog;
 }
 
 /** Focus containment shared by table-owned modal sheets. */
@@ -30,12 +39,18 @@ export function useDialogFocus(
   initialFocusRef: RefObject<HTMLElement | null>,
   onClose: () => void,
 ): void {
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
   useEffect(() => {
     if (!open) return;
     const dialog = dialogRef.current;
     if (!dialog) return;
     const previousFocus =
       document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const unregisterModal = registerModal(dialog);
 
     (initialFocusRef.current ?? focusableInside(dialog)[0] ?? dialog).focus();
 
@@ -43,7 +58,7 @@ export function useDialogFocus(
       if (!isTopModal(dialog)) return;
       if (event.key === 'Escape') {
         event.preventDefault();
-        onClose();
+        onCloseRef.current();
         return;
       }
       if (event.key !== 'Tab') return;
@@ -70,7 +85,8 @@ export function useDialogFocus(
     window.addEventListener('keydown', onKeyDown);
     return () => {
       window.removeEventListener('keydown', onKeyDown);
+      unregisterModal();
       if (previousFocus?.isConnected) previousFocus.focus();
     };
-  }, [dialogRef, initialFocusRef, onClose, open]);
+  }, [dialogRef, initialFocusRef, open]);
 }

@@ -1,4 +1,5 @@
 import { act, createElement } from 'react';
+import type { HowToPlayDoc } from '@parlour/engine';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { resetAudioManagerForTests } from '@/lib/audio/AudioManager';
@@ -13,6 +14,12 @@ import {
 } from '@/stores/tableFx';
 import { useLocaleStore } from '@/stores/locale';
 import { TableMenu } from './TableMenu';
+
+const HOW_TO_PLAY: HowToPlayDoc = {
+  summary: 'A tiny demo game.',
+  objective: 'Run out of demo cards.',
+  sections: [{ heading: 'Turns', body: ['Play a card.'] }],
+};
 
 const { FakeHowl } = vi.hoisted(() => {
   class FakeHowl {
@@ -140,6 +147,11 @@ describe('TableMenu', () => {
     const focusable = [...dialog.querySelectorAll<HTMLButtonElement>('button:not(:disabled)')];
     expect(dialog.contains(document.activeElement)).toBe(true);
 
+    const chosenControl = focusable[1]!;
+    chosenControl.focus();
+    await render({ open: true, onClose: () => {}, onQuit: () => {} });
+    expect(document.activeElement).toBe(chosenControl);
+
     focusable.at(-1)?.focus();
     act(() => {
       window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }));
@@ -157,6 +169,35 @@ describe('TableMenu', () => {
     await render({ open: false, onClose: () => {}, onQuit: () => {} });
     expect(document.activeElement).toBe(tableControl);
     tableControl.remove();
+  });
+
+  it('lets the nested rules sheet close with Escape before the table menu', async () => {
+    const onClose = vi.fn();
+    await render({
+      open: true,
+      onClose,
+      onQuit: () => {},
+      howToPlay: { doc: HOW_TO_PLAY, title: 'Demo' },
+    });
+
+    const rulesTrigger = container.querySelector<HTMLButtonElement>(
+      '[data-testid="how-to-play-demo"]',
+    )!;
+    rulesTrigger.focus();
+    act(() => rulesTrigger.click());
+    expect(document.querySelector('[data-testid="how-to-play"]')).not.toBeNull();
+
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    });
+    expect(document.querySelector('[data-testid="how-to-play"]')).toBeNull();
+    expect(document.activeElement).toBe(rulesTrigger);
+    expect(onClose).not.toHaveBeenCalled();
+
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    });
+    expect(onClose).toHaveBeenCalledOnce();
   });
 
   it('changes the background scene from the settings modal', async () => {

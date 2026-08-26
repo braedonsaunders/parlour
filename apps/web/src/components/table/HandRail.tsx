@@ -226,12 +226,10 @@ export function HandRail({
   }, [count, geometry.cardWidth, measure, updateScrollState]);
 
   /*
-   * Safari's default macOS keyboard preference skips implicit form controls,
-   * including the card buttons. The list is therefore the one explicit entry
-   * in the Tab order; the shared shell moves an arrow press from it into the
-   * enabled cards. Keeping those cards at -1 also avoids making every card in
-   * a thirteen-card hand a separate Tab stop in browsers that do include
-   * buttons by default.
+   * A hand is one composite stop, not thirteen sequential stops. The shared
+   * shell moves an arrow press from the list into its enabled card buttons.
+   * Safari users with Full Keyboard Access off reach webpage controls with
+   * Option+Tab; that browser convention cannot be changed by page markup.
    */
   useLayoutEffect(() => {
     railRef.current
