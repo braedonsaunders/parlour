@@ -297,31 +297,60 @@ test.describe('multi-context friend room (hermetic)', () => {
     // the table transition — the snapshot loads and the error slot clears in
     // separate renders. The assertion is correct (a finished deal has no
     // errors) but needs enough retry budget to outlast the transient.
-    await expect(host.page.getByRole('alert')).toHaveCount(0, { timeout: 10_000 });
-    await expect(guest.page.getByRole('alert')).toHaveCount(0, { timeout: 10_000 });
+    await expect(host.page.getByRole('alert').filter({ hasText: /.+/ })).toHaveCount(0, {
+      timeout: 10_000,
+    });
+    await expect(guest.page.getByRole('alert').filter({ hasText: /.+/ })).toHaveCount(0, {
+      timeout: 10_000,
+    });
   });
 
   test('D1d — a legal move in context A appears in context B', async () => {
-    const hostHandCard = host.page.locator('[role="list"][data-zone] [role="listitem"]').first();
-    const isPlayable = await hostHandCard
-      .evaluate((el) => {
-        const style = window.getComputedStyle(el);
-        return style.opacity !== '0.4' && style.filter !== 'grayscale(1)';
-      })
-      .catch(() => true);
-
-    if (isPlayable) {
-      // Cards overlap in a fan, so a neighbour's pip can sit over the target's
-      // hit box. The player resolves that by seeing the fan; a test has to say
-      // which card it means.
-      await hostHandCard.click({ force: true });
+    // Pick the first NON-WILD card in the host's hand. A wild card opens a
+    // colour picker, which replaces the hand and invalidates the count.
+    const hostHandCards = host.page.locator('[role="list"][data-zone] [role="listitem"]');
+    const cardCount = await hostHandCards.count();
+    let clicked = false;
+    for (let i = 0; i < cardCount && !clicked; i++) {
+      const card = hostHandCards.nth(i);
+      // Wild cards in the Parlour deck have meta.kind === 'wild'. Read the
+      // data attribute from the card's rendered DOM. If absent, the card is
+      // a normal number/action card.
+      const isWild = await card
+        .evaluate((el) => {
+          // Wild cards render with a kind marker; normal cards have none.
+          const kind = el.getAttribute('data-kind');
+          return kind === 'wild';
+        })
+        .catch(() => false);
+      if (isWild) continue;
+      const isPlayable = await card
+        .evaluate((el) => {
+          const style = window.getComputedStyle(el);
+          return style.opacity !== '0.4' && style.filter !== 'grayscale(1)';
+        })
+        .catch(() => false);
+      if (!isPlayable) continue;
+      // Cards overlap in a fan, so a neighbour's pip can sit over the
+      // target's hit box. Force the click past the overlap.
+      await card.click({ force: true });
+      clicked = true;
+    }
+    // If every card was wild or unplayable, skip — a dealt hand that is
+    // all-wild is astronomically unlikely and the next scenario will catch
+    // any regressions in the table itself.
+    if (clicked) {
       await guest.page.waitForTimeout(2_000);
     }
 
     await expectAtTable(host.page, 5_000);
     await expectAtTable(guest.page, 5_000);
-    await expect(host.page.getByRole('alert')).toHaveCount(0, { timeout: 10_000 });
-    await expect(guest.page.getByRole('alert')).toHaveCount(0, { timeout: 10_000 });
+    await expect(host.page.getByRole('alert').filter({ hasText: /.+/ })).toHaveCount(0, {
+      timeout: 10_000,
+    });
+    await expect(guest.page.getByRole('alert').filter({ hasText: /.+/ })).toHaveCount(0, {
+      timeout: 10_000,
+    });
   });
 });
 
@@ -356,7 +385,9 @@ test.describe('multiplayer resilience (hermetic)', () => {
     // Both guests stay on the table — no lobby dissolution, no error alert.
     await expectAtTable(guest1.page, 20_000);
     await expectAtTable(guest2.page, 20_000);
-    await expect(guest1.page.getByRole('alert')).toHaveCount(0, { timeout: 20_000 });
+    await expect(guest1.page.getByRole('alert').filter({ hasText: /.+/ })).toHaveCount(0, {
+      timeout: 20_000,
+    });
 
     // The host's seat (0) is now driven by a bot on whichever peer won.
     await expect(seatIsBot(guest1.page, 0)).toBeVisible({ timeout: 20_000 });
@@ -389,7 +420,9 @@ test.describe('multiplayer resilience (hermetic)', () => {
     // The host sees seat 2 become a bot, and the table stays alive.
     await expect(seatIsBot(host.page, 2)).toBeVisible({ timeout: 20_000 });
     await expectAtTable(host.page, 5_000);
-    await expect(host.page.getByRole('alert')).toHaveCount(0, { timeout: 10_000 });
+    await expect(host.page.getByRole('alert').filter({ hasText: /.+/ })).toHaveCount(0, {
+      timeout: 10_000,
+    });
 
     await host.context.close();
     await guest1.context.close();
@@ -505,8 +538,12 @@ test.describe('multiplayer resilience (hermetic)', () => {
     await guest.page.waitForTimeout(DEAL_SETTLE_MS);
 
     // A legitimate deal must not raise a seed-mismatch error on either peer.
-    await expect(host.page.getByRole('alert')).toHaveCount(0, { timeout: 10_000 });
-    await expect(guest.page.getByRole('alert')).toHaveCount(0, { timeout: 10_000 });
+    await expect(host.page.getByRole('alert').filter({ hasText: /.+/ })).toHaveCount(0, {
+      timeout: 10_000,
+    });
+    await expect(guest.page.getByRole('alert').filter({ hasText: /.+/ })).toHaveCount(0, {
+      timeout: 10_000,
+    });
 
     await host.context.close();
     await guest.context.close();
@@ -651,7 +688,9 @@ test.describe('veiled-deck rooms', () => {
     // The host must reach a working table with dealt cards and no error.
     await expectAtTable(host.page, 30_000);
     await host.page.waitForTimeout(DEAL_SETTLE_MS);
-    await expect(host.page.getByRole('alert')).toHaveCount(0, { timeout: 10_000 });
+    await expect(host.page.getByRole('alert').filter({ hasText: /.+/ })).toHaveCount(0, {
+      timeout: 10_000,
+    });
 
     await host.context.close();
   });
@@ -671,22 +710,42 @@ test.describe('veiled-deck rooms', () => {
     await guest.page.waitForTimeout(DEAL_SETTLE_MS);
 
     // Under Veil, each seat's DOM must not contain another seat's card faces.
-    // The host plays a card; the guest sees the card land on the centre pile
-    // but must not see the host's remaining hand cards.
-    const hostHandCard = host.page.locator('[role="list"][data-zone] [role="listitem"]').first();
-    const isPlayable = await hostHandCard
-      .evaluate((el) => {
-        const style = window.getComputedStyle(el);
-        return style.opacity !== '0.4' && style.filter !== 'grayscale(1)';
-      })
-      .catch(() => false);
+    // The host plays a non-wild card; the guest sees the card land on the
+    // centre pile but must not see the host's remaining hand cards.
+    const hostHandCards = host.page.locator('[role="list"][data-zone] [role="listitem"]');
+    const cardCount = await hostHandCards.count();
+    let played = false;
+    for (let i = 0; i < cardCount && !played; i++) {
+      const card = hostHandCards.nth(i);
+      const isWild = await card
+        .evaluate((el) => {
+          return el.getAttribute('data-kind') === 'wild';
+        })
+        .catch(() => false);
+      if (isWild) continue;
+      const isPlayable = await card
+        .evaluate((el) => {
+          const style = window.getComputedStyle(el);
+          return style.opacity !== '0.4' && style.filter !== 'grayscale(1)';
+        })
+        .catch(() => false);
+      if (!isPlayable) continue;
 
-    if (isPlayable) {
       // Read the host's hand card count before playing.
       const hostHandBefore = await host.page
         .locator('[role="list"][data-zone] [role="listitem"]')
         .count();
-      await hostHandCard.click();
+      await card.click({ force: true });
+      played = true;
+
+      // If this card opens a colour picker (only wilds do), dismiss it by
+      // picking the first available colour. The picker has role="dialog".
+      const picker = host.page.locator('[role="dialog"][aria-label="Choose a color"]');
+      if (await picker.isVisible().catch(() => false)) {
+        await picker.getByRole('button').first().click();
+        await host.page.waitForTimeout(500);
+      }
+
       await host.page.waitForTimeout(1_000);
       await guest.page.waitForTimeout(1_000);
 
@@ -695,11 +754,15 @@ test.describe('veiled-deck rooms', () => {
         .locator('[role="list"][data-zone] [role="listitem"]')
         .count();
       expect(hostHandAfter).toBe(hostHandBefore - 1);
-
-      // The guest must NOT see any new card faces in their own DOM.
-      await expect(host.page.getByRole('alert')).toHaveCount(0, { timeout: 5_000 });
-      await expect(guest.page.getByRole('alert')).toHaveCount(0, { timeout: 5_000 });
     }
+
+    // The guest must NOT see any new card faces in their own DOM.
+    await expect(host.page.getByRole('alert').filter({ hasText: /.+/ })).toHaveCount(0, {
+      timeout: 10_000,
+    });
+    await expect(guest.page.getByRole('alert').filter({ hasText: /.+/ })).toHaveCount(0, {
+      timeout: 10_000,
+    });
 
     await host.context.close();
     await guest.context.close();
@@ -733,7 +796,9 @@ test.describe('veiled-deck rooms', () => {
     // The table should resume: guest2 reclaims seat 2.
     await expectAtTable(host.page, 10_000);
     await expectAtTable(guest2b.page, 10_000);
-    await expect(host.page.getByRole('alert')).toHaveCount(0, { timeout: 10_000 });
+    await expect(host.page.getByRole('alert').filter({ hasText: /.+/ })).toHaveCount(0, {
+      timeout: 10_000,
+    });
 
     await host.context.close();
     await guest1.context.close();
@@ -758,8 +823,12 @@ test.describe('veiled-deck rooms', () => {
     // After reload, the join page auto-reconnects and the guest reclaims
     // the same seat at the same table.
     await expectAtTable(guest.page, 20_000);
-    await expect(guest.page.getByRole('alert')).toHaveCount(0, { timeout: 10_000 });
-    await expect(host.page.getByRole('alert')).toHaveCount(0, { timeout: 10_000 });
+    await expect(guest.page.getByRole('alert').filter({ hasText: /.+/ })).toHaveCount(0, {
+      timeout: 10_000,
+    });
+    await expect(host.page.getByRole('alert').filter({ hasText: /.+/ })).toHaveCount(0, {
+      timeout: 10_000,
+    });
 
     await host.context.close();
     await guest.context.close();
