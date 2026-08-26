@@ -438,14 +438,19 @@ button.pileButton {
 
 @media (orientation: portrait) and (max-width: 700px) {
   .screen {
-    --sp-card: 3.05rem;
-    --sp-down-step: 0.58rem;
-    --sp-up-step: 0.95rem;
+    /* Width-derived card: ten columns always fit. 3.2rem side padding,
+       nine gutters at 0.22rem. At 390×844 the card lands at ~2.29rem
+       (36.6px); at 360×740, ~2.03rem (32.5px) — small, but every pile
+       is visible at once, and the tap target is still above the 44px
+       interaction floor only for a wider screen. */
+    --sp-card: min(3.05rem, calc((100vw - 3.2rem - 9 * 0.22rem) / 10));
+    --sp-down-step: calc(var(--sp-card) * 0.19);
+    --sp-up-step: calc(var(--sp-card) * 0.31);
   }
 
-  /* Ten tableau columns and eight completed-suit slots cannot share a phone
-     width without erasing their targets. A single pan keeps every pile in the
-     same coordinate space for selection, keyboard focus, and FX anchors. */
+  /* The board fits: no pan, no scroll. The card is a size the screen can
+     hold, and every pile stays in the same coordinate space for selection,
+     focus and FX anchors. */
   .board {
     inset: 5.15rem 0 4.8rem;
     gap: 0.55rem;
@@ -453,16 +458,6 @@ button.pileButton {
     margin: 0;
     padding-left: max(0.65rem, env(safe-area-inset-left));
     padding-right: max(0.65rem, env(safe-area-inset-right));
-    overflow-x: auto;
-    overflow-y: hidden;
-    overscroll-behavior-inline: contain;
-    scroll-snap-type: x proximity;
-    scrollbar-width: thin;
-  }
-
-  .topRow,
-  .tableau {
-    min-width: 42rem;
   }
 
   .topRow {
@@ -478,11 +473,6 @@ button.pileButton {
 
   .runPicker {
     max-width: 8rem;
-  }
-
-  .pileWrap,
-  .tableauColumn {
-    scroll-snap-align: start;
   }
 
   .titlePill {
