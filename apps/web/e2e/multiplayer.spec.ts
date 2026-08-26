@@ -116,7 +116,7 @@ async function joinRoomByCode(
   await broker.drain(page);
   const input = page.locator(JOIN_INPUT);
   await input.fill(code);
-  await page.getByRole('button', { name: /join|knocking/i }).click();
+  await page.getByTestId('join-submit').click();
   // Drain repeatedly — the join triggers resolve, announce, and WebRTC
   // signalling ops on the same outbox.
   for (let i = 0; i < 20; i++) {
@@ -134,14 +134,14 @@ async function joinRoomByCode(
 
 /** Adds a bot to every empty chair, then presses Start and waits for the table. */
 async function fillBotsAndStart(page: Page, broker: HermeticSignalingBroker): Promise<void> {
-  const addBotButtons = page.getByRole('button', { name: /add bot/i });
+  const addBotButtons = page.getByTestId('add-bot');
   const count = await addBotButtons.count();
   for (let i = 0; i < count; i++) {
     await addBotButtons.first().click();
     await page.waitForTimeout(300);
   }
   await broker.drain(page);
-  await page.getByRole('button', { name: /start/i }).click({ timeout: 5_000 });
+  await page.getByTestId('start-match').click({ timeout: 5_000 });
   // Drain repeatedly during the deal: the seed round, snapshot publish, and
   // WebRTC state-sync all go through the outbox.
   for (let i = 0; i < 30; i++) {
