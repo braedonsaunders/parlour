@@ -15,6 +15,7 @@ function view(legal: readonly LegalMove[]): FreecellTableView {
     tableau: [['S13', 'H12'], ['C13'], ...Array.from({ length: 6 }, () => [])],
     legal,
     canUndo: false,
+    undoDepth: 0,
     canFinish: false,
     hint: null,
   };

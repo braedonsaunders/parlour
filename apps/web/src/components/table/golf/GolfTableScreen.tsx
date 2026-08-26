@@ -10,6 +10,7 @@ import {
   TablePlayfield,
   TableScreenFrame,
   TableTitlePill,
+  SolitaireUndoButton,
   useGameTextSurface,
   useTableMenu,
 } from '@/components/table/shell';
@@ -272,15 +273,12 @@ function ReadyGolfTable({
       </TablePlayfield>
 
       <TableActionRail className={styles.actions}>
-        <button
-          type="button"
-          className="btn-fat btn-fat--ghost"
-          data-testid="golf-undo"
-          onClick={onUndo}
+        <SolitaireUndoButton
+          depth={view.undoDepth}
+          testId="golf-undo"
+          onUndo={onUndo}
           disabled={!view.canUndo || deal.dealing || busy}
-        >
-          Undo
-        </button>
+        />
         <button
           type="button"
           className="btn-fat btn-fat--ghost"

@@ -9,6 +9,11 @@ import { rulesForPyramidMode } from '@/lib/pyramid/modes';
 import { pyramidTableView, type PyramidTableView } from '@/lib/pyramid/view';
 import { PyramidTransport } from '@/lib/solo/PyramidTransport';
 import { DEFAULT_PROFILE_SETTINGS, useProfileStore } from '@/stores/profile';
+import {
+  activateTableControl,
+  moveTableFocusTo,
+  pressTableKey,
+} from '@/components/table/shell/keyboard-test-utils';
 import { PyramidTableScreen } from './PyramidTableScreen';
 
 let container: HTMLDivElement;
@@ -65,6 +70,9 @@ describe('PyramidTableScreen', () => {
     const { view } = table();
     render(view);
     expect(container.querySelectorAll('[data-testid^="pyramid-row-"]')).toHaveLength(7);
+    expect(container.querySelector('[data-testid="pyramid-undo"]')?.textContent).toBe(
+      'Undo · 0 moves',
+    );
     const serialised = JSON.stringify(textSurface());
     expect(serialised).not.toContain('seed');
     expect(serialised).not.toContain('??');
@@ -185,7 +193,7 @@ describe('PyramidTableScreen', () => {
     }
   });
 
-  it('pairs two free cards in two taps', () => {
+  it('pairs two free cards with arrows and Enter', () => {
     let chosen:
       | { view: PyramidTableView; a: { row: number; col: number }; b: { row: number; col: number } }
       | undefined;
@@ -208,22 +216,15 @@ describe('PyramidTableScreen', () => {
     expect(chosen).toBeDefined();
     const onDispatch = vi.fn();
     render(chosen!.view, { onDispatch });
-    act(() =>
-      container
-        .querySelector<HTMLElement>(
-          `[data-testid="pyramid-card-${chosen!.a.row}-${chosen!.a.col}"]`,
-        )
-        ?.querySelector('button')
-        ?.click(),
+    const first = container.querySelector<HTMLButtonElement>(
+      `[data-testid="pyramid-card-${chosen!.a.row}-${chosen!.a.col}"] button`,
     );
-    act(() =>
-      container
-        .querySelector<HTMLElement>(
-          `[data-testid="pyramid-card-${chosen!.b.row}-${chosen!.b.col}"]`,
-        )
-        ?.querySelector('button')
-        ?.click(),
+    const second = container.querySelector<HTMLButtonElement>(
+      `[data-testid="pyramid-card-${chosen!.b.row}-${chosen!.b.col}"] button`,
     );
+    activateTableControl(first!);
+    moveTableFocusTo(second!);
+    pressTableKey(second!, 'Enter');
     expect(onDispatch).toHaveBeenCalledWith('pyramid.pair', { a: chosen!.a, b: chosen!.b });
   });
 

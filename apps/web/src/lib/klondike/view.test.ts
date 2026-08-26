@@ -21,6 +21,7 @@ function view(legal: readonly LegalMove[]): KlondikeTableView {
     ],
     legal,
     canUndo: false,
+    undoDepth: 0,
     canFinish: false,
     hint: null,
   };

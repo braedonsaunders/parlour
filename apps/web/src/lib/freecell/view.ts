@@ -27,6 +27,7 @@ export interface FreecellTableView {
   tableau: readonly (readonly string[])[];
   legal: readonly LegalMove[];
   canUndo: boolean;
+  undoDepth: number;
   canFinish: boolean;
   hint: FreecellHint | null;
 }
@@ -47,6 +48,7 @@ export function freecellTableView(
     tableau: state.tableau,
     legal,
     canUndo: snapshot.canUndo,
+    undoDepth: snapshot.undoDepth,
     canFinish: snapshot.canFinish,
     hint: snapshot.hint,
   };

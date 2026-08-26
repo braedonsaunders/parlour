@@ -16,6 +16,7 @@ export interface GolfTableView {
   tableau: readonly (readonly string[])[];
   legal: readonly LegalMove[];
   canUndo: boolean;
+  undoDepth: number;
   hint: GolfHint | null;
 }
 
@@ -33,6 +34,7 @@ export function golfTableView(snapshot: GolfSnapshot, legal: readonly LegalMove[
     tableau: state.tableau,
     legal,
     canUndo: snapshot.canUndo,
+    undoDepth: snapshot.undoDepth,
     hint: snapshot.hint,
   };
 }

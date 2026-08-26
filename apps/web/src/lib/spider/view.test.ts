@@ -20,6 +20,7 @@ function view(legal: readonly LegalMove[]): SpiderTableView {
     ],
     legal,
     canUndo: false,
+    undoDepth: 0,
     canFinish: false,
     hint: null,
   };

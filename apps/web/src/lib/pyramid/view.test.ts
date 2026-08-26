@@ -24,6 +24,7 @@ function view(legal: readonly LegalMove[]): PyramidTableView {
     ],
     legal,
     canUndo: false,
+    undoDepth: 0,
     hint: null,
   };
 }

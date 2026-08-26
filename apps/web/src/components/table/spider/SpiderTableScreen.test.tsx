@@ -15,6 +15,11 @@ import {
 } from '@/lib/spider/view';
 import { SpiderTransport } from '@/lib/solo/SpiderTransport';
 import { DEFAULT_PROFILE_SETTINGS, useProfileStore } from '@/stores/profile';
+import {
+  activateTableControl,
+  moveTableFocusTo,
+  pressTableKey,
+} from '@/components/table/shell/keyboard-test-utils';
 import { SpiderTableScreen } from './SpiderTableScreen';
 
 const SPIDER_STYLES = readFileSync(join(process.cwd(), 'src/styles/spider.module.css'), 'utf8');
@@ -83,6 +88,9 @@ describe('SpiderTableScreen', () => {
 
     const hidden = [...container.querySelectorAll<HTMLElement>('[data-face-down]')];
     expect(hidden).toHaveLength(44);
+    expect(container.querySelector('[data-testid="spider-undo"]')?.textContent).toBe(
+      'Undo · 0 moves',
+    );
     for (const node of hidden) {
       expect(node.hasAttribute('data-card')).toBe(false);
       expect(node.querySelector('[data-card]')).toBeNull();
@@ -144,12 +152,13 @@ describe('SpiderTableScreen', () => {
     expect(textSurface().hint).toBeNull();
   });
 
-  it('selects a public run then dispatches its ordinary legal destination', () => {
+  it('moves a public run between tableau columns with arrows and Enter', () => {
     let chosen:
       | {
           view: SpiderTableView;
           move: SpiderTableView['legal'][number];
           card: string;
+          source: string;
           target: string;
         }
       | undefined;
@@ -158,25 +167,28 @@ describe('SpiderTableScreen', () => {
       const move = view.legal.find((legal) => legal.id === 'tableau.move');
       if (!move) continue;
       const card = cardOfMove(move, view);
+      const source = sourceOfMove(move);
       const target = targetOfMove(move);
-      if (card && target && sourceOfMove(move)) chosen = { view, move, card, target };
+      if (card && source && target) chosen = { view, move, card, source, target };
     }
     expect(chosen).toBeDefined();
     const onDispatch = vi.fn();
     render(chosen!.view, { onDispatch });
 
-    const runButton = container.querySelector<HTMLButtonElement>(
-      `[data-testid="spider-run-head"][data-card="${chosen!.card}"]`,
+    const source = container.querySelector<HTMLButtonElement>(
+      `[data-zone="${chosen!.source}"] [data-card="${chosen!.card}"] button`,
     );
-    expect(runButton).not.toBeNull();
-    act(() => runButton!.click());
-    expect(runButton!.getAttribute('aria-pressed')).toBe('true');
+    expect(source).not.toBeNull();
+    activateTableControl(source!);
+    expect(source!.closest('[data-card]')?.getAttribute('data-selected')).toBe('true');
     expect(SPIDER_STYLES).toMatch(
       /\.tableauCard\[data-selected='true'\]\s*>\s*button\s*\{[^}]*outline:\s*3px solid #66ffe1;/s,
     );
     const target = container.querySelector<HTMLElement>(`[data-zone="${chosen!.target}"]`)!;
     expect(target.getAttribute('data-legal-target')).toBe('true');
-    act(() => target.querySelector<HTMLButtonElement>('button')!.click());
+    const targetButton = target.querySelector<HTMLButtonElement>('button:not(:disabled)')!;
+    moveTableFocusTo(targetButton);
+    pressTableKey(targetButton, 'Enter');
     expect(onDispatch).toHaveBeenCalledWith(chosen!.move.id, chosen!.move.payload);
   });
 

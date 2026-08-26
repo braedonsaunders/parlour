@@ -19,6 +19,7 @@ import {
   TablePlayfield,
   TableScreenFrame,
   TableTitlePill,
+  SolitaireUndoButton,
   useGameTextSurface,
   useTableMenu,
 } from '@/components/table/shell';
@@ -413,15 +414,12 @@ function ReadyFreecellTable({
       </TablePlayfield>
 
       <TableActionRail className={styles.actions}>
-        <button
-          type="button"
-          className="btn-fat btn-fat--ghost"
-          data-testid="freecell-undo"
-          onClick={onUndo}
+        <SolitaireUndoButton
+          depth={view.undoDepth}
+          testId="freecell-undo"
+          onUndo={onUndo}
           disabled={!view.canUndo || deal.dealing || busy}
-        >
-          Undo
-        </button>
+        />
         <button
           type="button"
           className="btn-fat btn-fat--ghost"

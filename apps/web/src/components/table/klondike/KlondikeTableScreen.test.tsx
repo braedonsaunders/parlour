@@ -16,6 +16,11 @@ import {
 } from '@/lib/klondike/view';
 import { KlondikeTransport } from '@/lib/solo/KlondikeTransport';
 import { DEFAULT_PROFILE_SETTINGS, useProfileStore } from '@/stores/profile';
+import {
+  activateTableControl,
+  moveTableFocusTo,
+  pressTableKey,
+} from '@/components/table/shell/keyboard-test-utils';
 import { KlondikeTableScreen } from './KlondikeTableScreen';
 
 const KLONDIKE_STYLES = readFileSync(join(process.cwd(), 'src/styles/klondike.module.css'), 'utf8');
@@ -84,6 +89,9 @@ describe('KlondikeTableScreen', () => {
 
     const hidden = [...container.querySelectorAll<HTMLElement>('[data-face-down]')];
     expect(hidden).toHaveLength(21);
+    expect(container.querySelector('[data-testid="klondike-undo"]')?.textContent).toBe(
+      'Undo · 0 moves',
+    );
     for (const node of hidden) {
       expect(node.hasAttribute('data-card')).toBe(false);
       expect(node.querySelector('[data-card]')).toBeNull();
@@ -165,47 +173,49 @@ describe('KlondikeTableScreen', () => {
     expect(container.querySelector('[data-zone="waste"]')!.getAttribute('data-hint')).toBe('true');
   });
 
-  it('selects a public card then dispatches its ordinary legal destination', () => {
+  it('moves a tableau card to its foundation with arrows and Enter', () => {
     let chosen:
       | {
           view: KlondikeTableView;
           move: KlondikeTableView['legal'][number];
           card: string;
+          source: string;
           target: string;
         }
       | undefined;
     for (let seed = 1; seed <= 100 && !chosen; seed++) {
       const { view } = table(seed);
-      const move = view.legal.find((legal) => legal.id === 'tableau.move');
+      const move = view.legal.find((legal) => legal.id === 'tableau.toFoundation');
       if (!move) continue;
       const card = cardOfMove(move, view);
+      const source = sourceOfMove(move, view);
       const target = targetOfMove(move, view);
-      if (card && target && sourceOfMove(move, view)) chosen = { view, move, card, target };
+      if (card && source && target) chosen = { view, move, card, source, target };
     }
     expect(chosen).toBeDefined();
     const onDispatch = vi.fn();
     render(chosen!.view, { onDispatch });
 
-    const runButton = container.querySelector<HTMLButtonElement>(
-      `[data-testid="klondike-run-head"][data-card="${chosen!.card}"]`,
+    const source = container.querySelector<HTMLButtonElement>(
+      `[data-zone="${chosen!.source}"] [data-card="${chosen!.card}"] button`,
     );
-    expect(runButton).not.toBeNull();
-    expect(runButton!.tagName).toBe('BUTTON');
-    expect(runButton!.getAttribute('aria-label')).toContain('tableau column');
-    act(() => runButton!.click());
-    expect(runButton!.getAttribute('aria-pressed')).toBe('true');
+    expect(source).not.toBeNull();
+    activateTableControl(source!);
+    expect(source!.closest('[data-card]')?.getAttribute('data-selected')).toBe('true');
     expect(KLONDIKE_STYLES).toMatch(
       /\.tableauCard\[data-selected='true'\]\s*>\s*button\s*\{[^}]*outline:\s*3px solid #66ffe1;[^}]*box-shadow:[^}]*rgba\(65, 255, 219, 0\.72\)/s,
     );
     const target = container.querySelector<HTMLElement>(`[data-zone="${chosen!.target}"]`)!;
     expect(target.getAttribute('data-legal-target')).toBe('true');
-    act(() => target.querySelector<HTMLButtonElement>('button')!.click());
+    const targetButton = target.querySelector<HTMLButtonElement>('button:not(:disabled)')!;
+    moveTableFocusTo(targetButton);
+    pressTableKey(targetButton, 'Enter');
     expect(onDispatch).toHaveBeenCalledWith(chosen!.move.id, chosen!.move.payload);
   });
 
   it('does not let Undo race the safe-finish loop', () => {
     const { view } = table();
-    render({ ...view, canUndo: true }, { busy: true });
+    render({ ...view, canUndo: true, undoDepth: 1 }, { busy: true });
     expect(
       container.querySelector<HTMLButtonElement>('[data-testid="klondike-undo"]')!.disabled,
     ).toBe(true);

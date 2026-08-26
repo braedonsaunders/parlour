@@ -11,6 +11,12 @@ export { DiscardPileButton, StockPile, TablePiles } from './TablePiles';
 export { TableActionRail, TablePlayfield, TableTurnIndicator } from './TablePlayfield';
 export { TableShell, useTableAnnouncer, type TableShellProps } from './TableShell';
 export { TableScreenFrame, type TableScreenFrameProps } from './TableScreenFrame';
+export { SolitaireUndoButton, type SolitaireUndoButtonProps } from './SolitaireUndoButton';
 export { TableErrorScreen, TableLoadingScreen } from './TableStatusScreen';
 export { useGameTextSurface } from './useGameTextSurface';
+export {
+  narrateSolitaireFx,
+  useSolitaireNarration,
+  type SolitaireNarrationGame,
+} from './useSolitaireNarration';
 export { useTableMenu, type TableMenuController } from './useTableMenu';
