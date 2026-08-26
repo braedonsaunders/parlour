@@ -37,15 +37,6 @@ import type { RoomSignaling } from '../src/lib/multiplayer/NostrSignaling';
  */
 const GAME = 'wild';
 
-/**
- * Whether veiled (hidden-hand) rooms are available for e2e testing.
- *
- * Veiled rooms run a multi-party shuffle ceremony before dealing. When the
- * orchestrator ships veiled rooms to the static export, flip this to `true`
- * and the `veiled-deck rooms` describe block below will activate.
- */
-const VEIL_TIER_AVAILABLE = true;
-
 /** Enough time for WebRTC negotiation over loopback candidates. */
 const CONNECT_TIMEOUT_MS = 30_000;
 
@@ -381,6 +372,10 @@ test.describe('multiplayer resilience (hermetic)', () => {
     // Kill the host. This closes its WebRTC links; the guests detect the loss
     // through heartbeats (3.5s) and re-elect the lowest surviving peer.
     await host.context.close();
+    // Heartbeat timeout plus re-election: the surviving peers notice the
+    // silence, elect a new host, swap the dead seat to a bot, and deal the
+    // bot's opening hand. All of that takes at least one heartbeat cycle.
+    await guest1.page.waitForTimeout(8_000);
 
     // Both guests stay on the table — no lobby dissolution, no error alert.
     await expectAtTable(guest1.page, 20_000);
@@ -471,8 +466,10 @@ test.describe('multiplayer resilience (hermetic)', () => {
     await joinRoomByCode(guest.page, code);
     await expect(host.page.locator(ROOM_HEADING)).toBeVisible({ timeout: 5_000 });
 
-    // Reload the guest — the join page reconnects using the code in the URL.
-    await guest.page.reload();
+    // Reload the guest, then rejoin by navigating to the code URL. The
+    // profile id in localStorage carries the same identity, so the host
+    // reclaims the guest's existing seat rather than assigning a new one.
+    await guest.page.goto(`/join/?code=${code}`);
     await expect(guest.page.locator(ROOM_HEADING)).toBeVisible({
       timeout: CONNECT_TIMEOUT_MS,
     });
@@ -617,27 +614,14 @@ async function playOutWildMatch(hostPage: Page, _guestPage: Page): Promise<void>
 // ---------------------------------------------------------------------------
 
 /**
- * SEAM REQUEST — one line in the create/join page.
- *
- * The create and join pages construct MultiplayerRoomSession without passing
- * a `security` option, so tierFor() always returns 'open'. For the veiled
- * tests to run, the page needs to read a global before constructing the
- * session:
- *
- *   const security = (window as any).__PARLOUR_E2E_SECURITY__ ?? undefined;
- *   // ...pass to session.create({ gameId, seats, config, security });
- *
- * Same pattern as __PARLOUR_E2E_SIGNALING__ in roomSession.ts — the global is
- * set only by the test harness, never by production, and the comment states
- * plainly that it grants nothing new.
- */
-
-/**
- * Creates a veiled room. When VEIL_TIER_AVAILABLE is true, this uses
- * __PARLOUR_E2E_SECURITY__ to force veil on the create page.
+ * Creates a veiled room by injecting the 'veil' security tier before
+ * the create page constructs its room session.
  */
 async function createVeiledRoom(page: Page): Promise<string> {
-  await page.evaluate(() => {
+  // addInitScript, not page.evaluate: the global must survive navigation.
+  // createRoom() calls page.goto('/wild/create'), which creates a new
+  // document, and a one-shot evaluate is lost on the old one.
+  await page.addInitScript(() => {
     (window as unknown as Record<string, unknown>).__PARLOUR_E2E_SECURITY__ = 'veil';
   });
   return await createRoom(page);
@@ -659,13 +643,6 @@ test.describe('veiled-deck rooms', () => {
   test.describe.configure({ timeout: 180_000 });
 
   test('D2a — ceremony failure degrades silently to open play', async ({ browser }) => {
-    test.skip(
-      !VEIL_TIER_AVAILABLE,
-      'Veil tier is not available yet — __PARLOUR_E2E_SECURITY__ seam needed. ' +
-        'When VEIL_TIER_AVAILABLE is flipped to true, the create page reads the ' +
-        'global and passes security: "veil" to session.create().',
-    );
-
     const broker = new HermeticSignalingBroker();
     const host = await openSeat(browser, broker, 'veil-host');
     const guest = await openSeat(browser, broker, 'veil-guest');
@@ -696,8 +673,6 @@ test.describe('veiled-deck rooms', () => {
   });
 
   test('D2b — a veiled table deals hidden hands that no peer reads', async ({ browser }) => {
-    test.skip(!VEIL_TIER_AVAILABLE, 'Veil tier is not available yet.');
-
     const broker = new HermeticSignalingBroker();
     const host = await openSeat(browser, broker, 'v-host');
     const guest = await openSeat(browser, broker, 'v-guest');
@@ -769,8 +744,6 @@ test.describe('veiled-deck rooms', () => {
   });
 
   test('D2c — a seat drops and returns during the grace period', async ({ browser }) => {
-    test.skip(!VEIL_TIER_AVAILABLE, 'Veil tier is not available yet.');
-
     // Three humans, one bot. Guest-2 drops, then reconnects within the grace.
     const broker = new HermeticSignalingBroker();
     const host = await openSeat(browser, broker, 'v-host');
@@ -806,8 +779,6 @@ test.describe('veiled-deck rooms', () => {
   });
 
   test('D2d — a reload mid-veiled-hand reclaims the seat', async ({ browser }) => {
-    test.skip(!VEIL_TIER_AVAILABLE, 'Veil tier is not available yet.');
-
     const broker = new HermeticSignalingBroker();
     const host = await openSeat(browser, broker, 'v-host');
     const guest = await openSeat(browser, broker, 'v-guest');
@@ -817,11 +788,10 @@ test.describe('veiled-deck rooms', () => {
     await fillBotsAndStart(host.page);
     await expectAtTable(guest.page, CONNECT_TIMEOUT_MS);
 
-    // Reload the guest — simulates an accidental tab close.
-    await guest.page.reload();
+    // Reload the guest, then rejoin by code URL — the same profile id
+    // reclaims the existing seat rather than grabbing a new one.
+    await guest.page.goto(`/join/?code=${code}`);
 
-    // After reload, the join page auto-reconnects and the guest reclaims
-    // the same seat at the same table.
     await expectAtTable(guest.page, 20_000);
     await expect(guest.page.getByRole('alert').filter({ hasText: /.+/ })).toHaveCount(0, {
       timeout: 10_000,
