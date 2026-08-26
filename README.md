@@ -128,15 +128,27 @@ state = replay(seed, eventLog)
 
 One pure TypeScript engine — no React, no DOM, no network, no `Math.random()` (ESLint fails the
 build if any sneaks in). Same seed plus same events means byte-identical state on every machine.
-**Replays, reconnects, host migration, and desync detection are wired in and shipped** — rejoin
-replays the log, peers compare state hashes and resync on drift. The design also affords more
-than is wired yet: a `verifyLog` mode that re-checks every logged move against the rules (for
-auditing an authority you don't trust) exists in the engine but no transport calls it, and
-spectating is not built — both are one surface away rather than bolted on.
+**Replays, reconnects, host migration, desync detection, undo and cheat-auditing are wired in and
+shipped.** Rejoin replays the log; peers compare state hashes and resync on drift; undo truncates
+the log and replays what is left, so it lands on the exact earlier position rather than an
+approximation of it.
+
+Cheat-auditing is the one worth spelling out, because a friend room has no server. The host is
+another player, so its packets are a claim about what the rules allowed rather than a fact.
+Every guest re-checks each packet as it arrives — legality and validation for player moves, and
+for the automatic events the runtime produces, a re-derivation of what `flow.advance` actually
+owed. A packet that fails is refused and the guest pulls a fresh snapshot instead of playing on.
+Verification is scoped to the tail a packet just added, so a peer checks each event once and the
+cost sits inside the replay it was already doing.
+
+The state hash is _not_ what does this. It is a 32-bit checksum for spotting drift between honest
+peers, and anyone who can edit a log can recompute it — the engine says so at the definition.
+
+Spectating is still not built.
 
 - **Moves are pure reducers** that emit an ordered **fx timeline**. The UI animates _only_ from fx events — never by diffing state. That's why deals cascade and cards arc instead of teleporting.
 - **Real-time and turn-based share one runtime.** A slap window, an out-of-turn jump-in, and an ordinary trick are all the same kind of move to the engine.
-- **Veiled decks are an engine primitive.** The protocol can deal opaque handles and record reveals in the log. Friend rooms do not use it — they play the open collaborative deal, the same replay on every peer.
+- **Veiled decks are an engine primitive.** The protocol deals opaque handles and records reveals in the log, backed by an SRA commutative cipher, threshold recovery for a dropped seat and a match-end audit. Friend rooms still play the open collaborative deal while the room layer is proven against it.
 - **Games are packages, not engine branches.** Every game on the shelf was written against the public engine API.
 
 | A new game inherits for free |                                                           |
