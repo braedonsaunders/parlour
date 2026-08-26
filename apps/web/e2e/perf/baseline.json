@@ -1,0 +1,23 @@
+{
+  "note": "Captured on a macOS arm64 developer laptop against the static export with CPU throttle 1× (no artificial slowdown). These are headless frame times — they are comparable only to the same machine and same Playwright version, never to a real device or a different runner. The ratchet bands are wide enough to absorb CI variation; a failure means a real rendering regression, not noise.",
+  "scenarios": {
+    "wild-solo": {
+      "blocking_ratio": 0.27,
+      "fps": 120.1,
+      "over33_frames": 0,
+      "over50_frames": 0
+    },
+    "rig-wild-shape": {
+      "blocking_ratio": 0.27,
+      "fps": 119.4,
+      "over33_frames": 0,
+      "over50_frames": 0
+    },
+    "rig-stress-max": {
+      "blocking_ratio": 0.27,
+      "fps": 118.5,
+      "over33_frames": 0,
+      "over50_frames": 0
+    }
+  }
+}
