@@ -22,8 +22,20 @@ import { createEightsDef } from '../game';
  */
 
 export const DEFAULT_THRESHOLDS = {
-  /** head-to-head: Hard must outplace Easy this often */
-  hardAboveEasyMin: 0.45,
+  /**
+   * Head-to-head: how often Hard must finish above Easy at a two-and-two table.
+   *
+   * The floor has to sit above 0.5, or the gate cannot fail. Two Sharp seats
+   * against two Easy seats put a coin-flip at exactly half, so the 0.45 this
+   * started at would have passed a hard bot that was measurably *worse* than
+   * the easy one — it asserted nothing.
+   *
+   * Measured at 0.563 over 600 games with the tier indexing corrected. Eights
+   * is a high-variance game and that is a genuinely modest edge; 0.52 is about
+   * two standard errors below the measurement, so it fails a real regression
+   * without flaking on the noise this game actually has.
+   */
+  hardAboveEasyMin: 0.52,
   /** mixed tables: nobody may fall outside this band */
   tierBandMin: 0.1,
   tierBandMax: 0.45,
@@ -40,9 +52,16 @@ export interface GateReport {
   thresholds: Thresholds;
 }
 
-/** Hard vs Easy, seats alternating to cancel position bias. */
-function ladderSeats(gameIndex: number): readonly number[] {
-  return gameIndex % 2 === 0 ? [2, 0, 0, 2] : [0, 2, 2, 0];
+/**
+ * Hard vs Easy, seats alternating to cancel position bias.
+ *
+ * These are tier numbers, not array indices. `eightsTierBot` is 1-based, and an
+ * earlier version of this gate used the 0-based seat arrays the Hearts gate
+ * carries — which quietly seated the *medium* bot everywhere it printed
+ * "Sharp", so the ladder passed without the hard bot ever playing.
+ */
+function ladderSeats(gameIndex: number): readonly (1 | 2 | 3)[] {
+  return gameIndex % 2 === 0 ? [3, 1, 1, 3] : [1, 3, 3, 1];
 }
 
 function ladderLabels(gameIndex: number): readonly string[] {
@@ -51,9 +70,9 @@ function ladderLabels(gameIndex: number): readonly string[] {
     : ['Easy', 'Sharp', 'Sharp', 'Easy'];
 }
 
-/** Mixed table: one of each tier + second Easy, rotated per game. */
-function mixedSeats(gameIndex: number): readonly number[] {
-  const base = [2, 0, 1, 0] as const;
+/** Mixed table: one of each tier + second Easy, rotated per game. Tier numbers. */
+function mixedSeats(gameIndex: number): readonly (1 | 2 | 3)[] {
+  const base = [3, 1, 2, 1] as const;
   return Array.from({ length: 4 }, (_, offset) => base[(gameIndex + offset) % 4]!);
 }
 
@@ -81,7 +100,7 @@ export function runBalanceGates(opts: {
     maxEvents: 4_000,
     config,
     tolerateStalls: true,
-    seatPoliciesFor: (i) => ladderSeats(i).map((t) => eightsTierBot((t || 1) as 1 | 2 | 3)),
+    seatPoliciesFor: (i) => ladderSeats(i).map(eightsTierBot),
     seatLabelsFor: (i) => ladderLabels(i),
   });
 
@@ -91,7 +110,7 @@ export function runBalanceGates(opts: {
     maxEvents: 4_000,
     config,
     tolerateStalls: true,
-    seatPoliciesFor: (i) => mixedSeats(i).map((t) => eightsTierBot((t || 1) as 1 | 2 | 3)),
+    seatPoliciesFor: (i) => mixedSeats(i).map(eightsTierBot),
     seatLabelsFor: (i) => mixedLabels(i),
   });
 
