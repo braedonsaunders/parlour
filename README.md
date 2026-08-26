@@ -122,9 +122,12 @@ state = replay(seed, eventLog)
 ```
 
 One pure TypeScript engine — no React, no DOM, no network, no `Math.random()` (ESLint fails the
-build if any sneaks in). Same seed plus same events means byte-identical state on every machine,
-so **replays, reconnects, host migration, spectating, and cheat-auditing fall out of the design**
-instead of being bolted on.
+build if any sneaks in). Same seed plus same events means byte-identical state on every machine.
+**Replays, reconnects, host migration, and desync detection are wired in and shipped** — rejoin
+replays the log, peers compare state hashes and resync on drift. The design also affords more
+than is wired yet: a `verifyLog` mode that re-checks every logged move against the rules (for
+auditing an authority you don't trust) exists in the engine but no transport calls it, and
+spectating is not built — both are one surface away rather than bolted on.
 
 - **Moves are pure reducers** that emit an ordered **fx timeline**. The UI animates _only_ from fx events — never by diffing state. That's why deals cascade and cards arc instead of teleporting.
 - **Real-time and turn-based share one runtime.** A slap window, an out-of-turn jump-in, and an ordinary trick are all the same kind of move to the engine.
@@ -136,7 +139,7 @@ instead of being bolted on.
 | 🎬 Animation                 | fx timeline → deal cascades, card flights, arrival glints |
 | 🤖 Bots                      | seat-fillable bot policies with difficulty tiers          |
 | 🌐 Multiplayer               | room codes, WebRTC mesh, host authority, rejoin           |
-| ⏪ Replay                    | deterministic log replay for reconnect, spectate, debug   |
+| ⏪ Replay                    | deterministic log replay for reconnect and debug          |
 | 🏆 Matches                   | lives, scores, clocks, sudden death, podium celebration   |
 | 🔊 Audio                     | per-game SFX pack keyed to your fx events                 |
 | 📖 Rules doc                 | structured help rendered by the in-app modal              |
