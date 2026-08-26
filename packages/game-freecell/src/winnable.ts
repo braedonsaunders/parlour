@@ -50,6 +50,15 @@ function nextCandidate(seed: number): number {
  * same table without anything being coordinated — same contract as Klondike's
  * {@link findWinnableSeed}, and the same proviso: the deals it picks depend
  * on the solver's behaviour, so treat the tuning as part of this contract.
+ *
+ * ## Why this is not wired into the app
+ *
+ * The solver proves ~92 of 100 sampled Classic deals at a 500k-node budget
+ * (avg 63k nodes; 6-cell Relaxed proves 10/10). FreeCell is famously
+ * near-universally solvable — of the classic 32,000 Microsoft deals exactly
+ * one is unsolvable — so a filter proving 92% would reject ~8% of deals that
+ * are almost certainly fine, for a guarantee the player already had. The
+ * filter stays a library tool; the app keeps dealing raw shuffles.
  */
 export function findWinnableSeed(
   startSeed: number,
