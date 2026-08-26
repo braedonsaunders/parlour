@@ -393,10 +393,6 @@
   transform-origin: 50% 82%;
 }
 
-.handScrollCue {
-  display: none;
-}
-
 .localHand[data-deal-state='complete'] .handTrack {
   animation: dealFanBloom 360ms var(--ease-pop) backwards;
 }
@@ -1052,133 +1048,34 @@ button.card {
     top: 48%;
     transform: translate(-50%, -50%) scale(0.85);
   }
-  /* A fan can expose five cards honestly on a phone, but it cannot expose
-     thirteen 44px targets. Portrait therefore becomes one full-size row: short
-     hands centre, long hands pan, and no game has to guess when to shrink. */
+  /* Portrait holds the hand the way a hand is held: one fan, compressed until
+     it fits. `calculateFanStep` already solves for the width, so a thirteen
+     card hand tightens its step rather than growing a rail that pans. Portrait
+     therefore inherits the landscape fan wholesale and only restates the two
+     numbers a narrow screen changes — a smaller card, and a rail no wider than
+     the phone. Nothing here may introduce a scroll or a clip: the hand must be
+     readable in one look, and a lifted playable card needs somewhere to go. */
   .localHand {
-    --hand-card-width: 4.5rem;
-    right: 0;
-    bottom: calc(env(safe-area-inset-bottom) + 0.1rem);
-    left: 0;
-    justify-content: flex-start;
-    width: 100%;
-    height: 7.5rem;
-    padding-block: 0.4rem 0.2rem;
-    transform: none;
-    background: linear-gradient(0deg, rgba(9, 20, 27, 0.76), rgba(9, 20, 27, 0));
+    --hand-card-width: clamp(4.3rem, 15.5vw, 5.1rem);
+    bottom: calc(env(safe-area-inset-bottom) + 0.9rem);
+    /* The rail is the width the fan solves inside, and the outermost cards
+       rotate beyond it — so it stops short of the screen to leave the arc its
+       gutters. At full width the corner cards sit on the bezel. */
+    width: min(30rem, calc(100vw - 2rem));
+    height: 11.5rem;
   }
-  .handTrack {
-    position: relative;
-    inset: auto;
-    display: flex;
-    flex: 1 1 auto;
-    gap: 0.35rem;
-    width: 100%;
-    min-width: 0;
-    height: 100%;
-    padding-left: max(0.75rem, env(safe-area-inset-left));
-    padding-right: max(0.75rem, env(safe-area-inset-right));
-    overflow-x: auto;
-    overflow-y: hidden;
-    overscroll-behavior-inline: contain;
-    scroll-padding-inline: 0.75rem;
-    scroll-snap-type: x proximity;
-    scrollbar-width: thin;
-    touch-action: pan-x;
-    pointer-events: auto;
-    transform: none;
-  }
-  /* Auto margins centre a short row and collapse to zero once it overflows.
-     Unlike toggling justify-content after measurement, that does not leave
-     WebKit preserving a stale centred scroll anchor halfway through a deal. */
-  .handTrack > .handCard:first-child {
-    margin-inline-start: auto;
-  }
-  .handTrack > .handCard:last-child {
-    margin-inline-end: auto;
-  }
-  .localHand[data-scroll-state='start'] .handTrack {
-    -webkit-mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 3rem), transparent);
-    mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 3rem), transparent);
-  }
-  .localHand[data-scroll-state='middle'] .handTrack {
-    -webkit-mask-image: linear-gradient(
-      to right,
-      transparent,
-      #000 3rem,
-      #000 calc(100% - 3rem),
-      transparent
-    );
-    mask-image: linear-gradient(
-      to right,
-      transparent,
-      #000 3rem,
-      #000 calc(100% - 3rem),
-      transparent
-    );
-  }
-  .localHand[data-scroll-state='end'] .handTrack {
-    -webkit-mask-image: linear-gradient(to right, transparent, #000 3rem, #000 100%);
-    mask-image: linear-gradient(to right, transparent, #000 3rem, #000 100%);
-  }
-  .handCard {
-    position: relative !important;
-    top: 0;
-    left: auto;
-    flex: 0 0 var(--hand-card-width);
-    width: var(--hand-card-width);
-    min-width: 2.75rem;
-    margin-left: 0;
-    /* Start, not centre. A centred snap point cannot resolve to scrollLeft 0 —
-       centring the first card would need a negative offset, so the engine
-       re-snaps to whichever card *can* sit in the middle and the rail opens
-       halfway along the hand. Aligning to the start makes the first card's snap
-       position and the rail's origin the same place, which is also what a hand
-       wants: you read it left to right, you do not browse it like a carousel. */
-    scroll-snap-align: start;
-    transform: none !important;
-  }
-  .handFan {
-    transform: translateY(var(--playable-y, 0rem));
-  }
-  .localHand .card,
-  .handCard > .handFan > button {
-    min-width: 2.75rem;
+  /* The fan's outermost cards rotate away from centre, so the widest part of
+     the hand is above its own box. Portrait gives that overhang room by
+     shrinking the card rather than by letting the rail clip or scroll. */
+  .localHand .card {
     min-height: 2.75rem;
   }
-  .handScrollCue {
-    position: absolute;
-    z-index: 8;
-    top: 2.35rem;
-    display: grid;
-    place-items: center;
-    width: 2.25rem;
-    height: 2.75rem;
-    border: 1px solid rgba(255, 236, 200, 0.4);
-    border-radius: 999px;
-    background: rgba(9, 25, 32, 0.9);
-    color: rgba(255, 236, 200, 0.94);
-    box-shadow: 0 6px 16px rgba(3, 11, 15, 0.42);
-    font-size: 1.55rem;
-    line-height: 1;
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 140ms ease;
-  }
-  .handScrollCueBack {
-    left: max(0.25rem, env(safe-area-inset-left));
-  }
-  .handScrollCueForward {
-    right: max(0.25rem, env(safe-area-inset-right));
-  }
-  .localHand[data-scroll-state='middle'] .handScrollCue,
-  .localHand[data-scroll-state='end'] .handScrollCueBack,
-  .localHand[data-scroll-state='start'] .handScrollCueForward {
-    opacity: 1;
-  }
+  /* Both rails clear the fan by sitting above it. The fan spans the full width
+     of a phone, so there is no bottom corner left to dock them in — and the
+     owner's standing rule is that nothing overlaps. */
   .ownerStatusRail {
     align-items: stretch;
-    bottom: calc(env(safe-area-inset-bottom) + 7.85rem);
+    bottom: calc(env(safe-area-inset-bottom) + 12.3rem);
     gap: 0.4rem;
   }
   .ownerCount,
@@ -1208,13 +1105,7 @@ button.card {
   }
   .actionRail {
     right: max(0.9rem, env(safe-area-inset-right));
-    bottom: calc(env(safe-area-inset-bottom) + 8rem);
-  }
-}
-
-@media (orientation: portrait) and (prefers-reduced-motion: reduce) {
-  .handScrollCue {
-    transition: none;
+    bottom: calc(env(safe-area-inset-bottom) + 12.3rem);
   }
 }
 
