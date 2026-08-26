@@ -110,7 +110,9 @@ async function joinRoomByCode(page: Page, code: string): Promise<void> {
   await page.goto('/join/');
   const input = page.locator(JOIN_INPUT);
   await input.fill(code);
-  await page.getByRole('button', { name: /join|knocking/i }).click();
+  // The label is localised — English idles at "Pull up a chair" — so matching on
+  // copy found nothing until the button happened to be mid-flight.
+  await page.getByTestId('join-submit').click();
   await expect(page.locator(ROOM_HEADING)).toBeVisible({ timeout: CONNECT_TIMEOUT_MS });
   await expect(page.locator(ROOM_HEADING)).toContainText(code);
 }

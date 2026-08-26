@@ -167,6 +167,10 @@ export default function JoinPage() {
       <JoinStatus session={roomSession} fallbackError={error} />
       <button
         type="button"
+        // Addressed by test id rather than by label: this button says "Pull up a
+        // chair" in five languages and "Knocking…" while it works, and a browser
+        // suite that matched on the copy silently found nothing at all.
+        data-testid="join-submit"
         onClick={() => void submit(code, typed === null ? linkHost || undefined : undefined)}
         disabled={code.length !== ROOM_CODE_LENGTH || checking}
         className="btn-fat w-64 text-lg"
