@@ -40,6 +40,8 @@ export const PARLOUR_SFX = {
   stockShuffle: 'parlour.stock.shuffle',
   turnReady: 'parlour.turn.ready',
   uiPress: 'parlour.ui.press',
+  roomPlayerJoined: 'parlour.room.player-joined',
+  roomPlayerLeft: 'parlour.room.player-left',
   matchWin: 'parlour.match.win',
   matchLose: 'parlour.match.lose',
 } as const;
@@ -232,6 +234,8 @@ export const PARLOUR_SFX_PACK: SfxPack = {
     sound(PARLOUR_SFX.stockShuffle, '/audio/sfx/stock-shuffle.mp3', 0.72, 1, 500),
     sound(PARLOUR_SFX.turnReady, '/audio/sfx/turn-ready.mp3', 0.54, 2, 100),
     sound(PARLOUR_SFX.uiPress, '/audio/sfx/ui-press.mp3', 0.5, 3, 55),
+    sound(PARLOUR_SFX.roomPlayerJoined, '/audio/sfx/president-role-chime.mp3', 0.58, 1, 220),
+    sound(PARLOUR_SFX.roomPlayerLeft, '/audio/sfx/president-pass.mp3', 0.42, 1, 220),
     sound(PARLOUR_SFX.matchWin, '/audio/sfx/win-celebration.mp3', 0.86, 1, 1_200),
     sound(PARLOUR_SFX.matchLose, '/audio/sfx/lose-sting.mp3', 0.74, 1, 1_200),
   ],

@@ -13,6 +13,8 @@ const REQUIRED_SOUNDS = [
   'parlour.stock.shuffle',
   'parlour.turn.ready',
   'parlour.ui.press',
+  'parlour.room.player-joined',
+  'parlour.room.player-left',
   'parlour.match.win',
   'parlour.match.lose',
   'blitz.knock',

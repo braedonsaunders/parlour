@@ -3,6 +3,13 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_SETTINGS, resetAudioManagerForTests } from '@/lib/audio/AudioManager';
 import { resetMusicBindingsForTests, useAudioStore } from '@/stores/audio';
+import {
+  activateMultiplayerSession,
+  clearActiveMultiplayerSession,
+  type MultiplayerRoomSession,
+  type MultiplayerRoomSnapshot,
+  type MultiplayerSeat,
+} from '@/app/_multiplayer/roomSession';
 
 const nav = { pathname: '/' };
 
@@ -63,6 +70,41 @@ vi.mock('next/navigation', () => ({
 
 import { AudioDirector } from './AudioDirector';
 
+function human(seat: number, name: string, connected = true): MultiplayerSeat {
+  return {
+    seat,
+    name,
+    avatarId: 'ember',
+    profileId: `profile-${name}`,
+    bot: false,
+    connected,
+  };
+}
+
+function roomHarness(initialSeats: readonly MultiplayerSeat[]) {
+  const listeners = new Set<() => void>();
+  let snapshot = {
+    room: { code: 'ABCD', peerId: 'host', hostId: 'host' },
+    connection: 'connected',
+    seats: initialSeats,
+  } as unknown as MultiplayerRoomSnapshot;
+  const room = {
+    getSnapshot: () => snapshot,
+    subscribe: (listener: () => void) => {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+    close: vi.fn(),
+  } as unknown as MultiplayerRoomSession;
+  return {
+    room,
+    seats(next: readonly MultiplayerSeat[]) {
+      snapshot = { ...snapshot, seats: next };
+      for (const listener of listeners) listener();
+    },
+  };
+}
+
 describe('AudioDirector', () => {
   let container: HTMLDivElement;
   let root: Root;
@@ -73,6 +115,7 @@ describe('AudioDirector', () => {
     nav.pathname = '/';
     resetAudioManagerForTests();
     resetMusicBindingsForTests();
+    clearActiveMultiplayerSession();
     useAudioStore.setState({ channels: DEFAULT_SETTINGS, unlocked: false });
     Object.defineProperty(document, 'visibilityState', {
       configurable: true,
@@ -88,6 +131,7 @@ describe('AudioDirector', () => {
     container?.remove();
     resetAudioManagerForTests();
     resetMusicBindingsForTests();
+    clearActiveMultiplayerSession();
     vi.unstubAllGlobals();
   });
 
@@ -167,5 +211,33 @@ describe('AudioDirector', () => {
     });
     act(() => document.dispatchEvent(new Event('visibilitychange')));
     expect(theme?.playing()).toBe(true);
+  });
+
+  it('chimes for human room arrivals and departures, but not the initial roster or bots', async () => {
+    const host = human(0, 'Host');
+    const guest = human(1, 'Guest');
+    const bot = { ...human(1, 'Bot'), bot: true };
+    const harness = roomHarness([host]);
+    activateMultiplayerSession(harness.room);
+    await act(async () => root.render(createElement(AudioDirector)));
+    act(() => window.dispatchEvent(new Event('pointerdown')));
+
+    expect(FakeHowl.instances.some((howl) => howl.src.includes('president-role-chime'))).toBe(
+      false,
+    );
+    act(() => harness.seats([host, bot]));
+    expect(FakeHowl.instances.some((howl) => howl.src.includes('president-role-chime'))).toBe(
+      false,
+    );
+
+    act(() => harness.seats([host, guest]));
+    expect(
+      FakeHowl.instances.find((howl) => howl.src.includes('president-role-chime'))?.playing(),
+    ).toBe(true);
+
+    act(() => harness.seats([host]));
+    expect(
+      FakeHowl.instances.find((howl) => howl.src.includes('president-pass.mp3'))?.playing(),
+    ).toBe(true);
   });
 });
