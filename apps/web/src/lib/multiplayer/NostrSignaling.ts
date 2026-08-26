@@ -83,6 +83,37 @@ export type RoomAnnouncement = {
   settings: RoomSettings;
 };
 
+/**
+ * The signaling surface a room consumes.
+ *
+ * This is the seam that makes the friend-room mesh testable without public
+ * Nostr relays: `NostrSignaling` is one implementation, and
+ * `MemorySignaling` (see MemorySignaling.ts) is another that routes the same
+ * six members over a bus two browser contexts can share.
+ *
+ * The six members are exactly what `P2PTransport` calls — `publicKey`,
+ * `announce`, `resolve`, `send`, `subscribe`, `close`. `healthyRelays` is a
+ * Nostr detail and deliberately NOT part of the interface: an in-memory
+ * transport has no relays to check.
+ */
+export interface RoomSignaling {
+  /** This peer's identity — the value other peers address signals to. */
+  readonly publicKey: string;
+  /** Publish this room under `code` so peers can resolve it. */
+  announce(code: string, settings: RoomSettings): Promise<void>;
+  /** Look up a room by code; `expectedHost` pins a share-link invite. */
+  resolve(code: string, expectedHost?: string): Promise<RoomAnnouncement>;
+  /** Deliver one signal to a specific peer. */
+  send(code: string, targetPubkey: string, payload: SignalPayload): Promise<void>;
+  /** Receive signals addressed to this peer. */
+  subscribe(
+    code: string,
+    callback: (senderPubkey: string, payload: SignalPayload) => void,
+  ): { close(): void };
+  /** Release every subscription and connection this peer opened. */
+  close(): void;
+}
+
 function parseRoomSettings(content: string): RoomSettings | null {
   try {
     const value: unknown = JSON.parse(content);
@@ -117,7 +148,7 @@ type SignalingOptions = {
   now?: () => number;
 };
 
-export class NostrSignaling {
+export class NostrSignaling implements RoomSignaling {
   readonly publicKey: string;
   private readonly relays: string[];
   private readonly pool: RelayPool;

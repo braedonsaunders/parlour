@@ -14,6 +14,7 @@ import {
   relaysFromEnv,
   type RelayPool,
 } from './NostrSignaling';
+import { InMemorySignalingBus, MemorySignaling } from './MemorySignaling';
 
 function fakePool(
   failing = new Set<string>(),
@@ -188,5 +189,46 @@ describe('Nostr signaling', () => {
     ]);
     expect(relaysFromEnv('')).toBeUndefined();
     expect(relaysFromEnv(undefined)).toBeUndefined();
+  });
+});
+
+describe('Memory signaling', () => {
+  it('routes a room announcement and a directed signal between two seats', async () => {
+    const bus = new InMemorySignalingBus();
+    const host = new MemorySignaling('host-key', bus);
+    const guest = new MemorySignaling('guest-key', bus);
+
+    await host.announce('AB2Z', { gameId: 'blitz', seats: 2, config: {} });
+    await expect(guest.resolve('AB2Z')).resolves.toMatchObject({
+      hostPubkey: 'host-key',
+    });
+
+    const received: Array<{ author: string; payload: unknown }> = [];
+    const sub = guest.subscribe('AB2Z', (author, payload) => received.push({ author, payload }));
+    await host.send('AB2Z', 'guest-key', { type: 'offer', sdp: 'hello' });
+    expect(received).toEqual([{ author: 'host-key', payload: { type: 'offer', sdp: 'hello' } }]);
+    sub.close();
+  });
+
+  it('pins a share-link resolve to the invited host and refuses a squatter', async () => {
+    const bus = new InMemorySignalingBus();
+    const host = new MemorySignaling('host-key', bus);
+    const squatter = new MemorySignaling('squatter-key', bus);
+    const guest = new MemorySignaling('guest-key', bus);
+
+    await host.announce('AB2Z', { gameId: 'blitz', seats: 2, config: {} });
+    // A squatter republishes the same code after the fact.
+    await squatter.announce('AB2Z', { gameId: 'blitz', seats: 2, config: {} });
+
+    await expect(guest.resolve('AB2Z', 'host-key')).resolves.toMatchObject({
+      hostPubkey: 'host-key',
+    });
+    await expect(guest.resolve('AB2Z', 'squatter-key')).resolves.toMatchObject({
+      hostPubkey: 'squatter-key',
+    });
+    // Without a pin the latest announcement wins — same as the relays.
+    await expect(guest.resolve('AB2Z')).resolves.toMatchObject({
+      hostPubkey: 'squatter-key',
+    });
   });
 });
