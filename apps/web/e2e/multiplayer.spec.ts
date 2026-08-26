@@ -116,15 +116,34 @@ async function joinRoomByCode(page: Page, code: string): Promise<void> {
   await expect(page.locator(ROOM_HEADING)).toContainText(code);
 }
 
-/** Adds a bot to every empty chair, then presses Start and waits for the table. */
+/**
+ * Fills every empty chair with a bot and starts the match.
+ *
+ * Each add-bot click has to round-trip through the signalling bus before
+ * the chair state updates, so the helper re-queries after every click instead
+ * of reading count once. It also stops clicking once the start button is
+ * enabled: after a guest joins there are fewer empty chairs, and clicking
+ * an add-bot that is no longer on screen either times out or dismisses the
+ * lobby before start-match can land.
+ */
 async function fillBotsAndStart(page: Page): Promise<void> {
-  const addBotButtons = page.getByTestId('add-bot');
-  const count = await addBotButtons.count();
-  for (let i = 0; i < count; i++) {
-    await addBotButtons.first().click();
-    await page.waitForTimeout(300);
+  for (let guard = 0; guard < 8; guard++) {
+    const bot = page.getByTestId('add-bot').first();
+    const visible = await bot.isVisible().catch(() => false);
+    if (!visible) break;
+    await bot.click();
+    // Wait for the lobby to register the new occupant — the seat list gets
+    // one more "Ready" indicator or the add-bot count drops by one.
+    await page.waitForTimeout(600);
   }
-  await page.getByTestId('start-match').click({ timeout: 5_000 });
+
+  // The start button may become enabled as soon as every chair is filled.
+  // Wait for it to be both visible and enabled, then click.
+  const start = page.getByTestId('start-match');
+  await expect(start).toBeVisible({ timeout: 10_000 });
+  await expect(start).toBeEnabled({ timeout: 10_000 });
+  await start.click();
+
   await expect(page.getByTestId('table-menu')).toBeVisible({ timeout: 20_000 });
   const hand = page.locator('[role="list"][data-zone]').first();
   await expect(hand.locator('[role="listitem"]').first()).toBeVisible({ timeout: 15_000 });
