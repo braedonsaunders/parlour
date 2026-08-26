@@ -222,13 +222,15 @@ export class HermeticSignalingBroker {
    * arrives for `receiver` on `code`, the broker calls `page.evaluate` to
    * invoke the page-side callback.
    *
-   * `receiver` is passed as an argument to `page.evaluate` — it is NOT closed
-   * over, because `page.evaluate` serialises the function body and re-evaluates
-   * it in the page, where Node-side closures are not available.
+   * The page may have been closed between subscribe and delivery (host
+   * death, seat drop, test teardown). `page.isClosed()` guards against
+   * evaluating into a dead context, which would throw and mask the real
+   * failure behind it.
    */
   private installForwarder(page: Page, code: string, receiver: string): void {
     console.warn(`[bridge] subscribe code=${code} receiver=${receiver}`);
     this.onSignal(code, receiver, (author: string, payload: SignalPayload) => {
+      if (page.isClosed()) return;
       void page.evaluate(
         ({ receiver: recv, author, payload }) => {
           const w = window as typeof window & {
@@ -238,6 +240,24 @@ export class HermeticSignalingBroker {
         },
         { receiver, author, payload },
       );
+    });
+  }
+
+  /**
+   * Drop all handlers for a seat whose context was closed.
+   *
+   * This prevents a race where a joiner with the same public key as a
+   * departed seat gets the old page's stale forwarder instead of the new
+   * one. Call before closing the context in test teardown.
+   */
+  dropKey(publicKey: string): void {
+    for (const codeHandlers of this.handlers.values()) {
+      codeHandlers.delete(publicKey);
+    }
+    this.rooms.forEach((list) => {
+      for (let i = list.length - 1; i >= 0; i--) {
+        if (list[i]!.hostPubkey === publicKey) list.splice(i, 1);
+      }
     });
   }
 }
