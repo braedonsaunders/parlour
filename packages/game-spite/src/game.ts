@@ -2,6 +2,8 @@ import {
   advanceSeat,
   Fx,
   dealOrder,
+  veilSupport,
+  isVeilHandle,
   type AutoMove,
   type CardId,
   type Flow,
@@ -13,7 +15,7 @@ import {
   type RuleError,
   type SeatId,
 } from '@parlour/engine';
-import { FIRST_RANK, LAST_RANK, dealtDeck, isWildCard, spiteFace } from './cards';
+import { FIRST_RANK, LAST_RANK, dealtDeck, isWildCard, spiteDeck, spiteFace } from './cards';
 import { spiteConfig, type SpiteRules } from './config';
 import { SPITE_BOTS } from './bots';
 import { spiteHowToPlay } from './howto';
@@ -108,6 +110,52 @@ export function fitsNeed(card: CardId, need: number): boolean {
  */
 function nextDemand(rank: number): number {
   return rank + 1;
+}
+
+// ---------------------------------------------------------------------------
+// veil: payoff-top reveal as an engine move
+//
+// The build move's apply slides the top card off a payoff pile and the card
+// beneath it becomes the new top — a public face appearing as a *side effect*
+// of a play, not as a named action. The engine's publicOpens hook needs a
+// named move the room can pause at, so this move exists purely to be that
+// pause: it validates that a payoff top is still a handle, emits the flip,
+// and changes nothing else. After the room runs its peel chain over it and
+// injects it with the reveal, the next build can proceed.
+//
+// It is deliberately an *automatic* move (seat null) — the player never
+// asked for it, the room asks for it, and the event log carries the reveal.
+// ---------------------------------------------------------------------------
+
+const revealPayoffTop: Move<SpiteState> = {
+  validate(state) {
+    if (!state.veiled) return error('not-veiled', 'this room is not running the Veil protocol');
+    for (let seat = 0; seat < state.seats; seat++) {
+      const top = (state.payoffs[seat] ?? [])[0];
+      if (top !== undefined && isVeilHandle(top)) return true;
+    }
+    return { code: 'no-payoff-handle', message: 'no payoff top is a handle' };
+  },
+  apply(state, _seat, _payload, ctx) {
+    for (let seat = 0; seat < state.seats; seat++) {
+      const top = (state.payoffs[seat] ?? [])[0];
+      if (top !== undefined && isVeilHandle(top)) {
+        ctx.fx.emit(Fx.FlipCard, { card: top, seat }, 0);
+      }
+    }
+    return state;
+  },
+};
+
+/** Which payoff tops are still handles — named so the room peels exactly those. */
+export function spitePublicOpens(state: SpiteState): { handles: CardId[]; move: string } | null {
+  if (!state.veiled) return null;
+  const handles: CardId[] = [];
+  for (let seat = 0; seat < state.seats; seat++) {
+    const top = (state.payoffs[seat] ?? [])[0];
+    if (top !== undefined && isVeilHandle(top)) handles.push(top);
+  }
+  return handles.length > 0 ? { handles, move: 'revealPayoffTop' } : null;
 }
 
 // ---------------------------------------------------------------------------
@@ -434,6 +482,12 @@ function phaseFor(state: SpiteState): PhaseState {
   if (state.winner !== null || state.stuckRuns >= state.seats) {
     return { phase: 'ended', actor: null, round: 1 };
   }
+  // A payoff top that is still a handle is a pause, not a turn — the room
+  // peels it first and the flow answers 'reveal-pending' so nothing else can
+  // be built against a card nobody can read.
+  if (state.veiled && spitePublicOpens(state) !== null) {
+    return { phase: 'reveal-pending', actor: null, round: 1 };
+  }
   return { phase: 'turn', actor: state.turn, round: 1, label: 'take your turn' };
 }
 
@@ -469,6 +523,10 @@ function advance(state: SpiteState): FlowAdvance {
       payload: { phase: 'mid' },
       reason: 'hand emptied mid-turn',
     });
+  } else if (phase.phase === 'reveal-pending') {
+    // The room's peel chain answers this: the reveal fires as an automatic
+    // move, the room opens the handles it names, and the turn resumes.
+    autoMoves.push({ seat: null, move: 'revealPayoffTop', reason: 'payoff top is a handle' });
   } else if (enumerateLegal(state, state.turn).length === 0) {
     autoMoves.push({ seat: null, move: 'sit', reason: 'nothing left to play' });
   }
@@ -479,6 +537,10 @@ const flow: Flow<SpiteState> = {
   start: (state) => phaseFor(state),
   legalMoves(state, phase) {
     if (phase.actor === null) return [];
+    // Under Veil, a payoff-top handle is a pause, not a turn: the build that
+    // exposed it is the only thing that can move next, and the room injects
+    // the reveal through it.
+    if (phase.phase === 'reveal-pending') return [];
     return enumerateLegal(state, phase.actor);
   },
   advance: (state) => advance(state),
@@ -492,6 +554,14 @@ export const spiteGame: GameDef<SpiteState, SpiteRules> = {
   id: 'spite',
   howToPlay: spiteHowToPlay,
   configSchema: spiteConfig,
+  // Spite deals payoff piles face-down under handles; the tops turn public
+  // the moment they are the top, which publicOpens names.
+  veil: veilSupport({
+    deck: () => spiteDeck,
+    handSize: (config) => (config.handSize as number) + (config.payoffSize as number),
+    publicSetup: 'none',
+    publicOpens: (state) => spitePublicOpens(state as SpiteState),
+  }),
 
   setup(ctx) {
     const { config, seats, fx } = ctx;
@@ -564,10 +634,11 @@ export const spiteGame: GameDef<SpiteState, SpiteRules> = {
       started: true,
       stuckRuns: 0,
       winner: null,
+      veiled: ctx.veiled === true,
     };
   },
 
-  moves: { build, discard, drawUp, sit },
+  moves: { build, discard, drawUp, sit, revealPayoffTop },
 
   flow,
 
