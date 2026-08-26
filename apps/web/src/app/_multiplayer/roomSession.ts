@@ -136,13 +136,17 @@ const REMATCH_TIMEOUT_MS = 10_000;
 const RECONNECT_GRACE_MS = 45_000;
 
 /**
- * Opening a room takes no privacy tier, because nobody is asked for one.
- * {@link tierFor} is always open: friend rooms share one replayable deal.
+ * Opening a room takes no privacy tier by default, because nobody has asked
+ * for one yet: {@link tierFor} answers open until the shipped default flips.
+ * A caller — today only tests; eventually the create screen — may request
+ * `security: 'veil'` explicitly, and {@link resolveRoomSettings} honors it
+ * exactly when the pack can run it.
  */
 type CreateRoomOptions = {
   seats: number;
   gameId?: MultiplayerGameId;
   config?: RuleValues;
+  security?: RoomSecurity;
 };
 
 function securityFor(
@@ -233,6 +237,7 @@ export class MultiplayerRoomSession {
       gameId: options.gameId ?? 'blitz',
       seats: options.seats,
       config: options.config ?? {},
+      security: options.security,
     });
     this.prepare(settings);
     try {
@@ -618,6 +623,18 @@ export class MultiplayerRoomSession {
       (seat, bot) => this.acceptSeatBot(seat, bot),
       plan.deckOrder,
     );
+    // A pack that declares Veil but exposes every card is a misconfiguration,
+    // not a mode: the table would look normal while hiding nothing. Fail the
+    // deal loudly instead of publishing it.
+    const dealt = runtime.authority.getSession();
+    const hidden = dealt.state
+      ? Array.from({ length: settings.seats }, (_, seat) =>
+          roomGame(settings.gameId).privateHandles(dealt.state, seat),
+        ).reduce((count, hand) => count + hand.length, 0)
+      : 0;
+    if (hidden === 0) {
+      throw new Error(`${settings.gameId} declared a veiled deal but hid no cards`);
+    }
     this.authority!.importSnapshot(runtime.authority.exportSnapshot());
     this.transport.publishSnapshot();
     this.update({
@@ -1740,13 +1757,16 @@ async function waitForVeilKeys(room: VeilRoom): Promise<void> {
 }
 
 /**
- * Friend rooms play the engine's open rules.
+ * Friend rooms play the engine's open rules by default.
  *
- * Veil is still in the tree as a protocol — packs may ship a veil block, and
- * the ceremony tests still cover it — but it is not the deal path. Jump-ins,
- * draws, recycles, showdowns and clocks are one replay for every game when
- * hands are not hidden. A joining peer computes the same answer from the game
- * id, so an announcement cannot talk a room into a tier the host is not running.
+ * Veil is a full protocol in the tree — packs ship veil blocks and the
+ * ceremony is tested end to end — but {@link tierFor} still answers open, so
+ * no shipped room runs it yet. A requested tier travels with the settings:
+ * create passes what its caller asked for, join passes the host's
+ * announcement, and both ends resolve it through this one function. A tier is
+ * honored only when the pack can actually run it, so host and guest compute
+ * the same answer from the same game id — an announcement cannot talk a room
+ * into a tier the pack does not support.
  */
 function tierFor(): RoomSecurity {
   return 'open';
@@ -1766,7 +1786,8 @@ function resolveRoomSettings(settings: RoomSettings): RoomSettings {
     gameId: pack.id,
     seats: settings.seats,
     config: pack.resolveConfig(settings.config),
-    security: tierFor(),
+    security:
+      settings.security === 'veil' && pack.veilSupport() !== null ? 'veil' : tierFor(),
   };
 }
 

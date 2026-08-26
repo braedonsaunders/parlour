@@ -395,6 +395,10 @@ export const ROOM_GAMES: Record<MultiplayerGameId, RoomGamePack> = {
     name: 'Gin Rummy',
     configSchema: ginConfigSchema,
     createDef: createGinMatchDef,
+    // Gin is the one match-shaped pack: its cards live one level down, so the
+    // default `state.hands` accessor reads nothing and a veiled table would
+    // deal hands nobody could peel.
+    privateHandles: (state, seat) => state.hand.hands[seat] ?? [],
   }),
 
   president: definePack<PresidentState, PresidentRules>({
