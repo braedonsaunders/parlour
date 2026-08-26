@@ -55,9 +55,9 @@ export interface MatchSnapshot {
 type MatchFlowState = {
   lastMatch: MatchSnapshot | null;
   /** Registered by the table so Play Again resumes the same room/settings in place. */
-  playAgain: (() => void) | null;
+  playAgain: (() => void | Promise<void>) | null;
   setLastMatch: (snapshot: MatchSnapshot) => void;
-  registerPlayAgain: (handler: (() => void) | null) => void;
+  registerPlayAgain: (handler: (() => void | Promise<void>) | null) => void;
 };
 
 export const MATCH_FLOW_STORAGE_KEY = 'parlour.matchflow.v1';

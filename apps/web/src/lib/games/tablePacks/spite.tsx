@@ -124,7 +124,7 @@ export const spiteTablePack = defineTablePack<
     );
   },
 
-  roomReport({ session, snapshot, localSeat, leave, push }) {
+  roomReport({ session, snapshot, localSeat }) {
     if (!session.result) return null;
     const roomMode = spiteModeForRules(session.config);
     return {
@@ -145,11 +145,6 @@ export const spiteTablePack = defineTablePack<
         kind: 'friend' as const,
         key: friendKey(seat.profileId),
       })),
-      onPlayAgain: () => {
-        useSpiteSetupStore.getState().setMode(roomMode);
-        push('/spite/create');
-      },
-      onFinish: () => leave(() => push('/match-end')),
     };
   },
 });

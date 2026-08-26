@@ -172,7 +172,7 @@ export const presidentTablePack = defineTablePack<
     );
   },
 
-  roomReport({ session, snapshot, localSeat, leave, push }) {
+  roomReport({ session, snapshot, localSeat }) {
     if (!session.result) return null;
     return {
       id: roomMatchId(
@@ -193,8 +193,6 @@ export const presidentTablePack = defineTablePack<
         kind: 'friend' as const,
         key: friendKey(seat.profileId),
       })),
-      onPlayAgain: () => push('/president/create'),
-      onFinish: () => leave(() => push('/match-end')),
     };
   },
 });

@@ -144,7 +144,7 @@ export const ohhellTablePack = defineTablePack<
     );
   },
 
-  roomReport({ session, snapshot, localSeat, leave, push }) {
+  roomReport({ session, snapshot, localSeat }) {
     if (!session.result) return null;
     const roomMode = ohhellModeForRules(session.config);
     return {
@@ -165,11 +165,6 @@ export const ohhellTablePack = defineTablePack<
         kind: 'friend' as const,
         key: friendKey(seat.profileId),
       })),
-      onPlayAgain: () => {
-        useOhHellSetupStore.getState().setMode(roomMode);
-        push('/ohhell/create');
-      },
-      onFinish: () => leave(() => push('/match-end')),
     };
   },
 });

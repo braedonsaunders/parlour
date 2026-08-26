@@ -67,8 +67,9 @@ export type SnapshotNotification = {
    * `divergence` — the peer's replay disagreed and it re-synced.
    * `opening` — the host published the round's starting position, which a
    * veiled room does once its shuffle ceremony closes.
+   * `rematch` — the same room replaced its completed match with a fresh deal.
    */
-  reason: 'divergence' | 'opening';
+  reason: 'divergence' | 'opening' | 'rematch';
   snapshot: ReplaySnapshot;
 };
 
@@ -136,6 +137,11 @@ export interface Transport {
   sendEmote(emote: Emote): boolean;
   onEvent(cb: (event: AppliedPacket) => void): () => void;
   onSnapshot(cb: (notification: SnapshotNotification) => void): () => void;
+  /** Asks the current host to deal another match at this same table. */
+  requestRematch(): void;
+  /** Host-only: publishes the fresh rematch position to every existing peer. */
+  publishRematch(): void;
+  onRematchRequest(cb: (seat: SeatId) => void): () => void;
   onPresence(cb: (presence: PresenceEvent) => void): () => void;
   onEmote(cb: (peerId: PeerId, emote: Emote) => void): () => void;
 }

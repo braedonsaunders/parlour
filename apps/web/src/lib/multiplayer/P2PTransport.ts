@@ -23,7 +23,8 @@ import {
   type PeerDescriptor,
   type WireMessage,
 } from './wireSchema';
-import type { SeatId } from '@parlour/engine';
+import { stateHash, type SeatId } from '@parlour/engine';
+import { rematchDealSeed } from './dealSeed';
 import type { VeilMessage } from './veil/wire';
 import type {
   AppliedPacket,
@@ -89,6 +90,7 @@ export class P2PTransport implements Transport {
   private readonly emoteListeners = new Set<(peerId: string, emote: Emote) => void>();
   private readonly veilListeners = new Set<(peerId: string, message: VeilMessage) => void>();
   private readonly dealListeners = new Set<(seat: SeatId, message: DealMessage) => void>();
+  private readonly rematchListeners = new Set<(seat: SeatId) => void>();
   private readonly lastReceivedEmote = new Map<string, number>();
   /** Redials spent on a peer since it last held an open channel. */
   private readonly redials = new Map<string, number>();
@@ -224,6 +226,22 @@ export class P2PTransport implements Transport {
     return () => this.snapshotListeners.delete(callback);
   }
 
+  requestRematch(): void {
+    this.assertReady();
+    const seat = this.seatForPeer(this.signaling.publicKey);
+    if (seat === null) throw new Error('your seat is not connected');
+    if (this.isHost()) {
+      for (const listener of this.rematchListeners) listener(seat);
+      return;
+    }
+    this.sendTo(this.resilience!.hostId, { type: 'rematch.request' });
+  }
+
+  onRematchRequest(callback: (seat: SeatId) => void): () => void {
+    this.rematchListeners.add(callback);
+    return () => this.rematchListeners.delete(callback);
+  }
+
   onPresence(callback: (presence: PresenceEvent) => void): () => void {
     this.presenceListeners.add(callback);
     return () => this.presenceListeners.delete(callback);
@@ -289,6 +307,12 @@ export class P2PTransport implements Transport {
     this.assertReady();
     if (!this.isHost()) throw new Error('only the host may publish a starting position');
     this.broadcast({ type: 'sync.snapshot', snapshot: this.exportMigration() });
+  }
+
+  publishRematch(): void {
+    this.assertReady();
+    if (!this.isHost()) throw new Error('only the host may publish a rematch');
+    this.broadcast({ type: 'rematch.start', snapshot: this.exportMigration() });
   }
 
   /** Match has started — host loss elects, guest loss becomes a bot. */
@@ -567,6 +591,50 @@ export class P2PTransport implements Transport {
           reason: opening ? 'opening' : 'divergence',
           snapshot,
         });
+        return;
+      }
+      case 'rematch.request': {
+        if (!this.isHost()) return;
+        const seat = this.seatForPeer(peerId);
+        if (seat === null) return;
+        for (const listener of this.rematchListeners) listener(seat);
+        return;
+      }
+      case 'rematch.start': {
+        if (peerId !== this.resilience?.hostId || !this.roomCode) return;
+        const previous = this.authority.exportSnapshot();
+        const incoming = message.snapshot.replay;
+
+        // Ordered channels should not duplicate this packet, but treating an
+        // identical replay as idempotent avoids turning a harmless retry into
+        // a visible room error.
+        if (
+          incoming.seed === previous.seed &&
+          incoming.stateHash === previous.stateHash &&
+          incoming.log.length === previous.log.length
+        ) {
+          return;
+        }
+        if (incoming.log.length > 0 || incoming.acceptedActions.length > 0) {
+          throw new Error('the host tried to begin a rematch after moves had already been played');
+        }
+        if (stateHash(incoming.settings) !== stateHash(previous.settings)) {
+          throw new Error('the host tried to change the room rules during a rematch');
+        }
+        const expectedSeed = await rematchDealSeed(
+          this.roomCode,
+          previous.seed,
+          previous.stateHash,
+        );
+        if (incoming.seed !== expectedSeed) {
+          throw new Error('the rematch deal does not follow from the table’s completed shuffle');
+        }
+
+        await this.importMigration(message.snapshot);
+        const snapshot = this.authority.exportSnapshot();
+        this.pendingResync = false;
+        this.pendingHostMigration = false;
+        this.emitSnapshot({ kind: 'snapshot', reason: 'rematch', snapshot });
         return;
       }
       case 'room.closed':

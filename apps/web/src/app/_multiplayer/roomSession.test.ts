@@ -37,6 +37,7 @@ import { spadesModeForRules } from '@/lib/spades/modes';
 import {
   wildpileConfig,
   wildpileFace,
+  wildpileGame,
   type WildpileRules,
   type WildpileState,
 } from '@parlour/game-wildpile';
@@ -830,6 +831,92 @@ describe('multiplayer route composition', () => {
       ),
     );
   });
+
+  it('rematches Wild in the same room with the same seats and a fresh shared deal', async () => {
+    const broker = new MockSignalingBroker();
+    const rtc = new MockRtcNetwork();
+    const host = new MultiplayerRoomSession(
+      { name: 'Host', avatarId: 'ember', profileId: 'rematch-host' },
+      {
+        signaling: broker.signaling('rematch-host-peer'),
+        peerConnection: rtc.factory('rematch-host'),
+        seed: 91,
+      },
+    );
+    const guest = new MultiplayerRoomSession(
+      { name: 'Guest', avatarId: 'mint', profileId: 'rematch-guest' },
+      {
+        signaling: broker.signaling('rematch-guest-peer'),
+        peerConnection: rtc.factory('rematch-guest'),
+        seed: 7,
+      },
+    );
+    sessions.push(host, guest);
+
+    const room = await host.create({
+      gameId: 'wildpile',
+      seats: 2,
+      config: wildpileConfig.resolve({ handSize: 5, jumpIn: false, forcePlay: true }),
+    });
+    await guest.join(room.code);
+    await eventually(() => expect(guest.getSnapshot().localSeat).toBe(1));
+    await host.start();
+    await eventually(() => expect(guest.getSnapshot().stage).toBe('table'));
+
+    const bot = wildpileGame.bots[0]!;
+    for (let step = 0; step < 6_000; step++) {
+      const session = multiplayerSession<WildpileState, WildpileRules>(
+        host.getSnapshot(),
+        'wildpile',
+      )!;
+      if (session.status === 'ended') break;
+      const actor = session.phase.actor;
+      if (actor === null) throw new Error(`Wild has no actor in ${session.phase.phase}`);
+      const legal = wildpileGame.flow.legalMoves(session.state, session.phase);
+      const move = bot.chooseMove(session.state, actor, legal, makeRng(step), {
+        thinkMs: () => 0,
+      });
+      if (!move) throw new Error(`Wild bot has no move in ${session.phase.phase}`);
+      const before = session.log.length;
+      (actor === 0 ? host : guest).send(move.id, move.payload);
+      await eventually(() => {
+        expect(host.getSnapshot().session?.log.length).toBeGreaterThan(before);
+        expect(guest.getSnapshot().session?.log.length).toBeGreaterThan(before);
+      }, 200);
+    }
+
+    const finished = host.getSnapshot();
+    expect(finished.session?.status).toBe('ended');
+    expect(guest.getSnapshot().session?.status).toBe('ended');
+    const firstSeed = finished.session!.seed;
+    const roster = finished.seats.map(({ seat, profileId }) => ({ seat, profileId }));
+
+    // Either player can ask; the current host deals and both existing peers
+    // atomically adopt the new table without revisiting create/join.
+    await guest.rematch();
+    await eventually(() => {
+      expect(host.getSnapshot().session?.status).toBe('playing');
+      expect(guest.getSnapshot().session?.status).toBe('playing');
+    });
+
+    expect(host.getSnapshot().room?.code).toBe(room.code);
+    expect(guest.getSnapshot().room?.code).toBe(room.code);
+    expect(host.getSnapshot().localSeat).toBe(0);
+    expect(guest.getSnapshot().localSeat).toBe(1);
+    expect(host.getSnapshot().seats.map(({ seat, profileId }) => ({ seat, profileId }))).toEqual(
+      roster,
+    );
+    expect(guest.getSnapshot().seats.map(({ seat, profileId }) => ({ seat, profileId }))).toEqual(
+      roster,
+    );
+    expect(host.getSnapshot().session?.seed).not.toBe(firstSeed);
+    expect(guest.getSnapshot().session?.seed).toBe(host.getSnapshot().session?.seed);
+    expect(host.getSnapshot().session?.log).toHaveLength(0);
+    expect(guest.getSnapshot().session?.log).toHaveLength(0);
+    expect(stateHash(guest.getSnapshot().session?.state)).toBe(
+      stateHash(host.getSnapshot().session?.state),
+    );
+  }, 120_000);
 
   it('plays a peeled Wild card by opening its handle, not the face sitting in the view', async () => {
     const broker = new MockSignalingBroker();

@@ -180,7 +180,7 @@ export const heartsTablePack = defineTablePack<
     );
   },
 
-  roomReport({ session, snapshot, localSeat, leave, push }) {
+  roomReport({ session, snapshot, localSeat }) {
     if (!session.result) return null;
     return {
       id: roomMatchId(
@@ -200,8 +200,6 @@ export const heartsTablePack = defineTablePack<
         kind: 'friend' as const,
         key: friendKey(seat.profileId),
       })),
-      onPlayAgain: () => push('/hearts/create'),
-      onFinish: () => leave(() => push('/match-end')),
     };
   },
 });

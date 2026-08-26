@@ -134,7 +134,7 @@ export const spadesTablePack = defineTablePack<
     );
   },
 
-  roomReport({ session, snapshot, localSeat, leave, push }) {
+  roomReport({ session, snapshot, localSeat }) {
     if (!session.result) return null;
     const mode = spadesModeForRules(session.config);
     const localRank = session.result.rankings.find((rank) => rank.seat === localSeat)?.rank ?? 99;
@@ -156,14 +156,6 @@ export const spadesTablePack = defineTablePack<
         kind: 'friend' as const,
         key: friendKey(seat.profileId),
       })),
-      onPlayAgain: () => {
-        // The new room is built from the setup store, so a rematch has to carry
-        // the mode this match was actually played under. Without this a guest
-        // who joined a Quick or Clean Books table would silently host Classic.
-        useSpadesSetupStore.getState().setMode(mode);
-        push('/spades/create');
-      },
-      onFinish: () => leave(() => push('/match-end')),
     };
   },
 });

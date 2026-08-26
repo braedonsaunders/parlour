@@ -266,7 +266,7 @@ export const wildTablePack = defineTablePack<
     );
   },
 
-  roomReport({ session, snapshot, localSeat, leave, push }) {
+  roomReport({ session, snapshot, localSeat }) {
     if (!session.result) return null;
     return {
       id: roomMatchId(
@@ -286,8 +286,6 @@ export const wildTablePack = defineTablePack<
         kind: 'friend' as const,
         key: friendKey(seat.profileId),
       })),
-      onPlayAgain: () => push('/wild/create'),
-      onFinish: () => leave(() => push('/match-end')),
     };
   },
 });

@@ -81,6 +81,9 @@ export interface PendingTableProps {
   loadingCopy?: string;
 }
 
+/** Room continuation is shared; packs report only the finished game facts. */
+export type RoomMatchReport = Omit<MatchReport, 'onPlayAgain' | 'onFinish'>;
+
 export interface TableGamePack<TSnapshot, TDispatch, TTransport, S, C extends RuleValues> {
   /** Shelf id — also the route segment, so `/hearts` and `/hearts/table`. */
   id: string;
@@ -138,7 +141,7 @@ export interface TableGamePack<TSnapshot, TDispatch, TTransport, S, C extends Ru
    * pending screen is what a stray URL gets rather than a faked table.
    */
   renderRoom?(ctx: RoomTableContext<S, C>): ReactNode;
-  roomReport?(ctx: RoomTableContext<S, C>): MatchReport | null;
+  roomReport?(ctx: RoomTableContext<S, C>): RoomMatchReport | null;
 }
 
 export interface SoloDriverResult<TSnapshot, TDispatch> {
@@ -276,7 +279,18 @@ function RoomTablePage<TSnapshot, TDispatch, TTransport, S, C extends RuleValues
   // Hooks cannot sit behind the null check, so both of these run every render
   // and are simply inert while the room is still seating.
   (pack.useRoomEffects ?? useNoRoomEffects)(ctx);
-  useMatchReport(ctx && pack.roomReport ? pack.roomReport(ctx) : null, room);
+  const gameReport = ctx && pack.roomReport ? pack.roomReport(ctx) : null;
+  const report = gameReport
+    ? {
+        ...gameReport,
+        // A friend rematch belongs to the room, not to fourteen separate create
+        // pages. Keep the mesh alive through the podium; one request deals a
+        // fresh match and the match-end screen follows it on every peer.
+        onPlayAgain: () => room.rematch(),
+        onFinish: () => router.push('/match-end'),
+      }
+    : null;
+  useMatchReport(report, ctx ? `${snapshot.room?.code ?? 'room'}:${ctx.session.seed}` : room);
 
   if (!ctx || !pack.renderRoom) {
     return <>{pack.renderPending({ fx: snapshot.fx, fxKey: snapshot.fxKey, error })}</>;

@@ -121,7 +121,7 @@ export const scopaTablePack = defineTablePack<
     );
   },
 
-  roomReport({ session, snapshot, localSeat, leave, push }) {
+  roomReport({ session, snapshot, localSeat }) {
     if (!session.result) return null;
     const roomMode = scopaModeForRules(session.config);
     return {
@@ -142,11 +142,6 @@ export const scopaTablePack = defineTablePack<
         kind: 'friend' as const,
         key: friendKey(seat.profileId),
       })),
-      onPlayAgain: () => {
-        useScopaSetupStore.getState().setMode(roomMode);
-        push('/scopa/create');
-      },
-      onFinish: () => leave(() => push('/match-end')),
     };
   },
 });

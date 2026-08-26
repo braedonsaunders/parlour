@@ -33,7 +33,12 @@ import {
 } from '@/lib/multiplayer/veil';
 import { botTurnKey } from './botSeats';
 import { NostrSignaling, type RoomAnnouncement } from '@/lib/multiplayer/NostrSignaling';
-import { createDealNonce, dealCommitment, DealSeedRound } from '@/lib/multiplayer/dealSeed';
+import {
+  createDealNonce,
+  dealCommitment,
+  DealSeedRound,
+  rematchDealSeed,
+} from '@/lib/multiplayer/dealSeed';
 import { validateRoomCode } from '@/lib/rooms/code';
 import { hasValidSeatCount } from '@/lib/rooms/seatRange';
 import type { MultiplayerGameId } from '@/lib/rooms/gameIds';
@@ -119,6 +124,7 @@ type Listener = () => void;
  * on "dealing…" forever.
  */
 const DEAL_ROUND_TIMEOUT_MS = 10_000;
+const REMATCH_TIMEOUT_MS = 10_000;
 
 /**
  * How long a veiled round holds a seat open for a player who dropped.
@@ -185,6 +191,8 @@ export class MultiplayerRoomSession {
   /** a veiled redeal ceremony already under way, so it cannot start twice */
   private redealPending = false;
   private openPending = false;
+  /** One host deal at a time when players leave the podium together. */
+  private rematchPending = false;
   /** bot turns already scheduled, keyed by log position, so none fires twice */
   private readonly scheduledBotTurns = new Set<string>();
   /** seats being held open for a player who dropped, keyed by seat */
@@ -369,6 +377,99 @@ export class MultiplayerRoomSession {
     } catch (error) {
       this.update({ error: startFault(error) });
       throw error;
+    }
+  }
+
+  /**
+   * Deals another match without replacing the room, code, seats or peers.
+   *
+   * A guest asks the current host and waits for the signed room state to move
+   * to a fresh seed. The host derives that seed from the completed shared deal
+   * and state hash, so it cannot keep rerolling the next deck to suit itself.
+   */
+  async rematch(): Promise<void> {
+    const transport = this.transport;
+    const current = this.snapshot.session;
+    if (!transport || !current || this.snapshot.connection === 'closed') {
+      throw new Error('the table is no longer connected');
+    }
+    if (current.status !== 'ended' || !current.result) {
+      if (current.status === 'playing') return;
+      throw new Error('the current match has not finished yet');
+    }
+
+    if (this.snapshot.isHost) {
+      await this.beginRematch();
+      return;
+    }
+
+    const previousSeed = current.seed;
+    let unsubscribe = () => {};
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const ready = new Promise<void>((resolve, reject) => {
+      timer = setTimeout(() => {
+        unsubscribe();
+        reject(new Error('the host did not answer the rematch request'));
+      }, REMATCH_TIMEOUT_MS);
+      unsubscribe = this.subscribe(() => {
+        const next = this.snapshot.session;
+        if (!next || next.seed === previousSeed || next.status !== 'playing') return;
+        if (timer) clearTimeout(timer);
+        unsubscribe();
+        resolve();
+      });
+    });
+    try {
+      transport.requestRematch();
+    } catch (error) {
+      if (timer) clearTimeout(timer);
+      unsubscribe();
+      throw error;
+    }
+    await ready;
+  }
+
+  private async beginRematch(): Promise<void> {
+    if (this.rematchPending) return;
+    const settings = this.snapshot.settings;
+    const code = this.snapshot.room?.code;
+    const current = this.authority?.exportSnapshot();
+    if (!settings || !code || !current || !this.authority || !this.transport) {
+      throw new Error('the table is no longer ready for a rematch');
+    }
+    const live = this.authority.getSession();
+    if (live.status !== 'ended' || !live.result) return;
+
+    this.rematchPending = true;
+    try {
+      const seed = await rematchDealSeed(code, current.seed, current.stateHash);
+      const runtime = createRoomRuntime(settings, seed, (seat, bot) =>
+        this.acceptSeatBot(seat, bot),
+      );
+      await this.authority.importSnapshot(runtime.authority.exportSnapshot());
+      this.seed = seed;
+      this.scheduledBotTurns.clear();
+      this.recycleActionPending = false;
+      this.autoDeclinePending = false;
+      this.redealPending = false;
+      this.openPending = false;
+      this.transport.publishRematch();
+      this.update({
+        session: this.presented(this.authority.getSession()),
+        fx: runtime.session.setupFx ?? [],
+        fxKey: this.snapshot.fxKey + 1,
+        stage: 'table',
+        error: null,
+        security: securityFor('open', settings.seats, 'open'),
+      });
+      this.driveBotSeats();
+    } catch (error) {
+      this.update({
+        error: error instanceof Error ? error.message : 'The rematch could not be dealt',
+      });
+      throw error;
+    } finally {
+      this.rematchPending = false;
     }
   }
 
@@ -1245,7 +1346,7 @@ export class MultiplayerRoomSession {
       // which closes the round in a single round trip.
       this.revealDealShare();
     });
-    this.transport.onSnapshot(() => {
+    this.transport.onSnapshot((notification) => {
       // The host published the opening position, so adopt it — and check the
       // deal inside it is the one the table's shares add up to.
       const imported = this.authority!.exportSnapshot();
@@ -1267,8 +1368,11 @@ export class MultiplayerRoomSession {
               },
             },
       });
-      this.verifyPublishedDeal();
+      if (notification.reason !== 'rematch') this.verifyPublishedDeal();
       void this.openMyHandles();
+    });
+    this.transport.onRematchRequest(() => {
+      if (this.snapshot.isHost) void this.beginRematch().catch(() => undefined);
     });
     const tier: RoomSecurity = settings.security ?? 'open';
     this.update({

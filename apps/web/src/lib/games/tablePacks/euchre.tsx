@@ -139,7 +139,7 @@ export const euchreTablePack = defineTablePack<
     );
   },
 
-  roomReport({ session, snapshot, localSeat, leave, push }) {
+  roomReport({ session, snapshot, localSeat }) {
     if (!session.result) return null;
     const localRank = session.result.rankings.find((rank) => rank.seat === localSeat)?.rank ?? 99;
     return {
@@ -160,8 +160,6 @@ export const euchreTablePack = defineTablePack<
         kind: 'friend' as const,
         key: friendKey(seat.profileId),
       })),
-      onPlayAgain: () => push('/euchre/create'),
-      onFinish: () => leave(() => push('/match-end')),
     };
   },
 });

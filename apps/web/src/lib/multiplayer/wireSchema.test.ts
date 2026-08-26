@@ -67,6 +67,8 @@ const validMessages = [
   { type: 'heartbeat', sentAt: 100, hostId: 'host', term: 2 },
   { type: 'sync.request', expectedSeq: 2 },
   { type: 'sync.snapshot', snapshot: migration },
+  { type: 'rematch.request' },
+  { type: 'rematch.start', snapshot: migration },
   { type: 'emote', emote: 'gg' },
   {
     type: 'veil',

@@ -131,7 +131,7 @@ export const pokerTablePack = defineTablePack<
     );
   },
 
-  roomReport({ session, snapshot, localSeat, leave, push }) {
+  roomReport({ session, snapshot, localSeat }) {
     if (!session.result) return null;
     const mode = pokerModeForRules(session.config);
     const localRank = session.result.rankings.find((rank) => rank.seat === localSeat)?.rank ?? 99;
@@ -153,13 +153,6 @@ export const pokerTablePack = defineTablePack<
         kind: 'friend' as const,
         key: friendKey(seat.profileId),
       })),
-      onPlayAgain: () => {
-        // A rematch has to carry the structure this match was played under, or
-        // a guest who joined a Turbo table would silently host Classic.
-        usePokerSetupStore.getState().setMode(mode);
-        push('/poker/create');
-      },
-      onFinish: () => leave(() => push('/match-end')),
     };
   },
 });

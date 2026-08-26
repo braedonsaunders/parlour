@@ -307,7 +307,7 @@ export const blitzTablePack = defineTablePack<
     );
   },
 
-  roomReport({ session, snapshot, localSeat, leave, push }) {
+  roomReport({ session, snapshot, localSeat }) {
     if (session.status !== 'ended' || !session.result) return null;
     return {
       id: roomMatchId(
@@ -327,8 +327,6 @@ export const blitzTablePack = defineTablePack<
         kind: 'friend' as const,
         key: friendKey(seat.profileId),
       })),
-      onPlayAgain: () => push('/create'),
-      onFinish: () => leave(() => push('/match-end')),
     };
   },
 });

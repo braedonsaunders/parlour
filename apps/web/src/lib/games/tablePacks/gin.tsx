@@ -120,7 +120,7 @@ export const ginTablePack = defineTablePack<
     );
   },
 
-  roomReport({ session, snapshot, localSeat, leave, push }) {
+  roomReport({ session, snapshot, localSeat }) {
     if (!session.result) return null;
     return {
       id: roomMatchId(
@@ -142,8 +142,6 @@ export const ginTablePack = defineTablePack<
         kind: 'friend' as const,
         key: friendKey(seat.profileId),
       })),
-      onPlayAgain: () => push('/gin/create'),
-      onFinish: () => leave(() => push('/match-end')),
     };
   },
 });

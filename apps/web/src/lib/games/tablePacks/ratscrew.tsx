@@ -212,7 +212,7 @@ export const ratscrewTablePack = defineTablePack<
     );
   },
 
-  roomReport({ session, snapshot, localSeat, leave, push }) {
+  roomReport({ session, snapshot, localSeat }) {
     if (!session.result) return null;
     return {
       id: roomMatchId(
@@ -232,8 +232,6 @@ export const ratscrewTablePack = defineTablePack<
         kind: 'friend' as const,
         key: friendKey(seat.profileId),
       })),
-      onPlayAgain: () => push('/ratscrew/create'),
-      onFinish: () => leave(() => push('/match-end')),
     };
   },
 });

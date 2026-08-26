@@ -6,6 +6,7 @@ import {
   DealSeedRound,
   isDealDigest,
   mixDealSeed,
+  rematchDealSeed,
 } from './dealSeed';
 
 const ROOM = 'ABCD';
@@ -80,6 +81,17 @@ describe('mixing the shuffle', () => {
       { seat: 1, nonce: createDealNonce() },
     ]);
     expect(first).not.toBe(second);
+  });
+});
+
+describe('rematch seed chaining', () => {
+  it('gives every peer the same fresh unsigned deal without a host reroll', async () => {
+    const first = await rematchDealSeed(ROOM, 42, 'finished-state');
+    expect(first).toBe(await rematchDealSeed(ROOM, 42, 'finished-state'));
+    expect(first).not.toBe(await rematchDealSeed(ROOM, 42, 'different-finish'));
+    expect(first).not.toBe(await rematchDealSeed('WXYZ', 42, 'finished-state'));
+    expect(first).toBeGreaterThanOrEqual(0);
+    expect(first).toBeLessThanOrEqual(0xffff_ffff);
   });
 });
 

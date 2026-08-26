@@ -59,6 +59,8 @@ export type WireMessage =
   | { type: 'room.closed' }
   | { type: 'sync.request'; expectedSeq: number }
   | { type: 'sync.snapshot'; snapshot: MigrationSnapshot }
+  | { type: 'rematch.request' }
+  | { type: 'rematch.start'; snapshot: MigrationSnapshot }
   | { type: 'emote'; emote: Emote }
   /**
    * The collaborative deal: a seat's commitment, then the share it committed
@@ -452,6 +454,10 @@ function isWireMessage(value: unknown): value is WireMessage {
         isBoundedInteger(value.expectedSeq, MAX_SEQUENCE)
       );
     case 'sync.snapshot':
+      return hasOnlyKeys(value, ['type', 'snapshot']) && isMigrationSnapshot(value.snapshot);
+    case 'rematch.request':
+      return hasOnlyKeys(value, ['type']);
+    case 'rematch.start':
       return hasOnlyKeys(value, ['type', 'snapshot']) && isMigrationSnapshot(value.snapshot);
     case 'emote':
       return (

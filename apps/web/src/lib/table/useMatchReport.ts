@@ -60,7 +60,7 @@ export interface MatchReport {
    */
   podiumDelayMs?: number;
   /** Where Play Again should send this player. */
-  onPlayAgain(): void;
+  onPlayAgain(): void | Promise<void>;
   /** Runs after the celebration beat — usually a push to the podium. */
   onFinish(): void;
 }

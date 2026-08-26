@@ -33,6 +33,7 @@ export const DEAL_NONCE_BYTES = 32;
 
 const COMMIT_DOMAIN = 'parlour.deal/commit';
 const MIX_DOMAIN = 'parlour.deal/mix';
+const REMATCH_DOMAIN = 'parlour.deal/rematch';
 
 /** A seat's revealed contribution, as lowercase hex. */
 export interface DealContribution {
@@ -89,6 +90,26 @@ export async function mixDealSeed(
   );
   // The wire bounds a snapshot seed to 0…0xffffffff, so take four bytes as an
   // unsigned integer rather than letting a sign bit through.
+  return Number.parseInt(digest.slice(0, 8), 16) >>> 0;
+}
+
+/**
+ * Derives the next fair deal after a completed room match.
+ *
+ * The first deal already contains entropy committed by every seat. Chaining
+ * that seed with the completed authority hash gives the room a fresh deal
+ * immediately, while leaving the host no number it can keep rerolling until it
+ * likes the cards. Every guest recomputes this value before accepting the
+ * rematch snapshot.
+ */
+export async function rematchDealSeed(
+  roomCode: string,
+  previousSeed: number,
+  previousStateHash: string,
+): Promise<number> {
+  const digest = await sha256Hex(
+    `${REMATCH_DOMAIN}|${roomCode}|${previousSeed >>> 0}|${previousStateHash}`,
+  );
   return Number.parseInt(digest.slice(0, 8), 16) >>> 0;
 }
 

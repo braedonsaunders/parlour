@@ -4,12 +4,16 @@ import { useT } from '@/lib/i18n';
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { clearActiveMultiplayerSession } from '@/app/_multiplayer/roomSession';
 import { useHydrated } from '@/components/backgrounds/SceneStage';
 import { MatchPodium } from '@/components/celebration/MatchPodium';
 import { MatchRivalry } from '@/components/celebration/MatchRivalry';
 import { getGame } from '@/lib/games';
 import { deriveRivalry, hasRivalryToShow } from '@/lib/match/rivalry';
+import { isMultiplayerGameId } from '@/lib/rooms/gameIds';
+import { tableRouteFor } from '@/lib/rooms/tableRoute';
+import { useAnyActiveRoom } from '@/lib/table/useRoomTable';
 import { useHistoryStore } from '@/stores/history';
 import { useMatchFlowStore } from '@/stores/matchFlow';
 import { useProfileStore } from '@/stores/profile';
@@ -27,6 +31,9 @@ export default function MatchEndPage() {
   const records = useHistoryStore((s) => s.records);
   const profileAvatarId = useProfileStore((s) => s.avatarId);
   const profileName = useProfileStore((s) => s.name);
+  const { room: activeRoom, snapshot: activeRoomSnapshot } = useAnyActiveRoom();
+  const [rematching, setRematching] = useState(false);
+  const [rematchError, setRematchError] = useState<string | null>(null);
 
   const rivalry = useMemo(() => deriveRivalry(records, snapshot?.id), [records, snapshot?.id]);
   // the seat you actually sat in wins over the profile, which may have moved on
@@ -34,11 +41,40 @@ export default function MatchEndPage() {
 
   const fallbackRoute = snapshot?.game ? (getGame(snapshot.game).href ?? '/play') : '/play';
 
+  // A rematch is published to the existing room, so every peer follows the
+  // fresh playing snapshot—even if only one person needed to press the button.
+  useEffect(() => {
+    if (!snapshot?.id?.startsWith('multiplayer:')) return;
+    const gameId = activeRoomSnapshot?.gameId;
+    if (
+      !isMultiplayerGameId(gameId) ||
+      activeRoomSnapshot?.session?.status !== 'playing' ||
+      activeRoomSnapshot.connection === 'closed'
+    ) {
+      return;
+    }
+    router.replace(tableRouteFor(gameId));
+  }, [activeRoomSnapshot, router, snapshot?.id]);
+
   const playAgain = useCallback(() => {
+    if (rematching) return;
     // The handler is a closure the table registered; a reload leaves the
     // snapshot but not the closure, so fall back to that game's own setup.
     if (playAgainHandler) {
-      playAgainHandler();
+      setRematching(true);
+      setRematchError(null);
+      try {
+        void Promise.resolve(playAgainHandler()).then(
+          () => setRematching(false),
+          (error: unknown) => {
+            setRematching(false);
+            setRematchError(error instanceof Error ? error.message : 'The rematch could not start');
+          },
+        );
+      } catch (error) {
+        setRematching(false);
+        setRematchError(error instanceof Error ? error.message : 'The rematch could not start');
+      }
       return;
     }
     router.push(fallbackRoute);
@@ -46,7 +82,13 @@ export default function MatchEndPage() {
     // closure: depending on `snapshot?.game` while the body reads `snapshot`
     // makes the compiler infer a broader dependency than the one declared, and
     // it then declines to memoize the component at all.
-  }, [fallbackRoute, playAgainHandler, router]);
+  }, [fallbackRoute, playAgainHandler, rematching, router]);
+
+  const leaveRoom = useCallback(() => {
+    if (!snapshot?.id?.startsWith('multiplayer:') || !activeRoom) return;
+    activeRoom.close();
+    clearActiveMultiplayerSession();
+  }, [activeRoom, snapshot?.id]);
 
   return (
     <main className={styles.page} data-testid="match-end-page">
@@ -65,15 +107,23 @@ export default function MatchEndPage() {
             <button
               type="button"
               onClick={playAgain}
+              disabled={rematching}
+              aria-busy={rematching}
               className={`btn-fat ${styles.primary}`}
               data-testid="play-again"
             >
               {t('matchEnd.playAgain')}
+              {rematching ? '…' : ''}
             </button>
-            <Link href="/" className={`btn-fat btn-fat--ghost ${styles.back}`}>
+            <Link href="/" onClick={leaveRoom} className={`btn-fat btn-fat--ghost ${styles.back}`}>
               {t('common.back')}
             </Link>
           </div>
+          {rematchError ? (
+            <p role="alert" className="px-6 text-center text-sm font-semibold text-rose-200">
+              {rematchError}
+            </p>
+          ) : null}
         </>
       ) : (
         <div className={`panel-soft mx-6 max-w-md p-8 text-center ${styles.empty}`}>

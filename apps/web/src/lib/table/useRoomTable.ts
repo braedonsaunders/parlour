@@ -91,6 +91,17 @@ export function useRoomTable<S, C extends RuleValues>(
  * them on the wrong one.
  */
 export function useActiveRoom(gameId: string): MultiplayerRoomSession | null {
+  const { room, snapshot } = useAnyActiveRoom();
+  if (!snapshot || snapshot.connection === 'closed') return null;
+  if (snapshot.gameId !== gameId && snapshot.settings?.gameId !== gameId) return null;
+  return room;
+}
+
+/** The live room and its current snapshot, without narrowing to one game. */
+export function useAnyActiveRoom(): {
+  room: MultiplayerRoomSession | null;
+  snapshot: MultiplayerRoomSnapshot | null;
+} {
   const room = useSyncExternalStore(
     subscribeActiveMultiplayerSession,
     getActiveMultiplayerSession,
@@ -101,9 +112,7 @@ export function useActiveRoom(gameId: string): MultiplayerRoomSession | null {
     room?.getSnapshot ?? emptySnapshot,
     emptySnapshot,
   );
-  if (!snapshot || snapshot.connection === 'closed') return null;
-  if (snapshot.gameId !== gameId && snapshot.settings?.gameId !== gameId) return null;
-  return room;
+  return { room, snapshot };
 }
 
 function emptySnapshot(): MultiplayerRoomSnapshot | null {

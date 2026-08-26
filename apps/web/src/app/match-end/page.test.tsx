@@ -2,11 +2,18 @@ import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { MatchResult } from '@parlour/engine';
+import {
+  activateMultiplayerSession,
+  clearActiveMultiplayerSession,
+  type MultiplayerRoomSession,
+  type MultiplayerRoomSnapshot,
+} from '@/app/_multiplayer/roomSession';
 import { botKey, buildMatchRecord, friendKey, useHistoryStore } from '@/stores/history';
 import { useMatchFlowStore, type MatchSnapshot } from '@/stores/matchFlow';
 import MatchEndPage from './page';
 
-vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }));
+const navigation = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn() }));
+vi.mock('next/navigation', () => ({ useRouter: () => navigation }));
 
 const SEATS = [
   { seat: 0, name: 'Braedon', avatarId: 'ember', kind: 'friend' as const, key: friendKey('me') },
@@ -62,6 +69,9 @@ beforeEach(() => {
   });
   useHistoryStore.setState({ records: [] });
   useMatchFlowStore.setState({ lastMatch: null, playAgain: null });
+  navigation.push.mockClear();
+  navigation.replace.mockClear();
+  clearActiveMultiplayerSession();
   container = document.createElement('div');
   document.body.append(container);
   root = createRoot(container);
@@ -70,6 +80,7 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount());
   container.remove();
+  clearActiveMultiplayerSession();
 });
 
 describe('match end screen', () => {
@@ -98,5 +109,60 @@ describe('match end screen', () => {
     expect(container.querySelector('[data-testid="rivalry-verdict"]')?.textContent).toBe(
       'You lead 2–1',
     );
+  });
+
+  it('follows a fresh rematch snapshot back to the same game table', () => {
+    play('multiplayer:ABCD:1:finished', 1_000, 1);
+    const listeners = new Set<() => void>();
+    let roomSnapshot = {
+      gameId: 'wildpile',
+      connection: 'connected',
+      session: { status: 'ended' },
+    } as unknown as MultiplayerRoomSnapshot;
+    const room = {
+      getSnapshot: () => roomSnapshot,
+      subscribe: (listener: () => void) => {
+        listeners.add(listener);
+        return () => listeners.delete(listener);
+      },
+      close: vi.fn(),
+    } as unknown as MultiplayerRoomSession;
+    activateMultiplayerSession(room);
+
+    render();
+    expect(navigation.replace).not.toHaveBeenCalled();
+
+    act(() => {
+      roomSnapshot = {
+        ...roomSnapshot,
+        session: { status: 'playing' },
+      } as unknown as MultiplayerRoomSnapshot;
+      for (const listener of listeners) listener();
+    });
+
+    expect(navigation.replace).toHaveBeenCalledWith('/wild/table');
+  });
+
+  it('closes a finished friend room only when the player leaves the podium', () => {
+    play('multiplayer:ABCD:1:finished', 1_000, 1);
+    const close = vi.fn();
+    const roomSnapshot = {
+      gameId: 'blitz',
+      connection: 'connected',
+      session: { status: 'ended' },
+    } as unknown as MultiplayerRoomSnapshot;
+    const room = {
+      getSnapshot: () => roomSnapshot,
+      subscribe: () => () => {},
+      close,
+    } as unknown as MultiplayerRoomSession;
+    activateMultiplayerSession(room);
+    render();
+
+    act(() => {
+      (container.querySelector('a[href="/"]') as HTMLAnchorElement).click();
+    });
+
+    expect(close).toHaveBeenCalledOnce();
   });
 });

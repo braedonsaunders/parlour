@@ -161,7 +161,7 @@ export const cribbageTablePack = defineTablePack<
     );
   },
 
-  roomReport({ session, snapshot, localSeat, leave, push }) {
+  roomReport({ session, snapshot, localSeat }) {
     if (!session.result) return null;
     const result = cribbageRoomResult(session.result);
     return {
@@ -183,8 +183,6 @@ export const cribbageTablePack = defineTablePack<
         kind: 'friend' as const,
         key: friendKey(seat.profileId),
       })),
-      onPlayAgain: () => push('/cribbage/create'),
-      onFinish: () => leave(() => push('/match-end')),
     };
   },
 });

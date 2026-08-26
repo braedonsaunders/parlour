@@ -21,6 +21,7 @@ import {
   validateEmote,
 } from './index';
 import type { PresenceSnapshot } from './types';
+import { rematchDealSeed } from './dealSeed';
 
 type CounterRules = Record<string, ConfigFieldValue>;
 type CounterState = { count: number };
@@ -433,6 +434,68 @@ describe('divergence recovery', () => {
       },
     ]);
     expect(importSnapshot).toHaveBeenCalledOnce();
+    transport.close();
+  });
+});
+
+describe('same-room rematches', () => {
+  it('accepts only the fresh deal derived from the completed shared table', async () => {
+    const def = createBlitzDef();
+    const config = blitzConfigSchema.defaults();
+    const settings = { gameId: 'blitz', seats: 2, config };
+    const authority = new EngineAuthority({
+      def,
+      session: createSession(def, { seed: 7, config, seats: 2 }),
+      settings,
+    });
+    const previous = authority.exportSnapshot();
+    const nextSeed = await rematchDealSeed('AB2Z', previous.seed, previous.stateHash);
+    const nextAuthority = new EngineAuthority({
+      def,
+      session: createSession(def, { seed: nextSeed, config, seats: 2 }),
+      settings,
+    });
+    const next = nextAuthority.exportSnapshot();
+    const signaling = new NostrSignaling({
+      relays: [],
+      pool: {
+        ensureRelay: vi.fn(),
+        publish: vi.fn(() => []),
+        querySync: vi.fn(async () => []),
+        subscribeMany: vi.fn(() => ({ close() {} })),
+        close: vi.fn(),
+      },
+    });
+    const transport = new P2PTransport({
+      authority,
+      profileId: 'guest-profile',
+      signaling,
+      origin: 'https://parlour.test',
+    });
+    const harness = transport as unknown as {
+      startRoom(code: string, hostId: string): void;
+      receiveWire(peerId: string, message: unknown): Promise<void>;
+    };
+    harness.startRoom('AB2Z', 'host');
+    const observations: unknown[] = [];
+    transport.onSnapshot((notification) => observations.push(notification));
+    const presence = { version: 0, seats: [] };
+
+    await expect(
+      harness.receiveWire('host', {
+        type: 'rematch.start',
+        snapshot: { replay: { ...next, seed: (nextSeed + 1) >>> 0 }, presence },
+      }),
+    ).rejects.toThrow(/does not follow from the table/);
+    expect(authority.exportSnapshot()).toEqual(previous);
+
+    await harness.receiveWire('host', {
+      type: 'rematch.start',
+      snapshot: { replay: next, presence },
+    });
+
+    expect(authority.exportSnapshot()).toEqual(next);
+    expect(observations).toEqual([{ kind: 'snapshot', reason: 'rematch', snapshot: next }]);
     transport.close();
   });
 });
