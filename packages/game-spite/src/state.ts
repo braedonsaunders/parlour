@@ -38,33 +38,15 @@ export interface SpiteState {
    * per seat, the face-down payoff pile with its top card at index 0. The
    * whole race lives here: first seat to play this array empty wins.
    *
-   * ## Veil impossibility
+   * ## Veil — solved
    *
-   * Veiled friend rooms are not supported ({@link apps/web/src/lib/rooms/gameRegistry.ts}
-   * carries the refusal). The reason is structural, not cosmetic:
-   *
-   * Under Veil the top card (index 0) is public and everything under it is an
-   * opaque handle. When the top is played, {@link game.ts} `build.apply` does
-   * `pileCards.slice(1)`, which makes the former index-1 slide to index 0 in a
-   * single atomic state transition. The newly-exposed card was private and is
-   * now public — but this exposure is a *side effect* of the play, not a
-   * distinct game move. There is no "reveal top" action in the rules.
-   *
-   * The engine's `VeilSupport.publicOpens` hook (Poker uses it for the board)
-   * expresses "open these handles, then inject this move" — it needs a named
-   * move that the flow can pause at. Spite's flow advances directly from one
-   * `build` to the next player's turn with no interposable reveal step, and
-   * adding one would split a single player action into "play" + "reveal" — a
-   * rules change the Veil protocol must not impose.
-   *
-   * What would be needed to lift this ceiling:
-   *   1. An engine-level primitive for "became-public-as-side-effect" openings
-   *      that does not require a distinct move.
-   *   2. Or a `build.apply` refactor that, under Veil, sets a `revealPending`
-   *      flag and pauses the flow, with the room injecting a reveal before the
-   *      turn passes. Both paths require engine changes beyond the pack layer.
-   *
-   * Until then, a clear refusal is safer than a half-working privacy claim.
+   * Veiled friend rooms are supported. The payoff pile's top card is public;
+   * everything beneath it is an opaque handle. When the top is played, the
+   * next card slides up and the room peels it through the `revealPayoffTop`
+   * engine move before the next build can proceed — the reveal-as-side-effect
+   * problem is solved by naming the reveal rather than by splitting the build.
+   * See packages/game-spite/src/game.ts `spitePublicOpens` and
+   * packages/game-spite/src/veil.test.ts for the contract.
    */
   payoffs: CardId[][];
   /** per seat, `rules.discardPiles` personal piles, anything-on-anything */
@@ -91,4 +73,6 @@ export interface SpiteState {
    */
   stuckRuns: number;
   winner: SeatId | null;
+  /** true when the match is dealt under the Veil protocol */
+  veiled: boolean;
 }

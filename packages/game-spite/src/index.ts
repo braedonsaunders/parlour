@@ -13,7 +13,7 @@ export const GAME_ID = 'spite';
 export * from './cards';
 export { spiteConfig, type SpiteRules } from './config';
 export { emptyCentre, type CentrePile, type SpiteState } from './state';
-export { fitsNeed, locateCard, spiteGame, type PlaySource } from './game';
+export { fitsNeed, locateCard, spiteGame, spitePublicOpens, type PlaySource } from './game';
 export { matchResult, payoffRemaining, progress, rankChasers } from './score';
 export { spiteHowToPlay } from './howto';
 export { spiteCatalog } from './catalog';
