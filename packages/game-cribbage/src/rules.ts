@@ -56,9 +56,14 @@ function seatsWithCards(state: CribbageState): SeatId[] {
   return allSeats(state.seats).filter((seat) => (state.hands[seat] ?? []).length > 0);
 }
 
-/** Cards in `hand` that may legally be laid onto the running count. */
+/**
+ * Cards in `hand` that may legally be laid onto the running count. Veil
+ * handles have no face and no count, so they are never in this set — which
+ * means callers deciding between "play" and "go" must check for handles
+ * first; a veiled hand that returns [] here is not a provable go.
+ */
 export function playableCards(pegging: PeggingState, hand: readonly CardId[]): CardId[] {
-  return hand.filter((card) => pegging.count + cardValue(card) <= 31);
+  return hand.filter((card) => !isVeilHandle(card) && pegging.count + cardValue(card) <= 31);
 }
 
 function emptyPegging(turn: SeatId | null = null): PeggingState {
@@ -347,6 +352,15 @@ const go: Move<CribbageState> = {
     if (state.pegging.turn !== seat) {
       return { code: 'not-your-turn', message: 'not your lead' };
     }
+    // Under Veil a go is only provable with the whole remaining hand opened —
+    // the reveals land before this runs, so a handle still present is an
+    // unproven claim, not a go.
+    if (hasVeiledCard(state.hands[seat] ?? [])) {
+      return {
+        code: 'go-not-proven',
+        message: 'open your remaining hand to show you cannot play',
+      };
+    }
     if (playableCards(state.pegging, state.hands[seat] ?? []).length > 0) {
       return { code: 'can-still-play', message: 'you still have a legal card' };
     }
@@ -624,7 +638,10 @@ const flow: GameDef<CribbageState, CribbageConfig>['flow'] = {
     if (state.pegging.turn !== null) {
       const actor = state.pegging.turn;
       const hand = state.hands[actor] ?? [];
-      if (playableCards(state.pegging, hand).length === 0) {
+      // A veiled hand proves nothing about its playable set, so the flow must
+      // not auto-emit go — the seat either plays (revealing as it goes) or
+      // says go with its remaining hand opened as proof.
+      if (!hasVeiledCard(hand) && playableCards(state.pegging, hand).length === 0) {
         return {
           phase: phaseFor(state, 'peg', actor, allSeats(state.seats)),
           autoMoves: [{ seat: actor, move: 'go', reason: 'no legal card below 31' }],
@@ -696,13 +713,30 @@ function legalForSeat(state: CribbageState, seat: SeatId): readonly LegalMove[] 
   }
 
   if (state.pegging.turn !== null) {
-    const own =
-      state.pegging.turn === seat
-        ? playableCards(state.pegging, state.hands[seat] ?? []).map(
-            (card) => ({ id: 'playCard', payload: { card } }) satisfies LegalMove,
-          )
-        : [];
-    return [...own, ...mugginsMovesFor(state, seat)];
+    // A veiled hand enumerates no cards: which handles can be played depends
+    // on the faces behind them, and only the seat holding them knows. The
+    // offer is bare; the play carries its own opening, and go is offered
+    // alongside it — go.validate runs against the opened hand, so a go that
+    // could not prove it is refused there rather than hidden here.
+    if (state.pegging.turn !== seat) return mugginsMovesFor(state, seat);
+    const hand = state.hands[seat] ?? [];
+    // A veiled hand enumerates no cards: which handles can be played depends
+    // on the faces behind them, and only the seat holding them knows. The
+    // offer is bare; the play carries its own opening, and go is offered
+    // alongside it — go.validate runs against the opened hand, so a go that
+    // could not prove it is refused there rather than hidden here.
+    if (hasVeiledCard(hand))
+      return [{ id: 'playCard' }, { id: 'go' }, ...mugginsMovesFor(state, seat)];
+    const playable = playableCards(state.pegging, hand);
+    // Open hands get go in the list when nothing fits; the flow also emits it
+    // automatically after a play, so this only matters under veil, where the
+    // reveal that opens the hand must be able to arrive first.
+    const goMove = playable.length === 0 ? [{ id: 'go' } satisfies LegalMove] : [];
+    return [
+      ...playable.map((card) => ({ id: 'playCard', payload: { card } }) satisfies LegalMove),
+      ...goMove,
+      ...mugginsMovesFor(state, seat),
+    ];
   }
 
   if (peggingComplete(state)) {
