@@ -176,6 +176,8 @@ export class MultiplayerRoomSession {
   /** This seat's shuffle share, minted once per room and revealed at the deal. */
   private dealNonce: string | null = null;
   private dealRound = new DealSeedRound();
+  /** A reveal arrived before this client finished attaching its local seat. */
+  private dealRevealStarted = false;
   private sequence = 0;
   private recycleActionPending = false;
   /** A no-match jump-in is declined from here, so it cannot re-enter send. */
@@ -289,6 +291,11 @@ export class MultiplayerRoomSession {
         localSeat: assignedSeat ?? this.snapshot.localSeat,
         seats: joinedSeats.sort((a, b) => a.seat - b.seat),
       });
+      // The host can finish seating us before this join continuation runs. In
+      // that ordering the earlier presence event could not identify our local
+      // seat, so publish the commitment again now that both room and seat are
+      // available.
+      this.commitDealShare();
       if (settings.security === 'veil' && assignedSeat !== null && !this.veil) {
         this.veilAttach = this.attachVeil(
           settings,
@@ -380,6 +387,7 @@ export class MultiplayerRoomSession {
     if (!settings || !code || !this.transport || !this.authority) {
       throw new Error('the room is not ready to deal');
     }
+    this.dealRevealStarted = true;
     this.revealDealShare();
     const seats = this.contributingSeats();
     await this.waitForDealShares(seats);
@@ -415,6 +423,10 @@ export class MultiplayerRoomSession {
       .then((commit) => {
         this.dealRound.recordCommitment(seat as SeatId, commit);
         this.transport?.sendDeal({ type: 'deal.commit', commit });
+        // A fast host may have opened the reveal phase while this commitment
+        // was still hashing. Do not make it repeat Start: answer the reveal as
+        // soon as this seat is ready.
+        if (this.dealRevealStarted) this.revealDealShare();
       })
       .catch(() => undefined);
   }
@@ -1226,6 +1238,7 @@ export class MultiplayerRoomSession {
         this.dealRound.recordCommitment(seat, message.commit);
         return;
       }
+      this.dealRevealStarted = true;
       this.dealRound.recordContribution(seat, message.nonce);
       // Somebody has opened the reveal phase, so answer with this seat's share.
       // The host reveals first when it deals; everyone else follows from here,

@@ -81,6 +81,8 @@ class MockSignalingBroker {
   readonly rooms = new Map<string, { hostPubkey: string; settings: RoomSettings }>();
   readonly handlers = new Map<string, Map<string, SignalHandler>>();
 
+  constructor(private readonly letWireSettleBeforeSendReturns = false) {}
+
   signaling(label: string): NostrSignaling {
     const broker = this;
     const publicKey = mockPubkey(label);
@@ -107,6 +109,9 @@ class MockSignalingBroker {
       },
       async send(code: string, recipient: string, signal: SignalPayload) {
         queueMicrotask(() => broker.handlers.get(code)?.get(recipient)?.(publicKey, signal));
+        if (broker.letWireSettleBeforeSendReturns) {
+          await new Promise((resolve) => setTimeout(resolve, 0));
+        }
       },
       close() {},
     } as unknown as NostrSignaling;
@@ -407,6 +412,59 @@ describe('multiplayer route composition', () => {
       stateHash(host.getSnapshot().session?.state),
     );
   });
+
+  it.each(MULTIPLAYER_GAME_IDS)(
+    'deals %s when the host starts as soon as the guest chair appears',
+    async (gameId) => {
+      // Real Nostr publication can stay in flight long enough for the WebRTC
+      // channel to finish its welcome exchange first. Exercise that ordering:
+      // the host sees the chair before the guest's `join()` continuation stores
+      // its RoomHandle and local seat.
+      const broker = new MockSignalingBroker(true);
+      const rtc = new MockRtcNetwork();
+      const host = new MultiplayerRoomSession(
+        { name: 'Host', avatarId: 'ember', profileId: 'fast-start-host' },
+        {
+          signaling: broker.signaling('fast-start-host-peer'),
+          peerConnection: rtc.factory('fast-start-host'),
+          seed: 42,
+        },
+      );
+      const guest = new MultiplayerRoomSession(
+        { name: 'Guest', avatarId: 'cobalt', profileId: 'fast-start-guest' },
+        {
+          signaling: broker.signaling('fast-start-guest-peer'),
+          peerConnection: rtc.factory('fast-start-guest'),
+          seed: 7,
+        },
+      );
+      sessions.push(host, guest);
+
+      const seats = ROOM_GAMES[gameId].seats.min;
+      const room = await host.create({ gameId, seats });
+      const joining = guest.join(room.code);
+      await eventually(() => expect(host.getSnapshot().seats).toHaveLength(2));
+      for (let seat = 2; seat < seats; seat++) host.addBot(seat);
+      await eventually(() => expect(host.getSnapshot().seats).toHaveLength(seats));
+
+      const starting = host.start();
+      await joining;
+      await starting;
+
+      await eventually(() => {
+        expect(host.getSnapshot().stage).toBe('table');
+        expect(guest.getSnapshot().stage).toBe('table');
+        expect(host.getSnapshot().error).toBeNull();
+        expect(guest.getSnapshot().error).toBeNull();
+        expect(host.getSnapshot().gameId).toBe(gameId);
+        expect(guest.getSnapshot().gameId).toBe(gameId);
+        expect(stateHash(guest.getSnapshot().session?.state)).toBe(
+          stateHash(host.getSnapshot().session?.state),
+        );
+      });
+    },
+    20_000,
+  );
 
   it('kicks every guest when the host leaves the lobby', async () => {
     const broker = new MockSignalingBroker();
