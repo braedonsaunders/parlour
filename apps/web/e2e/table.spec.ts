@@ -48,8 +48,8 @@ test('a solo table deals and shows a hand', async ({ page }) => {
 });
 
 test('leaving a table returns to its shelf page', async ({ page }) => {
-  // Hearts rather than Spades: Spades asks a phone to rotate before it deals,
-  // so on the WebKit project its table is deliberately unreachable in portrait.
+  // Hearts rather than Spades: Hearts still has no portrait hand rail, so it is
+  // the honest case for "leaving a table returns you to its shelf" on a phone.
   // That behaviour has its own test below.
   await page.goto('/hearts/table/');
   await expect(page.locator('[role="list"][data-zone] [role="listitem"]').first()).toBeVisible({
