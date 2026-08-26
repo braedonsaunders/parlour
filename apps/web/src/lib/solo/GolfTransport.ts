@@ -1,6 +1,7 @@
 import {
   createSession,
-  replaySession,
+  undoPolicy,
+  undoSession,
   sessionApply,
   type AppliedEvent,
   type FxEvent,
@@ -55,7 +56,9 @@ export interface GolfTransportOptions {
 /**
  * Solo Golf authority. Unlike turn/bot transports, this facade owns its log
  * so Undo can rebuild from a strict prefix. Every forward action still enters
- * through sessionApply and every rewind through replaySession.
+ * through sessionApply and every rewind through the engine's undoSession,
+ * which drops a player action together with whatever settle produced from it
+ * rather than trimming one event off the end.
  */
 export class GolfTransport {
   private readonly listeners = new Set<() => void>();
@@ -78,7 +81,7 @@ export class GolfTransport {
         setupFx: this.session.setupFx,
       },
       eventCount: this.session.log.length,
-      canUndo: this.session.log.length > 0,
+      canUndo: undoPolicy(this.session).available,
       hint: this.session.status === 'playing' ? hintFor(state) : null,
     };
   }
@@ -100,13 +103,10 @@ export class GolfTransport {
   }
 
   undo(): GolfDispatch {
-    if (this.session.log.length === 0) {
+    if (!undoPolicy(this.session).available) {
       return this.rejection({ code: 'nothing-to-undo', message: 'No move to undo yet.' });
     }
-    this.session = replaySession(golfGame, this.options.seed, this.session.log.slice(0, -1), {
-      config: this.options.rules,
-      seats: 1,
-    });
+    this.session = undoSession(golfGame, this.session);
     return this.publish({ events: [], fx: [], rejected: null, snapshot: this.getSnapshot() });
   }
 

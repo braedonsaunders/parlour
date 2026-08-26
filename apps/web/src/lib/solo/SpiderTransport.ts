@@ -1,6 +1,7 @@
 import {
   createSession,
-  replaySession,
+  undoPolicy,
+  undoSession,
   sessionApply,
   type AppliedEvent,
   type FxEvent,
@@ -56,7 +57,9 @@ export interface SpiderTransportOptions {
 /**
  * Solo Spider authority. Unlike turn/bot transports, this facade owns its log
  * so Undo can rebuild from a strict prefix. Every forward action still enters
- * through sessionApply and every rewind through replaySession.
+ * through sessionApply and every rewind through the engine's undoSession,
+ * which drops a player action together with whatever settle produced from it
+ * rather than trimming one event off the end.
  */
 export class SpiderTransport {
   private readonly listeners = new Set<() => void>();
@@ -79,7 +82,7 @@ export class SpiderTransport {
         setupFx: this.session.setupFx,
       },
       eventCount: this.session.log.length,
-      canUndo: this.session.log.length > 0,
+      canUndo: undoPolicy(this.session).available,
       canFinish: false,
       hint: this.session.status === 'playing' ? hintFor(state) : null,
     };
@@ -102,13 +105,10 @@ export class SpiderTransport {
   }
 
   undo(): SpiderDispatch {
-    if (this.session.log.length === 0) {
+    if (!undoPolicy(this.session).available) {
       return this.rejection({ code: 'nothing-to-undo', message: 'No move to undo yet.' });
     }
-    this.session = replaySession(spiderGame, this.options.seed, this.session.log.slice(0, -1), {
-      config: this.options.rules,
-      seats: 1,
-    });
+    this.session = undoSession(spiderGame, this.session);
     return this.publish({ events: [], fx: [], rejected: null, snapshot: this.getSnapshot() });
   }
 

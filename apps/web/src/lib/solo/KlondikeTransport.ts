@@ -1,6 +1,7 @@
 import {
   createSession,
-  replaySession,
+  undoPolicy,
+  undoSession,
   sessionApply,
   type AppliedEvent,
   type FxEvent,
@@ -59,8 +60,10 @@ export interface KlondikeTransportOptions {
 
 /**
  * Solo Klondike authority. Unlike turn/bot transports, this facade owns its
- * log so Undo can rebuild from a strict prefix. Every forward action still
- * enters through sessionApply and every rewind through replaySession.
+ * log so Undo can rebuild from a strict prefix. Every forward action enters
+ * through sessionApply and every rewind through the engine's undoSession,
+ * which drops a player action together with whatever settle produced from it
+ * rather than trimming one event off the end.
  */
 export class KlondikeTransport {
   private readonly listeners = new Set<() => void>();
@@ -85,7 +88,7 @@ export class KlondikeTransport {
         setupFx: this.session.setupFx,
       },
       eventCount: this.session.log.length,
-      canUndo: this.session.log.length > 0,
+      canUndo: undoPolicy(this.session).available,
       canFinish: this.session.status === 'playing' && canAutoFinish(state),
       hint: this.session.status === 'playing' ? this.planner.hint(this.session.state) : null,
     };
@@ -109,13 +112,10 @@ export class KlondikeTransport {
   }
 
   undo(): KlondikeDispatch {
-    if (this.session.log.length === 0) {
+    if (!undoPolicy(this.session).available) {
       return this.rejection({ code: 'nothing-to-undo', message: 'No move to undo yet.' });
     }
-    this.session = replaySession(klondikeGame, this.options.seed, this.session.log.slice(0, -1), {
-      config: this.options.rules,
-      seats: 1,
-    });
+    this.session = undoSession(klondikeGame, this.session);
     if (this.session.log.length === 0) this.planner.rewind();
     else this.planner.invalidate();
     return this.publish({ events: [], fx: [], rejected: null, snapshot: this.getSnapshot() });
