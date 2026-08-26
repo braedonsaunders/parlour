@@ -518,18 +518,69 @@ export function sessionInject<S, C extends RuleValues>(
 // ---------------------------------------------------------------------------
 
 /**
- * Re-checks one logged player action the way `sessionApply` would have.
+ * The automatic events a rules-abiding authority owes after `trigger`.
  *
- * Automatic and injected events are the runtime's own work rather than a claim
- * made by a peer, so they are not re-derived here: `settle` produced them from
- * a state this replay is reproducing anyway, and an injected event is admitted
- * by `flow.canInject` below instead.
+ * An event tagged `automatic` carries no seat to check and no legality to test,
+ * which is why verification used to return early on one. That early return was
+ * a hole: a peer could smuggle an arbitrary move into a log by setting the
+ * flag, and the audit that exists to catch a cheating host waved it through.
+ *
+ * There is exactly one honest source for these events — `flow.advance` — so
+ * verify mode re-runs the authority's own settle loop on a throwaway cursor and
+ * requires the log to match what it produced. The whole sequence is computed at
+ * once because `settle` keeps advancing until the phase stops moving; the
+ * caller consumes it one event at a time.
+ *
+ * Returns null when settle refuses to run at all. A flow that cannot settle
+ * from this state could not have produced these events either, so the caller
+ * treats that the same as owing nothing and lets the mismatch surface as an
+ * unexpected automatic event.
+ */
+function expectedAutoEvents<S, C extends RuleValues>(
+  def: GameDef<S, C>,
+  seed: number,
+  seats: number,
+  cursor: Cursor<S>,
+  trigger: AppliedEvent,
+): AppliedEvent[] | null {
+  const shadow: Cursor<S> = { ...cursor, events: [] };
+  try {
+    settle(def, seed, seats, shadow, trigger, createFx());
+  } catch {
+    return null;
+  }
+  return shadow.events;
+}
+
+/**
+ * True when a logged automatic event is the one settle said should come next.
+ *
+ * Seat, move and payload are the substantive claim; the hash follows from them
+ * and from a state this replay is recomputing anyway, so comparing it would add
+ * nothing a divergence check does not already catch.
+ */
+function autoEventMatches(expected: AppliedEvent, logged: AppliedEvent): boolean {
+  return (
+    (expected.seat ?? null) === (logged.seat ?? null) &&
+    expected.move === logged.move &&
+    canonical(expected.payload) === canonical(logged.payload)
+  );
+}
+
+/**
+ * Re-checks one logged event the way `sessionApply` would have.
+ *
+ * A player action is re-run against legality and validation. An automatic event
+ * is checked against `owedAuto` — the next entry `flow.advance` produced for
+ * this position — because nothing else about it is checkable. An injected event
+ * is admitted by `flow.canInject` below.
  */
 function verifyEvent<S, C extends RuleValues>(
   def: GameDef<S, C>,
   cursor: Cursor<S>,
   logged: AppliedEvent,
   index: number,
+  owedAuto: AppliedEvent | null,
 ): ReplayFault | null {
   const fault = (error: RuleError): ReplayFault => ({
     index,
@@ -548,7 +599,29 @@ function verifyEvent<S, C extends RuleValues>(
   const timing = timingError(cursor.lastAtMs, { atMs: logged.atMs });
   if (timing) return fault(timing);
 
-  if (logged.automatic === true) return null;
+  if (logged.automatic === true) {
+    if (!owedAuto) {
+      return fault({
+        code: 'unexpected-automatic',
+        message: `${logged.move} is tagged automatic, but flow.advance asked for no move here`,
+      });
+    }
+    return autoEventMatches(owedAuto, logged)
+      ? null
+      : fault({
+          code: 'forged-automatic',
+          message: `automatic ${logged.move} is not the ${owedAuto.move} flow.advance produced`,
+        });
+  }
+  if (owedAuto) {
+    // Settle runs to completion inside a single apply, so a player action can
+    // never land in the middle of one. A log that does it dropped the steps in
+    // between — scoring, a redeal — and arrived at a board nobody was owed.
+    return fault({
+      code: 'skipped-automatic',
+      message: `${logged.move} arrived while automatic ${owedAuto.move} was still owed`,
+    });
+  }
 
   const opened = applyReveals(cursor.state, logged.reveals ?? []);
 
@@ -639,13 +712,25 @@ export function replaySession<S, C extends RuleValues>(
   };
 
   let fault: ReplayFault | null = null;
+  /**
+   * Where re-checking starts. Everything before it is taken on trust, which is
+   * what a peer wants when it verified those events as they arrived: checking
+   * the whole log again on every move would make admission quadratic in the
+   * length of the match, and a guest that already refused a bad event is not
+   * holding one.
+   */
+  const verifyFrom = opts?.verifyFrom ?? (opts?.verify === true ? 0 : null);
+  const verifying = (index: number): boolean => verifyFrom !== null && index >= verifyFrom;
+  /** Automatic events settle says are still owed here, oldest first. */
+  let owedAutos: readonly AppliedEvent[] = [];
 
   for (const [index, logged] of log.entries()) {
     if (cursor.status !== 'playing') break;
-    if (opts?.verify) {
-      fault = verifyEvent(def, cursor, logged, index);
+    if (verifying(index)) {
+      fault = verifyEvent(def, cursor, logged, index, owedAutos[0] ?? null);
       if (fault) break;
     }
+    if (logged.automatic === true) owedAutos = owedAutos.slice(1);
     const event = applyStep(
       def,
       seed,
@@ -669,6 +754,28 @@ export function replaySession<S, C extends RuleValues>(
       cursor.status = 'ended';
       cursor.result = advance.ended;
     }
+    // Only a player action opens a settle. Re-deriving after each automatic
+    // event would recompute the same tail the trigger already produced.
+    if (logged.automatic !== true && verifying(index + 1)) {
+      owedAutos = expectedAutoEvents(def, seed, seats, cursor, event) ?? [];
+    }
+  }
+
+  if (fault === null && owedAutos.length > 0 && cursor.status === 'playing') {
+    // `sessionApply` settles before it returns, so a well-formed log never stops
+    // mid-settle. One that does had its tail cut off — which is how a peer hides
+    // a scoring step or a redeal it did not want replayed.
+    const owed = owedAutos[0]!;
+    fault = {
+      index: log.length,
+      seq: owed.seq,
+      seat: owed.seat,
+      move: owed.move,
+      error: {
+        code: 'truncated-settle',
+        message: `log ends while automatic ${owed.move} is still owed`,
+      },
+    };
   }
 
   if (cursor.status === 'playing') {

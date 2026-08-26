@@ -668,11 +668,22 @@ export interface ReplayOptions<C extends RuleValues> {
   veiled?: boolean;
   deckOrder?: readonly CardId[];
   /**
-   * Re-check every logged player action against `flow.legalMoves` and
-   * `move.validate` instead of trusting the authority that produced it. The
-   * first failure stops the replay and lands on `session.fault`.
+   * Re-check every logged event against the rules instead of trusting the
+   * authority that produced it: player actions against `flow.legalMoves` and
+   * `move.validate`, automatic events against the sequence `flow.advance`
+   * produces for that position. The first failure stops the replay and lands on
+   * `session.fault`.
    */
   verify?: boolean;
+  /**
+   * Start re-checking at this index instead of at the beginning.
+   *
+   * A peer admitting one packet at a time has already verified everything
+   * before the tail it is being handed, and re-checking the whole log on every
+   * move would make admission quadratic in the length of the match. Setting
+   * this implies `verify` — the two are the same switch, one scoped.
+   */
+  verifyFrom?: number;
 }
 
 export type ReplaySessionFn = <S, C extends RuleValues>(

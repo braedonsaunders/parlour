@@ -488,3 +488,116 @@ describe('verifyLog', () => {
     expect(replayed.fault).toBeNull();
   });
 });
+
+/**
+ * The `automatic` flag used to end verification early, because an automatic
+ * event has no seat to check and no legality to test. That made the flag itself
+ * the exploit: anything a peer wanted in the log became unauditable by setting
+ * one boolean. Verification now re-derives the whole settle sequence from
+ * `flow.advance` and holds the log to it.
+ */
+describe('verifyLog and automatic events', () => {
+  const opts = { config: OPTS.config, seats: OPTS.seats };
+
+  it('accepts the automatic events flow.advance actually produced', () => {
+    const live = runScript();
+    expect(live.session.log.some((e) => e.automatic === true)).toBe(true);
+    expect(verifyLog(miniGame, OPTS.seed, live.session.log, opts)).toBeNull();
+  });
+
+  it('catches a move smuggled into the log behind the automatic flag', () => {
+    const live = runScript();
+    const log: AppliedEvent[] = live.session.log.map((e) => ({ ...e }));
+    const at = log.findIndex((e) => e.automatic === true);
+    expect(at).toBeGreaterThan(-1);
+    // Same slot, same flag, different move. Nothing about the event is
+    // internally inconsistent; only flow.advance knows it is not the tick.
+    log[at] = { ...log[at]!, move: 'pass', seat: 1 };
+
+    const fault = verifyLog(miniGame, OPTS.seed, log, opts);
+    expect(fault?.error.code).toBe('forged-automatic');
+    expect(fault?.index).toBe(at);
+  });
+
+  it('rejects an automatic event flow.advance never asked for', () => {
+    const live = runScript();
+    const log: AppliedEvent[] = live.session.log.map((e) => ({ ...e }));
+    // `pass` settles immediately, so nothing is owed after one. A free extra
+    // tick here is the whole exploit in miniature: an unrequested move that
+    // moves the state and used to be waved through.
+    const afterPass = log.findIndex((e) => e.move === 'pass') + 1;
+    expect(afterPass).toBeGreaterThan(0);
+    log.splice(afterPass, 0, { seq: afterPass, seat: null, move: 'tick', automatic: true });
+    for (const [index, event] of log.entries()) log[index] = { ...event, seq: index };
+
+    const fault = verifyLog(miniGame, OPTS.seed, log, opts);
+    expect(fault?.error.code).toBe('unexpected-automatic');
+    expect(fault?.index).toBe(afterPass);
+  });
+
+  it('rejects a player action that lands while an automatic event is owed', () => {
+    const live = runScript();
+    const log: AppliedEvent[] = live.session.log.map((e) => ({ ...e }));
+    const tick = log.findIndex((e) => e.automatic === true);
+    expect(tick).toBeGreaterThan(-1);
+    // Dropping the tick skips the state it would have moved — which is how a
+    // peer quietly declines a scoring step it does not like.
+    log.splice(tick, 1);
+    for (const [index, event] of log.entries()) log[index] = { ...event, seq: index };
+
+    const fault = verifyLog(miniGame, OPTS.seed, log, opts);
+    expect(fault?.error.code).toBe('skipped-automatic');
+  });
+
+  it('rejects a log whose tail was cut off mid-settle', () => {
+    const live = runScript();
+    const log = live.session.log.map((e) => ({ ...e }));
+    const draw = log.findIndex((e) => e.move === 'draw');
+    expect(log[draw + 1]?.automatic).toBe(true);
+
+    const fault = verifyLog(miniGame, OPTS.seed, log.slice(0, draw + 1), opts);
+    expect(fault?.error.code).toBe('truncated-settle');
+    expect(fault?.move).toBe('tick');
+  });
+});
+
+describe('verifyFrom', () => {
+  const opts = { config: OPTS.config, seats: OPTS.seats };
+
+  /** The first player action whose seat can be swapped for one that had no turn. */
+  function tamperedLog() {
+    const live = runScript();
+    const log: AppliedEvent[] = live.session.log.map((e) => ({ ...e }));
+    const at = log.findIndex((e) => e.automatic !== true && e.seat !== null);
+    log[at] = { ...log[at]!, seat: (((log[at]!.seat as number) + 1) % OPTS.seats) as SeatId };
+    return { log, at };
+  }
+
+  it('checks the tail a peer was just handed', () => {
+    const { log, at } = tamperedLog();
+    const replayed = replaySession(miniGame, OPTS.seed, log, { ...opts, verifyFrom: at });
+    expect(replayed.fault?.error.code).toBe('not-your-turn');
+  });
+
+  it('does not re-check the prefix a peer already admitted', () => {
+    const { log, at } = tamperedLog();
+    const skipped = replaySession(miniGame, OPTS.seed, log, { ...opts, verifyFrom: at + 1 });
+    // The tampered event itself is never re-examined. Its *consequences* still
+    // are, and here seat 0 ends up discarding a card the swap moved out of its
+    // hand — a real finding at a later index, not the one that was skipped.
+    expect(skipped.fault?.index).not.toBe(at);
+    expect(skipped.fault?.index).toBeGreaterThan(at);
+  });
+
+  it('still owes the settle that opened before the verified tail', () => {
+    // Verification starting mid-settle has to know what was owed, or the first
+    // honest automatic event in the tail would read as an unrequested one.
+    const live = runScript();
+    const log = live.session.log.map((e) => ({ ...e }));
+    const tick = log.findIndex((e) => e.automatic === true);
+    expect(tick).toBeGreaterThan(0);
+
+    const honest = replaySession(miniGame, OPTS.seed, log, { ...opts, verifyFrom: tick });
+    expect(honest.fault).toBeNull();
+  });
+});
