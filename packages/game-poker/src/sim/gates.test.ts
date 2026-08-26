@@ -33,19 +33,15 @@ const QUICK_MATCHES = 8;
 const BAND_MATCHES = simGames(QUICK_MATCHES, 400);
 
 describe('balance gates', () => {
-  it(
-    'produces a deterministic report for a fixed seed, with every row measured',
-    () => {
-      const report = runBalanceGates({ matches: QUICK_MATCHES });
-      const again = runBalanceGates({ matches: QUICK_MATCHES });
-      expect(report.rows.map((row) => ({ name: row.name, measured: row.measured }))).toEqual(
-        again.rows.map((row) => ({ name: row.name, measured: row.measured })),
-      );
-      expect(report.rows).toHaveLength(4);
-      expect(report.rows.every((row) => row.passed || !row.passed)).toBe(true);
-    },
-    120_000,
-  );
+  it('produces a deterministic report for a fixed seed, with every row measured', () => {
+    const report = runBalanceGates({ matches: QUICK_MATCHES });
+    const again = runBalanceGates({ matches: QUICK_MATCHES });
+    expect(report.rows.map((row) => ({ name: row.name, measured: row.measured }))).toEqual(
+      again.rows.map((row) => ({ name: row.name, measured: row.measured })),
+    );
+    expect(report.rows).toHaveLength(4);
+    expect(report.rows.every((row) => row.passed || !row.passed)).toBe(true);
+  }, 120_000);
 
   it('structurally passes quick where it cannot fail: no head-to-head floor hiding', () => {
     // In a table of tier-1s the challenger sees 1/seats baseline 0.25, so
