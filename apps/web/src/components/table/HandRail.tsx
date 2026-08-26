@@ -149,6 +149,7 @@ export function HandRail({
   const receiving = useFanReceiving();
   const railRef = useRef<HTMLDivElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
+  const wasScrollableRef = useRef(false);
   const [geometry, setGeometry] = useState<FanGeometry>(NO_GEOMETRY);
   const [scrollState, setScrollState] = useState<HandScrollState>('none');
 
@@ -156,15 +157,22 @@ export function HandRail({
     const track = trackRef.current;
     if (!track) return;
     const maxScroll = Math.max(0, track.scrollWidth - track.clientWidth);
+    const scrollable = maxScroll > SCROLL_EDGE_EPSILON;
+    // The deal grows a centred short row into an overflowing one. WebKit can
+    // preserve the centred row's old anchor as an arbitrary middle/end offset,
+    // so the first transition to overflow has one canonical starting point.
+    // Once the player has a scrollable rail, later draws and plays preserve the
+    // position they chose.
+    if (scrollable && !wasScrollableRef.current) track.scrollLeft = 0;
+    wasScrollableRef.current = scrollable;
     const left = Math.max(0, track.scrollLeft);
-    const next: HandScrollState =
-      maxScroll <= SCROLL_EDGE_EPSILON
-        ? 'none'
-        : left <= SCROLL_EDGE_EPSILON
-          ? 'start'
-          : maxScroll - left <= SCROLL_EDGE_EPSILON
-            ? 'end'
-            : 'middle';
+    const next: HandScrollState = !scrollable
+      ? 'none'
+      : left <= SCROLL_EDGE_EPSILON
+        ? 'start'
+        : maxScroll - left <= SCROLL_EDGE_EPSILON
+          ? 'end'
+          : 'middle';
     setScrollState((current) => (current === next ? current : next));
   }, []);
 

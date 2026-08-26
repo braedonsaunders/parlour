@@ -1083,8 +1083,14 @@ button.card {
     pointer-events: auto;
     transform: none;
   }
-  .localHand[data-scroll-state='none'] .handTrack {
-    justify-content: center;
+  /* Auto margins centre a short row and collapse to zero once it overflows.
+     Unlike toggling justify-content after measurement, that does not leave
+     WebKit preserving a stale centred scroll anchor halfway through a deal. */
+  .handTrack > .handCard:first-child {
+    margin-inline-start: auto;
+  }
+  .handTrack > .handCard:last-child {
+    margin-inline-end: auto;
   }
   .localHand[data-scroll-state='start'] .handTrack {
     -webkit-mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 3rem), transparent);

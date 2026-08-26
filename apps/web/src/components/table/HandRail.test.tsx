@@ -150,6 +150,39 @@ describe('hand rail keyboard surface', () => {
     expect(rail.dataset.scrollState).toBe('end');
     expect(rail.querySelectorAll('[role="listitem"]')).toHaveLength(13);
   });
+
+  it('starts at the first card when a dealt hand first becomes scrollable', () => {
+    act(() => {
+      root.render(
+        <HandRail count={13} zone="hand:0" label="Your hand">
+          {Array.from({ length: 13 }, (_, index) => (
+            <HandRailCard key={index} cardId={`card-${index}`} index={index} count={13} playable>
+              <button type="button">Card {index + 1}</button>
+            </HandRailCard>
+          ))}
+        </HandRail>,
+      );
+    });
+
+    const rail = container.querySelector<HTMLElement>('[role="list"]')!;
+    const track = rail.querySelector<HTMLElement>('[data-hand-scroll]')!;
+    Object.defineProperties(track, {
+      clientWidth: { configurable: true, value: 320 },
+      scrollWidth: { configurable: true, value: 320, writable: true },
+      scrollLeft: { configurable: true, value: 0, writable: true },
+    });
+    act(() => window.dispatchEvent(new Event('resize')));
+    expect(rail.dataset.scrollState).toBe('none');
+
+    // WebKit can carry this stale centred offset across the underflow/overflow
+    // layout change while the thirteen cards arrive.
+    Object.defineProperty(track, 'scrollWidth', { configurable: true, value: 960 });
+    track.scrollLeft = 640;
+    act(() => window.dispatchEvent(new Event('resize')));
+
+    expect(track.scrollLeft).toBe(0);
+    expect(rail.dataset.scrollState).toBe('start');
+  });
 });
 
 describe('table chrome', () => {
