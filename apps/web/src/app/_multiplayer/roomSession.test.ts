@@ -2458,4 +2458,63 @@ describe('veiled rooms on the shared stack', () => {
       10,
     );
   }, 60_000);
+
+  it('ends a drop hold early when a seat chooses to carry on without them', async () => {
+    // A grace this long proves the resume call, not the timer, ended the hold.
+    const { host, guest } = await veilPair({ seats: 3, label: 'veil-carry-on', graceMs: 60_000 });
+    await host.start();
+    await eventually(
+      () => expect(host.getSnapshot().seats.every((seat) => seat.connected)).toBe(true),
+      600,
+      25,
+    );
+
+    guest.close();
+    await eventually(
+      () => {
+        const security = host.getSnapshot().security;
+        expect(security.paused).toContain('dropped');
+        expect(security.waitingOn).toMatchObject({ seat: 1 });
+        expect(security.waitingOn!.endsAtMs).toBeGreaterThan(Date.now());
+      },
+      800,
+      10,
+    );
+
+    host.resumeWithoutSeat(1);
+    await eventually(
+      () => {
+        const security = host.getSnapshot().security;
+        expect(security.recoveredSeats).toContain(1);
+        expect(security.waitingOn).toBeNull();
+        expect(security.paused).toBeNull();
+      },
+      2000,
+      10,
+    );
+  }, 30_000);
+
+  it('carrying on without a two-seat opponent is an immediate walkover', async () => {
+    const { host, guest } = await veilPair({ label: 'veil-carry-two', graceMs: 60_000 });
+    await host.start();
+    await eventually(() => expect(guest.getSnapshot().stage).toBe('table'), 600, 25);
+
+    guest.close();
+    await eventually(() => expect(host.getSnapshot().security.waitingOn?.seat).toBe(1), 800, 10);
+
+    host.resumeWithoutSeat(1);
+    await eventually(
+      () => {
+        const session = multiplayerSession<BlitzState, BlitzConfig>(host.getSnapshot(), 'blitz')!;
+        expect(session.result?.reason).toBe('opponent-left');
+        expect(session.result?.winner).toBe(0);
+        const security = host.getSnapshot().security;
+        expect(security.paused).toBeNull();
+        expect(security.waitingOn).toBeNull();
+        expect(host.getSnapshot().error).toBeNull();
+      },
+      1000,
+      10,
+    );
+  }, 40_000);
 });
