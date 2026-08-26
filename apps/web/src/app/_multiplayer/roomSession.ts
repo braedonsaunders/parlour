@@ -197,6 +197,32 @@ function securityFor(
   };
 }
 
+/**
+ * Signalling injected by an end-to-end test, or null.
+ *
+ * The multi-context browser suite runs each seat in its own page, so no shared
+ * JS object can serve them — the bus lives in the Node process and each page
+ * reaches it through this global. Without a seam the suite has to talk to the
+ * public Nostr relays it is meant to be independent of, which is exactly why it
+ * spent a day failing on relay availability rather than on Parlour.
+ *
+ * This is a production code path, and that is stated rather than hidden: the
+ * global is readable in the shipped bundle. It grants nothing new, because
+ * script running in this page can already read every hand, send any move and
+ * replace the transport outright — an attacker who can set this global has
+ * already won by every other route. What it must never become is a way to
+ * reach signalling from *outside* the page, so it stays a same-realm global
+ * with no message, storage or URL channel behind it.
+ */
+function injectedSignaling(): RoomSignaling | null {
+  if (typeof window === 'undefined') return null;
+  const candidate = (window as unknown as { __PARLOUR_E2E_SIGNALING__?: unknown })
+    .__PARLOUR_E2E_SIGNALING__;
+  return candidate !== null && typeof candidate === 'object' && 'publicKey' in candidate
+    ? (candidate as RoomSignaling)
+    : null;
+}
+
 export class MultiplayerRoomSession {
   private readonly listeners = new Set<Listener>();
   private authority: SessionAuthority | null = null;
@@ -313,7 +339,7 @@ export class MultiplayerRoomSession {
     this.update({ connection: 'connecting' });
     const verdict = validateRoomCode(code);
     if (!verdict.ok) throw new Error('Room codes use four unambiguous letters or digits');
-    const signaling = this.dependencies.signaling ?? new NostrSignaling();
+    const signaling = this.dependencies.signaling ?? injectedSignaling() ?? new NostrSignaling();
     let announcement: RoomAnnouncement | null = null;
     try {
       announcement = await signaling.resolve(verdict.code, expectedHost);
@@ -1440,7 +1466,7 @@ export class MultiplayerRoomSession {
       profileId: this.profile.profileId,
       profileName: this.profile.name,
       profileAvatarId: this.profile.avatarId,
-      signaling: signaling ?? this.dependencies.signaling,
+      signaling: signaling ?? this.dependencies.signaling ?? injectedSignaling() ?? undefined,
       peerConnection: this.dependencies.peerConnection,
       heartbeatIntervalMs: this.dependencies.heartbeatIntervalMs,
       heartbeatTimeoutMs: this.dependencies.heartbeatTimeoutMs,

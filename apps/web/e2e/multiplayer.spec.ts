@@ -55,7 +55,10 @@ const DEAL_SETTLE_MS = 3_000;
 const ROOM_HEADING = '#room-heading';
 
 /** The join input is the text field on the join page. */
-const JOIN_INPUT = 'input[aria-label*="room code"]';
+// Case-insensitive on purpose. The label is localised — English renders "Room
+// code, 0 of 4 entered" — and CSS attribute matching is case-sensitive by
+// default, so the lowercase form silently matched nothing at all.
+const JOIN_INPUT = 'input[aria-label*="room code" i]';
 
 /** A real Nostr pubkey is 64 hex chars, and host-bound invites validate that. */
 function peerKey(label: string): string {
