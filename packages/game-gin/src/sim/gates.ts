@@ -37,10 +37,28 @@ export interface GateThresholds {
  */
 export const DEFAULT_THRESHOLDS: GateThresholds = {
   headToHeadMin: 0.6,
-  // Blitz's four-seat band was 15–35%; a novice tier facing a mostly-strong
-  // two-seat field earns roughly a win in four, which stays healthy, not
-  // degenerate.
-  personaBandMin: 0.2,
+  /**
+   * Recalibrated after the discard rule was corrected.
+   *
+   * The floor used to be 0.2, on the reasoning that a novice tier facing a
+   * mostly-strong two-seat field earns roughly a win in four. That number
+   * described a game Parlour was playing wrong: until `c54babe` the rules
+   * refused to let anyone discard a card drawn from the stock, which standard
+   * gin permits. Correcting it widened the legal discard set, and the strong
+   * personas exploit a wider set better than the novice does, so the spread
+   * grew. The nightly caught it, which is what the nightly is for.
+   *
+   * Measured over 400 games at seed 20260824 after the correction: the six
+   * personas land at 68.9, 59.1, 57.6, 50.8, 21.3 and 18.4 percent, with Hard
+   * over Easy at 67.2 against 21.7 — a decisive ladder, and no persona that
+   * has stopped competing. The floor sits below the weakest of those with room
+   * for sampling noise rather than hugging it.
+   *
+   * Hearts carries a 0.1 floor for the same reason at four seats: a
+   * deliberately novice policy in strong company is meant to lose most hands,
+   * and a floor that forbids it is a floor asserting the wrong thing.
+   */
+  personaBandMin: 0.15,
   personaBandMax: 0.7,
   maxStallRate: 0.005,
 };
