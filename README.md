@@ -36,27 +36,27 @@ server to lag, no account to create, and nothing stored about you. Real life is 
 
 <img src="docs/shots/shelf-fable.png" alt="The parlour game shelf" width="100%" />
 
-| Game                         | The pitch                                                                                 |
-| ---------------------------- | ----------------------------------------------------------------------------------------- |
-| **Blitz** · the 31 game      | Knock your way to 31 in one suit. Three formats, six bot personalities.                   |
-| **Wild** · the shedding game | Skips, draw-fours, color dumps and jump-ins. Classic rules or the loud Party house rules. |
-| **Crazy Eights**             | Match suit or rank, eights call the suit, losers pay for what they're still holding.      |
-| **Egyptian Ratscrew**        | Flip, challenge the face cards, and slap the sandwich — in real time.                     |
-| **Gin Rummy**                | Meld, knock, go gin — and undercut whoever knocked too soon.                              |
-| **Hearts**                   | Pass three, dodge the Queen, break hearts, or shoot the moon.                             |
-| **Euchre**                   | Order it up, name trump, go alone, march the hand.                                        |
-| **Cribbage**                 | Peg the board, count the show, try not to get skunked.                                    |
-| **President**                | Slam sets, clear the pile, trade cards with the Scum.                                     |
-| **Poker** · no-limit hold'em | Blinds climb until one stack has the lot. Chips only.                                     |
-| **Oh Hell**                  | Bid exactly the tricks you'll take. The hand grows, then shrinks back down.               |
-| **Scopa**                    | Fish cards off the table by matching one — or the sum of several.                         |
-| **Spite & Malice**           | Race to empty your payoff pile and bury what your neighbour needs.                        |
-| **Spades**                   | Bid books with a partner, break spades, mind the bags.                                    |
-| **Klondike**                 | The solitaire everyone knows, dealt from a seed you can share.                            |
-| **Freecell** · the open solitaire | Every card face-up from the deal — four free cells, no luck but the shuffle.         |
-| **Spider** · the two-deck solitaire | Peel eight suited runs off 104 cards before the table buries you.                  |
-| **Pyramid** · pair to thirteen | Pair cards that sum to thirteen and topple the pyramid one match at a time.             |
-| **Golf** · the fast solitaire | Play ±1 onto the hole and clear the grass in as few passes as you can.                   |
+| Game                                | The pitch                                                                                 |
+| ----------------------------------- | ----------------------------------------------------------------------------------------- |
+| **Blitz** · the 31 game             | Knock your way to 31 in one suit. Three formats, six bot personalities.                   |
+| **Wild** · the shedding game        | Skips, draw-fours, color dumps and jump-ins. Classic rules or the loud Party house rules. |
+| **Crazy Eights**                    | Match suit or rank, eights call the suit, losers pay for what they're still holding.      |
+| **Egyptian Ratscrew**               | Flip, challenge the face cards, and slap the sandwich — in real time.                     |
+| **Gin Rummy**                       | Meld, knock, go gin — and undercut whoever knocked too soon.                              |
+| **Hearts**                          | Pass three, dodge the Queen, break hearts, or shoot the moon.                             |
+| **Euchre**                          | Order it up, name trump, go alone, march the hand.                                        |
+| **Cribbage**                        | Peg the board, count the show, try not to get skunked.                                    |
+| **President**                       | Slam sets, clear the pile, trade cards with the Scum.                                     |
+| **Poker** · no-limit hold'em        | Blinds climb until one stack has the lot. Chips only.                                     |
+| **Oh Hell**                         | Bid exactly the tricks you'll take. The hand grows, then shrinks back down.               |
+| **Scopa**                           | Fish cards off the table by matching one — or the sum of several.                         |
+| **Spite & Malice**                  | Race to empty your payoff pile and bury what your neighbour needs.                        |
+| **Spades**                          | Bid books with a partner, break spades, mind the bags.                                    |
+| **Klondike**                        | The solitaire everyone knows, dealt from a seed you can share.                            |
+| **Freecell** · the open solitaire   | Every card face-up from the deal — four free cells, no luck but the shuffle.              |
+| **Spider** · the two-deck solitaire | Peel eight suited runs off 104 cards before the table buries you.                         |
+| **Pyramid** · pair to thirteen      | Pair cards that sum to thirteen and topple the pyramid one match at a time.               |
+| **Golf** · the fast solitaire       | Play ±1 onto the hole and clear the grass in as few passes as you can.                    |
 
 House rules are real settings, not forks: every game ships rule toggles and named presets you can set
 when you create the room.

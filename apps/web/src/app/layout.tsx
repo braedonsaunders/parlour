@@ -51,10 +51,24 @@ export const metadata: Metadata = {
   other: { 'mobile-web-app-capable': 'yes' },
 };
 
+/**
+ * The table is an app surface, not a page: it is laid out to the viewport, it
+ * drags cards, and a pinch that rescales it mid-hand breaks the thing rather
+ * than revealing more of it. So the scale is pinned deliberately, and the cost
+ * is stated rather than hidden — this is a WCAG 1.4.4 trade, made on the
+ * grounds that a fixed-canvas game is not the reflowable content that rule is
+ * written for. Type size and contrast carry the legibility burden instead.
+ *
+ * Because the lock also suppresses iOS Safari's focus auto-zoom, no input needs
+ * to reach 16px to avoid it. Keep the lock and the input sizes together: if one
+ * ever goes, the other has to be revisited in the same change.
+ */
 export const viewport: Viewport = {
   themeColor: '#152833',
   width: 'device-width',
   initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
   viewportFit: 'cover',
   colorScheme: 'dark',
 };
