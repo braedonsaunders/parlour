@@ -1,13 +1,13 @@
-import type { GameCatalogEntry } from '@parlour/engine';
+import { defineGameCatalog } from '@parlour/engine';
 import { orderPokerHand } from './cards';
-import { pokerConfig, type PokerRules } from './config';
+import { pokerConfig } from './config';
 import { pokerHowToPlay } from './howto';
 
 /**
  * Poker's entry on the parlour shelf. Mode ids match the config presets in
  * {@link pokerConfig}.
  */
-export const pokerCatalog: GameCatalogEntry<PokerRules> = {
+export const pokerCatalog = defineGameCatalog({
   id: 'poker',
   gameId: 'poker',
   name: 'Poker',
@@ -73,4 +73,4 @@ export const pokerCatalog: GameCatalogEntry<PokerRules> = {
       ],
     },
   ],
-};
+});

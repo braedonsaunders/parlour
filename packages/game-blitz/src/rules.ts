@@ -1,4 +1,5 @@
 import {
+  advanceSeat,
   addTo,
   dealOrder,
   Fx,
@@ -66,7 +67,7 @@ function isRealCard(card: CardId): boolean {
 function nextLiveSeat(state: BlitzState, from: SeatId): SeatId {
   const live = liveSeats(state);
   for (let step = 1; step <= state.seats; step++) {
-    const seat = (from + step) % state.seats;
+    const seat = advanceSeat(from, state.seats, step);
     if (live.includes(seat)) return seat;
   }
   return live[0] ?? from;

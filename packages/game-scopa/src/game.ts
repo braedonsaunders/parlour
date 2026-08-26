@@ -1,4 +1,5 @@
 import {
+  advanceSeat,
   Fx,
   type BotPolicy,
   type CardId,
@@ -157,7 +158,7 @@ const playCard: Move<ScopaState> = {
       table = [];
     }
 
-    const turn = ((seat + 1) % state.seats) as SeatId;
+    const turn = advanceSeat(seat, state.seats);
     ctx.fx.emit(Fx.TurnRing, { seat: turn }, TURN_RING_DELAY_MS);
 
     return {
@@ -269,7 +270,7 @@ const nextRound: Move<ScopaState> = {
   validate: () => true,
 
   apply(state, _seat, _payload, ctx) {
-    const dealer = ((state.dealer + 1) % state.seats) as SeatId;
+    const dealer = advanceSeat(state.dealer, state.seats);
     return openRound(
       {
         ...state,

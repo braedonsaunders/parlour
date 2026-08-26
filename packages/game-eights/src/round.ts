@@ -1,4 +1,5 @@
 import {
+  advanceSeat,
   Fx,
   addTo,
   drawFrom,
@@ -63,8 +64,7 @@ export function handOf(round: EightsRound, seat: SeatId): readonly CardId[] {
 }
 
 export function nextSeat(round: EightsRound, from: SeatId, steps = 1): SeatId {
-  const seats = round.hands.length;
-  return (from + round.direction * steps + seats * steps) % seats;
+  return advanceSeat(from, round.hands.length, steps, round.direction);
 }
 
 /** A two can only be answered by another two, and only when the table stacks. */

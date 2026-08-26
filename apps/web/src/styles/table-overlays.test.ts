@@ -41,8 +41,31 @@ describe('table overlay stacking', () => {
     );
   });
 
+  it('centers the Hearts turn prompt instead of clipping it in the corner rail', () => {
+    const prompt = declarationsFor(hearts, '.turnPrompt.turnPrompt');
+    expect(prompt).toMatch(/right:\s*auto;/);
+    expect(prompt).toMatch(/left:\s*50%;/);
+    expect(prompt).toMatch(/bottom:\s*30%;/);
+    expect(prompt).toMatch(/translate:\s*-50% 0;/);
+  });
+
+  it('keeps four-player trick cards above the local hand on short landscape phones', () => {
+    expect(hearts).toMatch(
+      /@media \(orientation: landscape\) and \(max-height: 560px\)[\s\S]*?\.trickSlot\s*\{[^}]*top:\s*40%;[\s\S]*?\.trickSlot0\s*\{[^}]*--trick-y:\s*32px;/,
+    );
+    expect(euchre).toMatch(
+      /@media \(orientation: landscape\) and \(max-height: 560px\)[\s\S]*?\.trickZone\s*\{[^}]*top:\s*42%;[^}]*scale\(0\.78\);/,
+    );
+  });
+
   it('keeps President role moments above the next-deal flights', () => {
     expect(zIndexFor(president, '.celebration')).toBeGreaterThan(zIndexFor(table, '.fxLayer'));
+  });
+
+  it('lifts the President pile above the local fan on short landscape phones', () => {
+    expect(president).toMatch(
+      /@media \(orientation: landscape\) and \(max-height: 560px\)[\s\S]*?\.pileArea\s*\{[^}]*top:\s*35%;/,
+    );
   });
 
   it('keeps Wild jump-in notices above flights and moves short-screen badges beside the center', () => {

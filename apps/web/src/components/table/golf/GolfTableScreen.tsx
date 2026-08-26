@@ -3,14 +3,12 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import type { FxEvent } from '@parlour/engine';
 import { PlayingCard } from '@/components/table/PlayingCard';
-import { TableMenu } from '@/components/table/TableMenu';
 import {
   TableActionRail,
   TableErrorScreen,
-  TableHud,
   TableLoadingScreen,
   TablePlayfield,
-  TableShell,
+  TableScreenFrame,
   TableTitlePill,
   useGameTextSurface,
   useTableMenu,
@@ -147,12 +145,12 @@ function ReadyGolfTable({
   const finished = view.stage === 'won' || view.stage === 'holed';
 
   return (
-    <TableShell
+    <TableScreenFrame
       rootRef={rootRef}
       className={styles.screen}
       dealState={deal.sequence ? (deal.dealing ? 'dealing' : 'complete') : undefined}
-    >
-      <TableHud onOpenMenu={menu.open}>
+      menu={menu}
+      hud={
         <TableTitlePill
           eyebrow="Golf"
           status={
@@ -168,8 +166,13 @@ function ReadyGolfTable({
             <b>{view.leftover}</b> left · <b>{view.moves}</b> moves · <b>{formatTime(elapsedMs)}</b>
           </span>
         </TableTitlePill>
-      </TableHud>
-
+      }
+      howToPlay={{
+        doc: golfCatalog.howToPlay,
+        title: 'Golf',
+        subtitle: 'the fast solitaire',
+      }}
+    >
       <TablePlayfield label="Golf table" feltMark="G" className={styles.playfield}>
         <div className={styles.board} data-testid="golf-board" aria-busy={deal.dealing}>
           <div className={styles.topRow}>
@@ -316,18 +319,7 @@ function ReadyGolfTable({
         <strong>Turn the table sideways</strong>
         <p>Seven golf columns need a landscape table.</p>
       </div>
-
-      <TableMenu
-        open={menu.isOpen}
-        onClose={menu.close}
-        onQuit={menu.quit}
-        howToPlay={{
-          doc: golfCatalog.howToPlay,
-          title: 'Golf',
-          subtitle: 'the fast solitaire',
-        }}
-      />
-    </TableShell>
+    </TableScreenFrame>
   );
 }
 

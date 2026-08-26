@@ -1,4 +1,5 @@
 import {
+  advanceSeat,
   Fx,
   dealOrder,
   isVeilHandle,
@@ -69,12 +70,12 @@ function payloadDeckOrder(payload: unknown): readonly CardId[] | null {
 }
 
 function partnerOf(seat: SeatId): SeatId {
-  return (seat + 2) % 4;
+  return advanceSeat(seat, 4, 2);
 }
 
 function nextSeat(from: SeatId, sittingOut: SeatId | null = null): SeatId {
-  let seat = (from + 1) % 4;
-  while (seat === sittingOut) seat = (seat + 1) % 4;
+  let seat = advanceSeat(from, 4);
+  while (seat === sittingOut) seat = advanceSeat(seat, 4);
   return seat;
 }
 

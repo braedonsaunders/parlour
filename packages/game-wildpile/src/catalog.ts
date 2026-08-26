@@ -1,6 +1,6 @@
-import type { GameCatalogEntry } from '@parlour/engine';
+import { defineGameCatalog } from '@parlour/engine';
 import { orderWildpileHand } from './deck';
-import { wildpileConfig, type WildpileRules } from './game';
+import { wildpileConfig } from './game';
 import { wildpileHowToPlay } from './howto';
 
 /**
@@ -8,7 +8,7 @@ import { wildpileHowToPlay } from './howto';
  * generated from this, so presentation lives beside the rules it describes —
  * the mode ids here are the config presets in {@link wildpileConfig}.
  */
-export const wildpileCatalog: GameCatalogEntry<WildpileRules> = {
+export const wildpileCatalog = defineGameCatalog({
   id: 'wild',
   gameId: 'wildpile',
   name: 'Wild',
@@ -80,4 +80,4 @@ export const wildpileCatalog: GameCatalogEntry<WildpileRules> = {
       ],
     },
   ],
-};
+});

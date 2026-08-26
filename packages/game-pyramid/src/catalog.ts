@@ -1,9 +1,9 @@
-import type { GameCatalogEntry } from '@parlour/engine';
+import { defineGameCatalog } from '@parlour/engine';
 import { orderPyramidHand } from './cards';
-import { pyramidConfig, type PyramidRules } from './config';
+import { pyramidConfig } from './config';
 import { pyramidHowToPlay } from './howto';
 
-export const pyramidCatalog: GameCatalogEntry<PyramidRules> = {
+export const pyramidCatalog = defineGameCatalog({
   id: 'pyramid',
   gameId: 'pyramid',
   name: 'Pyramid',
@@ -68,4 +68,4 @@ export const pyramidCatalog: GameCatalogEntry<PyramidRules> = {
       ],
     },
   ],
-};
+});

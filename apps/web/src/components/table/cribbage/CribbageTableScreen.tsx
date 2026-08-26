@@ -15,17 +15,15 @@ import { useTableAudio } from '../fx-animation';
 import { HandRail, HandRailCard } from '../HandRail';
 import { PlayingCard } from '../PlayingCard';
 import { StockStack } from '../StockStack';
-import { TableMenu } from '../TableMenu';
 import {
   dealStateAttr,
   TableActionRail,
   TableCardFlight,
   TableErrorScreen,
   TableFxLayer,
-  TableHud,
   TableLoadingScreen,
   TablePlayfield,
-  TableShell,
+  TableScreenFrame,
   TableTitlePill,
   useGameTextSurface,
   useTableMenu,
@@ -90,11 +88,14 @@ export function CribbageTableScreen(props: CribbageTableScreenProps) {
   const tableBusy = (props.busy ?? false) || deal.dealing;
   return (
     <ArrivalProvider fx={props.fx} fxKey={props.fxKey} localSeat={view.localSeat}>
-      <TableShell rootRef={rootRef} className={styles.screen} dealState={dealStateAttr(deal)}>
-        <TableHud onOpenMenu={menu.open}>
-          <TableTitlePill eyebrow="Cribbage" status={phaseCopy(view)} />
-        </TableHud>
-
+      <TableScreenFrame
+        rootRef={rootRef}
+        className={styles.screen}
+        dealState={dealStateAttr(deal)}
+        menu={menu}
+        hud={<TableTitlePill eyebrow="Cribbage" status={phaseCopy(view)} />}
+        howToPlay={{ doc: cribbageHowToPlay, title: 'Cribbage', subtitle: 'the pegging race' }}
+      >
         <TablePlayfield label="Cribbage table">
           <div className={styles.feltMonogram} aria-hidden="true">
             121
@@ -139,14 +140,7 @@ export function CribbageTableScreen(props: CribbageTableScreenProps) {
             </button>
           )}
         </TableActionRail>
-
-        <TableMenu
-          open={menu.isOpen}
-          onClose={menu.close}
-          howToPlay={{ doc: cribbageHowToPlay, title: 'Cribbage', subtitle: 'the pegging race' }}
-          onQuit={menu.quit}
-        />
-      </TableShell>
+      </TableScreenFrame>
     </ArrivalProvider>
   );
 }

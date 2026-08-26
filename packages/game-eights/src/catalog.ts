@@ -1,6 +1,6 @@
-import type { GameCatalogEntry } from '@parlour/engine';
+import { defineGameCatalog } from '@parlour/engine';
 import { orderEightsHand } from './cards';
-import { eightsConfig, type EightsRules } from './config';
+import { eightsConfig } from './config';
 import { eightsHowToPlay } from './howto';
 
 /**
@@ -8,7 +8,7 @@ import { eightsHowToPlay } from './howto';
  * picker are generated from this, so presentation lives beside the rules it
  * describes — the mode ids here are the config presets in {@link eightsConfig}.
  */
-export const eightsCatalog: GameCatalogEntry<EightsRules> = {
+export const eightsCatalog = defineGameCatalog({
   id: 'eights',
   gameId: 'eights',
   name: 'Crazy Eights',
@@ -80,4 +80,4 @@ export const eightsCatalog: GameCatalogEntry<EightsRules> = {
       ],
     },
   ],
-};
+});

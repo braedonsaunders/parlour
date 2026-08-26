@@ -1,9 +1,9 @@
-import type { GameCatalogEntry } from '@parlour/engine';
+import { defineGameCatalog } from '@parlour/engine';
 import { orderSpiderHand } from './cards';
-import { spiderConfig, type SpiderRules } from './config';
+import { spiderConfig } from './config';
 import { spiderHowToPlay } from './howto';
 
-export const spiderCatalog: GameCatalogEntry<SpiderRules> = {
+export const spiderCatalog = defineGameCatalog({
   id: 'spider',
   gameId: 'spider',
   name: 'Spider',
@@ -81,4 +81,4 @@ export const spiderCatalog: GameCatalogEntry<SpiderRules> = {
       ],
     },
   ],
-};
+});

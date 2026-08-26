@@ -52,9 +52,12 @@ export function TableActionRail({
 }
 
 /** The shared "Your turn" whisper. Decorative: the phase line carries the text. */
-export function TableTurnIndicator() {
+export function TableTurnIndicator({ className }: { className?: string } = {}) {
   return (
-    <span className={styles.turnIndicator} aria-hidden="true">
+    <span
+      className={className ? `${styles.turnIndicator} ${className}` : styles.turnIndicator}
+      aria-hidden="true"
+    >
       Your turn
     </span>
   );

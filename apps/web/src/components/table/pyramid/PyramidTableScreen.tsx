@@ -4,14 +4,12 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactN
 import type { FxEvent } from '@parlour/engine';
 import { isFree, pyramidCatalog } from '@parlour/game-pyramid';
 import { PlayingCard } from '@/components/table/PlayingCard';
-import { TableMenu } from '@/components/table/TableMenu';
 import {
   TableActionRail,
   TableErrorScreen,
-  TableHud,
   TableLoadingScreen,
   TablePlayfield,
-  TableShell,
+  TableScreenFrame,
   TableTitlePill,
   useGameTextSurface,
   useTableMenu,
@@ -185,12 +183,12 @@ function ReadyPyramidTable({
   };
 
   return (
-    <TableShell
+    <TableScreenFrame
       rootRef={rootRef}
       className={styles.screen}
       dealState={deal.sequence ? (deal.dealing ? 'dealing' : 'complete') : undefined}
-    >
-      <TableHud onOpenMenu={menu.open}>
+      menu={menu}
+      hud={
         <TableTitlePill
           eyebrow="Pyramid"
           status={
@@ -206,8 +204,13 @@ function ReadyPyramidTable({
             <b>{view.leftover}</b> left · <b>{view.moves}</b> moves · <b>{formatTime(elapsedMs)}</b>
           </span>
         </TableTitlePill>
-      </TableHud>
-
+      }
+      howToPlay={{
+        doc: pyramidCatalog.howToPlay,
+        title: 'Pyramid',
+        subtitle: 'pair to thirteen',
+      }}
+    >
       <TablePlayfield label="Pyramid table" feltMark="P" className={styles.playfield}>
         <div className={styles.board} data-testid="pyramid-board" aria-busy={deal.dealing}>
           <div className={styles.topRow}>
@@ -398,18 +401,7 @@ function ReadyPyramidTable({
           </span>
         )}
       </TableActionRail>
-
-      <TableMenu
-        open={menu.isOpen}
-        onClose={menu.close}
-        onQuit={menu.quit}
-        howToPlay={{
-          doc: pyramidCatalog.howToPlay,
-          title: 'Pyramid',
-          subtitle: 'pair to thirteen',
-        }}
-      />
-    </TableShell>
+    </TableScreenFrame>
   );
 }
 

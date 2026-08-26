@@ -1,7 +1,7 @@
-import type { GameCatalogEntry } from '@parlour/engine';
+import { defineGameCatalog } from '@parlour/engine';
 import { orderPresidentHand } from './deck';
 import { MAX_SEATS, MIN_SEATS } from './game';
-import { presidentConfig, type PresidentRules } from './config';
+import { presidentConfig } from './config';
 import { presidentHowToPlay } from './howto';
 
 /**
@@ -10,7 +10,7 @@ import { presidentHowToPlay } from './howto';
  * describes — the mode ids here are the config presets in
  * {@link presidentConfig}.
  */
-export const presidentCatalog: GameCatalogEntry<PresidentRules> = {
+export const presidentCatalog = defineGameCatalog({
   id: 'president',
   gameId: 'president',
   name: 'President',
@@ -81,4 +81,4 @@ export const presidentCatalog: GameCatalogEntry<PresidentRules> = {
       ],
     },
   ],
-};
+});

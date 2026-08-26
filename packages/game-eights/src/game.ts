@@ -1,4 +1,5 @@
 import {
+  advanceSeat,
   Fx,
   VEILED_REDEAL_PENDING,
   isVeiledDealPayload,
@@ -245,7 +246,7 @@ const nextRound: Move<EightsState> = {
     return true;
   },
   apply(state, _seat, payload, ctx) {
-    const dealer = ((state.dealer + 1) % state.seats) as SeatId;
+    const dealer = advanceSeat(state.dealer, state.seats);
     const round = dealRound(
       {
         config: state.rules,

@@ -13,15 +13,13 @@ import { useDealPresentation } from '@/lib/table/deal-presentation';
 import { useTableAudio } from '../fx-animation';
 import { HandRail, HandRailCard } from '../HandRail';
 import { PlayingCard } from '../PlayingCard';
-import { TableMenu } from '../TableMenu';
 import {
   TableActionRail,
   TableErrorScreen,
   TableFxLayer,
-  TableHud,
   TableLoadingScreen,
   TablePlayfield,
-  TableShell,
+  TableScreenFrame,
   TableTitlePill,
   dealStateAttr,
   useGameTextSurface,
@@ -74,8 +72,12 @@ export function PokerTableScreen(props: PokerTableScreenProps) {
   const committed = local ? local.bet : 0;
 
   return (
-    <TableShell rootRef={rootRef} className={styles.screen} dealState={dealStateAttr(deal)}>
-      <TableHud onOpenMenu={menu.open}>
+    <TableScreenFrame
+      rootRef={rootRef}
+      className={styles.screen}
+      dealState={dealStateAttr(deal)}
+      menu={menu}
+      hud={
         <TableTitlePill eyebrow="Poker" status={view.streetLabel}>
           <span className={styles.hudChips}>
             <span className={styles.hudStat} data-you>
@@ -95,8 +97,9 @@ export function PokerTableScreen(props: PokerTableScreenProps) {
             </span>
           </span>
         </TableTitlePill>
-      </TableHud>
-
+      }
+      howToPlay={{ doc: pokerHowToPlay, title: 'Poker', subtitle: 'no-limit hold’em' }}
+    >
       <TablePlayfield
         label="Poker table"
         seatCount={view.players.length}
@@ -179,14 +182,7 @@ export function PokerTableScreen(props: PokerTableScreenProps) {
           onRaise={props.onRaise}
         />
       </TableActionRail>
-
-      <TableMenu
-        open={menu.isOpen}
-        onClose={menu.close}
-        onQuit={menu.quit}
-        howToPlay={{ doc: pokerHowToPlay, title: 'Poker', subtitle: 'no-limit hold’em' }}
-      />
-    </TableShell>
+    </TableScreenFrame>
   );
 }
 

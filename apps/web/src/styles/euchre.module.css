@@ -83,6 +83,14 @@
   transform: translate(58%, 0%) rotate(-5deg);
 }
 
+@media (orientation: landscape) and (max-height: 560px) {
+  /* Keep the south trick card clear of the local fan on short phones. */
+  .trickZone {
+    top: 42%;
+    transform: translate(-50%, -50%) scale(0.78);
+  }
+}
+
 .kitty {
   position: absolute;
   left: 50%;

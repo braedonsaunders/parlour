@@ -242,7 +242,9 @@ describe('slap reducer', () => {
     expect(slapped.next.turn).toBe(0);
     // seat 0's stack keeps its order; won cards go underneath
     expect(slapped.next.piles[0]).toEqual(['S10', 'D6', 'S6']);
-    expect(slapped.fx.some((e) => e.kind === 'ratscrew.slap')).toBe(true);
+    expect(slapped.fx.find((e) => e.kind === 'ratscrew.slap')).toMatchObject({
+      payload: { seat: 0, pattern: 'double', cards: ['S6', 'D6'] },
+    });
   });
 
   it('overrides a paused pile payout when slapped first', () => {

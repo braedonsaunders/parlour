@@ -1,9 +1,9 @@
-import type { GameCatalogEntry } from '@parlour/engine';
+import { defineGameCatalog } from '@parlour/engine';
 import { orderKlondikeHand } from './cards';
-import { klondikeConfig, type KlondikeRules } from './config';
+import { klondikeConfig } from './config';
 import { klondikeHowToPlay } from './howto';
 
-export const klondikeCatalog: GameCatalogEntry<KlondikeRules> = {
+export const klondikeCatalog = defineGameCatalog({
   id: 'klondike',
   gameId: 'klondike',
   name: 'Klondike',
@@ -66,4 +66,4 @@ export const klondikeCatalog: GameCatalogEntry<KlondikeRules> = {
       ],
     },
   ],
-};
+});

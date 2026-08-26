@@ -1,13 +1,13 @@
-import type { GameCatalogEntry } from '@parlour/engine';
+import { defineGameCatalog } from '@parlour/engine';
 import { orderScopaHand } from './cards';
-import { scopaConfig, type ScopaRules } from './config';
+import { scopaConfig } from './config';
 import { scopaHowToPlay } from './howto';
 
 /**
  * Scopa's entry on the parlour shelf. Mode ids match the config presets in
  * {@link scopaConfig}.
  */
-export const scopaCatalog: GameCatalogEntry<ScopaRules> = {
+export const scopaCatalog = defineGameCatalog({
   id: 'scopa',
   gameId: 'scopa',
   name: 'Scopa',
@@ -73,4 +73,4 @@ export const scopaCatalog: GameCatalogEntry<ScopaRules> = {
       ],
     },
   ],
-};
+});

@@ -19,7 +19,6 @@ import { discardRotation, useTableAudio } from '../fx-animation';
 import { HandRail, HandRailCard } from '../HandRail';
 import { PlayingCard } from '../PlayingCard';
 import { StockStack } from '../StockStack';
-import { TableMenu } from '../TableMenu';
 import {
   dealStateAttr,
   DiscardPileButton,
@@ -30,11 +29,10 @@ import {
   TableCardFlight,
   TableErrorScreen,
   TableFxLayer,
-  TableHud,
   TableLoadingScreen,
   TablePiles,
   TablePlayfield,
-  TableShell,
+  TableScreenFrame,
   TableTitlePill,
   TableTurnIndicator,
   TableTurnPop,
@@ -128,8 +126,11 @@ export function GinTableScreen(props: GinTableScreenProps) {
 
   return (
     <ArrivalProvider fx={props.fx} fxKey={props.fxKey} localSeat={view.localSeat}>
-      <TableShell rootRef={rootRef} dealState={dealStateAttr(deal)}>
-        <TableHud onOpenMenu={menu.open}>
+      <TableScreenFrame
+        rootRef={rootRef}
+        dealState={dealStateAttr(deal)}
+        menu={menu}
+        hud={
           <TableTitlePill
             eyebrow="Gin"
             status={view.phaseLabel}
@@ -140,8 +141,9 @@ export function GinTableScreen(props: GinTableScreenProps) {
               <span className="text-dusk-200/70"> → {view.matchTarget}</span>
             </span>
           </TableTitlePill>
-        </TableHud>
-
+        }
+        howToPlay={{ doc: ginHowToPlay, title: 'Gin', subtitle: 'the rummy classic' }}
+      >
         <TablePlayfield label="Gin table" feltMark="♣">
           {opponent && (
             <Seat
@@ -203,14 +205,7 @@ export function GinTableScreen(props: GinTableScreenProps) {
             readySent={!view.handEnd.waitingFor.includes(view.localSeat)}
           />
         )}
-
-        <TableMenu
-          open={menu.isOpen}
-          onClose={menu.close}
-          howToPlay={{ doc: ginHowToPlay, title: 'Gin', subtitle: 'the rummy classic' }}
-          onQuit={menu.quit}
-        />
-      </TableShell>
+      </TableScreenFrame>
     </ArrivalProvider>
   );
 }

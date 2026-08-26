@@ -1,5 +1,5 @@
-import type { GameCatalogEntry } from '@parlour/engine';
-import { ginConfigSchema, type GinConfig } from './config';
+import { defineGameCatalog } from '@parlour/engine';
+import { ginConfigSchema } from './config';
 import { ginHowToPlay } from './howto';
 import { orderGinHand } from './melds';
 
@@ -8,7 +8,7 @@ import { orderGinHand } from './melds';
  * presets in {@link ginConfigSchema} — Classic/Quick/Purist are rule presets,
  * so each mode carries its `preset` id.
  */
-export const ginCatalog: GameCatalogEntry<GinConfig> = {
+export const ginCatalog = defineGameCatalog({
   id: 'gin',
   gameId: 'gin',
   name: 'Gin',
@@ -78,4 +78,4 @@ export const ginCatalog: GameCatalogEntry<GinConfig> = {
       ],
     },
   ],
-};
+});

@@ -5,6 +5,8 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { HeartsTableScreen } from './HeartsTableScreen';
 import type { HeartsTableView } from '@/lib/hearts/view';
+import heartsStyles from '@/styles/hearts.module.css';
+import tableStyles from '@/styles/table.module.css';
 
 function makeView(overrides: Partial<HeartsTableView> = {}): HeartsTableView {
   return {
@@ -79,11 +81,25 @@ describe('HeartsTableScreen', () => {
     const trickArea = container.querySelector('[data-zone="discard"]');
     expect(trickArea?.querySelector('[aria-label="2 of clubs"]')).not.toBeNull();
     expect(trickArea?.querySelector('[aria-label="9 of clubs"]')).not.toBeNull();
+    expect(trickArea?.querySelectorAll('[data-trick-slot] > [data-trick-arrival]')).toHaveLength(2);
     const cards = [...container.querySelectorAll('[data-hand-card]')];
     expect(cards).toHaveLength(3);
     const playable = cards.filter((node) => node.getAttribute('data-playable') === 'true');
     expect(playable).toHaveLength(1);
     expect(container.querySelector('[data-table-screen]')).not.toBeNull();
+  });
+
+  it('centers the turn prompt on the felt instead of clipping it in the corner rail', () => {
+    act(() =>
+      root.render(createElement(HeartsTableScreen, { view: makeView(), fx: [], fxKey: 'turn' })),
+    );
+
+    const prompt = [...container.querySelectorAll('span')].find(
+      (node) => node.textContent === 'Your turn',
+    );
+    expect(prompt?.classList.contains(heartsStyles.turnPrompt!)).toBe(true);
+    expect(prompt?.closest(`.${tableStyles.playfield}`)).not.toBeNull();
+    expect(prompt?.closest(`.${tableStyles.actionRail}`)).toBeNull();
   });
 
   it('shows the pass banner pips and confirm button once three cards are picked', () => {

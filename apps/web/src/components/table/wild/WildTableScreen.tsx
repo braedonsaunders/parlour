@@ -35,7 +35,6 @@ import { CardDropFx } from '../CardDropFx';
 import { discardRotation, useTableAudio } from '../fx-animation';
 import { HandRail, HandRailCard } from '../HandRail';
 import { StockStack } from '../StockStack';
-import { TableMenu } from '../TableMenu';
 import {
   dealStateAttr,
   OpponentFan,
@@ -45,11 +44,10 @@ import {
   TableCardFlight,
   TableErrorScreen,
   TableFxLayer,
-  TableHud,
   TableLoadingScreen,
   TablePiles,
   TablePlayfield,
-  TableShell,
+  TableScreenFrame,
   TableTitlePill,
   TableTurnIndicator,
   TableTurnPop,
@@ -178,12 +176,18 @@ function WildTableScreenView(props: WildTableScreenProps) {
 
   return (
     <ArrivalProvider fx={props.fx} fxKey={props.fxKey} localSeat={view.localSeat}>
-      <TableShell rootRef={rootRef} dealState={dealStateAttr(deal)}>
-        <TableHud onOpenMenu={menu.open}>
-          <TableTitlePill eyebrow="Wild" status={view.phaseLabel} />
-          {props.matchEndsAt !== undefined && <MatchClock endsAt={props.matchEndsAt} />}
-        </TableHud>
-
+      <TableScreenFrame
+        rootRef={rootRef}
+        dealState={dealStateAttr(deal)}
+        menu={menu}
+        hud={
+          <>
+            <TableTitlePill eyebrow="Wild" status={view.phaseLabel} />
+            {props.matchEndsAt !== undefined && <MatchClock endsAt={props.matchEndsAt} />}
+          </>
+        }
+        howToPlay={{ doc: wildpileHowToPlay, title: 'Wild', subtitle: view.phaseLabel }}
+      >
         <TablePlayfield label="Wild table" feltMark="W">
           {view.players.map((player) => (
             <Seat
@@ -291,14 +295,7 @@ function WildTableScreenView(props: WildTableScreenProps) {
             )}
           </AnimatePresence>
         </TableActionRail>
-
-        <TableMenu
-          open={menu.isOpen}
-          onClose={menu.close}
-          howToPlay={{ doc: wildpileHowToPlay, title: 'Wild', subtitle: view.phaseLabel }}
-          onQuit={menu.quit}
-        />
-      </TableShell>
+      </TableScreenFrame>
     </ArrivalProvider>
   );
 }

@@ -22,4 +22,10 @@ describe('Euchre table layout', () => {
     expect(declarationsFor('.teamScores')).toMatch(/display:\s*flex;/);
     expect(declarationsFor('.teamChip small')).toMatch(/white-space:\s*nowrap;/);
   });
+
+  it('lifts and tightens the trick on short landscape phones', () => {
+    expect(stylesheet).toMatch(
+      /@media \(orientation: landscape\) and \(max-height: 560px\)[\s\S]*?\.trickZone\s*\{[^}]*top:\s*42%;[^}]*scale\(0\.78\);/,
+    );
+  });
 });

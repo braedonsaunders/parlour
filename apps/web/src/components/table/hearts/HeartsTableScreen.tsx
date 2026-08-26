@@ -15,7 +15,6 @@ import { type DealPresentation, useDealPresentation } from '@/lib/table/deal-pre
 import { type FxCue } from '@/lib/table/fx-motion';
 import { discardRotation, useTableAudio } from '../fx-animation';
 import { HandRail, HandRailCard } from '../HandRail';
-import { TableMenu } from '../TableMenu';
 import { PlayingCard } from '../PlayingCard';
 import {
   dealStateAttr,
@@ -25,10 +24,9 @@ import {
   TableCardFlight,
   TableErrorScreen,
   TableFxLayer,
-  TableHud,
   TableLoadingScreen,
   TablePlayfield,
-  TableShell,
+  TableScreenFrame,
   TableTitlePill,
   TableTurnIndicator,
   TableTurnPop,
@@ -125,11 +123,12 @@ export function HeartsTableScreen(props: HeartsTableScreenProps) {
 
   return (
     <ArrivalProvider fx={props.fx} fxKey={props.fxKey} localSeat={view.localSeat}>
-      <TableShell rootRef={rootRef} dealState={dealStateAttr(deal)}>
-        <TableHud onOpenMenu={menu.open}>
-          <TableTitlePill eyebrow="Hearts" status={view.phaseLabel} />
-        </TableHud>
-
+      <TableScreenFrame
+        rootRef={rootRef}
+        dealState={dealStateAttr(deal)}
+        menu={menu}
+        hud={<TableTitlePill eyebrow="Hearts" status={view.phaseLabel} />}
+      >
         <TablePlayfield label="Hearts table" feltMark="♥">
           {view.players.map((player) => (
             <Seat
@@ -173,10 +172,13 @@ export function HeartsTableScreen(props: HeartsTableScreenProps) {
               </div>
             </div>
           )}
+          {!localBusy && view.decision === 'play' && (
+            <TableTurnIndicator className={heartsStyles.turnPrompt} />
+          )}
         </TablePlayfield>
 
-        <TableActionRail>
-          {view.decision === 'pass' && !localBusy ? (
+        {view.decision === 'pass' && !localBusy && (
+          <TableActionRail>
             <button
               type="button"
               className="btn-fat"
@@ -190,10 +192,8 @@ export function HeartsTableScreen(props: HeartsTableScreenProps) {
                 ? `Pass ${PASS_SIZE} ${view.passDirection ?? ''}`.trim()
                 : `Pick ${PASS_SIZE - selectedPass.length} more`}
             </button>
-          ) : (
-            !localBusy && view.decision === 'play' && <TableTurnIndicator />
-          )}
-        </TableActionRail>
+          </TableActionRail>
+        )}
 
         {props.handEnd && (
           <HandEndOverlay
@@ -202,9 +202,7 @@ export function HeartsTableScreen(props: HeartsTableScreenProps) {
             onNextHand={props.onNextHand}
           />
         )}
-
-        <TableMenu open={menu.isOpen} onClose={menu.close} onQuit={menu.quit} />
-      </TableShell>
+      </TableScreenFrame>
     </ArrivalProvider>
   );
 }
@@ -286,12 +284,21 @@ function TrickArea({ trick }: { trick: HeartsTableView['trick'] }) {
           <motion.div
             key={play.card}
             className={`${heartsStyles.trickSlot} ${heartsStyles[`trickSlot${play.seat}`]}`}
-            initial={{ opacity: 0, scale: 0.7 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.8 }}
+            data-trick-slot={play.seat}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
             transition={{ duration: 0.18, ease: [0.2, 0.8, 0.3, 1] }}
           >
-            <PlayingCard card={play.card} rotation={discardRotation(play.card, play.seat)} />
+            <motion.div
+              className={heartsStyles.trickArrival}
+              data-trick-arrival
+              initial={{ scale: 0.7 }}
+              animate={{ scale: 1 }}
+              transition={{ duration: 0.18, ease: [0.2, 0.8, 0.3, 1] }}
+            >
+              <PlayingCard card={play.card} rotation={discardRotation(play.card, play.seat)} />
+            </motion.div>
           </motion.div>
         ))}
       </AnimatePresence>

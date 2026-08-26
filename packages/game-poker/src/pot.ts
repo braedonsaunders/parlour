@@ -1,4 +1,4 @@
-import type { SeatId } from '@parlour/engine';
+import { advanceSeat, seatOrder, type SeatId } from '@parlour/engine';
 import { compareHands, type HandRank } from './evaluate';
 
 export interface SidePot {
@@ -76,7 +76,7 @@ export function potTotal(pots: readonly SidePot[]): number {
  * favour seat 0 for a whole match. The table rule is the one implemented here.
  */
 function payoutOrder(button: SeatId, seats: number): SeatId[] {
-  return Array.from({ length: seats }, (_, step) => (button + 1 + step) % seats);
+  return seatOrder(advanceSeat(button, seats), seats);
 }
 
 /**

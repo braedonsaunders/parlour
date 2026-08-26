@@ -1,9 +1,9 @@
-import type { GameCatalogEntry } from '@parlour/engine';
+import { defineGameCatalog } from '@parlour/engine';
 import { orderGolfHand } from './cards';
-import { golfConfig, type GolfRules } from './config';
+import { golfConfig } from './config';
 import { golfHowToPlay } from './howto';
 
-export const golfCatalog: GameCatalogEntry<GolfRules> = {
+export const golfCatalog = defineGameCatalog({
   id: 'golf',
   gameId: 'golf',
   name: 'Golf',
@@ -67,4 +67,4 @@ export const golfCatalog: GameCatalogEntry<GolfRules> = {
       ],
     },
   ],
-};
+});

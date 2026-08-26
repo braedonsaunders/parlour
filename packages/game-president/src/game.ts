@@ -1,4 +1,5 @@
 import {
+  advanceSeat,
   Fx,
   type BotPolicy,
   type CardId,
@@ -83,7 +84,7 @@ export function activeSeats(state: PresidentState): SeatId[] {
 function nextActiveSeat(state: PresidentState, from: SeatId): SeatId | null {
   const active = activeSeats(state);
   for (let step = 1; step <= state.seats; step++) {
-    const seat = (from + step) % state.seats;
+    const seat = advanceSeat(from, state.seats, step);
     if (active.includes(seat)) return seat;
   }
   return active[0] ?? null;

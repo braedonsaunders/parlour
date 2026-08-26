@@ -3,15 +3,13 @@
 import { useEffect, useRef, useState } from 'react';
 import type { FxEvent, LegalMove } from '@parlour/engine';
 import { AvatarBadge } from '@/components/AvatarBadge';
-import { TableMenu } from '@/components/table/TableMenu';
 import { HandRail, HandRailCard } from '@/components/table/HandRail';
 import {
   SeatNameplate,
   TableErrorScreen,
-  TableHud,
   TableLoadingScreen,
   TablePlayfield,
-  TableShell,
+  TableScreenFrame,
   TableTitlePill,
   useGameTextSurface,
   useTableMenu,
@@ -109,15 +107,18 @@ export function ScopaTableScreen({
   const reachable = new Set(options.flatMap((option) => option.take));
 
   return (
-    <TableShell rootRef={rootRef} className={styles.screen}>
-      <TableHud onOpenMenu={menu.open}>
+    <TableScreenFrame
+      rootRef={rootRef}
+      className={styles.screen}
+      menu={menu}
+      hud={
         <TableTitlePill eyebrow="Scopa" status={view.stageLabel}>
           <span className={styles.stock}>
             stock <b>{view.stockCount}</b>
           </span>
         </TableTitlePill>
-      </TableHud>
-
+      }
+    >
       <TablePlayfield label="Scopa table" feltMark="S" className={styles.playfield}>
         <div
           className={styles.board}
@@ -257,9 +258,8 @@ export function ScopaTableScreen({
         </HandRail>
       </TablePlayfield>
 
-      <TableMenu open={menu.isOpen} onClose={menu.close} onQuit={menu.quit} />
       <span hidden data-fx-key={String(fxKey)} data-fx-count={fx.length} />
-    </TableShell>
+    </TableScreenFrame>
   );
 }
 

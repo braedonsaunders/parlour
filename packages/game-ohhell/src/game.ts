@@ -1,4 +1,5 @@
 import {
+  advanceSeat,
   Fx,
   veilSupport,
   type BotPolicy,
@@ -77,7 +78,7 @@ function hand(state: OhHellState, seat: SeatId): CardId[] {
 }
 
 function leftOf(seat: SeatId, seats: number): SeatId {
-  return (seat + 1) % seats;
+  return advanceSeat(seat, seats);
 }
 
 /**
@@ -257,7 +258,7 @@ function applyBidRecord(
   ctx.fx.emit(OhHellFx.Bid, { seat, bid: value });
 
   if (bids.some((bid) => bid === null)) {
-    const next = (seat + 1) % state.seats;
+    const next = advanceSeat(seat, state.seats);
     ctx.fx.emit(Fx.TurnRing, { seat: next }, 120);
     return { ...state, bids, turn: next };
   }
@@ -310,7 +311,7 @@ const playCard: Move<OhHellState> = {
     const base: OhHellState = { ...state, hands, trick, played };
 
     if (!isTrickComplete(trick, state.seats)) {
-      return { ...base, turn: (seat + 1) % state.seats };
+      return { ...base, turn: advanceSeat(seat, state.seats) };
     }
 
     const cards = trickCards(trick);

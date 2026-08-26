@@ -220,6 +220,18 @@ describe('OhHellTableScreen', () => {
       expect(board).toContain('padding:');
     });
 
+    it('docks every decision region inside a short landscape phone', () => {
+      const shortLandscape = OHHELL_STYLES.match(
+        /@media \(orientation: landscape\) and \(max-height: 560px\)\s*\{([\s\S]*?)\n\}/,
+      )?.[1];
+      expect(shortLandscape).toContain('.seats');
+      expect(shortLandscape).toContain('.centre');
+      expect(shortLandscape).toContain('.actionRail');
+      expect(shortLandscape).toContain('.localRow');
+      expect(shortLandscape).toMatch(/\.actionRail\s*\{[^}]*bottom:\s*8rem;/);
+      expect(shortLandscape).toMatch(/\.railButtons\s*\{[^}]*overflow-x:\s*auto;/);
+    });
+
     it('keeps every region inside the playfield', () => {
       // `.screen` is not a flow container and the playfield is the only box
       // with `inset: 0`. A region rendered as a sibling of the playfield stacks

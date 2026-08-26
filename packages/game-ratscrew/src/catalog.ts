@@ -1,5 +1,5 @@
-import { keepHandOrder, type GameCatalogEntry } from '@parlour/engine';
-import { ratscrewConfigSchema, type RatscrewConfig } from './config';
+import { defineGameCatalog, keepHandOrder } from '@parlour/engine';
+import { ratscrewConfigSchema } from './config';
 import { ratscrewHowToPlay } from './howto';
 
 /**
@@ -7,7 +7,7 @@ import { ratscrewHowToPlay } from './howto';
  * are generated from this; the mode ids here are the config presets in
  * {@link ratscrewConfigSchema}.
  */
-export const ratscrewCatalog: GameCatalogEntry<RatscrewConfig> = {
+export const ratscrewCatalog = defineGameCatalog({
   id: 'ratscrew',
   gameId: 'ratscrew',
   name: 'Rat Screw',
@@ -76,4 +76,4 @@ export const ratscrewCatalog: GameCatalogEntry<RatscrewConfig> = {
       ],
     },
   ],
-};
+});

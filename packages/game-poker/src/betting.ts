@@ -1,4 +1,4 @@
-import type { SeatId } from '@parlour/engine';
+import { advanceSeat, type SeatId } from '@parlour/engine';
 import { blindsForLevel } from './config';
 import {
   actingSeats,
@@ -12,7 +12,7 @@ import {
 /** The next seat still in the match, walking clockwise from `from`. */
 export function nextLiving(state: PokerState, from: SeatId): SeatId {
   for (let step = 1; step <= state.seats; step++) {
-    const seat = (from + step) % state.seats;
+    const seat = advanceSeat(from, state.seats, step);
     if (!state.out[seat]) return seat;
   }
   return from;
@@ -51,7 +51,7 @@ export function firstToActPostflop(state: PokerState): SeatId {
  */
 export function nextActor(state: PokerState, from: SeatId): SeatId | null {
   for (let step = 1; step <= state.seats; step++) {
-    const seat = (from + step) % state.seats;
+    const seat = advanceSeat(from, state.seats, step);
     if (state.out[seat] || state.folded[seat] || state.allIn[seat]) continue;
     if (state.needsToAct[seat]) return seat;
   }

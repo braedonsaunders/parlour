@@ -23,7 +23,6 @@ import { bidLabel, bidToken, type SpadesTableView } from '@/lib/spades/view';
 import { useTableAudio } from '../fx-animation';
 import { HandRail, HandRailCard } from '../HandRail';
 import { PlayingCard } from '../PlayingCard';
-import { TableMenu } from '../TableMenu';
 import {
   dealStateAttr,
   OpponentFan,
@@ -31,10 +30,9 @@ import {
   TableCardFlight,
   TableErrorScreen,
   TableFxLayer,
-  TableHud,
   TableLoadingScreen,
   TablePlayfield,
-  TableShell,
+  TableScreenFrame,
   TableTitlePill,
   TableTurnPop,
   useGameTextSurface,
@@ -116,14 +114,18 @@ export function SpadesTableScreen(props: SpadesTableScreenProps) {
   const localBusy = (props.busy ?? false) || deal.dealing;
 
   return (
-    <TableShell rootRef={rootRef} className={styles.screen} dealState={dealStateAttr(deal)}>
-      <TableHud onOpenMenu={menu.open}>
+    <TableScreenFrame
+      rootRef={rootRef}
+      className={styles.screen}
+      dealState={dealStateAttr(deal)}
+      menu={menu}
+      hud={
         <section className={styles.hudCluster}>
           <TableTitlePill eyebrow="Spades" status={view.stageLabel} />
           <TeamScores view={view} />
         </section>
-      </TableHud>
-
+      }
+    >
       <TablePlayfield label="Spades table" feltMark="♠">
         <div className={styles.brokenFlag} data-spades-broken={String(view.spadesBroken)}>
           {view.spadesBroken ? '♠ broken' : '♠ not yet broken'}
@@ -171,9 +173,7 @@ export function SpadesTableScreen(props: SpadesTableScreenProps) {
           actually hit — portrait would leave them slivers.
         </p>
       </div>
-
-      <TableMenu open={menu.isOpen} onClose={menu.close} onQuit={menu.quit} />
-    </TableShell>
+    </TableScreenFrame>
   );
 }
 

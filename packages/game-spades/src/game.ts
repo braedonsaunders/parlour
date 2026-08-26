@@ -1,4 +1,5 @@
 import {
+  advanceSeat,
   Fx,
   isVeiledDealPayload,
   veilSupport,
@@ -76,8 +77,8 @@ function hand(state: SpadesState, seat: SeatId): CardId[] {
   return state.hands[seat] ?? [];
 }
 
-function nextSeat(from: SeatId): SeatId {
-  return (from + 1) % SPADES_SEATS;
+function nextSeat(from: SeatId, steps = 1): SeatId {
+  return advanceSeat(from, SPADES_SEATS, steps);
 }
 
 function leftOfDealer(dealer: SeatId): SeatId {
@@ -99,7 +100,7 @@ function dealFreshHand(dealer: SeatId, order: readonly CardId[], fx: MoveCtx['fx
   let cursor = 0;
   for (let cardIndex = 0; cardIndex < HAND_SIZE; cardIndex++) {
     for (let step = 1; step <= SPADES_SEATS; step++) {
-      const seat = (dealer + step) % SPADES_SEATS;
+      const seat = nextSeat(dealer, step);
       const card = order[cursor++] as CardId;
       hands[seat]!.push(card);
       fx.emit(

@@ -1,5 +1,5 @@
-import type { GameCatalogEntry } from '@parlour/engine';
-import { blitzConfigSchema, type BlitzConfig } from './config';
+import { defineGameCatalog } from '@parlour/engine';
+import { blitzConfigSchema } from './config';
 import { orderBlitzHand } from './hand';
 import { blitzHowToPlay } from './howto';
 
@@ -7,7 +7,7 @@ import { blitzHowToPlay } from './howto';
  * Blitz's entry on the parlour shelf. The app's game picker and mode picker are
  * generated from this, so presentation lives beside the rules it describes.
  */
-export const blitzCatalog: GameCatalogEntry<BlitzConfig> = {
+export const blitzCatalog = defineGameCatalog({
   id: 'blitz',
   gameId: 'blitz',
   name: 'Blitz',
@@ -60,4 +60,4 @@ export const blitzCatalog: GameCatalogEntry<BlitzConfig> = {
       shade: '#25586e',
     },
   ],
-};
+});

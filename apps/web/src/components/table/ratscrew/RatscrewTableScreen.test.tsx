@@ -3,6 +3,8 @@ import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { RatscrewTableView } from '@/lib/ratscrew/view';
+import ratscrewStyles from '@/styles/ratscrew.module.css';
+import tableStyles from '@/styles/table.module.css';
 import { RatscrewTableScreen } from './RatscrewTableScreen';
 
 function viewFor(localSeat: number): RatscrewTableView {
@@ -79,6 +81,26 @@ describe('RatscrewTableScreen', () => {
     );
     expect(container.querySelector('[data-zone="discard"]')?.textContent).toContain('Flip here');
     expect(container.textContent).toContain('Your stack · 13');
+    const stackCard = container.querySelector('[data-zone="hand:0"] [data-card-chassis]');
+    expect(stackCard?.classList.contains(tableStyles.cardCompact!)).toBe(false);
+  });
+
+  it('uses the full shared card chassis for the center pile', () => {
+    const view = {
+      ...viewFor(0),
+      center: ['H7', 'S7'],
+      centerCount: 2,
+    } satisfies RatscrewTableView;
+
+    act(() => root.render(createElement(RatscrewTableScreen, { view, fx: [], fxKey: 0 })));
+
+    const centerCards = [
+      ...container.querySelectorAll('[data-ratscrew-center-card] [data-card-chassis]'),
+    ];
+    expect(centerCards).toHaveLength(2);
+    expect(centerCards.every((card) => !card.classList.contains(tableStyles.cardCompact!))).toBe(
+      true,
+    );
   });
 
   it('renders the live slap pattern as an alert over the center pile', () => {
@@ -172,5 +194,63 @@ describe('RatscrewTableScreen', () => {
 
     expect(container.querySelector('[data-fx-cue] [aria-label="5 of hearts"]')).not.toBeNull();
     expect(container.querySelector('[data-fx-cue] [aria-label="Face-down card"]')).toBeNull();
+    expect(
+      container
+        .querySelector('[data-fx-cue] [data-card-chassis]')
+        ?.classList.contains(tableStyles.cardCompact!),
+    ).toBe(false);
+  });
+
+  it('turns a successful slap fx into a pile-centered palm impact and card scoop', () => {
+    const liveView = {
+      ...viewFor(0),
+      turnSeat: null,
+      center: ['H7', 'S7'],
+      centerCount: 2,
+      window: { pattern: 'double', elapsedMs: 0, durationMs: 800 },
+      decision: 'slap',
+      legal: { flip: false, slap: true },
+    } satisfies RatscrewTableView;
+    act(() =>
+      root.render(createElement(RatscrewTableScreen, { view: liveView, fx: [], fxKey: 0 })),
+    );
+
+    const wonView = {
+      ...liveView,
+      turnSeat: 0,
+      center: [],
+      centerCount: 0,
+      window: null,
+      decision: 'flip',
+      legal: { flip: true, slap: true },
+    } satisfies RatscrewTableView;
+    const fx = [
+      {
+        kind: 'ratscrew.slap',
+        payload: { seat: 0, pattern: 'double', cards: ['H7', 'S7'] },
+        at: 0,
+      },
+      { kind: 'ratscrew.pile-win', payload: { seat: 0, cards: 2 }, at: 0 },
+    ];
+    act(() =>
+      root.render(createElement(RatscrewTableScreen, { view: wonView, fx, fxKey: 'slap' })),
+    );
+
+    const impact = container.querySelector('[data-slap-impact]');
+    expect(impact?.getAttribute('aria-label')).toBe('You slapped the double and won the pile');
+    expect(impact?.textContent).toContain('YOU SLAP!');
+    expect(impact?.querySelector(`.${ratscrewStyles.slapPalm}`)).not.toBeNull();
+    const scoopedCards = [
+      ...impact!.querySelectorAll('[data-slap-impact-card] [data-card-chassis]'),
+    ];
+    expect(scoopedCards).toHaveLength(2);
+    expect(scoopedCards.every((card) => !card.classList.contains(tableStyles.cardCompact!))).toBe(
+      true,
+    );
+    expect(
+      container
+        .querySelector('section[aria-label="Rat Screw table"]')
+        ?.classList.contains(ratscrewStyles.tableSlapped!),
+    ).toBe(true);
   });
 });

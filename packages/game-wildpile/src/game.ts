@@ -1,4 +1,5 @@
 import {
+  advanceSeat,
   Fx,
   addTo,
   defineConfig,
@@ -306,7 +307,7 @@ function hand(state: WildpileState, seat: SeatId): CardId[] {
 }
 
 function nextSeat(state: WildpileState, from: SeatId, steps = 1): SeatId {
-  return (from + state.direction * steps + state.seats * steps) % state.seats;
+  return advanceSeat(from, state.seats, steps, state.direction);
 }
 
 function topCard(state: WildpileState): CardId {

@@ -3,7 +3,6 @@
 import { useRef } from 'react';
 import type { FxEvent } from '@parlour/engine';
 import { PlayingCard } from '@/components/table/PlayingCard';
-import { TableMenu } from '@/components/table/TableMenu';
 import { HandRail, HandRailCard } from '@/components/table/HandRail';
 import { AvatarBadge } from '@/components/AvatarBadge';
 import { OHHELL_SFX_PACK } from '@/lib/audio/sfx';
@@ -12,10 +11,9 @@ import {
   OpponentFan,
   SeatNameplate,
   TableErrorScreen,
-  TableHud,
   TableLoadingScreen,
   TablePlayfield,
-  TableShell,
+  TableScreenFrame,
   TableTitlePill,
   useGameTextSurface,
   useTableMenu,
@@ -98,8 +96,11 @@ export function OhHellTableScreen({
   const playable = new Set(view.playable);
 
   return (
-    <TableShell rootRef={rootRef} className={styles.screen}>
-      <TableHud onOpenMenu={menu.open}>
+    <TableScreenFrame
+      rootRef={rootRef}
+      className={styles.screen}
+      menu={menu}
+      hud={
         <TableTitlePill eyebrow="Oh Hell!" status={view.stageLabel}>
           <span className={styles.contract} data-testid="ohhell-contract">
             bid <b>{view.bidTotal}</b> of <b>{view.handSize}</b>
@@ -108,8 +109,8 @@ export function OhHellTableScreen({
             ) : null}
           </span>
         </TableTitlePill>
-      </TableHud>
-
+      }
+    >
       <TablePlayfield label="Oh Hell table" feltMark="O" className={styles.playfield}>
         <div className={styles.board} data-testid="ohhell-board">
           <ol className={styles.seats}>
@@ -239,9 +240,8 @@ export function OhHellTableScreen({
         ) : null}
       </TablePlayfield>
 
-      <TableMenu open={menu.isOpen} onClose={menu.close} onQuit={menu.quit} />
       <span hidden data-fx-key={String(fxKey)} data-fx-count={fx.length} />
-    </TableShell>
+    </TableScreenFrame>
   );
 }
 

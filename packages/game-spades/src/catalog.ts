@@ -1,13 +1,13 @@
-import type { GameCatalogEntry } from '@parlour/engine';
+import { defineGameCatalog } from '@parlour/engine';
 import { orderSpadesHand } from './cards';
-import { spadesConfig, type SpadesRules } from './config';
+import { spadesConfig } from './config';
 import { spadesHowToPlay } from './howto';
 
 /**
  * Spades' entry on the parlour shelf. Mode ids match the config presets in
  * {@link spadesConfig}.
  */
-export const spadesCatalog: GameCatalogEntry<SpadesRules> = {
+export const spadesCatalog = defineGameCatalog({
   id: 'spades',
   gameId: 'spades',
   name: 'Spades',
@@ -73,4 +73,4 @@ export const spadesCatalog: GameCatalogEntry<SpadesRules> = {
       ],
     },
   ],
-};
+});

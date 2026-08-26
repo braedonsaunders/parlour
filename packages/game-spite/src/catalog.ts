@@ -1,6 +1,6 @@
-import type { GameCatalogEntry } from '@parlour/engine';
+import { defineGameCatalog } from '@parlour/engine';
 import { orderSpiteHand } from './cards';
-import { spiteConfig, type SpiteRules } from './config';
+import { spiteConfig } from './config';
 import { spiteHowToPlay } from './howto';
 
 /**
@@ -8,7 +8,7 @@ import { spiteHowToPlay } from './howto';
  * picker are generated from this, so presentation lives beside the rules it
  * describes — the mode ids here are the config presets in {@link spiteConfig}.
  */
-export const spiteCatalog: GameCatalogEntry<SpiteRules> = {
+export const spiteCatalog = defineGameCatalog({
   id: 'spite',
   gameId: 'spite',
   name: 'Spite & Malice',
@@ -79,4 +79,4 @@ export const spiteCatalog: GameCatalogEntry<SpiteRules> = {
       ],
     },
   ],
-};
+});

@@ -1,13 +1,13 @@
-import type { GameCatalogEntry } from '@parlour/engine';
+import { defineGameCatalog } from '@parlour/engine';
 import { orderCribbageHand } from './cards';
-import { cribbageConfigSchema, type CribbageConfig } from './config';
+import { cribbageConfigSchema } from './config';
 import { cribbageHowToPlay } from './howto';
 
 /**
  * Cribbage's entry on the parlour shelf. The app's game picker and mode picker
  * are generated from this, so presentation lives beside the rules it describes.
  */
-export const cribbageCatalog: GameCatalogEntry<CribbageConfig> = {
+export const cribbageCatalog = defineGameCatalog({
   id: 'cribbage',
   gameId: 'cribbage',
   name: 'Cribbage',
@@ -76,4 +76,4 @@ export const cribbageCatalog: GameCatalogEntry<CribbageConfig> = {
       ],
     },
   ],
-};
+});

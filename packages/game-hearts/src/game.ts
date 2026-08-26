@@ -1,4 +1,5 @@
 import {
+  advanceSeat,
   Fx,
   stdDeck,
   veilSupport,
@@ -166,7 +167,7 @@ const passCards = {
     const received = Array.from({ length: seats }, () => [] as CardId[]);
     const transfers: { from: SeatId; to: SeatId; cards: CardId[] }[] = [];
     for (let giver = 0; giver < seats; giver++) {
-      const receiver = (((giver + offset) % seats) + seats) % seats;
+      const receiver = advanceSeat(giver, seats, offset);
       const cards = selections[giver] ?? [];
       received[receiver] = [...cards];
       transfers.push({ from: giver, to: receiver, cards: [...cards] });
@@ -277,7 +278,7 @@ const playCard = {
     };
 
     if (!isTrickComplete(trick, state.seats)) {
-      return { ...base, turn: (seat + 1) % state.seats };
+      return { ...base, turn: advanceSeat(seat, state.seats) };
     }
 
     // Fourth card — sweep the trick to its taker.

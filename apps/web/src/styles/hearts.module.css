@@ -15,6 +15,10 @@
   transform: translate(calc(-50% + var(--trick-x)), calc(-50% + var(--trick-y)));
 }
 
+.trickArrival {
+  transform-origin: center;
+}
+
 .trickSlot0 {
   --trick-x: 0px;
   --trick-y: 92px;
@@ -47,6 +51,31 @@
   }
   .trickSlot3 {
     --trick-x: 84px;
+  }
+}
+
+@media (orientation: landscape) and (max-height: 560px) {
+  /* A phone can be wider than the portrait breakpoint while still having only
+   * ~390px of height. Lift and tighten the trick there so the south card ends
+   * above the local fan instead of disappearing underneath it. */
+  .trickSlot {
+    top: 40%;
+  }
+
+  .trickSlot0 {
+    --trick-y: 32px;
+  }
+
+  .trickSlot1 {
+    --trick-x: -100px;
+  }
+
+  .trickSlot2 {
+    --trick-y: -32px;
+  }
+
+  .trickSlot3 {
+    --trick-x: 100px;
   }
 }
 
@@ -117,6 +146,18 @@
   gap: 8px;
   align-items: center;
   text-align: center;
+}
+
+/* Hearts has no corner action during card play. Keep the turn whisper in the
+ * centered decision lane instead of leaving an empty action rail to clip it
+ * against the bottom-right safe area. */
+.turnPrompt.turnPrompt {
+  right: auto;
+  left: 50%;
+  top: auto;
+  bottom: 30%;
+  z-index: 12;
+  translate: -50% 0;
 }
 
 .passCount {

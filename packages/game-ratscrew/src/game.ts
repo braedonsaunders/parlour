@@ -1,4 +1,5 @@
 import {
+  advanceSeat,
   Fx,
   dealOrder,
   drawFrom,
@@ -114,7 +115,7 @@ function aliveSeats(state: RatscrewState): SeatId[] {
 function nextAlive(state: RatscrewState, from: SeatId): SeatId {
   const alive = aliveSeats(state);
   for (let step = 1; step <= state.seats; step++) {
-    const seat = (from + step) % state.seats;
+    const seat = advanceSeat(from, state.seats, step);
     if (alive.includes(seat)) return seat;
   }
   return from;
@@ -123,9 +124,9 @@ function nextAlive(state: RatscrewState, from: SeatId): SeatId {
 /** Seats allowed to slap a live window: card holders, plus everyone when re-entry is on. */
 function slapEligibleSeats(state: RatscrewState): SeatId[] {
   const ordered: SeatId[] = [];
-  const start = (state.lastFlipper + 1) % state.seats;
+  const start = advanceSeat(state.lastFlipper, state.seats);
   for (let step = 0; step < state.seats; step++) {
-    const seat = (start + step) % state.seats;
+    const seat = advanceSeat(start, state.seats, step);
     const hasCards = pileOf(state, seat).length > 0;
     if (hasCards || state.rules.slapBackIn) ordered.push(seat);
   }
@@ -258,7 +259,11 @@ const slap: Move<RatscrewState> = {
     if (state.window) {
       const pattern = state.window.pattern;
       const comeback = pileOf(state, seat).length === 0;
-      ctx.fx.emit('ratscrew.slap', { seat, pattern });
+      ctx.fx.emit('ratscrew.slap', {
+        seat,
+        pattern,
+        cards: state.center.slice(-3).reverse(),
+      });
       if (comeback) ctx.fx.emit('ratscrew.comeback', { seat }, 120);
       const collected = collectCenter(
         { ...state, window: null, pendingWin: null, challenge: null },

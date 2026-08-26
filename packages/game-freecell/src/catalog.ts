@@ -1,9 +1,9 @@
-import type { GameCatalogEntry } from '@parlour/engine';
+import { defineGameCatalog } from '@parlour/engine';
 import { orderFreecellHand } from './cards';
-import { freecellConfig, type FreecellRules } from './config';
+import { freecellConfig } from './config';
 import { freecellHowToPlay } from './howto';
 
-export const freecellCatalog: GameCatalogEntry<FreecellRules> = {
+export const freecellCatalog = defineGameCatalog({
   id: 'freecell',
   gameId: 'freecell',
   name: 'FreeCell',
@@ -66,4 +66,4 @@ export const freecellCatalog: GameCatalogEntry<FreecellRules> = {
       ],
     },
   ],
-};
+});

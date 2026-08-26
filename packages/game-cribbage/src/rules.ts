@@ -1,4 +1,5 @@
 import {
+  advanceSeat,
   dealOrder,
   Fx,
   hasVeiledCard,
@@ -8,6 +9,7 @@ import {
   isVeiledDealPayload,
   VEILED_REDEAL_PENDING,
   veilSupport,
+  seatOrder,
   type BotPolicy,
   type CardId,
   type FlowAdvance,
@@ -43,11 +45,11 @@ export { HAND_DEAL_SIZE, SKUNK_LINE, TARGET_SCORE } from './state';
 // ---------------------------------------------------------------------------
 
 function allSeats(seats: number): SeatId[] {
-  return Array.from({ length: seats }, (_, seat) => seat);
+  return seatOrder(0, seats);
 }
 
 function nextSeat(from: SeatId, seats: number): SeatId {
-  return (from + 1) % seats;
+  return advanceSeat(from, seats);
 }
 
 function seatsWithCards(state: CribbageState): SeatId[] {

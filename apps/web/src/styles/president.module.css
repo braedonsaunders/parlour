@@ -12,6 +12,13 @@
   transform: translate(-50%, -50%);
 }
 
+@media (orientation: landscape) and (max-height: 560px) {
+  /* Preserve the full pile card while moving its south edge above the fan. */
+  .pileArea {
+    top: 35%;
+  }
+}
+
 .pileStack {
   position: relative;
   display: flex;

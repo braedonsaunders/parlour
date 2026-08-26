@@ -24,6 +24,14 @@ describe('Rat Screw table stacking', () => {
     );
   });
 
+  it('keeps the physical slap impact above the pile and uses the full card scale', () => {
+    expect(zIndexFor(stylesheet, '.burstLayer')).toBeGreaterThan(
+      zIndexFor(stylesheet, '.centerPile'),
+    );
+    expect(stylesheet).toMatch(/\.pileFan\s*\{[^}]*width:\s*clamp\(5\.6rem,\s*8vw,\s*7\.2rem\);/);
+    expect(stylesheet).not.toMatch(/\.centerPile\s*\{[^}]*scale:\s*0\.82;/);
+  });
+
   it('keeps the challenge notice above player seats', () => {
     expect(zIndexFor(stylesheet, '.challengeBanner')).toBeGreaterThan(
       zIndexFor(tableStylesheet, '.seat'),

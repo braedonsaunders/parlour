@@ -12,14 +12,12 @@ import {
 import type { FxEvent } from '@parlour/engine';
 import { SUITS, type FreecellSuit } from '@parlour/game-freecell';
 import { PlayingCard } from '@/components/table/PlayingCard';
-import { TableMenu } from '@/components/table/TableMenu';
 import {
   TableActionRail,
   TableErrorScreen,
-  TableHud,
   TableLoadingScreen,
   TablePlayfield,
-  TableShell,
+  TableScreenFrame,
   TableTitlePill,
   useGameTextSurface,
   useTableMenu,
@@ -203,12 +201,12 @@ function ReadyFreecellTable({
   };
 
   return (
-    <TableShell
+    <TableScreenFrame
       rootRef={rootRef}
       className={styles.screen}
       dealState={deal.sequence ? (deal.dealing ? 'dealing' : 'complete') : undefined}
-    >
-      <TableHud onOpenMenu={menu.open}>
+      menu={menu}
+      hud={
         <TableTitlePill
           eyebrow="FreeCell"
           status={
@@ -228,8 +226,13 @@ function ReadyFreecellTable({
             ) : null}
           </span>
         </TableTitlePill>
-      </TableHud>
-
+      }
+      howToPlay={{
+        doc: freecellCatalog.howToPlay,
+        title: 'FreeCell',
+        subtitle: 'the open solitaire',
+      }}
+    >
       <TablePlayfield label="FreeCell table" feltMark="F" className={styles.playfield}>
         <div
           className={styles.board}
@@ -467,18 +470,7 @@ function ReadyFreecellTable({
         <strong>Turn the table sideways</strong>
         <p>Eight open columns need a landscape table.</p>
       </div>
-
-      <TableMenu
-        open={menu.isOpen}
-        onClose={menu.close}
-        onQuit={menu.quit}
-        howToPlay={{
-          doc: freecellCatalog.howToPlay,
-          title: 'FreeCell',
-          subtitle: 'the open solitaire',
-        }}
-      />
-    </TableShell>
+    </TableScreenFrame>
   );
 }
 

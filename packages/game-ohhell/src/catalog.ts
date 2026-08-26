@@ -1,13 +1,13 @@
-import type { GameCatalogEntry } from '@parlour/engine';
+import { defineGameCatalog } from '@parlour/engine';
 import { orderOhHellHand } from './cards';
-import { ohhellConfig, type OhHellRules } from './config';
+import { ohhellConfig } from './config';
 import { ohhellHowToPlay } from './howto';
 
 /**
  * Oh Hell's entry on the parlour shelf. Mode ids match the config presets in
  * {@link ohhellConfig}.
  */
-export const ohhellCatalog: GameCatalogEntry<OhHellRules> = {
+export const ohhellCatalog = defineGameCatalog({
   id: 'ohhell',
   gameId: 'ohhell',
   name: 'Oh Hell',
@@ -74,4 +74,4 @@ export const ohhellCatalog: GameCatalogEntry<OhHellRules> = {
       ],
     },
   ],
-};
+});

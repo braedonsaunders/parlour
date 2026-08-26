@@ -14,7 +14,6 @@ import { discardRotation, useTableAudio } from './fx-animation';
 import { HandRail, HandRailCard } from './HandRail';
 import { PlayingCard } from './PlayingCard';
 import { StockStack } from './StockStack';
-import { TableMenu } from './TableMenu';
 import {
   dealStateAttr,
   DiscardPileButton,
@@ -25,11 +24,10 @@ import {
   TableCardFlight,
   TableErrorScreen,
   TableFxLayer,
-  TableHud,
   TableLoadingScreen,
   TablePiles,
   TablePlayfield,
-  TableShell,
+  TableScreenFrame,
   TableTitlePill,
   TableTurnIndicator,
   TableTurnPop,
@@ -116,11 +114,13 @@ export function TableScreen(props: TableScreenProps) {
 
   return (
     <ArrivalProvider fx={props.fx} fxKey={props.fxKey} localSeat={localSeat}>
-      <TableShell rootRef={rootRef} dealState={dealStateAttr(deal)}>
-        <TableHud onOpenMenu={menu.open}>
-          <TableTitlePill eyebrow="Blitz" status={view.phaseLabel} />
-        </TableHud>
-
+      <TableScreenFrame
+        rootRef={rootRef}
+        dealState={dealStateAttr(deal)}
+        menu={menu}
+        hud={<TableTitlePill eyebrow="Blitz" status={view.phaseLabel} />}
+        howToPlay={{ doc: blitzHowToPlay, title: 'Blitz', subtitle: 'the 31 game' }}
+      >
         <TablePlayfield label="Blitz table" feltMark="31">
           {view.players.map((player) => (
             <Seat
@@ -150,14 +150,7 @@ export function TableScreen(props: TableScreenProps) {
             Knock
           </button>
         </TableActionRail>
-
-        <TableMenu
-          open={menu.isOpen}
-          onClose={menu.close}
-          howToPlay={{ doc: blitzHowToPlay, title: 'Blitz', subtitle: 'the 31 game' }}
-          onQuit={menu.quit}
-        />
-      </TableShell>
+      </TableScreenFrame>
     </ArrivalProvider>
   );
 }

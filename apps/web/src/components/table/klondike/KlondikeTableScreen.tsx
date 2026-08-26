@@ -12,14 +12,12 @@ import {
 import type { FxEvent } from '@parlour/engine';
 import { SUITS, type KlondikeSuit } from '@parlour/game-klondike';
 import { PlayingCard } from '@/components/table/PlayingCard';
-import { TableMenu } from '@/components/table/TableMenu';
 import {
   TableActionRail,
   TableErrorScreen,
-  TableHud,
   TableLoadingScreen,
   TablePlayfield,
-  TableShell,
+  TableScreenFrame,
   TableTitlePill,
   useGameTextSurface,
   useTableMenu,
@@ -233,12 +231,12 @@ function ReadyKlondikeTable({
   );
 
   return (
-    <TableShell
+    <TableScreenFrame
       rootRef={rootRef}
       className={styles.screen}
       dealState={deal.sequence ? (deal.dealing ? 'dealing' : 'complete') : undefined}
-    >
-      <TableHud onOpenMenu={menu.open}>
+      menu={menu}
+      hud={
         <TableTitlePill
           eyebrow="Klondike"
           status={
@@ -252,8 +250,13 @@ function ReadyKlondikeTable({
             <b>{view.moves}</b> moves · <b>{formatTime(elapsedMs)}</b>
           </span>
         </TableTitlePill>
-      </TableHud>
-
+      }
+      howToPlay={{
+        doc: klondikeCatalog.howToPlay,
+        title: 'Klondike',
+        subtitle: 'the solitaire classic',
+      }}
+    >
       <TablePlayfield label="Klondike table" feltMark="K" className={styles.playfield}>
         <div
           className={styles.board}
@@ -508,18 +511,7 @@ function ReadyKlondikeTable({
         <strong>Turn the table sideways</strong>
         <p>Seven solitaire columns need a landscape table.</p>
       </div>
-
-      <TableMenu
-        open={menu.isOpen}
-        onClose={menu.close}
-        onQuit={menu.quit}
-        howToPlay={{
-          doc: klondikeCatalog.howToPlay,
-          title: 'Klondike',
-          subtitle: 'the solitaire classic',
-        }}
-      />
-    </TableShell>
+    </TableScreenFrame>
   );
 }
 

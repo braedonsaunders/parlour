@@ -1,5 +1,5 @@
-import type { GameCatalogEntry } from '@parlour/engine';
-import { euchreConfig, type EuchreRules } from './config';
+import { defineGameCatalog } from '@parlour/engine';
+import { euchreConfig } from './config';
 import { orderEuchreHand } from './deck';
 import { euchreHowToPlay } from './howto';
 
@@ -8,7 +8,7 @@ import { euchreHowToPlay } from './howto';
  * picker and generated rules panel all read from this — the mode ids here are
  * the config presets in {@link euchreConfig}.
  */
-export const euchreCatalog: GameCatalogEntry<EuchreRules> = {
+export const euchreCatalog = defineGameCatalog({
   id: 'euchre',
   gameId: 'euchre',
   name: 'Euchre',
@@ -81,4 +81,4 @@ export const euchreCatalog: GameCatalogEntry<EuchreRules> = {
       art: [{ label: '10♥', tint: ['#d95763', '#a3372c'] }, { label: 'K♦' }],
     },
   ],
-};
+});

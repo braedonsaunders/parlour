@@ -1,4 +1,10 @@
-import type { CardFace, CardId, FxEmitter, SeatId } from '@parlour/engine';
+import {
+  seatOrder,
+  type CardFace,
+  type CardId,
+  type FxEmitter,
+  type SeatId,
+} from '@parlour/engine';
 
 /**
  * @parlour/tricks — neutral trick-taking primitives.
@@ -54,7 +60,7 @@ export function openTrick(leader: SeatId): Trick {
 
 /** Seats in play order starting from `leader`, clockwise. */
 export function trickOrder(leader: SeatId, seats: number): SeatId[] {
-  return Array.from({ length: Math.max(0, seats) }, (_, offset) => (leader + offset) % seats);
+  return seatOrder(leader, seats);
 }
 
 export function trickPlaysNeeded(seats: number): number {

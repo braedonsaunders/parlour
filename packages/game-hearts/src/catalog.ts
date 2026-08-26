@@ -1,6 +1,6 @@
-import type { GameCatalogEntry } from '@parlour/engine';
+import { defineGameCatalog } from '@parlour/engine';
 import { orderHeartsHand } from './cards';
-import { heartsConfigSchema, type HeartsRules } from './config';
+import { heartsConfigSchema } from './config';
 import { heartsHowToPlay } from './howto';
 
 /**
@@ -8,7 +8,7 @@ import { heartsHowToPlay } from './howto';
  * generated from this; the mode ids here ARE the config presets in
  * {@link heartsConfigSchema}, so a mode pick is a full house-rule set.
  */
-export const heartsCatalog: GameCatalogEntry<HeartsRules> = {
+export const heartsCatalog = defineGameCatalog({
   id: 'hearts',
   gameId: 'hearts',
   name: 'Hearts',
@@ -80,4 +80,4 @@ export const heartsCatalog: GameCatalogEntry<HeartsRules> = {
       ],
     },
   ],
-};
+});

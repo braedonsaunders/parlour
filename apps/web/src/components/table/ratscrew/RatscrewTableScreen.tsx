@@ -12,7 +12,6 @@ import { useMusicMood } from '@/stores/audio';
 import { type FxCue } from '@/lib/table/fx-motion';
 import { useDealPresentation } from '@/lib/table/deal-presentation';
 import { useTableAudio } from '../fx-animation';
-import { TableMenu } from '../TableMenu';
 import { PlayingCard } from '../PlayingCard';
 import {
   SeatNameplate,
@@ -20,10 +19,9 @@ import {
   TableCardFlight,
   TableErrorScreen,
   TableFxLayer,
-  TableHud,
   TableLoadingScreen,
   TablePlayfield,
-  TableShell,
+  TableScreenFrame,
   TableTitlePill,
   TableTurnPop,
   useGameTextSurface,
@@ -51,6 +49,7 @@ export function RatscrewTableScreen(props: RatscrewTableScreenProps) {
   const menu = useTableMenu(props.onQuit);
   const deal = useDealPresentation(props.fx, props.fxKey);
   useTableAudio(props.fx, props.fxKey, RATSCREW_SFX_PACK.id);
+  const slapLanded = props.fx.some((event) => event.kind === 'ratscrew.slap');
 
   // Races keep everyone glued to the pile; the tense cue rides the match pace.
   const racing = Boolean(view?.window);
@@ -85,12 +84,16 @@ export function RatscrewTableScreen(props: RatscrewTableScreenProps) {
   }
 
   return (
-    <TableShell rootRef={rootRef}>
-      <TableHud onOpenMenu={menu.open}>
-        <TableTitlePill eyebrow="Rat Screw" status={view.phaseLabel} />
-      </TableHud>
-
-      <TablePlayfield label="Rat Screw table" feltMark="♣">
+    <TableScreenFrame
+      rootRef={rootRef}
+      menu={menu}
+      hud={<TableTitlePill eyebrow="Rat Screw" status={view.phaseLabel} />}
+    >
+      <TablePlayfield
+        label="Rat Screw table"
+        feltMark="♣"
+        className={slapLanded ? styles.tableSlapped : undefined}
+      >
         {view.players.map((player) => (
           <Seat
             key={player.seat}
@@ -136,6 +139,7 @@ export function RatscrewTableScreen(props: RatscrewTableScreenProps) {
 
         {view.window && (
           <div className={styles.slapBanner} role="alertdialog" aria-label="Slap window open">
+            <span className={styles.slapReadyRing} aria-hidden="true" />
             <div className={styles.slapCard}>
               <span className={styles.slapWord}>{slapPatternLabel(view.window.pattern)}</span>
               <span className={styles.windowBar} aria-hidden="true">
@@ -153,7 +157,7 @@ export function RatscrewTableScreen(props: RatscrewTableScreenProps) {
         )}
 
         <FxLayer fx={props.fx} fxKey={props.fxKey} rootRef={rootRef} />
-        <BurstLayer fx={props.fx} fxKey={props.fxKey} rootRef={rootRef} />
+        <BurstLayer fx={props.fx} fxKey={props.fxKey} rootRef={rootRef} view={view} />
       </TablePlayfield>
 
       <TableActionRail className={styles.actionRail}>
@@ -175,9 +179,7 @@ export function RatscrewTableScreen(props: RatscrewTableScreenProps) {
           SLAP!
         </button>
       </TableActionRail>
-
-      <TableMenu open={menu.isOpen} onClose={menu.close} onQuit={menu.quit} />
-    </TableShell>
+    </TableScreenFrame>
   );
 }
 
@@ -242,7 +244,7 @@ function Seat({
               } as CSSProperties
             }
           >
-            <PlayingCard compact faceDown />
+            <PlayingCard faceDown />
           </span>
         ))}
       </div>
@@ -276,7 +278,9 @@ function CenterPile({ view }: { view: RatscrewTableView }) {
           </span>
         )}
         {view.center.map((card, index) => (
-          <PlayingCard key={`${card}:${index}`} card={card} rotation={(index - 1) * 7} compact />
+          <span key={`${card}:${index}`} data-ratscrew-center-card>
+            <PlayingCard card={card} rotation={(index - 1) * 7} />
+          </span>
         ))}
         <span className={styles.pileCountChip}>{view.centerCount} on the pile</span>
       </div>
@@ -304,7 +308,7 @@ function renderRatscrewCue(cue: FxCue) {
     const faceDown = cue.type === 'deal' || cue.type === 'draw';
     return (
       <TableCardFlight cueId={cue.id}>
-        <PlayingCard card={faceDown ? undefined : cue.card} faceDown={faceDown} compact />
+        <PlayingCard card={faceDown ? undefined : cue.card} faceDown={faceDown} />
       </TableCardFlight>
     );
   }
@@ -321,6 +325,17 @@ interface Burst {
   tone: 'win' | 'burn' | 'comeback';
 }
 
+interface SlapImpactBurst {
+  id: string;
+  seat: number;
+  pattern: NonNullable<RatscrewTableView['window']>['pattern'];
+  cards: readonly string[];
+}
+
+type TablePoint = { x: number; y: number };
+
+const SLAP_SPARKS = Array.from({ length: 12 }, (_, index) => index);
+
 /**
  * Game-specific moments the shared cue timeline does not model: slap wins,
  * mis-slap burns and comeback returns pop over their seat plaque.
@@ -329,24 +344,36 @@ function BurstLayer({
   fx,
   fxKey,
   rootRef,
+  view,
 }: {
   fx: readonly FxEvent[];
   fxKey: string | number;
   rootRef: RefObject<HTMLElement | null>;
+  view: RatscrewTableView;
 }) {
-  const bursts = useMemo<readonly Burst[]>(() => {
+  const { seatBursts, slapImpact } = useMemo<{
+    seatBursts: readonly Burst[];
+    slapImpact: SlapImpactBurst | null;
+  }>(() => {
     const out: Burst[] = [];
-    for (const event of fx) {
-      const payload = (event.payload ?? {}) as { seat?: unknown; pattern?: unknown };
+    let impact: SlapImpactBurst | null = null;
+    for (const [index, event] of fx.entries()) {
+      const payload = (event.payload ?? {}) as {
+        seat?: unknown;
+        pattern?: unknown;
+        cards?: unknown;
+      };
       const seat = typeof payload.seat === 'number' ? payload.seat : -1;
       switch (event.kind) {
         case 'ratscrew.slap':
-          out.push({
-            id: `slap:${String(payload.pattern)}`,
+          impact = {
+            id: `slap:${index}:${String(payload.pattern)}`,
             seat,
-            label: 'SLAPPED IT!',
-            tone: 'win',
-          });
+            pattern: String(payload.pattern) as SlapImpactBurst['pattern'],
+            cards: Array.isArray(payload.cards)
+              ? payload.cards.filter((card): card is string => typeof card === 'string').slice(0, 3)
+              : [],
+          };
           break;
         case 'ratscrew.misslap':
           out.push({ id: 'misslap', seat, label: 'MIS-SLAP', tone: 'burn' });
@@ -358,10 +385,13 @@ function BurstLayer({
           break;
       }
     }
-    return out.slice(-3);
+    return { seatBursts: out.slice(-3), slapImpact: impact };
   }, [fx]);
 
-  const [points, setPoints] = useState<Record<number, { x: number; y: number }>>({});
+  const [geometry, setGeometry] = useState<{
+    seats: Record<number, TablePoint>;
+    center: TablePoint | null;
+  }>({ seats: {}, center: null });
   useEffect(() => {
     const root = rootRef.current;
     if (!root) return;
@@ -376,14 +406,128 @@ function BurstLayer({
         y: rect.top + rect.height / 2 - bounds.top,
       };
     }
-    setPoints(next);
+    const centerAnchor = root.querySelector<HTMLElement>('[data-zone="discard"]');
+    const centerRect = centerAnchor?.getBoundingClientRect();
+    setGeometry({
+      seats: next,
+      center: centerRect
+        ? {
+            x: centerRect.left + centerRect.width / 2 - bounds.left,
+            y: centerRect.top + centerRect.height / 2 - bounds.top,
+          }
+        : { x: bounds.width / 2, y: bounds.height * 0.47 },
+    });
   }, [rootRef, fxKey]);
+
+  const winnerPoint = slapImpact ? geometry.seats[slapImpact.seat] : undefined;
+  const centerPoint = geometry.center;
+  const winner = slapImpact
+    ? view.players.find((player) => player.seat === slapImpact.seat)
+    : undefined;
+  const winnerName = winner?.isLocal ? 'You' : (winner?.name ?? 'Player');
+  const winnerCallout = winner?.isLocal ? 'YOU SLAP!' : `${winnerName.toUpperCase()} SLAPS!`;
+  const cards = slapImpact?.cards ?? [];
 
   return (
     <div className={styles.burstLayer} aria-live="polite">
       <AnimatePresence>
-        {bursts.map((burst) => {
-          const at = points[burst.seat];
+        {slapImpact && centerPoint && (
+          <motion.div
+            key={`${fxKey}:${slapImpact.id}`}
+            data-slap-impact
+            className={styles.slapImpact}
+            style={
+              {
+                left: centerPoint.x,
+                top: centerPoint.y,
+                '--scoop-x': `${(winnerPoint?.x ?? centerPoint.x) - centerPoint.x}px`,
+                '--scoop-y': `${(winnerPoint?.y ?? centerPoint.y) - centerPoint.y}px`,
+              } as CSSProperties
+            }
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.08 }}
+            role="status"
+            aria-label={`${winnerName} slapped the ${slapImpact.pattern} and won the pile`}
+          >
+            <span className={styles.impactCards} aria-hidden="true">
+              {cards.map((card, index) => (
+                <span
+                  key={`${card}:${index}`}
+                  data-slap-impact-card
+                  className={styles.impactCard}
+                  style={
+                    {
+                      '--impact-index': index,
+                      '--impact-rotation': `${(index - 1) * 8}deg`,
+                      '--scatter-rotation': `${(index - 1) * 13}deg`,
+                      '--scoop-rotation': `${(index - 1) * 8 + 18}deg`,
+                      '--scatter-x': `${(index - 1) * 18}px`,
+                      '--scatter-y': `${Math.abs(index - 1) * 8 - 9}px`,
+                    } as CSSProperties
+                  }
+                >
+                  <PlayingCard card={card} />
+                </span>
+              ))}
+            </span>
+            <span className={styles.slapShockwave} aria-hidden="true" />
+            <span
+              className={`${styles.slapShockwave} ${styles.slapShockwaveEcho}`}
+              aria-hidden="true"
+            />
+            <span className={styles.slapSparks} aria-hidden="true">
+              {SLAP_SPARKS.map((index) => (
+                <i
+                  key={index}
+                  style={
+                    {
+                      '--spark-angle': `${index * 30}deg`,
+                      '--spark-distance': `${4.7 + (index % 3) * 0.55}rem`,
+                      '--spark-delay': `${(index % 2) * 24}ms`,
+                    } as CSSProperties
+                  }
+                />
+              ))}
+            </span>
+            <svg
+              className={styles.slapPalm}
+              viewBox="0 0 120 150"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <defs>
+                <linearGradient id="ratscrew-palm" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0" stopColor="#fff1cd" />
+                  <stop offset="0.58" stopColor="#f0a75b" />
+                  <stop offset="1" stopColor="#c75a2d" />
+                </linearGradient>
+              </defs>
+              <g fill="url(#ratscrew-palm)" stroke="#71351f" strokeWidth="4" strokeLinejoin="round">
+                <rect x="27" y="8" width="17" height="69" rx="8.5" />
+                <rect x="46" y="1" width="17" height="76" rx="8.5" />
+                <rect x="65" y="6" width="17" height="72" rx="8.5" />
+                <rect x="84" y="17" width="17" height="65" rx="8.5" />
+                <path d="M31 57c-8-8-17-19-24-10-8 10 9 30 19 43v18c0 22 16 37 38 37h9c22 0 37-16 37-39V68c0-11-9-19-20-19H48c-7 0-13 3-17 8Z" />
+              </g>
+              <path
+                d="M38 93c15 8 37 10 57 1M43 112c13 6 30 7 43 2"
+                fill="none"
+                stroke="rgb(113 53 31 / 40%)"
+                strokeWidth="3"
+                strokeLinecap="round"
+              />
+            </svg>
+            <span className={styles.slapImpactCopy}>
+              <strong>{winnerCallout}</strong>
+              <span>{slapPatternLabel(slapImpact.pattern)} · pile won</span>
+            </span>
+          </motion.div>
+        )}
+
+        {seatBursts.map((burst) => {
+          const at = geometry.seats[burst.seat];
           if (!at) return null;
           return (
             <motion.span

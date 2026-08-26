@@ -15,7 +15,6 @@ import { ArrivalProvider, useAdmittedHand } from '@/lib/table/arrival-presentati
 import { type DealPresentation, useDealPresentation } from '@/lib/table/deal-presentation';
 import { discardRotation, useTableAudio } from '../fx-animation';
 import { HandRail, HandRailCard } from '../HandRail';
-import { TableMenu } from '../TableMenu';
 import { PlayingCard } from '../PlayingCard';
 import {
   dealStateAttr,
@@ -25,10 +24,9 @@ import {
   TableCardFlight,
   TableErrorScreen,
   TableFxLayer,
-  TableHud,
   TableLoadingScreen,
   TablePlayfield,
-  TableShell,
+  TableScreenFrame,
   TableTitlePill,
   TableTurnPop,
   useGameTextSurface,
@@ -155,11 +153,12 @@ export function PresidentTableScreen(props: PresidentTableScreenProps) {
 
   return (
     <ArrivalProvider fx={props.fx} fxKey={props.fxKey} localSeat={view.localSeat}>
-      <TableShell rootRef={rootRef} dealState={dealStateAttr(deal)}>
-        <TableHud onOpenMenu={menu.open}>
-          <TableTitlePill eyebrow="President" status={view.phaseLabel} />
-        </TableHud>
-
+      <TableScreenFrame
+        rootRef={rootRef}
+        dealState={dealStateAttr(deal)}
+        menu={menu}
+        hud={<TableTitlePill eyebrow="President" status={view.phaseLabel} />}
+      >
         <TablePlayfield
           label="President table"
           feltMark="♛"
@@ -276,9 +275,7 @@ export function PresidentTableScreen(props: PresidentTableScreenProps) {
             </>
           )}
         </TableActionRail>
-
-        <TableMenu open={menu.isOpen} onClose={menu.close} onQuit={menu.quit} />
-      </TableShell>
+      </TableScreenFrame>
     </ArrivalProvider>
   );
 }

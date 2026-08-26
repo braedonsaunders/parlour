@@ -15,7 +15,6 @@ import { suitName as suitLabel, type EuchreTableView } from '@/lib/euchre/view';
 import { useTableAudio } from '../fx-animation';
 import { HandRail, HandRailCard } from '../HandRail';
 import { PlayingCard } from '../PlayingCard';
-import { TableMenu } from '../TableMenu';
 import {
   dealStateAttr,
   OpponentFan,
@@ -23,10 +22,9 @@ import {
   TableCardFlight,
   TableErrorScreen,
   TableFxLayer,
-  TableHud,
   TableLoadingScreen,
   TablePlayfield,
-  TableShell,
+  TableScreenFrame,
   TableTitlePill,
   TableTurnPop,
   useGameTextSurface,
@@ -106,14 +104,17 @@ export function EuchreTableScreen(props: EuchreTableScreenProps) {
 
   return (
     <ArrivalProvider fx={props.fx} fxKey={props.fxKey} localSeat={view.localSeat}>
-      <TableShell rootRef={rootRef} dealState={dealStateAttr(deal)}>
-        <TableHud onOpenMenu={menu.open}>
+      <TableScreenFrame
+        rootRef={rootRef}
+        dealState={dealStateAttr(deal)}
+        menu={menu}
+        hud={
           <section className={styles.hudCluster}>
             <TableTitlePill eyebrow="Euchre" status={view.stageLabel} />
             <TeamScores view={view} />
           </section>
-        </TableHud>
-
+        }
+      >
         <TablePlayfield label="Euchre table" feltMark="E">
           {view.trump && (
             <div
@@ -182,9 +183,7 @@ export function EuchreTableScreen(props: EuchreTableScreenProps) {
             />
           )}
         </TablePlayfield>
-
-        <TableMenu open={menu.isOpen} onClose={menu.close} onQuit={menu.quit} />
-      </TableShell>
+      </TableScreenFrame>
     </ArrivalProvider>
   );
 }

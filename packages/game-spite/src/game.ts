@@ -1,4 +1,5 @@
 import {
+  advanceSeat,
   Fx,
   dealOrder,
   type AutoMove,
@@ -77,7 +78,7 @@ function hand(state: SpiteState, seat: SeatId): CardId[] {
 }
 
 function nextSeat(state: Pick<SpiteState, 'seats'>, seat: SeatId): SeatId {
-  return (seat + 1) % state.seats;
+  return advanceSeat(seat, state.seats);
 }
 
 /** Where a seat's copy of `card` sits, checked in the order a player would look. */

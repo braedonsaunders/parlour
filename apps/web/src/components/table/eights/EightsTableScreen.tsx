@@ -29,7 +29,6 @@ import { discardRotation, useTableAudio } from '../fx-animation';
 import { HandRail, HandRailCard } from '../HandRail';
 import { PlayingCard } from '../PlayingCard';
 import { StockStack } from '../StockStack';
-import { TableMenu } from '../TableMenu';
 import {
   dealStateAttr,
   OpponentFan,
@@ -39,11 +38,10 @@ import {
   TableCardFlight,
   TableErrorScreen,
   TableFxLayer,
-  TableHud,
   TableLoadingScreen,
   TablePiles,
   TablePlayfield,
-  TableShell,
+  TableScreenFrame,
   TableTitlePill,
   TableTurnIndicator,
   TableTurnPop,
@@ -132,18 +130,22 @@ export function EightsTableScreen(props: EightsTableScreenProps) {
 
   return (
     <ArrivalProvider fx={props.fx} fxKey={props.fxKey} localSeat={view.localSeat}>
-      <TableShell rootRef={rootRef} dealState={dealStateAttr(deal)}>
-        <TableHud onOpenMenu={menu.open}>
-          {/* Every opponent wears their score on their own plate; the local
-              plate is hidden by the shared ring, so yours lives here. */}
+      {/* Every opponent wears their score on their own plate; the local plate
+          is hidden by the shared ring, so yours lives in the shared HUD. */}
+      <TableScreenFrame
+        rootRef={rootRef}
+        dealState={dealStateAttr(deal)}
+        menu={menu}
+        hud={
           <TableTitlePill eyebrow="Crazy Eights" status={view.phaseLabel}>
             <span className={styles.scoreLine} data-testid="eights-score">
               You <b>{localScore(view)}</b>
               <small>→ {view.targetScore}</small>
             </span>
           </TableTitlePill>
-        </TableHud>
-
+        }
+        howToPlay={{ doc: eightsHowToPlay, title: 'Crazy Eights', subtitle: view.phaseLabel }}
+      >
         <TablePlayfield
           label="Crazy Eights table"
           feltMark="8"
@@ -201,14 +203,7 @@ export function EightsTableScreen(props: EightsTableScreenProps) {
             )}
           </AnimatePresence>
         </TableActionRail>
-
-        <TableMenu
-          open={menu.isOpen}
-          onClose={menu.close}
-          howToPlay={{ doc: eightsHowToPlay, title: 'Crazy Eights', subtitle: view.phaseLabel }}
-          onQuit={menu.quit}
-        />
-      </TableShell>
+      </TableScreenFrame>
     </ArrivalProvider>
   );
 }

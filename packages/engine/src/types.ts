@@ -507,6 +507,18 @@ export interface GameCatalogEntry<C extends RuleValues = RuleValues> {
   handOrder: HandOrder;
 }
 
+/**
+ * Defines one shelf catalog without making each pack repeat the generic entry
+ * annotation. The config type is inferred from `configSchema`, and the exact
+ * object is returned so registries and identity-sensitive consumers see no
+ * runtime wrapper or copied metadata.
+ */
+export function defineGameCatalog<C extends RuleValues>(
+  entry: GameCatalogEntry<C>,
+): GameCatalogEntry<C> {
+  return entry;
+}
+
 /** The config preset a mode selects, or null to take the schema defaults. */
 export function modePreset(mode: GameMode): string | null {
   return mode.preset ?? null;

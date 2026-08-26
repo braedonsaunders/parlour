@@ -12,14 +12,12 @@ import {
 import type { FxEvent } from '@parlour/engine';
 import { FOUNDATION_SLOTS, spiderCatalog } from '@parlour/game-spider';
 import { PlayingCard } from '@/components/table/PlayingCard';
-import { TableMenu } from '@/components/table/TableMenu';
 import {
   TableActionRail,
   TableErrorScreen,
-  TableHud,
   TableLoadingScreen,
   TablePlayfield,
-  TableShell,
+  TableScreenFrame,
   TableTitlePill,
   useGameTextSurface,
   useTableMenu,
@@ -196,12 +194,12 @@ function ReadySpiderTable({
   const stockMove = view.legal.find((move) => move.id === 'stock.deal');
 
   return (
-    <TableShell
+    <TableScreenFrame
       rootRef={rootRef}
       className={styles.screen}
       dealState={deal.sequence ? (deal.dealing ? 'dealing' : 'complete') : undefined}
-    >
-      <TableHud onOpenMenu={menu.open}>
+      menu={menu}
+      hud={
         <TableTitlePill
           eyebrow="Spider"
           status={
@@ -213,8 +211,13 @@ function ReadySpiderTable({
             <b>{view.moves}</b> moves · <b>{formatTime(elapsedMs)}</b>
           </span>
         </TableTitlePill>
-      </TableHud>
-
+      }
+      howToPlay={{
+        doc: spiderCatalog.howToPlay,
+        title: 'Spider',
+        subtitle: 'the two-deck solitaire',
+      }}
+    >
       <TablePlayfield label="Spider table" feltMark="S" className={styles.playfield}>
         <div
           className={styles.board}
@@ -409,18 +412,7 @@ function ReadySpiderTable({
         <strong>Turn the table sideways</strong>
         <p>Ten solitaire columns need a landscape table.</p>
       </div>
-
-      <TableMenu
-        open={menu.isOpen}
-        onClose={menu.close}
-        onQuit={menu.quit}
-        howToPlay={{
-          doc: spiderCatalog.howToPlay,
-          title: 'Spider',
-          subtitle: 'the two-deck solitaire',
-        }}
-      />
-    </TableShell>
+    </TableScreenFrame>
   );
 }
 
