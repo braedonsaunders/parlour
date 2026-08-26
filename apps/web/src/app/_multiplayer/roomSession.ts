@@ -446,16 +446,19 @@ export class MultiplayerRoomSession {
     }
     try {
       if (this.snapshot.security.tier === 'veil') {
-        // A veiled deal takes its unpredictability from the ceremony itself —
-        // every shuffling seat lays a layer on a deck nobody can read — so it
-        // needs no separate seed round, and it publishes the real position at
-        // the end.
-        //
-        // House bots no longer force this room onto open play. They hold no key
-        // and sit the ceremony out; the humans still each hold a layer, so no
-        // single player can read the deck, and the host opens a bot's hand to
-        // play it exactly as it already did.
-        await this.dealVeiled();
+        // Veil is infrastructure, not a promise made to anyone: nothing in the
+        // product mentions it, so a ceremony that cannot complete has no claim
+        // to break. A worker that dies, a peer that never lays its layer, a
+        // seat that drops at the wrong moment — the table deals openly and the
+        // evening carries on. The alternative is a match that fails to start
+        // over a privacy feature the players never asked for and cannot see.
+        try {
+          await this.dealVeiled();
+        } catch {
+          await this.dealOpen();
+          const seats = this.snapshot.settings?.seats ?? this.snapshot.seats.length;
+          this.update({ security: securityFor('open', seats, 'open') });
+        }
       } else {
         // An open room had no "the host dealt" signal at all, which is why a
         // guest used to be pushed onto the table the moment it was seated. The
