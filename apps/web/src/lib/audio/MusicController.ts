@@ -42,6 +42,8 @@ type Voice = {
 };
 
 const FADE_MS = 900;
+/** iOS hands the app one media slot, so its swaps are quick cuts, not crossfades. */
+const SWAP_MS = 320;
 
 type HowlHtml5 = {
   _sounds?: Array<{ _node?: HTMLMediaElement }>;
@@ -387,17 +389,26 @@ export class MusicController {
     trackId: string,
   ): void {
     const generation = ++this.transitionGeneration;
+    // iOS only lets one HTML5 media element sound at a time, so a crossfade
+    // leaves the incoming song fighting the outgoing one for the slot and the
+    // table keeps playing the background you just left. Free the slot first.
+    const solo = isAppleTouchDevice();
+    const fadeMs = solo ? SWAP_MS : FADE_MS;
 
     for (const [id, voice] of this.voices) {
       if (id === trackId) continue;
+      if (solo) {
+        this.retire(id, voice);
+        continue;
+      }
       if (voice.soundId !== null) {
         voice.howl.fade(voice.gain, 0, FADE_MS, voice.soundId);
       }
       window.setTimeout(() => {
-        if (generation !== this.transitionGeneration) return;
-        voice.howl.stop();
-        voice.howl.unload();
-        this.voices.delete(id);
+        // Rapid background flips can bring a faded voice back before its timer
+        // fires; only retire the one that is still on its way out.
+        if (this.voices.get(id) !== voice || this.state.trackId === id) return;
+        this.retire(id, voice);
       }, FADE_MS + 50);
     }
 
@@ -407,7 +418,7 @@ export class MusicController {
       existing.soundId = soundId;
       existing.gain = this.gainFor(trackId);
       existing.howl.volume(0, soundId);
-      existing.howl.fade(0, existing.gain, FADE_MS, soundId);
+      existing.howl.fade(0, existing.gain, fadeMs, soundId);
       return;
     }
 
@@ -440,7 +451,14 @@ export class MusicController {
     const soundId = voice.howl.play();
     voice.soundId = soundId;
     voice.gain = this.gainFor(trackId);
-    voice.howl.fade(0, voice.gain, FADE_MS, soundId);
+    voice.howl.fade(0, voice.gain, fadeMs, soundId);
+  }
+
+  /** Drops a voice we have moved on from, handing its media slot straight back. */
+  private retire(id: string, voice: Voice): void {
+    voice.howl.stop();
+    voice.howl.unload();
+    this.voices.delete(id);
   }
 
   private syncGain(): void {

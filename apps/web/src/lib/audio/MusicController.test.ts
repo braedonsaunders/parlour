@@ -119,6 +119,17 @@ function howlFor(srcPart: string): InstanceType<typeof FakeHowl> | undefined {
   return FakeHowl.instances.find((howl) => howl.src.includes(srcPart));
 }
 
+const DESKTOP_UA = navigator.userAgent;
+
+/** iPhone UA, so the controller takes its one-media-element-at-a-time path. */
+function asAppleTouchDevice(): void {
+  Object.defineProperty(navigator, 'userAgent', {
+    configurable: true,
+    value:
+      'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Version/17.0 Mobile/15E148 Safari/604.1',
+  });
+}
+
 beforeEach(() => {
   localStorage.clear();
   FakeHowl.instances.length = 0;
@@ -127,6 +138,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.useRealTimers();
+  Object.defineProperty(navigator, 'userAgent', { configurable: true, value: DESKTOP_UA });
 });
 
 describe('MusicController', () => {
@@ -235,6 +247,51 @@ describe('MusicController', () => {
     vi.advanceTimersByTime(1000);
     const retired = howlFor('music-campfire-1.m4a');
     expect(retired?.stopped || retired?.unloaded).toBe(true);
+  });
+
+  it('frees the media slot before the new background starts on iOS', () => {
+    asAppleTouchDevice();
+    const controller = new MusicController(makeManager());
+    controller.play();
+    const leaving = howlFor('music-campfire-1.m4a')!;
+    expect(leaving.html5).toBe(true);
+
+    controller.setScene('casino');
+
+    // No crossfade: the outgoing song is already gone when the new one plays,
+    // so iOS's single media slot is free for it.
+    const arriving = howlFor('music-casino-1.m4a')!;
+    expect(leaving.playing()).toBe(false);
+    expect(leaving.unloaded).toBe(true);
+    expect(arriving.playing()).toBe(true);
+    expect(controller.getState()).toMatchObject({ status: 'playing', trackId: 'casino-1' });
+  });
+
+  it('retires the song left behind when backgrounds flip mid-crossfade', () => {
+    const controller = new MusicController(makeManager());
+    controller.play();
+    controller.setScene('casino');
+    controller.setScene('snug');
+    vi.advanceTimersByTime(2000);
+
+    expect(howlFor('music-campfire-1.m4a')?.playing()).toBe(false);
+    expect(howlFor('music-casino-1.m4a')?.playing()).toBe(false);
+    expect(howlFor('music-snug-1.m4a')?.playing()).toBe(true);
+  });
+
+  it('keeps the song playing when a background flip lands back on it', () => {
+    const controller = new MusicController(makeManager());
+    controller.play();
+    controller.setScene('casino');
+    controller.setScene('campfire');
+    vi.advanceTimersByTime(2000);
+
+    const back = howlFor('music-campfire-1.m4a')!;
+    expect(back.unloaded).toBe(false);
+    expect(back.playing()).toBe(true);
+    // The background we passed through does not linger at zero volume.
+    expect(howlFor('music-casino-1.m4a')?.playing()).toBe(false);
+    expect(controller.getState()).toMatchObject({ status: 'playing', trackId: 'campfire-1' });
   });
 
   it('switches to the title theme in the menu and back at the table', () => {
