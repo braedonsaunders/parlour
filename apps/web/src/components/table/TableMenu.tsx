@@ -6,6 +6,8 @@ import { HowToPlayButton } from '@/components/HowToPlay';
 import { useAudioManager, useAudioStore } from '@/stores/audio';
 import { SCENE_IDS, SCENE_LABELS, useSceneStore, type SceneId } from '@/stores/scene';
 import {
+  APP_COLOR_LABELS,
+  APP_COLOR_MODES,
   DROP_EFFECT_LABELS,
   DROP_EFFECT_LEVELS,
   useTableFxStore,
@@ -33,6 +35,8 @@ export type TableMenuProps = {
 export function TableMenu({ open, onClose, onQuit, howToPlay }: TableMenuProps) {
   const dropEffects = useTableFxStore((state) => state.dropEffects);
   const setDropEffects = useTableFxStore((state) => state.setDropEffects);
+  const appColorMode = useTableFxStore((state) => state.appColorMode);
+  const setAppColorMode = useTableFxStore((state) => state.setAppColorMode);
   const [confirmingQuit, setConfirmingQuit] = useState(false);
   const [wasOpen, setWasOpen] = useState(false);
   if (open !== wasOpen) {
@@ -140,6 +144,36 @@ export function TableMenu({ open, onClose, onQuit, howToPlay }: TableMenuProps) 
                   );
                 })}
               </div>
+            </section>
+            <section aria-label="App colors" data-testid="app-colors-picker">
+              <p className="mb-1.5 text-center text-xs font-semibold uppercase tracking-[0.25em] text-dusk-200">
+                App colors
+              </p>
+              <div role="radiogroup" className="flex items-center justify-center gap-1">
+                {APP_COLOR_MODES.map((mode) => {
+                  const active = mode === appColorMode;
+                  return (
+                    <button
+                      key={mode}
+                      type="button"
+                      role="radio"
+                      aria-checked={active}
+                      data-testid={`app-colors-${mode}`}
+                      onClick={() => setAppColorMode(mode)}
+                      className={`rounded-full px-2.5 py-1 text-xs font-semibold transition-all duration-150 ease-pop ${
+                        active
+                          ? 'bg-hearth-400/25 text-hearth-100'
+                          : 'text-dusk-200/70 hover:-translate-y-0.5 hover:text-dusk-100'
+                      }`}
+                    >
+                      {APP_COLOR_LABELS[mode]}
+                    </button>
+                  );
+                })}
+              </div>
+              <small className="mt-1 block text-center text-[0.65rem] text-dusk-200/60">
+                Applies everywhere
+              </small>
             </section>
             <section aria-label="Card effects" data-testid="drop-effects-picker">
               <p className="mb-1.5 text-center text-xs font-semibold uppercase tracking-[0.25em] text-dusk-200">

@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import Script from 'next/script';
 import { Baloo_2, Nunito_Sans } from 'next/font/google';
 import { ComfortSync } from '@/components/ComfortSync';
+import { ColorModeSync } from '@/components/ColorModeSync';
 import { LocaleSync } from '@/components/LocaleSync';
 import { AudioDirector } from '@/components/AudioDirector';
 import { SceneStage } from '@/components/backgrounds/SceneStage';
@@ -96,7 +97,7 @@ const developmentPwaReset = `
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${display.variable} ${body.variable}`}>
+    <html lang="en" className={`${display.variable} ${body.variable}`} data-color-mode="richer">
       <body className="min-h-dvh antialiased">
         {process.env.NODE_ENV === 'development' ? (
           <Script
@@ -110,6 +111,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <WipeOverlay />
         <SplashScreen />
         <ComfortSync />
+        <ColorModeSync />
         <LocaleSync />
         <AudioDirector />
         <PwaRegister />

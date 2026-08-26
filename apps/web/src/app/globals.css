@@ -56,6 +56,20 @@
   --dur-flight: 200ms;
 }
 
+/* Keep the root compositor layer stable at its identity value in `Original`;
+   creating and dropping a full-screen filter during comparison can flash on
+   Windows DComp. Richer changes that one root-level pass, so it reaches canvas
+   scenes, cards, avatars, HUD, menus, setup, and the game shelf together. */
+html {
+  filter: saturate(1);
+}
+
+html[data-color-mode='richer'] {
+  filter: saturate(1.26);
+  --unplayable-filter: grayscale(0.12) saturate(0.68) brightness(0.76);
+  --unplayable-opacity: 0.82;
+}
+
 @media (display-mode: standalone), (display-mode: fullscreen) {
   :root {
     /* Installed apps have no collapsing browser chrome, so the large viewport is

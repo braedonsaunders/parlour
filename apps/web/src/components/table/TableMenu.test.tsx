@@ -5,6 +5,12 @@ import { resetAudioManagerForTests } from '@/lib/audio/AudioManager';
 import { MUSIC_STORAGE_KEY, resetMusicControllerForTests } from '@/lib/audio/MusicController';
 import { SCENE_STORAGE_KEY, DEFAULT_SCENE, useSceneStore } from '@/stores/scene';
 import { resetMusicBindingsForTests } from '@/stores/audio';
+import {
+  DEFAULT_APP_COLOR_MODE,
+  DEFAULT_DROP_EFFECTS,
+  TABLE_FX_STORAGE_KEY,
+  useTableFxStore,
+} from '@/stores/tableFx';
 import { TableMenu } from './TableMenu';
 
 const { FakeHowl } = vi.hoisted(() => {
@@ -48,6 +54,10 @@ describe('TableMenu', () => {
   beforeEach(() => {
     localStorage.clear();
     useSceneStore.setState({ sceneId: DEFAULT_SCENE });
+    useTableFxStore.setState({
+      dropEffects: DEFAULT_DROP_EFFECTS,
+      appColorMode: DEFAULT_APP_COLOR_MODE,
+    });
     resetAudioManagerForTests();
     resetMusicControllerForTests();
     resetMusicBindingsForTests();
@@ -125,6 +135,24 @@ describe('TableMenu', () => {
     act(() => casino?.click());
     expect(casino?.getAttribute('aria-checked')).toBe('true');
     expect(JSON.parse(localStorage.getItem(SCENE_STORAGE_KEY)!).state.sceneId).toBe('casino');
+  });
+
+  it('switches the whole app between richer and original colors', async () => {
+    await render({ open: true, onClose: () => {}, onQuit: () => {} });
+
+    const richer = container.querySelector<HTMLButtonElement>('[data-testid="app-colors-richer"]');
+    const original = container.querySelector<HTMLButtonElement>(
+      '[data-testid="app-colors-original"]',
+    );
+    expect(richer?.getAttribute('aria-checked')).toBe('true');
+    expect(original?.getAttribute('aria-checked')).toBe('false');
+
+    act(() => original?.click());
+    expect(richer?.getAttribute('aria-checked')).toBe('false');
+    expect(original?.getAttribute('aria-checked')).toBe('true');
+    expect(JSON.parse(localStorage.getItem(TABLE_FX_STORAGE_KEY)!).state.appColorMode).toBe(
+      'original',
+    );
   });
 
   it('plays music from the music section and reflects the state', async () => {
