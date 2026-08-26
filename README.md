@@ -2,7 +2,7 @@
 
 <img src="docs/parlour-logo.svg" alt="parlour" width="640" />
 
-### Fifteen card games. One cozy table. Your friends join with four letters.
+### Nineteen card games. One cozy table. Your friends join with four letters.
 
 No account. No download. No server. Send a room code and you're dealing in seconds —
 on your phone, your laptop, or a native desktop app.
@@ -32,7 +32,7 @@ server to lag, no account to create, and nothing stored about you. Real life is 
 - The host closes their laptop? **The table elects a new host** and keeps dealing.
 - Dropped connection? **Rejoin with the same code** and land exactly where you left off.
 
-## The shelf — fifteen games, all playable
+## The shelf — nineteen games, all playable
 
 <img src="docs/shots/shelf-fable.png" alt="The parlour game shelf" width="100%" />
 
@@ -53,6 +53,10 @@ server to lag, no account to create, and nothing stored about you. Real life is 
 | **Spite & Malice**           | Race to empty your payoff pile and bury what your neighbour needs.                        |
 | **Spades**                   | Bid books with a partner, break spades, mind the bags.                                    |
 | **Klondike**                 | The solitaire everyone knows, dealt from a seed you can share.                            |
+| **Freecell** · the open solitaire | Every card face-up from the deal — four free cells, no luck but the shuffle.         |
+| **Spider** · the two-deck solitaire | Peel eight suited runs off 104 cards before the table buries you.                  |
+| **Pyramid** · pair to thirteen | Pair cards that sum to thirteen and topple the pyramid one match at a time.             |
+| **Golf** · the fast solitaire | Play ±1 onto the hole and clear the grass in as few passes as you can.                   |
 
 House rules are real settings, not forks: every game ships rule toggles and named presets you can set
 when you create the room.
@@ -89,6 +93,11 @@ hidden the same way they are around a kitchen table: honest UI. For tables that 
 parlour carries **veiled-deck play**, where even the wire never sees your cards until you
 reveal them. Multiplayer rides end-to-end-encrypted peer-to-peer channels.
 
+One exception, named plainly: the hosted site loads **Vercel Analytics**, which records page
+views and coarse request metadata (no cookies, no profile identifiers, nothing you type or
+play). Your game itself never talks to it. The desktop apps and the static export carry none
+of it — analytics is a property of the hosted URL, not of parlour.
+
 The fine print (TURN relays, replay verification, exactly what "veiled" guarantees) lives in
 the app and in the engine docs below.
 
@@ -118,9 +127,12 @@ state = replay(seed, eventLog)
 ```
 
 One pure TypeScript engine — no React, no DOM, no network, no `Math.random()` (ESLint fails the
-build if any sneaks in). Same seed plus same events means byte-identical state on every machine,
-so **replays, reconnects, host migration, spectating, and cheat-auditing fall out of the design**
-instead of being bolted on.
+build if any sneaks in). Same seed plus same events means byte-identical state on every machine.
+**Replays, reconnects, host migration, and desync detection are wired in and shipped** — rejoin
+replays the log, peers compare state hashes and resync on drift. The design also affords more
+than is wired yet: a `verifyLog` mode that re-checks every logged move against the rules (for
+auditing an authority you don't trust) exists in the engine but no transport calls it, and
+spectating is not built — both are one surface away rather than bolted on.
 
 - **Moves are pure reducers** that emit an ordered **fx timeline**. The UI animates _only_ from fx events — never by diffing state. That's why deals cascade and cards arc instead of teleporting.
 - **Real-time and turn-based share one runtime.** A slap window, an out-of-turn jump-in, and an ordinary trick are all the same kind of move to the engine.
@@ -132,7 +144,7 @@ instead of being bolted on.
 | 🎬 Animation                 | fx timeline → deal cascades, card flights, arrival glints |
 | 🤖 Bots                      | seat-fillable bot policies with difficulty tiers          |
 | 🌐 Multiplayer               | room codes, WebRTC mesh, host authority, rejoin           |
-| ⏪ Replay                    | deterministic log replay for reconnect, spectate, debug   |
+| ⏪ Replay                    | deterministic log replay for reconnect and debug          |
 | 🏆 Matches                   | lives, scores, clocks, sudden death, podium celebration   |
 | 🔊 Audio                     | per-game SFX pack keyed to your fx events                 |
 | 📖 Rules doc                 | structured help rendered by the in-app modal              |
@@ -204,7 +216,7 @@ parlour/
 - [x] Local profiles, lifetime stats, friend head-to-head history, PWA
 - [x] P2P multiplayer — room codes, share links, host election, bot takeover, rejoin
 - [x] Installable PWA and native macOS, Windows, and Linux releases
-- [x] Fifteen games built entirely on the public engine API
+- [x] Nineteen games built entirely on the public engine API
 - [x] Veiled-deck primitives in the engine
 - [ ] Platform paydown — shared table shell, room registry, harder CI
 - [ ] Daily-seeded Klondike / FreeCell

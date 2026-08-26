@@ -31,7 +31,6 @@ function freshState(partial: Partial<GinState> = {}): GinState {
     optionSeat: null,
     passedUpcard: false,
     forceStockDraw: false,
-    drawnFromStock: null,
     drawnFromDiscard: null,
     knocker: null,
     quietTurns: 0,
@@ -139,11 +138,12 @@ describe('upcard option', () => {
 });
 
 describe('draw / discard loop', () => {
-  it('never allows discarding the stock-drawn card', () => {
+  it('allows discarding a card just drawn from the stock', () => {
     let state = freshState();
     ({ state } = applyMove(state, 0, 'draw.stock'));
-    const drawn = state.drawnFromStock!;
-    expect(codeOf(def.moves.discard!.validate(state, 0, { card: drawn }))).toBe('discard-locked');
+    const drawn = state.hands[0]!.at(-1)!;
+    const verdict = def.moves.discard!.validate(state, 0, { card: drawn });
+    expect(codeOf(verdict)).toBeNull();
   });
 
   it('never allows discarding the card just taken off the pile', () => {
@@ -153,11 +153,24 @@ describe('draw / discard loop', () => {
     expect(codeOf(def.moves.discard!.validate(state, 0, { card: taken }))).toBe('discard-locked');
   });
 
+  it('clears the pile lock once the turn completes', () => {
+    let state = freshState({ turn: 1 });
+    ({ state } = applyMove(state, 1, 'draw.discard'));
+    const taken = state.drawnFromDiscard!;
+    // the opponent throws something else; when the taker acts again the card is free
+    const hand = [...state.hands[0]!];
+    ({ state } = applyMove(state, 0, 'draw.stock'));
+    const thrown = [...state.hands[0]!].find((card) => !hand.includes(card))!;
+    ({ state } = applyMove(state, 0, 'discard', { card: thrown }));
+    expect(state.turn).toBe(1);
+    expect(def.moves.discard!.validate(state, 1, { card: taken })).toBe(true);
+  });
+
   it('advances the turn and clears draw markers on discard', () => {
     let state = freshState({ turn: 1 });
     ({ state } = applyMove(state, 1, 'draw.stock'));
     const hand = [...state.hands[1]!];
-    const thrown = hand.find((card) => card !== state.drawnFromStock)!;
+    const thrown = hand.find((card) => card !== state.discard[0])!;
     const stockBefore = state.stock.length;
     const discarded = applyMove(state, 1, 'discard', { card: thrown });
     state = discarded.state;
@@ -165,7 +178,6 @@ describe('draw / discard loop', () => {
     expect(state.turn).toBe(0);
     expect(state.discard[0]).toBe(thrown);
     expect(state.stock.length).toBe(stockBefore);
-    expect(state.drawnFromStock).toBeNull();
   });
 
   it('records public pickups only for discard takes', () => {

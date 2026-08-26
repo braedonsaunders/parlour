@@ -10,6 +10,11 @@ coverage/
 .env*.local
 *.log
 
+# local desktop release builds drop their artifacts in the repo root
+Parlour_*.dmg
+Parlour_*.AppImage
+Parlour_*_x64.deb
+
 # local-only working notes and agent scaffolding
 AGENTS.md
 CLAUDE.md

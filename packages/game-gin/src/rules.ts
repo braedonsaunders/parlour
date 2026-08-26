@@ -72,8 +72,8 @@ function knockLegality(state: GinState, seat: SeatId): boolean {
 
 function discardable(state: GinState, seat: SeatId, card: CardId): boolean {
   if (!(state.hands[seat] ?? []).includes(card)) return false;
-  // core rule: neither freshly drawn card may go straight back
-  if (card === state.drawnFromStock) return false;
+  // core rule: the upcard you just took cannot go straight back — but a stock
+  // draw may be thrown immediately, which is sometimes exactly the right play
   if (card === state.drawnFromDiscard) return false;
   return true;
 }
@@ -130,7 +130,6 @@ export function dealHand(
     optionSeat: dealer === 0 ? 1 : 0,
     passedUpcard: false,
     forceStockDraw: false,
-    drawnFromStock: null,
     drawnFromDiscard: null,
     knocker: null,
     quietTurns: 0,
@@ -206,7 +205,6 @@ const drawStock: Move<GinState> = {
       hands: state.hands.map((hand, at) => (at === seat ? addTo(hand, card) : hand)),
       stock: state.stock.slice(1),
       turn: seat,
-      drawnFromStock: card,
       forceStockDraw: false,
       quietTurns: 0,
     };
@@ -242,12 +240,6 @@ const discardCard: Move<GinState> = {
     if (!(state.hands[seat] ?? []).includes(card)) {
       return { code: 'not-in-hand', message: `${card} is not in seat ${seat}'s hand` };
     }
-    if (card === state.drawnFromStock) {
-      return {
-        code: 'discard-locked',
-        message: 'the card just drawn from the stock cannot be discarded',
-      };
-    }
     if (card === state.drawnFromDiscard) {
       return {
         code: 'discard-locked',
@@ -264,7 +256,6 @@ const discardCard: Move<GinState> = {
       hands: state.hands.map((hand, at) => (at === seat ? removeFrom(hand, card) : hand)),
       discard: addTo(state.discard, card),
       turn: other(seat),
-      drawnFromStock: null,
       drawnFromDiscard: null,
     };
   },
