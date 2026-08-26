@@ -197,33 +197,52 @@ describe('ordering hands', () => {
   });
 });
 
-describe('against an independent reference', () => {
-  it('agrees on ten thousand random seven-card holdings', () => {
-    const next = lcg(0x5eed);
-    for (let trial = 0; trial < 10_000; trial++) {
-      const cards = dealRandom(next, 7);
-      const ranked = rankHand(cards);
-      const reference = naiveBest(cards);
-      expect([ranked.category, ...ranked.kickers].slice(0, reference.length)).toEqual(reference);
-    }
-  });
+/**
+ * Cross-checks the fast evaluator against a naive one that enumerates every
+ * five-card subset. Fifteen thousand hands is the point of these two tests —
+ * a smaller sample stops being an oracle and starts being a spot check — so
+ * they are slow on purpose, and slow enough to outrun vitest's five second
+ * default on a shared CI runner. They take well under a second on a developer
+ * laptop and around five and a half on a GitHub runner, so the budget below is
+ * generous rather than tight: it exists to stop a hang, not to police speed.
+ */
+const ORACLE_TIMEOUT_MS = 60_000;
 
-  it('orders random pairs of holdings the same way the reference does', () => {
-    const next = lcg(0xd00d);
-    for (let trial = 0; trial < 5_000; trial++) {
-      const board = dealRandom(next, 5);
-      const rest = [...DECK.cardIds].filter((card) => !board.includes(card));
-      const pick = (): CardId[] => {
-        const first = Math.floor(next() * rest.length);
-        let second = Math.floor(next() * rest.length);
-        if (second === first) second = (second + 1) % rest.length;
-        return [rest[first] as CardId, rest[second] as CardId];
-      };
-      const left = [...pick(), ...board];
-      const right = [...pick(), ...board];
-      expect(Math.sign(compareHands(rankHand(left), rankHand(right)))).toBe(
-        Math.sign(compareVectors(naiveBest(left), naiveBest(right))),
-      );
-    }
-  });
+describe('against an independent reference', () => {
+  it(
+    'agrees on ten thousand random seven-card holdings',
+    () => {
+      const next = lcg(0x5eed);
+      for (let trial = 0; trial < 10_000; trial++) {
+        const cards = dealRandom(next, 7);
+        const ranked = rankHand(cards);
+        const reference = naiveBest(cards);
+        expect([ranked.category, ...ranked.kickers].slice(0, reference.length)).toEqual(reference);
+      }
+    },
+    ORACLE_TIMEOUT_MS,
+  );
+
+  it(
+    'orders random pairs of holdings the same way the reference does',
+    () => {
+      const next = lcg(0xd00d);
+      for (let trial = 0; trial < 5_000; trial++) {
+        const board = dealRandom(next, 5);
+        const rest = [...DECK.cardIds].filter((card) => !board.includes(card));
+        const pick = (): CardId[] => {
+          const first = Math.floor(next() * rest.length);
+          let second = Math.floor(next() * rest.length);
+          if (second === first) second = (second + 1) % rest.length;
+          return [rest[first] as CardId, rest[second] as CardId];
+        };
+        const left = [...pick(), ...board];
+        const right = [...pick(), ...board];
+        expect(Math.sign(compareHands(rankHand(left), rankHand(right)))).toBe(
+          Math.sign(compareVectors(naiveBest(left), naiveBest(right))),
+        );
+      }
+    },
+    ORACLE_TIMEOUT_MS,
+  );
 });

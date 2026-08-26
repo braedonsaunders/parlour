@@ -1124,7 +1124,13 @@ button.card {
     width: var(--hand-card-width);
     min-width: 2.75rem;
     margin-left: 0;
-    scroll-snap-align: center;
+    /* Start, not centre. A centred snap point cannot resolve to scrollLeft 0 —
+       centring the first card would need a negative offset, so the engine
+       re-snaps to whichever card *can* sit in the middle and the rail opens
+       halfway along the hand. Aligning to the start makes the first card's snap
+       position and the rail's origin the same place, which is also what a hand
+       wants: you read it left to right, you do not browse it like a carousel. */
+    scroll-snap-align: start;
     transform: none !important;
   }
   .handFan {
