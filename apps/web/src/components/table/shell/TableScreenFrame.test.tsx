@@ -1,4 +1,4 @@
-import { act } from 'react';
+import { act, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
@@ -116,6 +116,109 @@ describe('TableScreenFrame', () => {
     expect(document.activeElement).toBe(
       container.querySelector<HTMLButtonElement>('[data-hand-card] button'),
     );
+  });
+
+  it('keeps focus in the hand when a descendant removes the played card later', async () => {
+    function AnimatedHand() {
+      const [cards, setCards] = useState(['Ace', 'Two']);
+      return (
+        <div role="list" data-zone="hand:0" aria-label="Your hand">
+          {cards.map((card, index) => (
+            <div key={card} data-hand-card>
+              <button
+                type="button"
+                tabIndex={index === 0 ? 0 : -1}
+                onClick={() => setCards((current) => current.filter((entry) => entry !== card))}
+              >
+                Play {card}
+              </button>
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    act(() =>
+      root.render(
+        <TableScreenFrame
+          rootRef={{ current: null }}
+          hud={null}
+          menu={{ isOpen: false, open: vi.fn(), close: vi.fn(), quit: vi.fn() }}
+        >
+          <AnimatedHand />
+        </TableScreenFrame>,
+      ),
+    );
+
+    const played = container.querySelector<HTMLButtonElement>('[data-hand-card] button')!;
+    played.focus();
+    await act(async () => played.click());
+
+    expect(played.isConnected).toBe(false);
+    expect(document.activeElement).toBe(
+      container.querySelector<HTMLButtonElement>('[data-hand-card] button'),
+    );
+  });
+
+  it('hands a disabled played card to the choice that replaced it', async () => {
+    function CardChoice() {
+      const [choosing, setChoosing] = useState(false);
+      return (
+        <>
+          <div data-hand-card aria-hidden={choosing || undefined}>
+            <button type="button" disabled={choosing} onClick={() => setChoosing(true)}>
+              Play wild
+            </button>
+          </div>
+          {choosing ? (
+            <div role="dialog" aria-label="Choose a color">
+              <button type="button">Choose red</button>
+            </div>
+          ) : null}
+        </>
+      );
+    }
+
+    act(() =>
+      root.render(
+        <TableScreenFrame
+          rootRef={{ current: null }}
+          hud={null}
+          menu={{ isOpen: false, open: vi.fn(), close: vi.fn(), quit: vi.fn() }}
+        >
+          <CardChoice />
+        </TableScreenFrame>,
+      ),
+    );
+
+    const played = container.querySelector<HTMLButtonElement>('[data-hand-card] button')!;
+    played.focus();
+    await act(async () => played.click());
+
+    expect(document.activeElement).toBe(
+      container.querySelector<HTMLButtonElement>('[role="dialog"] button'),
+    );
+  });
+
+  it('keeps a route handoff anchored when the whole table unmounts', () => {
+    act(() =>
+      root.render(
+        <TableScreenFrame
+          rootRef={{ current: null }}
+          hud={null}
+          menu={{ isOpen: false, open: vi.fn(), close: vi.fn(), quit: vi.fn() }}
+        >
+          <button type="button">Finish match</button>
+        </TableScreenFrame>,
+      ),
+    );
+
+    const finish = container.querySelector<HTMLButtonElement>('button')!;
+    finish.focus();
+    act(() => root.render(<main data-testid="podium">Podium</main>));
+
+    expect(finish.isConnected).toBe(false);
+    expect(document.activeElement).toBe(container);
   });
 
   it('moves from a solitaire source to a pointer-equivalent target', () => {

@@ -49,25 +49,86 @@ export function TableShell({ rootRef, className, dealState, children }: TableShe
     if (event.target instanceof HTMLElement) lastFocusedElement.current = event.target;
   }, []);
 
-  useLayoutEffect(() => {
+  const recoverOrphanedFocus = useCallback(() => {
     const root = rootRef.current;
     const previous = lastFocusedElement.current;
-    if (!root || !previous || previous.isConnected) return;
+    if (!root?.isConnected || !previous || focusAvailable(previous)) return;
 
     const active = document.activeElement;
-    if (active && active !== document.body && active !== document.documentElement) return;
+    if (
+      active instanceof HTMLElement &&
+      active !== document.body &&
+      active !== document.documentElement &&
+      focusAvailable(active)
+    ) {
+      // A dialog may have restored focus outside the table before this
+      // observer runs. Forget the old table control so a later animation does
+      // not pull that deliberate focus back into the felt.
+      if (!root.contains(active)) lastFocusedElement.current = null;
+      return;
+    }
 
-    // WebKit loses its sequential-navigation starting point when a focused
-    // decision rail is removed. Keep keyboard players in the table by handing
-    // them to the newly playable hand, or to the table itself when play has
-    // passed to another seat.
+    // A choice that replaces the played card comes first, then the newly
+    // playable hand. With neither available, the table itself is an honest
+    // starting point while another seat acts.
     const destination =
-      root.querySelector<HTMLElement>('[data-hand-card] button:not(:disabled)[tabindex="0"]') ??
-      root.querySelector<HTMLElement>('[data-hand-card] button:not(:disabled)') ??
+      firstAvailable(root, '[role="dialog"] button:not(:disabled)') ??
+      firstAvailable(root, '[role="alertdialog"] button:not(:disabled)') ??
+      firstAvailable(root, '[data-hand-card] button:not(:disabled)[tabindex="0"]') ??
+      firstAvailable(root, '[data-hand-card] button:not(:disabled)') ??
+      firstAvailable(root, '[data-table-actions] button:not(:disabled)') ??
+      firstAvailable(root, '[role="group"] button:not(:disabled)') ??
       root;
     destination.focus();
     lastFocusedElement.current = destination;
-  });
+  }, [rootRef]);
+
+  useLayoutEffect(recoverOrphanedFocus);
+
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root) return;
+    // Motion keeps an exiting card connected until its flight ends. That
+    // removal happens below TableShell, after the parent commit whose layout
+    // effect used to be the only recovery chance. Watch the actual DOM
+    // lifetime, plus controls that become unavailable without unmounting.
+    const observer = new MutationObserver(recoverOrphanedFocus);
+    observer.observe(root, {
+      subtree: true,
+      childList: true,
+      attributes: true,
+      attributeFilter: ['aria-disabled', 'aria-hidden', 'disabled', 'hidden', 'inert'],
+    });
+    return () => observer.disconnect();
+  }, [recoverOrphanedFocus, rootRef]);
+
+  useLayoutEffect(() => {
+    const root = rootRef.current;
+    const boundary = root?.parentElement;
+    if (!root || !boundary) return;
+    return () => {
+      const active = document.activeElement;
+      if (!(active instanceof HTMLElement) || !root.contains(active) || !boundary.isConnected) {
+        return;
+      }
+
+      // The shell cannot focus the podium or shelf before that route exists.
+      // Keep WebKit's sequential-navigation origin on the stable page boundary
+      // while Next swaps the table out; its route focus then takes over when
+      // the destination mounts.
+      const previousTabIndex = boundary.getAttribute('tabindex');
+      boundary.tabIndex = -1;
+      boundary.focus({ preventScroll: true });
+      boundary.addEventListener(
+        'blur',
+        () => {
+          if (previousTabIndex === null) boundary.removeAttribute('tabindex');
+          else boundary.setAttribute('tabindex', previousTabIndex);
+        },
+        { once: true },
+      );
+    };
+  }, [rootRef]);
 
   // Scoped to the shell rather than the app: a table earns the battery, a menu
   // does not. Leaving the table unmounts this and hands the screen back.
@@ -97,6 +158,17 @@ export function TableShell({ rootRef, className, dealState, children }: TableShe
       </main>
     </TableAnnouncerContext.Provider>
   );
+}
+
+function focusAvailable(element: HTMLElement): boolean {
+  if (!element.isConnected) return false;
+  if (element instanceof HTMLButtonElement && element.disabled) return false;
+  if (element.getAttribute('aria-disabled') === 'true') return false;
+  return element.closest('[aria-hidden="true"], [hidden], [inert]') === null;
+}
+
+function firstAvailable(root: HTMLElement, selector: string): HTMLElement | null {
+  return [...root.querySelectorAll<HTMLElement>(selector)].find(focusAvailable) ?? null;
 }
 
 const NAVIGATION_KEYS = new Set(['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End']);

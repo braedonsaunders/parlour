@@ -68,6 +68,23 @@ async function announcements(page: Page): Promise<string[]> {
   return page.evaluate(() => [...((window as AnnouncementWindow).__parlourAnnouncements ?? [])]);
 }
 
+async function expectFocusWithinTable(page: Page) {
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const table = document.querySelector('[data-table-screen]');
+        const active = document.activeElement;
+        return (
+          active !== document.body &&
+          active !== document.documentElement &&
+          active !== null &&
+          table?.contains(active)
+        );
+      }),
+    )
+    .toBe(true);
+}
+
 test('a player can move a Klondike card to its foundation with only the keyboard', async ({
   page,
   browserName,
@@ -185,7 +202,35 @@ test('a player can bid and play a Spades card with only the keyboard', async ({
   await page.keyboard.press('Enter');
 
   await expect(hand.locator('[data-hand-card]')).toHaveCount(12);
+  await expectFocusWithinTable(page);
   expect(initialCard).toMatch(/^Play /);
+});
+
+test('focus stays on the Hearts table when the pass rail closes', async ({ page, browserName }) => {
+  test.setTimeout(45_000);
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto('/hearts/table/');
+
+  const hand = page.locator('[role="list"][data-zone^="hand:"]').first();
+  const handEntry = hand.locator(
+    '[data-hand-card] button[data-card-chassis]:not(:disabled)[tabindex="0"]',
+  );
+  await expect(hand.locator('[data-hand-card]')).toHaveCount(13, { timeout: 15_000 });
+  await expect(handEntry).toHaveCount(1, { timeout: 15_000 });
+  await tabTo(page, handEntry, browserName);
+
+  for (let pick = 0; pick < 3; pick += 1) {
+    await page.keyboard.press('Enter');
+    if (pick < 2) await page.keyboard.press('ArrowRight');
+  }
+
+  const confirm = page.getByTestId('confirm-pass');
+  await expect(confirm).toBeEnabled();
+  await tabTo(page, confirm, browserName);
+  await page.keyboard.press('Enter');
+
+  await expect(confirm).toHaveCount(0);
+  await expectFocusWithinTable(page);
 });
 
 test('the table menu and nested rules sheet trap and restore keyboard focus', async ({

@@ -174,7 +174,8 @@ describe('OhHellTableScreen', () => {
     render(view);
     expect(container.querySelector('[data-testid="ohhell-round-end"]')).toBeNull();
     render({ ...view, roundOver: true, matchOver: false });
-    expect(container.querySelector('[data-testid="ohhell-round-end"]')).not.toBeNull();
+    const roundEnd = container.querySelector('[data-testid="ohhell-round-end"]');
+    expect(roundEnd?.getAttribute('role')).toBe('dialog');
     // A finished match hands over to the podium, so the table must not offer
     // another round on top of it.
     render({ ...view, roundOver: true, matchOver: true });

@@ -45,7 +45,10 @@ export function TableActionRail({
   children: ReactNode;
 }) {
   return (
-    <div className={className ? `${styles.actionRail} ${className}` : styles.actionRail}>
+    <div
+      className={className ? `${styles.actionRail} ${className}` : styles.actionRail}
+      data-table-actions
+    >
       {children}
     </div>
   );

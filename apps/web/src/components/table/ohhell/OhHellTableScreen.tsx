@@ -223,7 +223,12 @@ export function OhHellTableScreen({
         </HandRail>
 
         {view.roundOver && !view.matchOver ? (
-          <div className={styles.roundEnd} data-testid="ohhell-round-end">
+          <div
+            className={styles.roundEnd}
+            role="dialog"
+            aria-label={`Round ${view.round} scored`}
+            data-testid="ohhell-round-end"
+          >
             <h2>Round {view.round} scored</h2>
             <ul>
               {view.seats.map((seat) => (

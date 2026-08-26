@@ -47,7 +47,10 @@ test('a solo table deals and shows a hand', async ({ page }) => {
   await expect(hand.locator('[role="listitem"]').first()).toBeVisible({ timeout: 15_000 });
 });
 
-test('leaving a table returns to its shelf page', async ({ page }) => {
+test('leaving a table returns to its shelf without orphaning keyboard focus', async ({
+  page,
+  browserName,
+}) => {
   // Hearts exercises the shared table frame without adding a game-specific
   // result screen to the route home.
   await page.goto('/hearts/table/');
@@ -59,6 +62,22 @@ test('leaving a table returns to its shelf page', async ({ page }) => {
   await page.getByTestId('quit-to-menu').click();
   await page.getByTestId('confirm-quit').click();
   await expect(page).toHaveURL(/\/hearts\/?$/, { timeout: 15_000 });
+
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          document.activeElement !== document.body &&
+          document.activeElement !== document.documentElement,
+      ),
+    )
+    .toBe(true);
+  await page.keyboard.press(browserName === 'webkit' ? 'Alt+Tab' : 'Tab');
+  await expect
+    .poll(() =>
+      page.evaluate(() => ['A', 'BUTTON'].includes(document.activeElement?.tagName ?? '')),
+    )
+    .toBe(true);
 });
 
 test.describe('portrait hand rails', () => {

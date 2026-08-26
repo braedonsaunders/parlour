@@ -477,7 +477,12 @@ function RoundEndSheet({
 }) {
   const end = view.roundEnd!;
   return (
-    <div className={styles.roundEnd} data-testid="round-end-sheet">
+    <div
+      className={styles.roundEnd}
+      role="dialog"
+      aria-label="Round scored"
+      data-testid="round-end-sheet"
+    >
       <motion.div
         className={`${styles.sheet} panel-soft`}
         initial={{ opacity: 0, y: 18, scale: 0.96 }}

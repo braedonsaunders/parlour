@@ -144,6 +144,7 @@ describe('EightsTableScreen', () => {
     });
 
     const sheet = container.querySelector('[data-testid="round-end-sheet"]')!;
+    expect(sheet.getAttribute('role')).toBe('dialog');
     expect(sheet.textContent).toContain('Juniper went out');
     expect(sheet.textContent).toContain('+62');
     expect(sheet.textContent).toContain('62 pts held');

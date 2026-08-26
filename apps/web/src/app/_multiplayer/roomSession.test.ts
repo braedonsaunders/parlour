@@ -38,10 +38,11 @@ import {
   wildpileConfig,
   wildpileFace,
   wildpileGame,
+  sameWildpileFace,
   type WildpileRules,
   type WildpileState,
 } from '@parlour/game-wildpile';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { EngineAuthority } from '@/lib/multiplayer';
 import { NostrSignaling, type SignalPayload } from '@/lib/multiplayer/NostrSignaling';
 import type { RoomSettings } from '@/lib/multiplayer/types';
@@ -223,6 +224,7 @@ describe('multiplayer route composition', () => {
   afterEach(() => {
     sessions.splice(0).forEach((session) => session.close());
     clearActiveMultiplayerSession();
+    vi.restoreAllMocks();
   });
 
   // D3 seam: a share link carries a host-binding capability because a 4-char
@@ -1079,6 +1081,24 @@ describe('multiplayer route composition', () => {
   }, 120_000);
 
   it('declines a jump-in when this seat has no exact match', async () => {
+    let randomState = 0x5eed;
+    const deterministicRandom: Crypto['getRandomValues'] = <T extends ArrayBufferView | null>(
+      array: T,
+    ): T => {
+      if (array === null) return array;
+      const bytes = new Uint8Array(array.buffer, array.byteOffset, array.byteLength);
+      for (let index = 0; index < bytes.length; index++) {
+        randomState = (Math.imul(randomState, 1_664_525) + 1_013_904_223) >>> 0;
+        bytes[index] = randomState >>> 24;
+      }
+      return array;
+    };
+    vi.spyOn(globalThis.crypto, 'getRandomValues').mockImplementation(deterministicRandom);
+    for (let index = window.localStorage.length - 1; index >= 0; index--) {
+      const key = window.localStorage.key(index);
+      if (key?.startsWith('parlour.veil.round.')) window.localStorage.removeItem(key);
+    }
+
     const broker = new MockSignalingBroker();
     const rtc = new MockRtcNetwork();
     const host = new MultiplayerRoomSession(
@@ -1103,6 +1123,7 @@ describe('multiplayer route composition', () => {
       gameId: 'wildpile',
       seats: 2,
       config: applyPreset(wildpileConfig, 'party'),
+      security: 'veil',
     });
     await guest.join(room.code);
     await eventually(() => expect(guest.getSnapshot().localSeat).toBe(1));
@@ -1119,6 +1140,8 @@ describe('multiplayer route composition', () => {
         const guestHand =
           multiplayerSession<WildpileState, WildpileRules>(guest.getSnapshot(), 'wildpile')?.state
             .hands[1] ?? [];
+        expect(hostHand.length).toBeGreaterThan(0);
+        expect(guestHand.length).toBeGreaterThan(0);
         expect(hostHand.every((card) => !isVeilHandle(card))).toBe(true);
         expect(guestHand.every((card) => !isVeilHandle(card))).toBe(true);
       },
@@ -1134,12 +1157,24 @@ describe('multiplayer route composition', () => {
       speaker.getSnapshot(),
       'wildpile',
     )!;
+    expect(speaker.getSnapshot().security.tier).toBe('veil');
+    expect(live.state.veiled).toBe(true);
+    const otherSeat = other.getSnapshot().localSeat!;
+    const otherHand = multiplayerSession<WildpileState, WildpileRules>(
+      other.getSnapshot(),
+      'wildpile',
+    )!.state.hands[otherSeat]!;
     const play = live.def.flow.legalMoves(live.state, live.phase).find((move) => {
       if (move.id !== 'playCard') return false;
       const card = (move.payload as { card?: string } | undefined)?.card;
-      return Boolean(card) && !wildpileFace(card!).meta.kind.startsWith('wild');
+      return (
+        Boolean(card) &&
+        !wildpileFace(card!).meta.kind.startsWith('wild') &&
+        !otherHand.some((held) => sameWildpileFace(held, card!))
+      );
     });
     expect(play).toBeDefined();
+    const before = live.log.length;
     speaker.send(play!.id, play!.payload);
 
     await eventually(
@@ -1150,6 +1185,7 @@ describe('multiplayer route composition', () => {
         )!;
         expect(after.state.interrupt).toBeNull();
         expect(after.phase.phase).toBe('play');
+        expect(after.log.slice(before).some((event) => event.move === 'declineJump')).toBe(true);
         expect(other.getSnapshot().error).toBeNull();
         expect(host.getSnapshot().error).toBeNull();
       },
