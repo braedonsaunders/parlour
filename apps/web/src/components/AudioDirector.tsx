@@ -16,7 +16,7 @@ export function AudioDirector() {
   useEffect(() => {
     controller.setMenu(resolveMusicContext(pathname) === 'menu');
     const kick = () => {
-      if (!manager.isUnlocked() || manager.gainFor('music') <= 0) return;
+      if (!manager.isPageActive() || !manager.isUnlocked() || manager.gainFor('music') <= 0) return;
       controller.autoStart();
       keepMenuAudioAlive();
     };
@@ -24,6 +24,11 @@ export function AudioDirector() {
     kick();
     return unsubscribe;
   }, [controller, manager, pathname]);
+
+  useEffect(() => {
+    controller.setPageActive(manager.isPageActive());
+    return manager.subscribePageActive((active) => controller.setPageActive(active));
+  }, [controller, manager]);
 
   useEffect(() => {
     const onPointerDown = (event: PointerEvent) => {

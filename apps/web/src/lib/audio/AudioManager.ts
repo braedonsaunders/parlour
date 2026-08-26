@@ -5,7 +5,11 @@ export const AUDIO_STORAGE_KEY = 'parlour.audio.v1';
 
 type HowlerRuntime = {
   volume?: (value: number) => void;
-  ctx?: { state?: string; resume?: () => Promise<void> };
+  ctx?: {
+    state?: string;
+    resume?: () => Promise<void>;
+    suspend?: () => Promise<void>;
+  };
   autoSuspend?: boolean;
 };
 
@@ -107,9 +111,15 @@ export class AudioManager {
   private entries = new Map<string, Entry>();
   private listeners = new Set<(settings: AudioSettings) => void>();
   private unlocked = false;
+  private pageActive = typeof document === 'undefined' || document.visibilityState !== 'hidden';
   private gestureBound = false;
   private gestureHandler: (() => void) | null = null;
-  private lifecycleHandler: (() => void) | null = null;
+  private lifecycleHandlers: {
+    visibilityChange: () => void;
+    pageHide: () => void;
+    pageShow: () => void;
+  } | null = null;
+  private pageActiveListeners = new Set<(active: boolean) => void>();
   private sessionHold: HTMLAudioElement | null = null;
 
   constructor() {
@@ -128,10 +138,21 @@ export class AudioManager {
     return this.unlocked;
   }
 
+  isPageActive(): boolean {
+    return this.pageActive;
+  }
+
   subscribe(listener: (settings: AudioSettings) => void): () => void {
     this.listeners.add(listener);
     return () => {
       this.listeners.delete(listener);
+    };
+  }
+
+  subscribePageActive(listener: (active: boolean) => void): () => void {
+    this.pageActiveListeners.add(listener);
+    return () => {
+      this.pageActiveListeners.delete(listener);
     };
   }
 
@@ -177,6 +198,7 @@ export class AudioManager {
   }
 
   play(id: string, options: PlayOptions = {}): number | null {
+    if (!this.pageActive) return null;
     const entry = this.entries.get(id);
     if (!entry || entry.failed) return null;
 
@@ -254,6 +276,7 @@ export class AudioManager {
 
   /** Resume the shared Howler context if the browser suspended it. */
   async resumeContext(): Promise<boolean> {
+    if (!this.pageActive) return false;
     this.holdSession();
     const ctx = howlerRuntime().ctx;
     if (ctx && ctx.state !== 'running' && typeof ctx.resume === 'function') {
@@ -278,6 +301,7 @@ export class AudioManager {
     this.sessionHold?.pause();
     this.sessionHold = null;
     this.listeners.clear();
+    this.pageActiveListeners.clear();
   }
 
   private ensureHowl(entry: Entry): Howl | null {
@@ -303,7 +327,7 @@ export class AudioManager {
   }
 
   private holdSession(): void {
-    if (!isAppleTouchDevice() || typeof Audio === 'undefined') return;
+    if (!this.pageActive || !isAppleTouchDevice() || typeof Audio === 'undefined') return;
     if (!this.sessionHold) {
       try {
         const hold = new Audio(SESSION_HOLD_SRC);
@@ -323,23 +347,49 @@ export class AudioManager {
   }
 
   private watchPageLifecycle(): void {
-    if (this.lifecycleHandler || typeof window === 'undefined') return;
-    const onShow = () => {
-      if (document.visibilityState === 'hidden') return;
-      void this.resumeContext().then((running) => {
-        if (running && this.unlocked) this.notify();
-      });
+    if (this.lifecycleHandlers || typeof window === 'undefined') return;
+    const visibilityChange = () => {
+      this.setPageActive(document.visibilityState !== 'hidden');
     };
-    this.lifecycleHandler = onShow;
-    document.addEventListener('visibilitychange', onShow);
-    window.addEventListener('pageshow', onShow);
+    const pageHide = () => this.setPageActive(false);
+    const pageShow = () => this.setPageActive(document.visibilityState !== 'hidden');
+    this.lifecycleHandlers = { visibilityChange, pageHide, pageShow };
+    document.addEventListener('visibilitychange', visibilityChange);
+    window.addEventListener('pagehide', pageHide);
+    window.addEventListener('pageshow', pageShow);
   }
 
   private unwatchPageLifecycle(): void {
-    if (!this.lifecycleHandler || typeof window === 'undefined') return;
-    document.removeEventListener('visibilitychange', this.lifecycleHandler);
-    window.removeEventListener('pageshow', this.lifecycleHandler);
-    this.lifecycleHandler = null;
+    if (!this.lifecycleHandlers || typeof window === 'undefined') return;
+    const { visibilityChange, pageHide, pageShow } = this.lifecycleHandlers;
+    document.removeEventListener('visibilitychange', visibilityChange);
+    window.removeEventListener('pagehide', pageHide);
+    window.removeEventListener('pageshow', pageShow);
+    this.lifecycleHandlers = null;
+  }
+
+  private setPageActive(active: boolean): void {
+    if (active === this.pageActive) return;
+    this.pageActive = active;
+    if (!active) {
+      this.stopAll();
+      this.sessionHold?.pause();
+      const ctx = howlerRuntime().ctx;
+      if (ctx?.state === 'running' && typeof ctx.suspend === 'function') {
+        void ctx.suspend().catch(() => undefined);
+      }
+      this.notifyPageActive(false);
+      return;
+    }
+
+    void this.resumeContext().then(() => {
+      this.notifyPageActive(true);
+      if (this.unlocked) this.notify();
+    });
+  }
+
+  private notifyPageActive(active: boolean): void {
+    for (const listener of this.pageActiveListeners) listener(active);
   }
 
   private applyMasterVolume(): void {

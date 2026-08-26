@@ -74,6 +74,10 @@ describe('AudioDirector', () => {
     resetAudioManagerForTests();
     resetMusicBindingsForTests();
     useAudioStore.setState({ channels: DEFAULT_SETTINGS, unlocked: false });
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      value: 'visible',
+    });
     container = document.createElement('div');
     document.body.append(container);
     root = createRoot(container);
@@ -110,5 +114,29 @@ describe('AudioDirector', () => {
     expect(FakeHowl.instances.filter((howl) => howl.src.includes('music-title.m4a'))).toHaveLength(
       1,
     );
+  });
+
+  it('silences the title theme while hidden and resumes it on foreground', async () => {
+    await act(async () => root.render(createElement(AudioDirector)));
+    act(() => window.dispatchEvent(new Event('pointerdown')));
+    const theme = FakeHowl.instances.find((howl) => howl.src.includes('music-title.m4a'));
+    expect(theme?.playing()).toBe(true);
+
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      value: 'hidden',
+    });
+    act(() => document.dispatchEvent(new Event('visibilitychange')));
+    expect(theme?.playing()).toBe(false);
+
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      value: 'visible',
+    });
+    await act(async () => {
+      document.dispatchEvent(new Event('visibilitychange'));
+      await Promise.resolve();
+    });
+    expect(theme?.playing()).toBe(true);
   });
 });

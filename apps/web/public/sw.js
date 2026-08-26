@@ -47,13 +47,21 @@ function navigationCandidates(url) {
   ];
 }
 
+async function matchCurrent(request, runtimeName = RUNTIME) {
+  const runtime = await caches.open(runtimeName);
+  const cachedRuntime = await runtime.match(request, { ignoreSearch: true });
+  if (cachedRuntime) return cachedRuntime;
+  const precache = await caches.open(PRECACHE);
+  return precache.match(request, { ignoreSearch: true });
+}
+
 async function matchNavigation(request) {
-  const exact = await caches.match(request, { ignoreSearch: true });
+  const exact = await matchCurrent(request);
   if (exact) return exact;
 
   const url = new URL(request.url);
   for (const candidate of navigationCandidates(url)) {
-    const response = await caches.match(candidate, { ignoreSearch: true });
+    const response = await matchCurrent(candidate);
     if (response) return response;
   }
 
@@ -62,7 +70,7 @@ async function matchNavigation(request) {
 
 async function cachedNavigation(request) {
   return (
-    (await matchNavigation(request)) ?? (await caches.match('/offline.html')) ?? Response.error()
+    (await matchNavigation(request)) ?? (await matchCurrent('/offline.html')) ?? Response.error()
   );
 }
 
@@ -103,32 +111,21 @@ self.addEventListener('fetch', (event) => {
   if (url.origin !== self.location.origin) return;
 
   if (request.mode === 'navigate') {
+    const network = fetch(request).then((response) => ({
+      response,
+      cacheWrite: cacheResponse(RUNTIME, request, response),
+    }));
     event.respondWith(
-      (async () => {
-        const cached = await matchNavigation(request);
-        const network = fetch(request)
-          .then((response) => {
-            event.waitUntil(cacheResponse(RUNTIME, request, response));
-            return response;
-          })
-          .catch(() => undefined);
-
-        if (cached) {
-          event.waitUntil(network);
-          return cached;
-        }
-
-        return (await network) ?? (await cachedNavigation(request));
-      })(),
+      network.then(({ response }) => response).catch(() => cachedNavigation(request)),
     );
+    event.waitUntil(network.then(({ cacheWrite }) => cacheWrite).catch(() => undefined));
     return;
   }
 
   const isMusic = url.pathname.startsWith(MUSIC_PATH_PREFIX);
   const cacheName = isMusic ? MUSIC_RUNTIME : RUNTIME;
   const maxEntries = isMusic ? MUSIC_CACHE_MAX_ENTRIES : undefined;
-  const cacheFirst = caches.open(cacheName).then(async (cache) => {
-    const cached = await cache.match(request, { ignoreSearch: true });
+  const cacheFirst = matchCurrent(request, cacheName).then(async (cached) => {
     if (cached) return { response: cached, cacheWrite: Promise.resolve() };
     const response = await fetch(request);
     return { response, cacheWrite: cacheResponse(cacheName, request, response, maxEntries) };

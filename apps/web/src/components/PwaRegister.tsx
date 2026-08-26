@@ -35,9 +35,22 @@ export function PwaRegister() {
       if (!disposed && worker && navigator.serviceWorker.controller) setWaitingWorker(worker);
     };
 
-    const watchRegistration = (nextRegistration: ServiceWorkerRegistration) => {
+    const activateWorker = (worker: ServiceWorker) => {
+      reloadForUpdate.current = true;
+      setApplyingUpdate(true);
+      worker.postMessage({ type: 'SKIP_WAITING' });
+    };
+
+    const watchRegistration = (
+      nextRegistration: ServiceWorkerRegistration,
+      activateWaiting: boolean,
+    ) => {
       registration = nextRegistration;
-      offerUpdate(nextRegistration.waiting);
+      if (activateWaiting && nextRegistration.waiting && navigator.serviceWorker.controller) {
+        activateWorker(nextRegistration.waiting);
+      } else {
+        offerUpdate(nextRegistration.waiting);
+      }
       nextRegistration.addEventListener('updatefound', () => {
         const worker = nextRegistration.installing;
         if (!worker) return;
@@ -49,7 +62,12 @@ export function PwaRegister() {
 
     const register = async () => {
       try {
-        watchRegistration(await navigator.serviceWorker.register('/sw.js'));
+        const nextRegistration = await navigator.serviceWorker.register('/sw.js', {
+          updateViaCache: 'none',
+        });
+        watchRegistration(nextRegistration, true);
+        lastUpdateCheck = Date.now();
+        void nextRegistration.update().catch(() => undefined);
       } catch (error: unknown) {
         console.warn('[parlour] service worker registration failed', error);
       }
@@ -58,7 +76,7 @@ export function PwaRegister() {
     const checkForUpdate = () => {
       if (!registration || !navigator.onLine || document.visibilityState !== 'visible') return;
       const now = Date.now();
-      if (now - lastUpdateCheck < 60 * 60 * 1000) return;
+      if (now - lastUpdateCheck < 5 * 60 * 1000) return;
       lastUpdateCheck = now;
       void registration.update().catch(() => undefined);
     };

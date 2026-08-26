@@ -74,6 +74,7 @@ export class MusicController {
   private voices = new Map<string, Voice>();
   private wantPlaying = false;
   private pausedByMute = false;
+  private pageActive = true;
   private history: string[] = [];
   private scene: SceneId = DEFAULT_SCENE;
   private inMenu = false;
@@ -109,7 +110,7 @@ export class MusicController {
    * silent (iOS suspending the element, a rejected autoplay, a route change).
    */
   ensurePlaying(): void {
-    if (!this.wantPlaying || this.pausedByMute) return;
+    if (!this.pageActive || !this.wantPlaying || this.pausedByMute) return;
     const trackId = this.state.trackId;
     if (!trackId || this.gainFor(trackId) <= 0) return;
 
@@ -147,7 +148,7 @@ export class MusicController {
    */
   keepAlive(): void {
     this.ensurePlaying();
-    if (!this.wantPlaying || this.pausedByMute) return;
+    if (!this.pageActive || !this.wantPlaying || this.pausedByMute) return;
     const trackId = this.state.trackId;
     const voice = trackId ? this.voices.get(trackId) : undefined;
     if (!voice) return;
@@ -176,6 +177,21 @@ export class MusicController {
     for (const voice of this.voices.values()) voice.howl.pause();
     this.state.status = 'paused';
     this.notify();
+  }
+
+  /** Temporarily silences background tabs without changing the user's intent. */
+  setPageActive(active: boolean): void {
+    if (active === this.pageActive) return;
+    this.pageActive = active;
+    if (!active) {
+      for (const voice of this.voices.values()) voice.howl.pause();
+      if (this.state.status !== 'idle') {
+        this.state.status = 'paused';
+        this.notify();
+      }
+      return;
+    }
+    this.ensurePlaying();
   }
 
   toggle(): void {
@@ -355,13 +371,13 @@ export class MusicController {
     this.wantPlaying = true;
     this.pausedByMute = false;
 
-    this.startVoice(track, trackId);
+    if (this.pageActive) this.startVoice(track, trackId);
     const mutedOut = this.gainFor(trackId) <= 0;
-    if (mutedOut) {
-      this.pausedByMute = true;
+    this.pausedByMute = mutedOut;
+    if (mutedOut || !this.pageActive) {
       for (const voice of this.voices.values()) voice.howl.pause();
     }
-    this.state.status = mutedOut ? 'paused' : 'playing';
+    this.state.status = mutedOut || !this.pageActive ? 'paused' : 'playing';
     this.persist();
     this.notify();
   }
@@ -431,19 +447,24 @@ export class MusicController {
     const gain = this.gainFor(this.state.trackId ?? '');
     const mutedOut = gain <= 0;
 
-    if (mutedOut && this.state.status === 'playing') {
+    if (mutedOut) {
+      const changed = !this.pausedByMute || this.state.status === 'playing';
       this.pausedByMute = true;
-      this.state.status = 'paused';
+      if (this.state.status !== 'idle') this.state.status = 'paused';
       for (const voice of this.voices.values()) voice.howl.pause();
-      this.notify();
+      if (changed) this.notify();
       return;
     }
 
     const voice = this.state.trackId ? this.voices.get(this.state.trackId) : undefined;
-    if (!mutedOut && this.pausedByMute && this.wantPlaying && voice && !voice.failed) {
+    if (this.pausedByMute) {
       this.pausedByMute = false;
-      this.state.status = 'playing';
-      if (voice.soundId !== null) {
+      if (this.pageActive && this.wantPlaying) {
+        if (!voice || voice.failed || voice.soundId === null) {
+          this.ensurePlaying();
+          return;
+        }
+        this.state.status = 'playing';
         voice.howl.play(voice.soundId);
         voice.howl.fade(0, gain, FADE_MS, voice.soundId);
       }

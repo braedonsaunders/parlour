@@ -51,7 +51,7 @@ describe('installable offline shell', () => {
   it('precaches a dedicated offline document and serves it for failed navigation', () => {
     const worker = readFileSync(join(process.cwd(), 'public/sw.js'), 'utf8');
     expect(worker).toContain("'/offline.html'");
-    expect(worker).toContain("caches.match('/offline.html')");
+    expect(worker).toContain("matchCurrent('/offline.html')");
     expect(worker).toContain('async function matchNavigation(request)');
     expect(readFileSync(join(process.cwd(), 'public/offline.html'), 'utf8')).toContain(
       'You’re still at the table',
@@ -67,10 +67,25 @@ describe('installable offline shell', () => {
     expect(worker).toContain('`parlour-music-${manifest.version}`');
     expect(worker).toContain("const MUSIC_PATH_PREFIX = '/audio/music/'");
     expect(worker).toContain('const MUSIC_CACHE_MAX_ENTRIES = 4');
+    expect(worker).toContain('matchCurrent(request, cacheName)');
     expect(worker).not.toContain(
       "self.addEventListener('install', (event) => {\n  self.skipWaiting",
     );
+    expect(worker).toContain('async function matchCurrent(request, runtimeName = RUNTIME)');
+    expect(worker).toContain(
+      'network.then(({ response }) => response).catch(() => cachedNavigation(request))',
+    );
+    expect(worker).not.toContain('if (cached) {\n          event.waitUntil(network);');
     expect(worker).toContain('const copy = response.clone()');
+
+    const register = readFileSync(join(process.cwd(), 'src/components/PwaRegister.tsx'), 'utf8');
+    expect(register).toContain("register('/sw.js', {");
+    expect(register).toContain("updateViaCache: 'none'");
+    expect(register).toContain('void nextRegistration.update()');
+
+    const globalError = readFileSync(join(process.cwd(), 'src/app/global-error.tsx'), 'utf8');
+    expect(globalError).toContain('recoverPwa()');
+    expect(globalError).toContain('Reload clean copy');
   });
 
   it('precaches routes and lightweight game audio without eagerly caching music', () => {

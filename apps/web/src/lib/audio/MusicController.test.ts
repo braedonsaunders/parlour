@@ -190,6 +190,38 @@ describe('MusicController', () => {
     expect(FakeHowl.instances).toHaveLength(1);
   });
 
+  it('temporarily pauses the same voice while the page is backgrounded', () => {
+    const controller = new MusicController(makeManager());
+    controller.play();
+    const howl = howlFor('music-campfire-1.m4a')!;
+    expect(howl.playing()).toBe(true);
+
+    controller.setPageActive(false);
+    expect(howl.playing()).toBe(false);
+    expect(controller.getState()).toMatchObject({ status: 'paused', trackId: 'campfire-1' });
+    controller.ensurePlaying();
+    controller.keepAlive();
+    expect(howl.playing()).toBe(false);
+
+    controller.setPageActive(true);
+    expect(howl.playing()).toBe(true);
+    expect(controller.getState()).toMatchObject({ status: 'playing', trackId: 'campfire-1' });
+    expect(FakeHowl.instances).toHaveLength(1);
+  });
+
+  it('does not resume foreground music that the user paused', () => {
+    const controller = new MusicController(makeManager());
+    controller.play();
+    const howl = howlFor('music-campfire-1.m4a')!;
+    controller.pause();
+
+    controller.setPageActive(false);
+    controller.setPageActive(true);
+
+    expect(howl.playing()).toBe(false);
+    expect(controller.getState()).toMatchObject({ status: 'paused', trackId: 'campfire-1' });
+  });
+
   it('swaps playlists when the background changes mid-song', () => {
     const controller = new MusicController(makeManager());
     controller.play();

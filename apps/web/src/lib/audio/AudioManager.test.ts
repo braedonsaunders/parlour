@@ -293,7 +293,7 @@ describe('unlock', () => {
     manager.dispose();
   });
 
-  it('holds a silent audio session on iOS after the first gesture', () => {
+  it('holds a silent audio session on iOS only while the page is active', async () => {
     vi.stubGlobal('navigator', {
       userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)',
       platform: 'iPhone',
@@ -303,6 +303,9 @@ describe('unlock', () => {
       this.paused = false;
       return Promise.resolve();
     });
+    const pause = vi.fn(function (this: { paused: boolean }) {
+      this.paused = true;
+    });
     vi.stubGlobal(
       'Audio',
       class {
@@ -311,7 +314,7 @@ describe('unlock', () => {
         volume = 1;
         paused = true;
         play = play;
-        pause = vi.fn();
+        pause = pause;
         setAttribute = vi.fn();
       },
     );
@@ -320,7 +323,54 @@ describe('unlock', () => {
     manager.unlock();
     window.dispatchEvent(new Event('pointerdown'));
     expect(play).toHaveBeenCalledTimes(1);
+
+    window.dispatchEvent(new Event('pagehide'));
+    expect(pause).toHaveBeenCalledTimes(1);
+    window.dispatchEvent(new Event('pageshow'));
+    await Promise.resolve();
+    expect(play).toHaveBeenCalledTimes(2);
+
     manager.dispose();
     vi.unstubAllGlobals();
+  });
+
+  it('stops and blocks sounds while hidden, then resumes the Web Audio context', async () => {
+    const context = {
+      state: 'running',
+      suspend: vi.fn(async () => {
+        context.state = 'suspended';
+      }),
+      resume: vi.fn(async () => {
+        context.state = 'running';
+      }),
+    };
+    (Howler as unknown as { ctx: typeof context }).ctx = context;
+    const manager = makeManager();
+    const activeStates: boolean[] = [];
+    manager.subscribePageActive((active) => activeStates.push(active));
+    manager.unlock();
+    expect(manager.play('pop')).not.toBeNull();
+
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      value: 'hidden',
+    });
+    document.dispatchEvent(new Event('visibilitychange'));
+    expect(manager.isPageActive()).toBe(false);
+    expect(manager.activeVoices('pop')).toBe(0);
+    expect(manager.play('pop')).toBeNull();
+    expect(context.suspend).toHaveBeenCalledTimes(1);
+
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      value: 'visible',
+    });
+    document.dispatchEvent(new Event('visibilitychange'));
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(manager.isPageActive()).toBe(true);
+    expect(context.resume).toHaveBeenCalledTimes(1);
+    expect(activeStates).toEqual([false, true]);
+    manager.dispose();
   });
 });
