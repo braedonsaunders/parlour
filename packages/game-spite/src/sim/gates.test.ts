@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import { isFullSim, scaleNote, simGames } from '@parlour/engine/sim';
 import { DEFAULT_THRESHOLDS, runBalanceGates } from './gates';
+
+const QUICK_GAMES = 8;
+const BAND_GAMES = simGames(QUICK_GAMES, 200);
 
 describe('runBalanceGates', () => {
   it('produces a deterministic report for a fixed seed', () => {
@@ -44,4 +48,18 @@ describe('runBalanceGates', () => {
   it('rejects non-positive game counts', () => {
     expect(() => runBalanceGates({ games: 0 })).toThrow(/positive integer/);
   });
+
+  it.runIf(isFullSim())(
+    `keeps the tier gap and persona band at full sample ${scaleNote()}`,
+    () => {
+      const report = runBalanceGates({ games: BAND_GAMES, baseSeed: 20260824 });
+      expect(report.headToHead.hardWinRate).toBeGreaterThanOrEqual(
+        DEFAULT_THRESHOLDS.headToHeadMin,
+      );
+      expect(report.personas.passes).toBe(true);
+      expect(report.stalls).toBe(0);
+      expect(report.passed).toBe(true);
+    },
+    600_000,
+  );
 });

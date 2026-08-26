@@ -1,8 +1,12 @@
 import { describe, expect, it } from 'vitest';
+import { isFullSim, scaleNote, simGames } from '@parlour/engine/sim';
 import { euchreConfig } from '../config';
 import { PERSONAS, makePersonaBot } from '../bots/personas';
 import { tierBot } from '../bots';
 import { DEFAULT_THRESHOLDS, runBalanceGates, teamWinShare, type GateThresholds } from './gates';
+
+const QUICK_GAMES = 8;
+const BAND_GAMES = simGames(QUICK_GAMES, 300);
 
 describe('bot roster', () => {
   it('ships three distinct tiers', () => {
@@ -63,6 +67,27 @@ describe('balance gates', () => {
     expect(DEFAULT_THRESHOLDS.maxStallRate).toBeLessThanOrEqual(0.01);
     expect(euchreConfig.defaults().targetScore).toBe(10);
   });
+
+  it.runIf(isFullSim())(
+    `keeps the tier gap, persona band, and seat symmetry at full sample ${scaleNote()}`,
+    () => {
+      const report = runBalanceGates({ games: BAND_GAMES, baseSeed: 20260824 });
+      expect(report.headToHead.hardWinRate).toBeGreaterThanOrEqual(
+        DEFAULT_THRESHOLDS.headToHeadMin,
+      );
+      expect(report.personas.passes).toBe(true);
+      expect(report.symmetry.teamZeroShare).not.toBeNull();
+      expect(report.symmetry.teamZeroShare!).toBeGreaterThanOrEqual(
+        DEFAULT_THRESHOLDS.symmetryBandMin,
+      );
+      expect(report.symmetry.teamZeroShare!).toBeLessThanOrEqual(
+        DEFAULT_THRESHOLDS.symmetryBandMax,
+      );
+      expect(report.stalls).toBe(0);
+      expect(report.passed).toBe(true);
+    },
+    600_000,
+  );
 });
 
 describe('teamWinShare', () => {
