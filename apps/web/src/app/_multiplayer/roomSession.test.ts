@@ -54,6 +54,7 @@ import {
   LOBBY_CLOSED,
   multiplayerSession,
   MultiplayerRoomSession,
+  type MultiplayerGameId,
 } from './roomSession';
 
 type SignalHandler = (sender: string, signal: SignalPayload) => void;
@@ -2076,4 +2077,376 @@ describe('spades rooms on the shared stack', () => {
     expect(security.tier).toBe('open');
     expect(`${security.label} ${security.detail}`.toLowerCase()).toContain('fair deal');
   });
+});
+
+describe('veiled rooms on the shared stack', () => {
+  const sessions: MultiplayerRoomSession[] = [];
+
+  afterEach(() => {
+    sessions.splice(0).forEach((session) => session.close());
+    clearActiveMultiplayerSession();
+  });
+
+  interface VeilPair {
+    host: MultiplayerRoomSession;
+    guest: MultiplayerRoomSession;
+    room: Awaited<ReturnType<MultiplayerRoomSession['create']>>;
+    broker: MockSignalingBroker;
+    rtc: MockRtcNetwork;
+  }
+
+  async function veilPair(options: {
+    gameId?: MultiplayerGameId;
+    seats?: number;
+    graceMs?: number;
+    label: string;
+  }): Promise<VeilPair> {
+    const broker = new MockSignalingBroker();
+    const rtc = new MockRtcNetwork();
+    const seats = options.seats ?? 2;
+    const peers = Array.from({ length: seats }, (_, seat) => {
+      const session = new MultiplayerRoomSession(
+        { name: `P${seat}`, avatarId: 'ember', profileId: `${options.label}-${seat}` },
+        {
+          signaling: broker.signaling(`${options.label}-peer-${seat}`),
+          peerConnection: rtc.factory(`${options.label}-rtc-${seat}`),
+          seed: 400 + seat,
+          heartbeatIntervalMs: 20,
+          reconnectGraceMs: options.graceMs,
+        },
+      );
+      sessions.push(session);
+      return session;
+    });
+    const [host, guest] = peers as [MultiplayerRoomSession, MultiplayerRoomSession];
+    const gameId = options.gameId ?? 'blitz';
+    const room = await host.create({ gameId, seats, security: 'veil' });
+    for (let seat = 1; seat < seats; seat++) {
+      await peers[seat]!.join(room.code);
+      await eventually(() => expect(peers[seat]!.getSnapshot().localSeat).toBe(seat), 400, 5);
+    }
+    return { host, guest, room, broker, rtc };
+  }
+
+  /** Waits until this peer's own veiled hand has been peeled to real faces. */
+  async function awaitOwnFaces(peer: MultiplayerRoomSession): Promise<void> {
+    await eventually(
+      () => {
+        const session = multiplayerSession<BlitzState, BlitzConfig>(peer.getSnapshot(), 'blitz');
+        const state = session?.state ?? multiplayerSession<GinMatchState, GinConfig>(
+          peer.getSnapshot(),
+          'gin',
+        )?.state;
+        const hand =
+          state && 'hand' in state ? state.hand.hands[peer.getSnapshot().localSeat ?? 0] : undefined;
+        const own = hand ?? session?.state.hands[peer.getSnapshot().localSeat ?? 0];
+        expect(own?.every((card) => !isVeilHandle(card))).toBe(true);
+      },
+      800,
+      25,
+    );
+  }
+
+  /** Sends one legal move for whichever seat this peer owns, if it is their turn. */
+  function playLegalPly(peer: MultiplayerRoomSession): boolean {
+    const snapshot = peer.getSnapshot();
+    const session = multiplayerSession<BlitzState, BlitzConfig>(snapshot, 'blitz');
+    if (!session || snapshot.localSeat === null) return false;
+    if (session.phase.actor !== snapshot.localSeat || session.status !== 'playing') return false;
+    const move = session.def.flow.legalMovesFor
+      ? session.def.flow.legalMovesFor(session.state, session.phase, snapshot.localSeat)[0]
+      : session.def.flow.legalMoves(session.state, session.phase)[0];
+    if (!move) return false;
+    peer.send(move.id, move.payload);
+    return true;
+  }
+
+  it('honours a requested veil tier and refuses one the pack cannot run', async () => {
+    const broker = new MockSignalingBroker();
+    const rtc = new MockRtcNetwork();
+    const host = new MultiplayerRoomSession(
+      { name: 'Host', avatarId: 'ember', profileId: 'veil-tier-host' },
+      { signaling: broker.signaling('veil-tier-peer'), peerConnection: rtc.factory('veil-tier'), seed: 3 },
+    );
+    sessions.push(host);
+    await host.create({ gameId: 'blitz', seats: 2 });
+    expect(host.getSnapshot().settings!.security).toBe('open');
+
+    const veiled = new MultiplayerRoomSession(
+      { name: 'Host', avatarId: 'ember', profileId: 'veil-tier-veiled' },
+      { signaling: broker.signaling('veil-tier-peer2'), peerConnection: rtc.factory('veil-tier2'), seed: 4 },
+    );
+    sessions.push(veiled);
+    await veiled.create({ gameId: 'blitz', seats: 2, security: 'veil' });
+    expect(veiled.getSnapshot().settings!.security).toBe('veil');
+    expect(veiled.getSnapshot().security.tier).toBe('veil');
+  });
+
+  it('runs the ceremony on Start and deals both seats handle hands from one deck', async () => {
+    const { host, guest } = await veilPair({ label: 'veil-deal' });
+    await host.start();
+
+    await eventually(
+      () => {
+        expect(host.getSnapshot().stage).toBe('table');
+        expect(guest.getSnapshot().stage).toBe('table');
+      },
+      600,
+      25,
+    );
+
+    // Both authorities hold handles — the ceremony's whole point — while each
+    // presented view resolves exactly its own hand to faces. The resolves land
+    // asynchronously after the deal, so wait them out.
+    await eventually(
+      () => {
+        for (const peer of [host, guest]) {
+          const session = multiplayerSession<BlitzState, BlitzConfig>(peer.getSnapshot(), 'blitz')!;
+          const ownSeat = peer.getSnapshot().localSeat!;
+          session.state.hands.forEach((hand, seat) => {
+            expect(hand.every(isVeilHandle)).toBe(seat !== ownSeat);
+          });
+        }
+      },
+      600,
+      25,
+    );
+    for (const peer of [host, guest]) {
+      expect(peer.knownFaces().size).toBeGreaterThan(0);
+      const security = peer.getSnapshot().security;
+      expect(security.tier).toBe('veil');
+      expect(security.ceremony).toMatchObject({ laid: 2, seats: 2, ready: true });
+    }
+    expect(multiplayerSession<BlitzState, BlitzConfig>(host.getSnapshot(), 'blitz')!.log.length).toBe(
+      multiplayerSession<BlitzState, BlitzConfig>(guest.getSnapshot(), 'blitz')!.log.length,
+    );
+  }, 30_000);
+
+  it('keeps both logs hash-identical while veiled moves open their own handles', async () => {
+    const { host, guest } = await veilPair({ label: 'veil-play' });
+    await host.start();
+    await eventually(() => expect(guest.getSnapshot().stage).toBe('table'), 600, 25);
+
+    for (let ply = 0; ply < 6; ply++) {
+      await eventually(
+        () => {
+          for (const peer of [host, guest]) {
+            if (playLegalPly(peer)) return;
+          }
+          throw new Error('no seat could act');
+        },
+        2_000,
+        10,
+      );
+    }
+    await eventually(
+      () => {
+        const left = multiplayerSession<BlitzState, BlitzConfig>(host.getSnapshot(), 'blitz')!;
+        const right = multiplayerSession<BlitzState, BlitzConfig>(guest.getSnapshot(), 'blitz')!;
+        expect(left.log.length).toBe(right.log.length);
+        expect(left.lastAppliedHash).toBe(right.lastAppliedHash);
+        expect(left.log.length).toBeGreaterThan(0);
+      },
+      400,
+      10,
+    );
+  }, 40_000);
+
+  it('redeals between gin hands with a fresh ceremony once the table readies up', async () => {
+    const { host, guest } = await veilPair({ gameId: 'gin', label: 'veil-redeal' });
+    await host.start();
+    await eventually(() => expect(guest.getSnapshot().stage).toBe('table'), 800, 25);
+    await awaitOwnFaces(host);
+    await awaitOwnFaces(guest);
+
+    // Drive both seats with boring but legal play until the hand dies of a
+    // starved stock or somebody knocks; either outcome folds the hand. One ply
+    // per wait, because the acting seat alternates as the log grows.
+    const ginPly = (peer: MultiplayerRoomSession): boolean => {
+      const snapshot = peer.getSnapshot();
+      const session = multiplayerSession<GinMatchState, GinConfig>(snapshot, 'gin');
+      if (!session || snapshot.localSeat === null || session.status !== 'playing') return false;
+      const seat = snapshot.localSeat;
+      if (session.phase.actor === null) return false;
+      if (!(session.phase.actors ?? [session.phase.actor]).includes(seat)) return false;
+      const moves =
+        session.def.flow.legalMovesFor?.(session.state, session.phase, seat) ??
+        session.def.flow.legalMoves(session.state, session.phase);
+      if (moves.length === 0) return false;
+      // Pass on the upcard (keeps hands sealed), draw from the stock on a turn,
+      // throw a real card during the act, and ready up once the hand folded.
+      const preferred =
+        moves.find((move) => move.id === 'option.pass') ??
+        moves.find((move) => move.id === 'draw.stock') ??
+        moves.find(
+          (move) => move.id === 'discard' && !isVeilHandle((move.payload as { card: string }).card),
+        ) ??
+        moves.find((move) => move.id === 'ready');
+      if (!preferred) return false;
+      peer.send(preferred.id, preferred.payload);
+      return true;
+    };
+    async function onePly(): Promise<void> {
+      for (let attempt = 0; attempt < 2_000; attempt++) {
+        for (const peer of [host, guest]) {
+          if (ginPly(peer)) return;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+      throw new Error('the veiled gin table stopped offering turns');
+    }
+
+    // Phase A: boring but legal play until the hand folds (stock starvation or
+    // an accidental knock both fold it). One ply per wait, because the acting
+    // seat alternates as the log grows, and each peer acts on its own freshest
+    // view — a stale view can offer a move the authority then rejects, which
+    // costs a retry rather than breaking the table.
+    for (let step = 0; step < 500; step++) {
+      const session = multiplayerSession<GinMatchState, GinConfig>(host.getSnapshot(), 'gin')!;
+      if (session.state.handIndex > 0 || session.state.folded) break;
+      await onePly();
+    }
+
+    // Phase B: both seats ready up during the hand-end window.
+    for (let step = 0; step < 50; step++) {
+      const session = multiplayerSession<GinMatchState, GinConfig>(host.getSnapshot(), 'gin')!;
+      if (session.state.readied.length >= 2) break;
+      await onePly();
+    }
+
+    await eventually(
+      () => {
+        for (const peer of [host, guest]) {
+          const session = multiplayerSession<GinMatchState, GinConfig>(peer.getSnapshot(), 'gin')!;
+          expect(session.state.handIndex).toBe(1);
+          expect(session.state.folded).toBe(false);
+          expect(session.status).toBe('playing');
+          const ownSeat = peer.getSnapshot().localSeat!;
+          session.state.hand.hands.forEach((hand, seat) => {
+            expect(hand.every(isVeilHandle)).toBe(seat !== ownSeat);
+          });
+        }
+        const left = multiplayerSession<GinMatchState, GinConfig>(host.getSnapshot(), 'gin')!;
+        const right = multiplayerSession<GinMatchState, GinConfig>(guest.getSnapshot(), 'gin')!;
+        expect(left.lastAppliedHash).toBe(right.lastAppliedHash);
+      },
+      1200,
+      25,
+    );
+  }, 120_000);
+
+  it('pauses for a dropped seat and resumes without recovery when they return in time', async () => {
+    const { host, guest, room, broker, rtc } = await veilPair({
+      label: 'veil-return',
+      graceMs: 60_000,
+    });
+    await host.start();
+    await eventually(() => expect(guest.getSnapshot().stage).toBe('table'), 600, 25);
+
+    guest.close();
+    await eventually(
+      () => expect(host.getSnapshot().security.paused).toContain('dropped'),
+      800,
+      10,
+    );
+
+    const rejoined = new MultiplayerRoomSession(
+      { name: 'P1', avatarId: 'ember', profileId: 'veil-return-1' },
+      {
+        signaling: broker.signaling('veil-return-rejoined'),
+        peerConnection: rtc.factory('veil-return-rejoined'),
+        seed: 9,
+      },
+    );
+    sessions.push(rejoined);
+    await rejoined.join(room.code);
+    await eventually(
+      () => {
+        expect(rejoined.getSnapshot().localSeat).toBe(1);
+        expect(host.getSnapshot().seats.find((seat) => seat.seat === 1)).toMatchObject({
+          connected: true,
+          bot: false,
+        });
+        expect(host.getSnapshot().security.paused).toBeNull();
+        expect(rejoined.getSnapshot().security.paused).toBeNull();
+      },
+      1500,
+      10,
+    );
+
+    // The returned seat can still act, and the table stays in one piece.
+    await eventually(
+      () => {
+        for (const peer of [host, rejoined]) {
+          if (playLegalPly(peer)) return;
+        }
+        throw new Error('the resumed table is not dealing turns');
+      },
+      600,
+      10,
+    );
+  }, 60_000);
+
+  it('awards a two-seat walkover when a veiled opponent stays gone', async () => {
+    const { host, guest } = await veilPair({ label: 'veil-walkover', graceMs: 60 });
+    await host.start();
+    await eventually(() => expect(guest.getSnapshot().stage).toBe('table'), 600, 25);
+
+    guest.close();
+    await eventually(
+      () => {
+        const session = multiplayerSession<BlitzState, BlitzConfig>(host.getSnapshot(), 'blitz')!;
+        expect(session.result?.reason).toBe('opponent-left');
+        expect(session.result?.winner).toBe(0);
+        expect(host.getSnapshot().security.paused).toBeNull();
+        expect(host.getSnapshot().error).toBeNull();
+        // A walkover names the fact; it never narrates key material.
+        const said = `${host.getSnapshot().error ?? ''} ${host.getSnapshot().security.paused ?? ''}`;
+        expect(/key|layer|thread/i.test(said)).toBe(false);
+      },
+      1000,
+      10,
+    );
+  }, 40_000);
+
+  it('recovers a dropped seat by threshold shares at three seats and keeps playing', async () => {
+    const { host, guest } = await veilPair({ seats: 3, label: 'veil-recover', graceMs: 60 });
+    await host.start();
+    await eventually(
+      () => expect(host.getSnapshot().seats.every((seat) => seat.connected)).toBe(true),
+      600,
+      25,
+    );
+
+    guest.close();
+    await eventually(
+      () => {
+        const security = host.getSnapshot().security;
+        expect(security.recoveredSeats).toContain(1);
+        expect(security.paused).toBeNull();
+        expect(security.recoveredSeats.length).toBeGreaterThan(0);
+      },
+      2000,
+      10,
+    );
+
+    // The recovered seat's cards are readable to the host as surrogate only —
+    // the third seat still sees plain handles for that hand.
+    const third = sessions.find(
+      (session) => session.getSnapshot().localSeat === 2,
+    ) as MultiplayerRoomSession;
+    const hidden = multiplayerSession<BlitzState, BlitzConfig>(third.getSnapshot(), 'blitz')!;
+    expect(hidden.state.hands[1]!.every(isVeilHandle)).toBe(true);
+
+    await eventually(
+      () => {
+        const left = multiplayerSession<BlitzState, BlitzConfig>(host.getSnapshot(), 'blitz')!;
+        const right = multiplayerSession<BlitzState, BlitzConfig>(third.getSnapshot(), 'blitz')!;
+        expect(left.log.length).toBe(right.log.length);
+        expect(left.lastAppliedHash).toBe(right.lastAppliedHash);
+      },
+      1000,
+      10,
+    );
+  }, 60_000);
 });
