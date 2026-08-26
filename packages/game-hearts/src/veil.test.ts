@@ -260,4 +260,15 @@ describe('hearts under Veil', () => {
     });
     expect(stateHash(replayed.state)).toBe(stateHash(passed.state));
   });
+
+  it('plays a full veiled hand through passes, tricks, showdown and audit', () => {
+    const { session, faceOf } = veiledSession(8_060);
+    const finished = driveVeiledHand(session, faceOf);
+    // Hand ended cleanly: every seat opened, no dispute, and the hand result
+    // exists because all four were public when the last trick was taken.
+    expect(finished.status).toBe('ended');
+    expect(finished.state.openedUp.every(Boolean)).toBe(true);
+    expect(finished.state.disputed).toEqual([]);
+    expect(finished.result).not.toBeNull();
+  });
 });

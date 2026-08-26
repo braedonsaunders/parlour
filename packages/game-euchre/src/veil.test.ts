@@ -216,5 +216,36 @@ describe('euchre under Veil', () => {
       deckOrder: veiledSession(seed).order,
     });
     expect(stateHash(replayed.state)).toBe(stateHash(dealt.session.state));
+
+    // The second hand plays to hand-over under its own epoch — the shape a
+    // real evening takes, ceremony between hands and all.
+    let second = dealt.session;
+    const orderOutcome2 = sessionApply(def, second, second.phase.actor!, 'orderUp', {
+      alone: false,
+    });
+    expect(orderOutcome2.rejected).toBeUndefined();
+    second = orderOutcome2.session;
+    const dealerHand2 = (second.state as EuchreState).hands[1]!;
+    second = sessionApply(def, second, 1, 'dealerDiscard', {
+      card: dealerHand2.at(-1)!,
+    }).session;
+    let guard2 = 0;
+    while ((second.state as EuchreState).stage === 'playing' && guard2++ < 40) {
+      const seat = second.phase.actor!;
+      const handle = (second.state as EuchreState).hands[seat]![0]!;
+      const face = next.faceOf.get(handle)!;
+      const outcome = sessionApply(
+        def,
+        second,
+        seat,
+        'playCard',
+        { card: face },
+        { reveals: [[handle, face]] },
+      );
+      expect(outcome.rejected).toBeUndefined();
+      second = outcome.session;
+    }
+    expect((second.state as EuchreState).stage).toBe('hand-over');
+    expect((second.state as EuchreState).tricksPlayed).toBeGreaterThanOrEqual(1);
   });
 });
