@@ -570,6 +570,65 @@ describe('multiplayer route composition', () => {
     expect(host.getSnapshot().stage).toBe('lobby');
   });
 
+  it('blames the right device when a shuffle commitment cannot be produced', async () => {
+    const broker = new MockSignalingBroker();
+    const rtc = new MockRtcNetwork();
+    const host = new MultiplayerRoomSession(
+      { name: 'Host', avatarId: 'ember', profileId: 'deal-fault-host' },
+      {
+        signaling: broker.signaling('deal-fault-host-peer'),
+        peerConnection: rtc.factory('deal-fault-host'),
+        seed: 5,
+      },
+    );
+    const guest = new MultiplayerRoomSession(
+      { name: 'Guest', avatarId: 'cobalt', profileId: 'deal-fault-guest' },
+      {
+        signaling: broker.signaling('deal-fault-guest-peer'),
+        peerConnection: rtc.factory('deal-fault-guest'),
+        seed: 6,
+      },
+    );
+    sessions.push(host, guest);
+    const room = await host.create({ gameId: 'cribbage', seats: 2 });
+
+    // Break the hash only while the GUEST attaches, so exactly one device
+    // cannot produce its commitment — one real route being a non-secure
+    // context, where crypto.subtle does not exist at all.
+    const subtle = globalThis.crypto.subtle;
+    Object.defineProperty(globalThis.crypto, 'subtle', {
+      configurable: true,
+      get() {
+        return undefined;
+      },
+    });
+    try {
+      await guest.join(room.code);
+
+      // The commitment is produced off the join promise, so the break has to
+      // outlive `join` resolving — restoring in a `finally` here would let the
+      // hash succeed after all and the fault would never happen.
+      await eventually(
+        () =>
+          expect(guest.getSnapshot().dealFault).toMatch(/this device could not mix the shuffle/i),
+        2_000,
+        10,
+      );
+    } finally {
+      Object.defineProperty(globalThis.crypto, 'subtle', {
+        configurable: true,
+        value: subtle,
+      });
+    }
+
+    // The starting host, whose own mixing worked, still reports the silent
+    // seat as missing — an honest statement from where it stands.
+    await expect(host.start()).rejects.toThrow(/seat 2 never mixed the shuffle/);
+    // The host's refusal is the deal-round timeout expiring, which is ten
+    // seconds by design — the point of the case is that the broken device says
+    // so long before then, not that the timeout is short.
+  }, 20_000);
+
   it('announces the created seat count so a guest draws the same chairs', async () => {
     const broker = new MockSignalingBroker();
     const rtc = new MockRtcNetwork();

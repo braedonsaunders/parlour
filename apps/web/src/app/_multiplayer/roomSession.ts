@@ -109,6 +109,13 @@ export type MultiplayerRoomSnapshot = {
   error: string | null;
   isHost: boolean;
   security: MultiplayerSecurity;
+  /**
+   * This device failed to produce its deal commitment. Kept separate from
+   * `error`, which ordinary traffic clears: a device that cannot hash stays
+   * broken until it says otherwise, and the table needs to know which screen
+   * to blame.
+   */
+  dealFault: string | null;
 };
 
 type SessionDependencies = {
@@ -210,6 +217,14 @@ export class MultiplayerRoomSession {
   private openPending = false;
   /** One host deal at a time when players leave the podium together. */
   private rematchPending = false;
+  /**
+   * Commitments THIS seat failed to produce, keyed by seat.
+   *
+   * A swallowed failure here used to be reported ten seconds later as an
+   * innocent peer "never mixing the shuffle". Recording the real error keeps
+   * the timeout message able to name the device that actually broke.
+   */
+  private readonly localDealFaults = new Map<SeatId, string>();
   /** bot turns already scheduled, keyed by log position, so none fires twice */
   private readonly scheduledBotTurns = new Set<string>();
   /** seats being held open for a player who dropped, keyed by seat */
@@ -228,6 +243,7 @@ export class MultiplayerRoomSession {
     error: null,
     isHost: false,
     security: securityFor('open', 2, 'open'),
+    dealFault: null,
   };
 
   constructor(
@@ -540,6 +556,8 @@ export class MultiplayerRoomSession {
     const nonce = this.dealNonce;
     void dealCommitment(code, seat as SeatId, nonce)
       .then((commit) => {
+        this.localDealFaults.delete(seat as SeatId);
+        if (this.snapshot.dealFault) this.update({ dealFault: null });
         this.dealRound.recordCommitment(seat as SeatId, commit);
         this.transport?.sendDeal({ type: 'deal.commit', commit });
         // A fast host may have opened the reveal phase while this commitment
@@ -547,7 +565,22 @@ export class MultiplayerRoomSession {
         // soon as this seat is ready.
         if (this.dealRevealStarted) this.revealDealShare();
       })
-      .catch(() => undefined);
+      .catch((error: unknown) => {
+        // A commitment this seat could not produce is THIS seat's fault, and
+        // saying nothing about it lets the deal timeout name an innocent peer
+        // ten seconds later. Record the failure where waitForDealShares can
+        // tell "your own device could not mix" apart from "a seat stopped
+        // answering", because only one of those is somebody else's problem.
+        const reason = error instanceof Error ? error.message : 'the shuffle could not be mixed';
+        this.localDealFaults.set(seat as SeatId, reason);
+        // Say so on this device now — the deal timeout would otherwise be the
+        // first anyone here heard of it, ten seconds later and worded as if a
+        // peer were at fault. Its own slot because `error` is cleared by
+        // every accepted packet.
+        this.update({
+          dealFault: `This device could not mix the shuffle (${reason})`,
+        });
+      });
   }
 
   private revealDealShare(): void {
@@ -563,6 +596,17 @@ export class MultiplayerRoomSession {
     while (this.dealRound.missing(seats).length > 0) {
       if (Date.now() > deadline) {
         const missing = this.dealRound.missing(seats).map((seat) => `Seat ${seat + 1}`);
+        const local = new Map(
+          [...this.localDealFaults].filter(([seat]) => missing.includes(`Seat ${seat + 1}`)),
+        );
+        const localNames = [...local.keys()].map((seat) => `Seat ${seat + 1}`);
+        const reasons = [...new Set([...local.values()])].join('; ');
+        if (local.size > 0 && missing.every((name) => localNames.includes(name))) {
+          throw new Error(
+            `${localNames.join(' and ')} could not mix the shuffle on this device (${reasons}). ` +
+              'The deal cannot start from here.',
+          );
+        }
         throw new Error(
           `${missing.join(' and ')} never mixed the shuffle, so nobody could deal. Try again.`,
         );
