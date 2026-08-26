@@ -167,11 +167,21 @@ test('a player can bid and play a Spades card with only the keyboard', async ({
   const playableCount = await playableCards.count();
   const initialCard = await handEntry.getAttribute('aria-label');
   await page.keyboard.press('ArrowRight');
+
+  // `handEntry` matches on tabindex="0", and a roving tabindex moves that
+  // attribute to whichever card now holds focus — so the locator follows the
+  // selection rather than staying on the card it started from. Compare the
+  // focused card's label instead, which is what "the arrow moved me" actually
+  // means to a player.
+  const focusedLabel = await page.evaluate(
+    () => document.activeElement?.getAttribute('aria-label') ?? null,
+  );
   if (playableCount > 1) {
-    await expect(handEntry).not.toBeFocused();
+    expect(focusedLabel).not.toBe(initialCard);
   } else {
-    await expect(handEntry).toBeFocused();
+    expect(focusedLabel).toBe(initialCard);
   }
+  await expect(handEntry).toBeFocused();
   await page.keyboard.press('Enter');
 
   await expect(hand.locator('[data-hand-card]')).toHaveCount(12);
