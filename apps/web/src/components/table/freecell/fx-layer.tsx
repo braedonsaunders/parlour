@@ -4,7 +4,7 @@ import { useEffect, useMemo, type RefObject } from 'react';
 import type { FxEvent } from '@parlour/engine';
 import { gsap } from 'gsap';
 import { PlayingCard } from '@/components/table/PlayingCard';
-import { TableCardFlight } from '@/components/table/shell';
+import { TableCardFlight, useSolitaireNarration } from '@/components/table/shell';
 import { useTableAudio } from '@/components/table/fx-animation';
 import { prefersCalmMotion } from '@/lib/table/calm-motion';
 import styles from '@/styles/freecell.module.css';
@@ -33,6 +33,7 @@ export function FreecellFxLayer({
 }) {
   const flights = useMemo(() => planFlights(fx), [fx]);
   useTableAudio(fx, fxKey, 'freecell');
+  useSolitaireNarration('freecell', fx, fxKey);
 
   useEffect(() => {
     const root = rootRef.current;
@@ -78,7 +79,7 @@ export function FreecellFxLayer({
   const won = fx.some((event) => event.kind === 'freecell.win');
 
   return (
-    <div className={tableStyles.fxLayer} aria-live="polite">
+    <div className={tableStyles.fxLayer} aria-hidden="true">
       {flights.map((flight) => (
         <TableCardFlight key={`${fxKey}:${flight.id}`} cueId={flight.id}>
           <PlayingCard
