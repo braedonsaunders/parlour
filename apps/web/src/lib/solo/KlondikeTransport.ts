@@ -82,9 +82,26 @@ export class KlondikeTransport {
     this.session = this.freshSession();
   }
 
+  /**
+   * Klondike's hint is the one expensive thing on this screen.
+   *
+   * The planner walks a cached winning line for free, but the moment a player
+   * deviates from it — which is most moves — it falls through to a fresh
+   * `solveKlondike`, a 200k-node search. That ran on EVERY snapshot, so every
+   * card sent to a foundation and every stock flip paid for a hint the table
+   * then threw away: the screen reads `hint` only while the hint is actually
+   * being shown. It is why Klondike felt heavy and the other solitaires, which
+   * carry the cheap greedy hinter, did not.
+   *
+   * The getter defers the search to the first read and memoises it per
+   * snapshot, so a hidden hint costs nothing and a shown one costs one solve.
+   */
   getSnapshot(): KlondikeSnapshot {
     const state = klondikePlayerView(this.session.state);
     const undo = undoPolicy(this.session);
+    const session = this.session;
+    const planner = this.planner;
+    let hinted: KlondikeHint | null | undefined;
     return {
       mode: this.options.mode,
       dailyKey: this.options.dailyKey,
@@ -99,7 +116,12 @@ export class KlondikeTransport {
       canUndo: undo.available,
       undoDepth: undo.depth,
       canFinish: this.session.status === 'playing' && canAutoFinish(state),
-      hint: this.session.status === 'playing' ? this.planner.hint(this.session.state) : null,
+      get hint(): KlondikeHint | null {
+        if (hinted === undefined) {
+          hinted = session.status === 'playing' ? planner.hint(session.state) : null;
+        }
+        return hinted;
+      },
     };
   }
 

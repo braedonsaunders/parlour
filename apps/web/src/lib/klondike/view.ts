@@ -54,7 +54,11 @@ export function klondikeTableView(
     canUndo: snapshot.canUndo,
     undoDepth: snapshot.undoDepth,
     canFinish: snapshot.canFinish,
-    hint: snapshot.hint,
+    // Forwarded lazily: reading this runs the solver, and the table only reads
+    // it while a hint is on screen. See KlondikeTransport.getSnapshot.
+    get hint() {
+      return snapshot.hint;
+    },
   };
 }
 
