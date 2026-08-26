@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
+import { isFullSim, scaleNote, simGames } from '@parlour/engine/sim';
 import { PERSONAS } from '../bots/personas';
 import { tierBot } from '../bots';
 import { DEFAULT_THRESHOLDS, runBalanceGates, seatWinShare, type GateThresholds } from './gates';
+
+const QUICK_GAMES = 8;
+const BAND_GAMES = simGames(QUICK_GAMES, 200);
 
 describe('bot roster', () => {
   it('ships three distinct tiers and six personas', () => {
@@ -35,6 +39,21 @@ describe('balance gates', () => {
     expect(DEFAULT_THRESHOLDS.personaBandMax).toBeGreaterThan(0.25);
     expect(DEFAULT_THRESHOLDS.maxStallRate).toBeLessThanOrEqual(0.01);
   });
+
+  it.runIf(isFullSim())(
+    `keeps the tier gap, persona band, and seat symmetry at full sample ${scaleNote()}`,
+    () => {
+      const report = runBalanceGates({ games: BAND_GAMES, baseSeed: 20260824 });
+      expect(report.headToHead.hardWinShare).toBeGreaterThanOrEqual(
+        DEFAULT_THRESHOLDS.headToHeadMin,
+      );
+      expect(report.personas.passes).toBe(true);
+      expect(report.symmetry.spread).toBeLessThanOrEqual(DEFAULT_THRESHOLDS.symmetryMaxSpread);
+      expect(report.stalls).toBe(0);
+      expect(report.passed).toBe(true);
+    },
+    600_000,
+  );
 });
 
 describe('seatWinShare', () => {
