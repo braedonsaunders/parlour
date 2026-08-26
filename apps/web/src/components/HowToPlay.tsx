@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useState, type ReactNode } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import type { HowToPlayDoc } from '@parlour/engine';
 import { useT } from '@/lib/i18n';
 import styles from '@/styles/howto.module.css';
+import { useDialogFocus } from '@/components/table/shell/useDialogFocus';
 
 export type HowToPlayModalProps = {
   open: boolean;
@@ -24,14 +25,9 @@ export type HowToPlayModalProps = {
  */
 export function HowToPlayModal({ open, onClose, doc, title, subtitle }: HowToPlayModalProps) {
   const t = useT();
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose, open]);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
+  useDialogFocus(open, dialogRef, closeRef, onClose);
 
   if (!open) return null;
 
@@ -42,10 +38,12 @@ export function HowToPlayModal({ open, onClose, doc, title, subtitle }: HowToPla
   // sheet, which already sits on the viewport.
   const sheet = (
     <div
+      ref={dialogRef}
       className={styles.overlay}
       role="dialog"
       aria-modal="true"
       aria-label={t('howto.playTitle', { title })}
+      tabIndex={-1}
       data-testid="how-to-play"
       onClick={onClose}
     >
@@ -61,12 +59,12 @@ export function HowToPlayModal({ open, onClose, doc, title, subtitle }: HowToPla
             {subtitle && <p className={styles.subtitle}>{subtitle}</p>}
           </div>
           <button
+            ref={closeRef}
             type="button"
             className={styles.close}
             aria-label={t('howto.close')}
             data-testid="close-how-to-play"
             onClick={onClose}
-            autoFocus
           >
             ✕
           </button>

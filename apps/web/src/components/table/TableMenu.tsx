@@ -1,26 +1,44 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useRef, useState } from 'react';
 import type { HowToPlayDoc } from '@parlour/engine';
 import { HowToPlayButton } from '@/components/HowToPlay';
+import { useT, type MessageKey } from '@/lib/i18n';
 import { useAudioManager, useAudioStore } from '@/stores/audio';
-import { SCENE_IDS, SCENE_LABELS, useSceneStore, type SceneId } from '@/stores/scene';
+import { SCENE_IDS, useSceneStore, type SceneId } from '@/stores/scene';
 import {
-  APP_COLOR_LABELS,
   APP_COLOR_MODES,
-  DROP_EFFECT_LABELS,
   DROP_EFFECT_LEVELS,
   useTableFxStore,
+  type AppColorMode,
   type DropEffectLevel,
 } from '@/stores/tableFx';
 import { useProfileStore } from '@/stores/profile';
 import { MusicControls } from '@/components/MusicControls';
 import styles from '@/styles/table.module.css';
+import { useDialogFocus } from './shell/useDialogFocus';
 
 const SCENE_ICONS: Record<SceneId, string> = {
   campfire: '🔥',
   casino: '🎲',
   snug: '🛋️',
+};
+
+const SCENE_KEYS: Record<SceneId, MessageKey> = {
+  campfire: 'scene.campfire',
+  casino: 'scene.casino',
+  snug: 'scene.snug',
+};
+
+const APP_COLOR_KEYS: Record<AppColorMode, MessageKey> = {
+  richer: 'tableMenu.appColorsRicher',
+  original: 'tableMenu.appColorsOriginal',
+};
+
+const DROP_EFFECT_KEYS: Record<DropEffectLevel, MessageKey> = {
+  off: 'tableMenu.cardEffectsOff',
+  subtle: 'tableMenu.cardEffectsSubtle',
+  full: 'tableMenu.cardEffectsFull',
 };
 
 export type TableMenuProps = {
@@ -33,6 +51,9 @@ export type TableMenuProps = {
 };
 
 export function TableMenu({ open, onClose, onQuit, howToPlay }: TableMenuProps) {
+  const t = useT();
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const resumeRef = useRef<HTMLButtonElement>(null);
   const dropEffects = useTableFxStore((state) => state.dropEffects);
   const setDropEffects = useTableFxStore((state) => state.setDropEffects);
   const appColorMode = useTableFxStore((state) => state.appColorMode);
@@ -51,14 +72,7 @@ export function TableMenu({ open, onClose, onQuit, howToPlay }: TableMenuProps) 
   const sceneId = useSceneStore((state) => state.sceneId);
   const setScene = useSceneStore((state) => state.setScene);
 
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [open, onClose]);
+  useDialogFocus(open, dialogRef, resumeRef, onClose);
 
   if (!open) return null;
 
@@ -67,24 +81,24 @@ export function TableMenu({ open, onClose, onQuit, howToPlay }: TableMenuProps) 
       <button
         type="button"
         className={styles.menuScrim}
-        aria-label="Back to the table"
+        aria-label={t('tableMenu.backToTable')}
         onClick={onClose}
       />
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
-        aria-label={confirmingQuit ? 'Quit this match?' : 'Table menu'}
+        aria-label={confirmingQuit ? t('tableMenu.quitPrompt') : t('table.menu')}
+        tabIndex={-1}
         className={`${styles.menuPanel} panel-soft`}
       >
         {confirmingQuit ? (
           <>
-            <h2 className={styles.menuTitle}>Quit this match?</h2>
-            <p className={styles.menuHint}>
-              You&rsquo;ll fold your seat and head back to the menu. The match won&rsquo;t wait.
-            </p>
+            <h2 className={styles.menuTitle}>{t('tableMenu.quitPrompt')}</h2>
+            <p className={styles.menuHint}>{t('tableMenu.quitHint')}</p>
             <div className={styles.menuActions}>
               <button type="button" className="btn-fat" onClick={() => setConfirmingQuit(false)}>
-                Keep playing
+                {t('tableMenu.keepPlaying')}
               </button>
               <button
                 type="button"
@@ -92,13 +106,13 @@ export function TableMenu({ open, onClose, onQuit, howToPlay }: TableMenuProps) 
                 data-testid="confirm-quit"
                 onClick={onQuit}
               >
-                Quit match
+                {t('tableMenu.quitMatch')}
               </button>
             </div>
           </>
         ) : (
           <>
-            <h2 className={styles.menuTitle}>Table menu</h2>
+            <h2 className={styles.menuTitle}>{t('table.menu')}</h2>
             <div className={styles.menuToggles}>
               <button
                 type="button"
@@ -106,7 +120,7 @@ export function TableMenu({ open, onClose, onQuit, howToPlay }: TableMenuProps) 
                 aria-pressed={!muted}
                 onClick={() => toggleMuted('master')}
               >
-                Sound {muted ? 'off' : 'on'}
+                {t(muted ? 'sound.off' : 'sound.on')}
               </button>
               <button
                 type="button"
@@ -114,12 +128,12 @@ export function TableMenu({ open, onClose, onQuit, howToPlay }: TableMenuProps) 
                 aria-pressed={reducedMotion}
                 onClick={() => updateSettings({ reducedMotion: !reducedMotion })}
               >
-                Calm motion {reducedMotion ? 'on' : 'off'}
+                {t(reducedMotion ? 'tableMenu.calmMotionOn' : 'tableMenu.calmMotionOff')}
               </button>
             </div>
-            <section aria-label="Background" data-testid="background-picker">
+            <section aria-label={t('tableMenu.background')} data-testid="background-picker">
               <p className="mb-1.5 text-center text-xs font-semibold uppercase tracking-[0.25em] text-dusk-200">
-                Background
+                {t('tableMenu.background')}
               </p>
               <div role="radiogroup" className="flex items-center justify-center gap-1">
                 {SCENE_IDS.map((scene) => {
@@ -139,15 +153,15 @@ export function TableMenu({ open, onClose, onQuit, howToPlay }: TableMenuProps) 
                       }`}
                     >
                       <span aria-hidden="true">{SCENE_ICONS[scene]}</span>
-                      {SCENE_LABELS[scene]}
+                      {t(SCENE_KEYS[scene])}
                     </button>
                   );
                 })}
               </div>
             </section>
-            <section aria-label="App colors" data-testid="app-colors-picker">
+            <section aria-label={t('tableMenu.appColors')} data-testid="app-colors-picker">
               <p className="mb-1.5 text-center text-xs font-semibold uppercase tracking-[0.25em] text-dusk-200">
-                App colors
+                {t('tableMenu.appColors')}
               </p>
               <div role="radiogroup" className="flex items-center justify-center gap-1">
                 {APP_COLOR_MODES.map((mode) => {
@@ -166,18 +180,18 @@ export function TableMenu({ open, onClose, onQuit, howToPlay }: TableMenuProps) 
                           : 'text-dusk-200/70 hover:-translate-y-0.5 hover:text-dusk-100'
                       }`}
                     >
-                      {APP_COLOR_LABELS[mode]}
+                      {t(APP_COLOR_KEYS[mode])}
                     </button>
                   );
                 })}
               </div>
               <small className="mt-1 block text-center text-[0.65rem] text-dusk-200/60">
-                Applies everywhere
+                {t('tableMenu.appliesEverywhere')}
               </small>
             </section>
-            <section aria-label="Card effects" data-testid="drop-effects-picker">
+            <section aria-label={t('tableMenu.cardEffects')} data-testid="drop-effects-picker">
               <p className="mb-1.5 text-center text-xs font-semibold uppercase tracking-[0.25em] text-dusk-200">
-                Card effects
+                {t('tableMenu.cardEffects')}
               </p>
               <div role="radiogroup" className="flex items-center justify-center gap-1">
                 {DROP_EFFECT_LEVELS.map((level) => {
@@ -196,7 +210,7 @@ export function TableMenu({ open, onClose, onQuit, howToPlay }: TableMenuProps) 
                           : 'text-dusk-200/70 hover:-translate-y-0.5 hover:text-dusk-100'
                       }`}
                     >
-                      {DROP_EFFECT_LABELS[level]}
+                      {t(DROP_EFFECT_KEYS[level])}
                     </button>
                   );
                 })}
@@ -205,12 +219,12 @@ export function TableMenu({ open, onClose, onQuit, howToPlay }: TableMenuProps) 
             {/* The transport is a row of controls, so it takes the full width
                 of the landscape grid rather than half of it. */}
             <section
-              aria-label="Music"
+              aria-label={t('tableMenu.music')}
               data-testid="music-section"
               className={styles.menuSectionWide}
             >
               <p className="mb-1 text-center text-xs font-semibold uppercase tracking-[0.25em] text-dusk-200">
-                Music
+                {t('tableMenu.music')}
               </p>
               <MusicControls />
             </section>
@@ -223,8 +237,8 @@ export function TableMenu({ open, onClose, onQuit, howToPlay }: TableMenuProps) 
                   className={styles.menuHelp}
                 />
               )}
-              <button type="button" className="btn-fat" autoFocus onClick={onClose}>
-                Back to the table
+              <button ref={resumeRef} type="button" className="btn-fat" onClick={onClose}>
+                {t('tableMenu.backToTable')}
               </button>
               <button
                 type="button"
@@ -232,7 +246,7 @@ export function TableMenu({ open, onClose, onQuit, howToPlay }: TableMenuProps) 
                 data-testid="quit-to-menu"
                 onClick={() => setConfirmingQuit(true)}
               >
-                Quit to main menu
+                {t('tableMenu.quitToMenu')}
               </button>
             </div>
           </>

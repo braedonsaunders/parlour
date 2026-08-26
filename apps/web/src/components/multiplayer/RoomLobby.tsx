@@ -101,14 +101,14 @@ export function RoomLobby({
             {copyState === 'copied' ? t('room.copied') : t('room.copyLink')}
           </button>
           <button className="btn-fat btn-fat--teal" type="button" onClick={shareRoom}>
-            Share
+            {t('room.share')}
           </button>
         </div>
       </div>
 
       {copyState === 'error' && (
         <p className="mt-3 text-sm text-hearth-200" role="alert">
-          Couldn’t open sharing. Copy this address manually: {shareUrl}
+          {t('room.shareFailed', { url: shareUrl })}
         </p>
       )}
 
@@ -127,7 +127,7 @@ export function RoomLobby({
                   </span>
                   <strong className="mt-2 font-display">
                     {player.name}
-                    {player.bot ? ' (bot)' : ''}
+                    {player.bot ? ` (${t('room.bot')})` : ''}
                   </strong>
                   <span className="text-xs text-dusk-200">
                     {player.connected ? t('room.ready') : t('room.rejoining')}

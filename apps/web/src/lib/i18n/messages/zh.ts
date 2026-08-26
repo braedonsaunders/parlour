@@ -87,6 +87,9 @@ export const zh: Messages = {
   'room.finding': '正在寻找牌桌…',
   'room.copyLink': '复制链接',
   'room.copied': '已复制！',
+  'room.share': '分享',
+  'room.shareFailed': '无法打开分享功能。请手动复制此地址：{url}',
+  'room.bot': '机器人',
   'room.shareTitle': '来我的客厅玩牌',
   'room.seatsLabel': '牌桌座位',
   'room.ready': '准备好了',
@@ -101,6 +104,37 @@ export const zh: Messages = {
   // --- table ----------------------------------------------------------------
   'table.menu': '牌桌菜单',
   'table.dealing': '发牌中…',
+
+  // --- table menu -----------------------------------------------------------
+  'tableMenu.backToTable': '返回牌桌',
+  'tableMenu.quitPrompt': '要退出这局吗？',
+  'tableMenu.quitHint': '你将离开座位并返回主菜单。本局不会等待。',
+  'tableMenu.keepPlaying': '继续游戏',
+  'tableMenu.quitMatch': '退出本局',
+  'tableMenu.calmMotionOn': '舒缓动画已开启',
+  'tableMenu.calmMotionOff': '舒缓动画已关闭',
+  'tableMenu.background': '背景',
+  'tableMenu.appColors': '应用配色',
+  'tableMenu.appColorsRicher': '更鲜明',
+  'tableMenu.appColorsOriginal': '原版',
+  'tableMenu.appliesEverywhere': '随处生效',
+  'tableMenu.cardEffects': '牌面特效',
+  'tableMenu.cardEffectsOff': '关闭',
+  'tableMenu.cardEffectsSubtle': '轻微',
+  'tableMenu.cardEffectsFull': '完整',
+  'tableMenu.music': '音乐',
+  'tableMenu.quitToMenu': '退出到主菜单',
+
+  // --- multiplayer security ------------------------------------------------
+  'security.fairDeal': '公平发牌',
+  'security.veiled': '帷幕保护',
+  'security.verified': '已验证',
+  'security.disputed': '有争议',
+  'security.seat': '{seat}号座位',
+  'security.recovered_one': '{seats}已断开连接，其手牌已公开以继续本轮，现已不再保密。',
+  'security.recovered_other': '{seats}已断开连接，其手牌已公开以继续本轮，现已不再保密。',
+  'security.seatDropped': '{seat}号座位已掉线，正在等待其返回…',
+  'security.waitingPlayers': '正在等待更多玩家，然后才能继续本轮。',
 
   // --- match end ------------------------------------------------------------
   'matchEnd.playAgain': '再来一局',
@@ -311,6 +345,14 @@ export const zh: Messages = {
   'install.shareStep': '点按浏览器工具栏中的“分享”。',
   'install.menuStep': '打开浏览器菜单。',
   'install.tapEither': '点按{add}或{install}。',
+
+  // --- PWA status -----------------------------------------------------------
+  'pwa.offline': '正在离线游玩',
+  'pwa.offlineSolo': '单人游戏仍可使用',
+  'pwa.updateReady': '新牌桌已准备好。',
+  'pwa.refreshing': '正在刷新…',
+  'pwa.refresh': '刷新',
+  'pwa.dismissUpdate': '忽略更新',
 
   // --- scene ----------------------------------------------------------------
   'scene.label': '背景场景',

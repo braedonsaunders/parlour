@@ -1,9 +1,11 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { useT } from '@/lib/i18n';
 import { isTauriRuntime, syncAppViewportHeight } from '@/lib/pwa';
 
 export function PwaRegister() {
+  const t = useT();
   const [online, setOnline] = useState(true);
   const [waitingWorker, setWaitingWorker] = useState<ServiceWorker | null>(null);
   const [applyingUpdate, setApplyingUpdate] = useState(false);
@@ -131,8 +133,8 @@ export function PwaRegister() {
             ◌
           </span>
           <p className="min-w-0 flex-1 text-sm font-semibold text-dusk-50">
-            Playing offline{' '}
-            <span className="font-normal text-dusk-200">· solo games still work</span>
+            {t('pwa.offline')}{' '}
+            <span className="font-normal text-dusk-200">· {t('pwa.offlineSolo')}</span>
           </p>
         </div>
       ) : null}
@@ -147,7 +149,7 @@ export function PwaRegister() {
             ✦
           </span>
           <p className="min-w-0 flex-1 text-sm font-semibold text-dusk-50">
-            A fresh table is ready.
+            {t('pwa.updateReady')}
           </p>
           <button
             type="button"
@@ -155,12 +157,12 @@ export function PwaRegister() {
             disabled={applyingUpdate}
             className="pointer-events-auto rounded-full bg-hearth-300 px-3 py-1.5 font-display text-xs font-extrabold text-[#43200a] transition hover:bg-hearth-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-hearth-100 disabled:opacity-60"
           >
-            {applyingUpdate ? 'Refreshing…' : 'Refresh'}
+            {t(applyingUpdate ? 'pwa.refreshing' : 'pwa.refresh')}
           </button>
           <button
             type="button"
             onClick={() => setWaitingWorker(null)}
-            aria-label="Dismiss update"
+            aria-label={t('pwa.dismissUpdate')}
             className="pointer-events-auto grid h-9 w-9 place-items-center rounded-full text-xl text-dusk-200 transition hover:bg-dusk-800/60 hover:text-dusk-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-hearth-100"
           >
             ×

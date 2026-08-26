@@ -11,6 +11,7 @@ import {
   TABLE_FX_STORAGE_KEY,
   useTableFxStore,
 } from '@/stores/tableFx';
+import { useLocaleStore } from '@/stores/locale';
 import { TableMenu } from './TableMenu';
 
 const { FakeHowl } = vi.hoisted(() => {
@@ -53,6 +54,7 @@ describe('TableMenu', () => {
 
   beforeEach(() => {
     localStorage.clear();
+    useLocaleStore.setState({ locale: 'en', chosen: false });
     useSceneStore.setState({ sceneId: DEFAULT_SCENE });
     useTableFxStore.setState({
       dropEffects: DEFAULT_DROP_EFFECTS,
@@ -126,6 +128,37 @@ describe('TableMenu', () => {
     expect(onQuit).not.toHaveBeenCalled();
   });
 
+  it('keeps keyboard focus inside the dialog and restores the table control on close', async () => {
+    const tableControl = document.createElement('button');
+    tableControl.textContent = 'Open table menu';
+    document.body.prepend(tableControl);
+    tableControl.focus();
+
+    await render({ open: true, onClose: () => {}, onQuit: () => {} });
+
+    const dialog = container.querySelector<HTMLElement>('[role="dialog"]')!;
+    const focusable = [...dialog.querySelectorAll<HTMLButtonElement>('button:not(:disabled)')];
+    expect(dialog.contains(document.activeElement)).toBe(true);
+
+    focusable.at(-1)?.focus();
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }));
+    });
+    expect(document.activeElement).toBe(focusable[0]);
+
+    focusable[0]?.focus();
+    act(() => {
+      window.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, bubbles: true }),
+      );
+    });
+    expect(document.activeElement).toBe(focusable.at(-1));
+
+    await render({ open: false, onClose: () => {}, onQuit: () => {} });
+    expect(document.activeElement).toBe(tableControl);
+    tableControl.remove();
+  });
+
   it('changes the background scene from the settings modal', async () => {
     await render({ open: true, onClose: () => {}, onQuit: () => {} });
 
@@ -168,5 +201,18 @@ describe('TableMenu', () => {
     expect(container.querySelector('[data-testid="music-track-title"]')?.textContent).toContain(
       'Ember Watch',
     );
+  });
+
+  it('renders every table-menu control in the selected language', async () => {
+    useLocaleStore.setState({ locale: 'es', chosen: true });
+    await render({ open: true, onClose: () => {}, onQuit: () => {} });
+
+    expect(container.querySelector('[role="dialog"]')?.getAttribute('aria-label')).toBe(
+      'Menú de la mesa',
+    );
+    expect(buttonByText('Volver a la mesa')).toBeDefined();
+    expect(buttonByText('Salir al menú principal')).toBeDefined();
+    expect(container.textContent).toContain('Colores de la app');
+    expect(container.textContent).toContain('Efectos de las cartas');
   });
 });

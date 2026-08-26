@@ -87,6 +87,9 @@ export const en = {
   'room.finding': 'Finding the table…',
   'room.copyLink': 'Copy link',
   'room.copied': 'Copied!',
+  'room.share': 'Share',
+  'room.shareFailed': 'Couldn’t open sharing. Copy this address manually: {url}',
+  'room.bot': 'bot',
   'room.shareTitle': 'Join my parlour',
   'room.seatsLabel': 'Table seats',
   'room.ready': 'Ready',
@@ -101,6 +104,39 @@ export const en = {
   // --- table ----------------------------------------------------------------
   'table.menu': 'Table menu',
   'table.dealing': 'Dealing…',
+
+  // --- table menu -----------------------------------------------------------
+  'tableMenu.backToTable': 'Back to the table',
+  'tableMenu.quitPrompt': 'Quit this match?',
+  'tableMenu.quitHint': 'You’ll fold your seat and head back to the menu. The match won’t wait.',
+  'tableMenu.keepPlaying': 'Keep playing',
+  'tableMenu.quitMatch': 'Quit match',
+  'tableMenu.calmMotionOn': 'Calm motion on',
+  'tableMenu.calmMotionOff': 'Calm motion off',
+  'tableMenu.background': 'Background',
+  'tableMenu.appColors': 'App colors',
+  'tableMenu.appColorsRicher': 'Richer',
+  'tableMenu.appColorsOriginal': 'Original',
+  'tableMenu.appliesEverywhere': 'Applies everywhere',
+  'tableMenu.cardEffects': 'Card effects',
+  'tableMenu.cardEffectsOff': 'Off',
+  'tableMenu.cardEffectsSubtle': 'Subtle',
+  'tableMenu.cardEffectsFull': 'Full',
+  'tableMenu.music': 'Music',
+  'tableMenu.quitToMenu': 'Quit to main menu',
+
+  // --- multiplayer security ------------------------------------------------
+  'security.fairDeal': 'Fair deal',
+  'security.veiled': 'Veiled',
+  'security.verified': 'Verified',
+  'security.disputed': 'Disputed',
+  'security.seat': 'Seat {seat}',
+  'security.recovered_one':
+    '{seats} disconnected and their hand was reopened so the round could continue. It is no longer private.',
+  'security.recovered_other':
+    '{seats} disconnected and their hands were reopened so the round could continue. They are no longer private.',
+  'security.seatDropped': 'Seat {seat} dropped. Waiting for them to come back…',
+  'security.waitingPlayers': 'Waiting for more players before the round can continue.',
 
   // --- match end ------------------------------------------------------------
   'matchEnd.playAgain': 'Play again',
@@ -326,6 +362,14 @@ export const en = {
   'install.shareStep': 'Tap Share in your browser toolbar.',
   'install.menuStep': 'Open your browser menu.',
   'install.tapEither': 'Tap {add} or {install}.',
+
+  // --- PWA status -----------------------------------------------------------
+  'pwa.offline': 'Playing offline',
+  'pwa.offlineSolo': 'solo games still work',
+  'pwa.updateReady': 'A fresh table is ready.',
+  'pwa.refreshing': 'Refreshing…',
+  'pwa.refresh': 'Refresh',
+  'pwa.dismissUpdate': 'Dismiss update',
 
   // --- scene ----------------------------------------------------------------
   'scene.label': 'Background scene',

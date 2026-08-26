@@ -1,6 +1,7 @@
 'use client';
 
 import type { MultiplayerSecurity } from '@/app/_multiplayer/roomSession';
+import { LOCALE_META, useT, type MessageKey, type Translator } from '@/lib/i18n';
 
 /**
  * What the room guarantees, stated plainly — and never asked as a question.
@@ -30,15 +31,18 @@ import type { MultiplayerSecurity } from '@/app/_multiplayer/roomSession';
  * The machinery is untouched; this is only what the table says about it.
  */
 export function SecurityBadge({ security }: { security: MultiplayerSecurity }) {
+  const t = useT();
+  const recovered = new Intl.ListFormat(LOCALE_META[t.locale].tag, {
+    style: 'long',
+    type: 'conjunction',
+  }).format(security.recoveredSeats.map((seat) => t('security.seat', { seat: seat + 1 })));
+
   return (
     <div className="panel-soft flex flex-col gap-1 p-3 text-left" data-testid="table-security">
-      <p className="text-sm font-bold text-dusk-50">{security.label}</p>
+      <p className="text-sm font-bold text-dusk-50">{t(securityLabelKey(security.audit))}</p>
       {security.recoveredSeats.length > 0 ? (
         <p className="text-xs text-hearth-200" data-testid="table-security-recovered">
-          {seatList(security.recoveredSeats)} disconnected and{' '}
-          {security.recoveredSeats.length === 1 ? 'their hand was' : 'their hands were'} reopened so
-          the round could continue. {security.recoveredSeats.length === 1 ? 'It is' : 'They are'} no
-          longer private.
+          {t.count('security.recovered', security.recoveredSeats.length, { seats: recovered })}
         </p>
       ) : null}
       {security.paused ? (
@@ -47,15 +51,31 @@ export function SecurityBadge({ security }: { security: MultiplayerSecurity }) {
           role="status"
           data-testid="table-security-paused"
         >
-          {security.paused}
+          {localizedPause(security.paused, t)}
         </p>
       ) : null}
     </div>
   );
 }
 
-function seatList(seats: readonly number[]): string {
-  const names = seats.map((seat) => `Seat ${seat + 1}`);
-  if (names.length === 1) return names[0] as string;
-  return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+function securityLabelKey(audit: MultiplayerSecurity['audit']): MessageKey {
+  switch (audit) {
+    case 'open':
+      return 'security.fairDeal';
+    case 'veiled':
+      return 'security.veiled';
+    case 'verified':
+      return 'security.verified';
+    case 'disputed':
+      return 'security.disputed';
+  }
+}
+
+function localizedPause(paused: string, t: Translator): string {
+  const dropped = /^Seat (\d+) dropped\. Waiting for them to come back…$/.exec(paused);
+  if (dropped) return t('security.seatDropped', { seat: dropped[1]! });
+  if (paused === 'Waiting for more players before the round can continue.') {
+    return t('security.waitingPlayers');
+  }
+  return paused;
 }

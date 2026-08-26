@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { interpolate, interpolateParts, translatorFor } from './index';
 import { LOCALES, LOCALE_META, preferredLocale, isLocale, type Locale } from './locales';
-import { en, type Messages } from './messages/en';
+import { en, type MessageKey, type Messages } from './messages/en';
 import { es } from './messages/es';
 import { fr } from './messages/fr';
 import { pt } from './messages/pt';
@@ -55,6 +55,29 @@ describe('catalogue completeness', () => {
           return catalogue[key] === english;
         })
         .map(([key]) => key);
+      expect(untranslated).toEqual([]);
+    },
+  );
+
+  it.each(LOCALES.filter((locale) => locale !== 'en'))(
+    '%s translates every live table-chrome message',
+    (locale) => {
+      const catalogue = CATALOGUES[locale] as unknown as Record<MessageKey, string>;
+      const liveKeys = (Object.keys(en) as MessageKey[]).filter(
+        (key) =>
+          key.startsWith('tableMenu.') ||
+          key.startsWith('security.') ||
+          key.startsWith('pwa.') ||
+          key === 'room.share' ||
+          key === 'room.shareFailed' ||
+          key === 'room.bot',
+      );
+      const sharedTerms = new Set<MessageKey>(
+        locale === 'es' || locale === 'fr' || locale === 'pt' ? ['room.bot'] : [],
+      );
+      const untranslated = liveKeys.filter(
+        (key) => !sharedTerms.has(key) && catalogue[key] === en[key],
+      );
       expect(untranslated).toEqual([]);
     },
   );

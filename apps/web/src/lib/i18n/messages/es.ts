@@ -90,6 +90,10 @@ export const es: Messages = {
   'room.finding': 'Buscando la mesa…',
   'room.copyLink': 'Copiar enlace',
   'room.copied': '¡Copiado!',
+  'room.share': 'Compartir',
+  'room.shareFailed':
+    'No se pudo abrir la opción de compartir. Copia esta dirección manualmente: {url}',
+  'room.bot': 'bot',
   'room.shareTitle': 'Únete a mi parlour',
   'room.seatsLabel': 'Sillas de la mesa',
   'room.ready': 'Listo',
@@ -104,6 +108,39 @@ export const es: Messages = {
   // --- table ----------------------------------------------------------------
   'table.menu': 'Menú de la mesa',
   'table.dealing': 'Repartiendo…',
+
+  // --- table menu -----------------------------------------------------------
+  'tableMenu.backToTable': 'Volver a la mesa',
+  'tableMenu.quitPrompt': '¿Salir de esta partida?',
+  'tableMenu.quitHint': 'Dejarás tu silla y volverás al menú. La partida no esperará.',
+  'tableMenu.keepPlaying': 'Seguir jugando',
+  'tableMenu.quitMatch': 'Salir de la partida',
+  'tableMenu.calmMotionOn': 'Movimiento tranquilo activado',
+  'tableMenu.calmMotionOff': 'Movimiento tranquilo desactivado',
+  'tableMenu.background': 'Fondo',
+  'tableMenu.appColors': 'Colores de la app',
+  'tableMenu.appColorsRicher': 'Más intensos',
+  'tableMenu.appColorsOriginal': 'Originales',
+  'tableMenu.appliesEverywhere': 'Se aplica en todas partes',
+  'tableMenu.cardEffects': 'Efectos de las cartas',
+  'tableMenu.cardEffectsOff': 'Desactivados',
+  'tableMenu.cardEffectsSubtle': 'Sutiles',
+  'tableMenu.cardEffectsFull': 'Completos',
+  'tableMenu.music': 'Música',
+  'tableMenu.quitToMenu': 'Salir al menú principal',
+
+  // --- multiplayer security ------------------------------------------------
+  'security.fairDeal': 'Reparto justo',
+  'security.veiled': 'Oculto',
+  'security.verified': 'Verificado',
+  'security.disputed': 'En disputa',
+  'security.seat': 'Asiento {seat}',
+  'security.recovered_one':
+    '{seats} se desconectó y su mano se reabrió para poder continuar la ronda. Ya no es privada.',
+  'security.recovered_other':
+    '{seats} se desconectaron y sus manos se reabrieron para poder continuar la ronda. Ya no son privadas.',
+  'security.seatDropped': 'El asiento {seat} se desconectó. Esperando a que vuelva…',
+  'security.waitingPlayers': 'Esperando a más jugadores para poder continuar la ronda.',
 
   // --- match end ------------------------------------------------------------
   'matchEnd.playAgain': 'Jugar otra vez',
@@ -331,6 +368,14 @@ export const es: Messages = {
   'install.shareStep': 'Toca Compartir en la barra de tu navegador.',
   'install.menuStep': 'Abre el menú de tu navegador.',
   'install.tapEither': 'Toca {add} o {install}.',
+
+  // --- PWA status -----------------------------------------------------------
+  'pwa.offline': 'Jugando sin conexión',
+  'pwa.offlineSolo': 'los juegos en solitario siguen funcionando',
+  'pwa.updateReady': 'Hay una mesa nueva lista.',
+  'pwa.refreshing': 'Actualizando…',
+  'pwa.refresh': 'Actualizar',
+  'pwa.dismissUpdate': 'Descartar actualización',
 
   // --- scene ----------------------------------------------------------------
   'scene.label': 'Escenario de fondo',

@@ -112,6 +112,28 @@ describe('HowToPlay', () => {
     expect(onTileClick).not.toHaveBeenCalled();
   });
 
+  it('traps focus in the sheet and returns it to the rules trigger', () => {
+    act(() => root.render(createElement(HowToPlayButton, { doc: DOC, title: 'Demo Game' })));
+
+    const trigger = container.querySelector<HTMLButtonElement>(
+      '[data-testid="how-to-play-demo-game"]',
+    )!;
+    trigger.focus();
+    act(() => trigger.click());
+
+    const sheet = overlay()!;
+    const close = sheet.querySelector<HTMLButtonElement>('[data-testid="close-how-to-play"]')!;
+    expect(document.activeElement).toBe(close);
+
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }));
+    });
+    expect(document.activeElement).toBe(close);
+
+    act(() => close.click());
+    expect(document.activeElement).toBe(trigger);
+  });
+
   it('gives every shelved game a doc to show', () => {
     for (const game of GAMES) {
       expect(game.howToPlay.summary, game.id).toBeTruthy();
