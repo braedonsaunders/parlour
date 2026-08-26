@@ -151,6 +151,7 @@ export function RoomLobby({
                     <button
                       className="mt-2 text-xs font-bold text-hearth-200 underline"
                       type="button"
+                      data-testid="add-bot"
                       onClick={() => onAddBot(seat)}
                     >
                       {t('room.addBot')}
@@ -183,6 +184,11 @@ export function RoomLobby({
         <button
           className="btn-fat mt-6 w-full"
           type="button"
+          // Addressed by test id, not by label: this button reads "Start match",
+          // "Waiting for one more" or "Dealing…" depending on the table, in five
+          // languages. A browser suite matching on any of those finds nothing
+          // most of the time, which cost three separate debugging sessions.
+          data-testid="start-match"
           disabled={starting || seats.length < capacity || connection !== 'connected'}
           onClick={() => void handleStart()}
         >
