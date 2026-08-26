@@ -153,6 +153,12 @@ async function fillBotsAndStart(page: Page): Promise<void> {
   await expect(hand.locator('[role="listitem"]').first()).toBeVisible({ timeout: 15_000 });
 }
 
+/** Drops a seat's broker handlers and closes its context. */
+async function closeSeat(seat: Seat, broker: HermeticSignalingBroker): Promise<void> {
+  broker.dropKey(seat.key);
+  await seat.context.close();
+}
+
 /** True when the seat named by `data-seat` is showing the "bot" marker. */
 function seatIsBot(page: Page, seat: number) {
   return page.locator(`[data-seat="${seat}"] small`).filter({ hasText: 'bot' });
@@ -371,7 +377,7 @@ test.describe('multiplayer resilience (hermetic)', () => {
 
     // Kill the host. This closes its WebRTC links; the guests detect the loss
     // through heartbeats (3.5s) and re-elect the lowest surviving peer.
-    await host.context.close();
+    await closeSeat(host, broker);
     // Heartbeat timeout plus re-election: the surviving peers notice the
     // silence, elect a new host, swap the dead seat to a bot, and deal the
     // bot's opening hand. All of that takes at least one heartbeat cycle.
@@ -410,7 +416,7 @@ test.describe('multiplayer resilience (hermetic)', () => {
     await fillBotsAndStart(host.page);
 
     // guest2 occupies seat 2 (host=0, guest1=1, guest2=2). Drop it.
-    await guest2.context.close();
+    await closeSeat(guest2, broker);
 
     // The host sees seat 2 become a bot, and the table stays alive.
     await expect(seatIsBot(host.page, 2)).toBeVisible({ timeout: 20_000 });
@@ -442,7 +448,7 @@ test.describe('multiplayer resilience (hermetic)', () => {
     await fillBotsAndStart(host.page);
 
     // Drop the only other human.
-    await guest.context.close();
+    await closeSeat(guest, broker);
 
     // The host's match ends on the podium with a walkover reason.
     await expect(host.page.getByTestId('match-end-page')).toBeVisible({ timeout: 20_000 });
@@ -655,7 +661,7 @@ test.describe('veiled-deck rooms', () => {
     // Close the guest context BEFORE filling bots and starting — the ceremony
     // runs when start is pressed, and a missing seat means its layer never
     // arrives, which is exactly the fault we are testing.
-    await guest.context.close();
+    await closeSeat(guest, broker);
 
     // The host fills the remaining chairs (now 3 empty — guest is gone) with
     // bots and presses Start. The ceremony should fail (missing guest layer)
@@ -758,7 +764,7 @@ test.describe('veiled-deck rooms', () => {
     await expectAtTable(guest2.page, CONNECT_TIMEOUT_MS);
 
     // Close guest2 — simulates a phone losing signal.
-    await guest2.context.close();
+    await closeSeat(guest2, broker);
 
     // Wait briefly — not past the grace — then reconnect.
     await host.page.waitForTimeout(2_000);
