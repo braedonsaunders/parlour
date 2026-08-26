@@ -499,3 +499,141 @@ describe('same-room rematches', () => {
     transport.close();
   });
 });
+
+describe('only the current host may move the board', () => {
+  function stubSignaling() {
+    return new NostrSignaling({
+      relays: [],
+      pool: {
+        ensureRelay: vi.fn(),
+        publish: vi.fn(() => []),
+        querySync: vi.fn(async () => []),
+        subscribeMany: vi.fn(() => ({ close() {} })),
+        close: vi.fn(),
+      },
+    });
+  }
+
+  function guestOnBlitz() {
+    const def = createBlitzDef();
+    const config = blitzConfigSchema.defaults();
+    const settings = { gameId: 'blitz', seats: 2, config };
+    const host = new EngineAuthority({
+      def,
+      session: createSession(def, { seed: 7, config, seats: 2 }),
+      settings,
+      now: () => 100,
+    });
+    const authority = new EngineAuthority({
+      def,
+      session: createSession(def, { seed: 7, config, seats: 2 }),
+      settings,
+    });
+    const transport = new P2PTransport({
+      authority,
+      profileId: 'guest-profile',
+      signaling: stubSignaling(),
+      origin: 'https://parlour.test',
+    });
+    const harness = transport as unknown as {
+      startRoom(code: string, hostId: string): void;
+      receiveWire(peerId: string, message: unknown): Promise<void>;
+      sendTo: ReturnType<typeof vi.fn>;
+    };
+    harness.sendTo = vi.fn();
+    harness.startRoom('AB2Z', 'host');
+
+    const session = host.getSession();
+    const move = def.flow.legalMoves(session.state, session.phase)[0]!;
+    const packet = host.apply({
+      id: 'action-1',
+      seat: session.phase.actor!,
+      move: move.id,
+      payload: move.payload,
+    });
+    return { transport, harness, authority, packet };
+  }
+
+  it('ignores an applied packet that did not come from the host', async () => {
+    const { transport, harness, authority, packet } = guestOnBlitz();
+    const before = authority.exportSnapshot();
+    const events: unknown[] = [];
+    transport.onEvent((event) => events.push(event));
+
+    // A well-formed packet the host really did produce, relayed by somebody
+    // else. Every other host-shaped message on this wire already checks the
+    // sender; this one is the one that moves the game.
+    await harness.receiveWire('some-other-peer', { type: 'applied', packet });
+
+    expect(events).toEqual([]);
+    expect(authority.exportSnapshot()).toEqual(before);
+    expect(harness.sendTo).not.toHaveBeenCalled();
+    transport.close();
+  });
+
+  it('still accepts the same packet from the host', async () => {
+    const { transport, harness, authority, packet } = guestOnBlitz();
+    const events: unknown[] = [];
+    transport.onEvent((event) => events.push(event));
+
+    await harness.receiveWire('host', { type: 'applied', packet });
+
+    expect(events).toEqual([packet]);
+    expect(authority.exportSnapshot().log).toHaveLength(packet.events.length);
+    transport.close();
+  });
+});
+
+/**
+ * The deterministic-candidate rule says *who* may take over. On its own it says
+ * nothing about *when*, and the peer it names satisfies it permanently — so the
+ * smallest peer in a room could depose a host that was answering fine.
+ */
+describe('a host claim has to survive the host still being there', () => {
+  /** peer-b is the smallest id in the room, so it is the standing candidate. */
+  function guestUnder(host: string, seenAt = 1_000) {
+    const guest = new MultiplayerState('peer-c', host);
+    guest.seePeer(host, seenAt);
+    guest.seePeer('peer-b', seenAt);
+    return guest;
+  }
+
+  it('refuses a term bump while the current host is still being heard', () => {
+    const guest = guestUnder('peer-m');
+    expect(guest.considerHostClaim('peer-b', 1, false, 1_200)).toBe(false);
+    expect(guest.hostId).toBe('peer-m');
+    expect(guest.electionTerm).toBe(0);
+  });
+
+  it('accepts the same claim once the host has gone quiet', () => {
+    const guest = guestUnder('peer-m');
+    expect(guest.considerHostClaim('peer-b', 1, false, 1_000 + HEARTBEAT_TIMEOUT_MS + 1)).toBe(
+      true,
+    );
+    expect(guest.hostId).toBe('peer-b');
+    expect(guest.electionTerm).toBe(1);
+  });
+
+  it('refuses a peer trying to take the room from a host that is running it', () => {
+    const host = new MultiplayerState('peer-m', 'peer-m');
+    host.seePeer('peer-b', 1_000);
+    // A host cannot have expired from its own point of view, whatever a peer
+    // that would rather be in charge says about it.
+    expect(host.considerHostClaim('peer-b', 1, false, 9_999)).toBe(false);
+    expect(host.hostId).toBe('peer-m');
+    expect(host.electionTerm).toBe(0);
+  });
+
+  it('leaves a same-term tiebreak alone — that is disagreement, not a seizure', () => {
+    const guest = guestUnder('peer-z');
+    expect(guest.considerHostClaim('peer-b', 0, false, 1_200)).toBe(true);
+    expect(guest.hostId).toBe('peer-b');
+  });
+
+  it('still refuses a peer that is not the candidate at all', () => {
+    const guest = new MultiplayerState('peer-c', 'peer-m');
+    guest.seePeer('peer-m', 1_000);
+    guest.seePeer('peer-b', 1_000);
+    expect(guest.considerHostClaim('peer-z', 1, false, 99_999)).toBe(false);
+  });
+});

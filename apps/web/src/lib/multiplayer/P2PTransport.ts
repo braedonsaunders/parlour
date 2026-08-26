@@ -505,7 +505,7 @@ export class P2PTransport implements Transport {
         if (
           message.hostId === peerId &&
           message.term !== undefined &&
-          this.resilience?.considerHostClaim(message.hostId, message.term)
+          this.resilience?.considerHostClaim(message.hostId, message.term, false, this.now())
         ) {
           this.pendingResync = true;
           this.pendingHostMigration = true;
@@ -556,9 +556,21 @@ export class P2PTransport implements Transport {
         }
         return;
       case 'applied': {
-        this.resilience?.confirmAction(message.packet.actionId);
+        // Only the seat everyone currently agrees is the authority may move the
+        // board. Every other host-shaped message in this switch already says so;
+        // this one did not, which left the single most consequential packet in
+        // the protocol open to any peer on the mesh.
+        const resilience = this.resilience;
+        if (!resilience || peerId !== resilience.hostId) return;
+        resilience.confirmAction(message.packet.actionId);
         if (this.isHost()) return;
         const remote = await this.authority.applyRemote(message.packet);
+        if (remote.fault) {
+          this.emitPresence({
+            kind: 'error',
+            message: `The host played a move the rules do not allow (${remote.fault.error.code}).`,
+          });
+        }
         const mismatch = this.resilience?.checkHash(
           message.packet.events.at(-1)?.seq ?? 0,
           remote.stateHash,
@@ -647,7 +659,10 @@ export class P2PTransport implements Transport {
         if (message.term === undefined) {
           const legacyElection = this.resilience!.expireAndElect(this.now());
           if (legacyElection.hostId !== message.hostId) return;
-        } else if (!this.resilience!.considerHostClaim(message.hostId, message.term)) return;
+        } else if (
+          !this.resilience!.considerHostClaim(message.hostId, message.term, false, this.now())
+        )
+          return;
         await this.importMigration(message.snapshot, true);
         this.pendingResync = false;
         this.pendingHostMigration = false;

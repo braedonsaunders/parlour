@@ -85,12 +85,45 @@ export class MultiplayerState {
     return this.hostTerm;
   }
 
-  considerHostClaim(hostId: string, term: number, trustedWelcome = false): boolean {
+  /**
+   * Accepts or refuses another peer's claim to be the host.
+   *
+   * The deterministic-candidate rule keeps two peers from electing themselves
+   * at once, but on its own it is a rule about *who* may take over, not about
+   * *when*. The lexicographically smallest peer satisfies it permanently, so it
+   * could raise the term and seize a live host's authority at any moment — no
+   * fork, no disagreement, just a peer deciding it would rather be in charge.
+   *
+   * So a claim that raises the term also has to survive this peer's own view:
+   * refuse it while we can still hear the host we already have. If the host
+   * really is gone, every peer's `lastSeen` for it goes stale within the
+   * heartbeat timeout and the claim goes through on the next attempt.
+   *
+   * `now` is undefined only for callers with no clock in hand (a trusted
+   * welcome, which skips these checks anyway, and tests that assert the
+   * candidate rule in isolation).
+   */
+  considerHostClaim(
+    hostId: string,
+    term: number,
+    trustedWelcome = false,
+    now?: number,
+    timeoutMs = HEARTBEAT_TIMEOUT_MS,
+  ): boolean {
     if (!hostId || !Number.isSafeInteger(term) || term < 0) return false;
     if (!trustedWelcome) {
       if (term > this.hostTerm + 1) return false;
       const deterministicCandidate = [this.localPeerId, hostId, ...this.lastSeen.keys()].sort()[0];
       if (hostId !== deterministicCandidate) return false;
+      if (term > this.hostTerm && now !== undefined && hostId !== this.hostId) {
+        const hostSeenAt = this.lastSeen.get(this.hostId);
+        if (
+          this.hostId === this.localPeerId ||
+          (hostSeenAt !== undefined && now - hostSeenAt <= timeoutMs)
+        ) {
+          return false;
+        }
+      }
     }
     const wins = term > this.hostTerm || (term === this.hostTerm && hostId < this.hostId);
     if (!wins) return false;
