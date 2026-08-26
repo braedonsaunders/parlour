@@ -2,23 +2,27 @@
  * Hermetic signalling bridge for the multi-context multiplayer suite.
  *
  * Two Playwright browser contexts cannot share a JavaScript object. This
- * file bridges them: a single {@link HermeticSignalingBroker} lives in the
- * test runner (Node), and each page gets a {@link RoomSignaling} backed by
- * {@link https://playwright.dev/docs/api/class-page#page-expose-function | page.exposeFunction}
- * and {@link https://playwright.dev/docs/api/class-page#page-add-init-script | page.addInitScript}.
+ * file bridges them: a single {@link HermeticSignalingBroker} lives in
+ * the test runner (Node), each page pushes ops to a polling outbox, and
+ * the broker delivers results and signals back via `page.evaluate`.
  *
- * ## Architecture
+ * ## Architecture (no exposeFunction, no timing race)
  *
- *   page A ──exposeFunction──┐
- *                             ├── HermeticSignalingBroker (Node)
- *   page B ──exposeFunction──┘
+ *   page A ──outbox poll──┐
+ *                          ├── HermeticSignalingBroker (Node)
+ *   page B ──outbox poll──┘
  *
- * - **announce / resolve / send** flow page→Node via a single `__parlourCall`
- *   dispatcher. The broker stores announcements in a per-code list (mirroring
- *   a relay that keeps every event) and routes signals by `(code, publicKey)`.
+ * Page→Node: the addInitScript creates `window.__parlourOutbox` (a
+ * `PendingOp[]`). Each op is `{op, args, id}`. The test driver loops
+ * over the outbox, processes each op, and writes the result to
+ * `window.__parlourResults[id]` via `page.evaluate`.
  *
- * - **subscribe** registers a Node-side forwarder that delivers signals back
- *   to the page via `page.evaluate`.
+ * Node→page: signals arrive at the broker's forwarder, which calls
+ * `page.evaluate` to invoke `window.__parlourCallbacks[key](...)`.
+ *
+ * There are no Playwright `exposeFunction` bindings, so there is no
+ * ordering race between addInitScript scripts. The outbox is polled
+ * continuously during every `waitForOutboxDrain` call.
  *
  * ## Usage
  *
@@ -27,35 +31,31 @@
  * const hostPage = await hostCtx.newPage();
  * await broker.install(hostPage, 'host-key');
  * await hostPage.goto('/wild/create');
- * ```
  *
- * The room session reads `window.__PARLOUR_E2E_SIGNALING__` (the hook in
- * roomSession.ts calls `injectedSignaling()`).
+ * // After every app interaction, drain the outbox:
+ * await broker.drain(hostPage);
+ * await broker.drain(guestPage);
+ * ```
  */
 
 import type { Page } from '@playwright/test';
 import type { RoomSettings } from '../src/lib/multiplayer/types';
 import type { RoomAnnouncement, SignalPayload } from '../src/lib/multiplayer/NostrSignaling';
 
-/** The subset of RoomSignaling that a page can call into Node for. */
-type PageSideSignaling = {
-  publicKey: string;
-  announce(code: string, settings: RoomSettings): Promise<void>;
-  resolve(code: string, expectedHost?: string): Promise<RoomAnnouncement>;
-  send(code: string, targetPubkey: string, payload: SignalPayload): Promise<void>;
-  subscribe(
-    code: string,
-    callback: (senderPubkey: string, payload: SignalPayload) => void,
-  ): { close(): void };
-  close(): void;
-};
+interface PendingOp {
+  op: string;
+  args: unknown[];
+  id: number;
+}
 
 /**
- * One instance per multi-context test: holds announcements and routes signals
- * between pages. Two {@link HermeticSignalingBroker} instances are completely
- * isolated, so tests do not need unique room codes.
+ * One instance per multi-context test: holds announcements and routes
+ * signals between pages. Two {@link HermeticSignalingBroker} instances
+ * are completely isolated, so tests do not need unique room codes.
  */
 export class HermeticSignalingBroker {
+  private nextId = 1;
+
   /** Per-code announcement list, oldest index 0 — mirrors a real relay. */
   private readonly rooms = new Map<string, RoomAnnouncement[]>();
 
@@ -65,8 +65,11 @@ export class HermeticSignalingBroker {
     Map<string, (author: string, payload: SignalPayload) => void>
   >();
 
+  /** Page-installed public keys that are awaiting outbox drains. */
+  private readonly installedPages = new Map<string, Page>();
+
   // -----------------------------------------------------------------------
-  // Bus methods — these are the Node-side backing store
+  // Bus methods — the Node-side backing store
   // -----------------------------------------------------------------------
 
   announce(author: string, code: string, settings: RoomSettings): void {
@@ -106,87 +109,66 @@ export class HermeticSignalingBroker {
     handler?.(author, payload);
   }
 
-  private onSignal(
-    code: string,
-    receiver: string,
-    handler: (author: string, payload: SignalPayload) => void,
-  ): void {
-    const codeHandlers = this.handlers.get(code) ?? new Map();
-    codeHandlers.set(receiver, handler);
-    this.handlers.set(code, codeHandlers);
-  }
-
   // -----------------------------------------------------------------------
   // Page install — called once per page before navigation
   // -----------------------------------------------------------------------
 
   /**
-   * Wires a page into the broker so that `window.__PARLOUR_E2E_SIGNALING__`
-   * is a working {@link RoomSignaling} backed by this broker.
-   *
-   * Must run BEFORE the first page navigation. All four ops (announce,
-   * resolve, send, subscribe) flow through a single `__parlourCall` exposed
-   * function, which keeps the bridge surface to one thing.
+   * Installs the outbox-based bridge on `page`. No `exposeFunction` is used:
+   * the page writes ops to a polling outbox, and `drain()` processes them.
    */
   async install(page: Page, publicKey: string): Promise<void> {
-    // ---- Page → Node: single dispatcher ----
-    await page.exposeFunction('__parlourCall', (op: string, args: unknown[]) => {
-      switch (op) {
-        case 'announce':
-          this.announce(args[0] as string, args[1] as string, args[2] as RoomSettings);
-          return undefined;
-        case 'resolve':
-          return this.resolve(args[0] as string, (args[1] as string | null) ?? undefined);
-        case 'send':
-          this.deliver(
-            args[0] as string,
-            args[1] as string,
-            args[2] as string,
-            args[3] as SignalPayload,
-          );
-          return undefined;
-        case 'subscribe':
-          this.installForwarder(page, args[0] as string, args[1] as string);
-          return undefined;
-        default:
-          throw new Error(`[bridge] unknown op: ${op}`);
-      }
-    });
+    this.installedPages.set(publicKey, page);
 
-    // ---- Build the RoomSignaling object on window, on every navigation. ----
-    //
-    // `addInitScript` runs before every document load, so the global is always
-    // set before the app's React effects run. `publicKey` is passed as the
-    // script argument — Playwright serialises it into the page.
-
+    // `addInitScript` runs before every document load, so the outbox and
+    // the RoomSignaling facade are always set before React effects fire.
     await page.addInitScript((pk: string) => {
       const w = window as typeof window & {
-        __PARLOUR_E2E_SIGNALING__?: PageSideSignaling;
-        __parlourCallbacks?: Record<string, (author: string, payload: SignalPayload) => void>;
-        __parlourCall: (op: string, args: unknown[]) => Promise<unknown>;
+        __parlourOutbox: PendingOp[];
+        __parlourResults: Record<number, unknown>;
+        __parlourCallbacks: Record<string, (author: string, payload: SignalPayload) => void>;
+        __PARLOUR_E2E_SIGNALING__: {
+          publicKey: string;
+          announce(code: string, settings: RoomSettings): Promise<void>;
+          resolve(code: string, expectedHost?: string): Promise<RoomAnnouncement>;
+          send(code: string, targetPubkey: string, payload: SignalPayload): Promise<void>;
+          subscribe(
+            code: string,
+            cb: (senderPubkey: string, payload: SignalPayload) => void,
+          ): { close(): void };
+          close(): void;
+        };
       };
 
+      w.__parlourOutbox = [];
+      w.__parlourResults = {};
       w.__parlourCallbacks = {};
+      let nextId = 1;
+      const enqueue = (op: string, args: unknown[]): Promise<unknown> =>
+        new Promise((resolve) => {
+          const id = nextId++;
+          w.__parlourOutbox.push({ op, args, id });
+          // Poll for the result — the test driver writes it back via evaluate.
+          const poll = () => {
+            if (id in w.__parlourResults) {
+              resolve(w.__parlourResults[id]);
+              delete w.__parlourResults[id];
+              return;
+            }
+            setTimeout(poll, 5);
+          };
+          poll();
+        });
 
       w.__PARLOUR_E2E_SIGNALING__ = {
         publicKey: pk,
 
         async announce(code: string, settings: RoomSettings): Promise<void> {
-          if (typeof w.__parlourCall !== 'function') {
-            console.error(
-              '[bridge] __parlourCall is not a function — exposeFunction may not have survived navigation',
-            );
-            throw new Error('bridge: exposeFunction binding not available');
-          }
-          await w.__parlourCall('announce', [pk, code, settings]);
+          await enqueue('announce', [pk, code, settings]);
         },
 
         async resolve(code: string, expectedHost?: string): Promise<RoomAnnouncement> {
-          if (typeof w.__parlourCall !== 'function') {
-            console.error('[bridge] __parlourCall is not a function');
-            throw new Error('bridge: exposeFunction binding not available');
-          }
-          const result = (await w.__parlourCall('resolve', [
+          const result = (await enqueue('resolve', [
             code,
             expectedHost ?? null,
           ])) as RoomAnnouncement | null;
@@ -195,22 +177,20 @@ export class HermeticSignalingBroker {
         },
 
         async send(code: string, target: string, payload: SignalPayload): Promise<void> {
-          await w.__parlourCall('send', [pk, code, target, payload]);
+          await enqueue('send', [pk, code, target, payload]);
         },
 
         subscribe(code: string, callback: (sender: string, payload: SignalPayload) => void) {
-          w.__parlourCallbacks![pk] = callback;
-          void w.__parlourCall('subscribe', [code, pk]).catch(() => {});
+          w.__parlourCallbacks[pk] = callback;
+          enqueue('subscribe', [code, pk]).catch(() => {});
           return {
             close() {
-              delete w.__parlourCallbacks![pk];
+              delete w.__parlourCallbacks[pk];
             },
           };
         },
 
-        close() {
-          // per-seat close is a no-op; the broker outlives any one page
-        },
+        close() {},
       };
 
       console.warn(`[bridge] init script ran, publicKey=${pk}`);
@@ -218,26 +198,79 @@ export class HermeticSignalingBroker {
   }
 
   /**
-   * Installs a Node→page forwarder for a subscribed seat. When a signal
-   * arrives for `receiver` on `code`, the broker calls `page.evaluate` to
-   * invoke the page-side callback.
-   *
-   * `receiver` is passed as an argument to `page.evaluate` — it is NOT closed
-   * over, because `page.evaluate` serialises the function body and re-evaluates
-   * it in the page, where Node-side closures are not available.
+   * Processes every pending op on `page`'s outbox and delivers any queued
+   * signals. Call this after every app interaction (navigation, click) to
+   * keep the bridge in sync.
    */
-  private installForwarder(page: Page, code: string, receiver: string): void {
-    console.warn(`[bridge] subscribe code=${code} receiver=${receiver}`);
-    this.onSignal(code, receiver, (author: string, payload: SignalPayload) => {
-      void page.evaluate(
-        ({ receiver: recv, author, payload }) => {
-          const w = window as typeof window & {
-            __parlourCallbacks?: Record<string, (author: string, payload: SignalPayload) => void>;
-          };
-          w.__parlourCallbacks?.[recv]?.(author, payload);
-        },
-        { receiver, author, payload },
-      );
+  async drain(page: Page): Promise<void> {
+    const ops = await page.evaluate(() => {
+      const w = window as unknown as {
+        __parlourOutbox: PendingOp[];
+        __parlourCallbacks: Record<string, (author: string, payload: SignalPayload) => void>;
+      };
+      const pending = w.__parlourOutbox.splice(0);
+      // Also snapshot the callbacks — we need them for subscribe forwarding.
+      const callbackKeys = Object.keys(w.__parlourCallbacks);
+      return { pending, callbackKeys };
     });
+
+    for (const op of ops.pending) {
+      const result = this.processOp(op, page);
+      if (result !== undefined) {
+        // Write the result back — the page is polling for it.
+        await page.evaluate(
+          ({ id, value }) => {
+            const w = window as unknown as { __parlourResults: Record<number, unknown> };
+            w.__parlourResults[id] = value;
+          },
+          { id: op.id, value: result },
+        );
+      }
+    }
+  }
+
+  private processOp(op: PendingOp, page: Page): unknown {
+    switch (op.op) {
+      case 'announce':
+        this.announce(op.args[0] as string, op.args[1] as string, op.args[2] as RoomSettings);
+        return undefined;
+      case 'resolve':
+        return this.resolve(op.args[0] as string, (op.args[1] as string | null) ?? undefined);
+      case 'send':
+        this.deliver(
+          op.args[0] as string,
+          op.args[1] as string,
+          op.args[2] as string,
+          op.args[3] as SignalPayload,
+        );
+        return undefined;
+      case 'subscribe': {
+        const code = op.args[0] as string;
+        const receiver = op.args[1] as string;
+        console.warn(`[bridge] subscribe code=${code} receiver=${receiver}`);
+        // Install a Node-side forwarder: when a signal arrives for this
+        // (code, receiver), call page.evaluate to invoke the page callback.
+        const codeHandlers = this.handlers.get(code) ?? new Map();
+        codeHandlers.set(receiver, (author: string, payload: SignalPayload) => {
+          void page.evaluate(
+            ({ receiver: recv, author, payload }) => {
+              const w = window as unknown as {
+                __parlourCallbacks: Record<
+                  string,
+                  (author: string, payload: SignalPayload) => void
+                >;
+              };
+              w.__parlourCallbacks?.[recv]?.(author, payload);
+            },
+            { receiver, author, payload },
+          );
+        });
+        this.handlers.set(code, codeHandlers);
+        return undefined;
+      }
+      default:
+        console.warn(`[bridge] unknown op: ${op.op}`);
+        return undefined;
+    }
   }
 }
