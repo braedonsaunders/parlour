@@ -28,7 +28,7 @@ describe('installable offline shell', () => {
     }
   });
 
-  it('provides standalone landscape metadata and useful app shortcuts', () => {
+  it('provides standalone rotation metadata and useful app shortcuts', () => {
     const manifest = JSON.parse(
       readFileSync(join(process.cwd(), 'public/manifest.webmanifest'), 'utf8'),
     ) as {
@@ -41,7 +41,7 @@ describe('installable offline shell', () => {
 
     expect(manifest).toMatchObject({
       display: 'standalone',
-      orientation: 'landscape',
+      orientation: 'any',
       id: '/',
       scope: '/',
     });

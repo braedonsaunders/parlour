@@ -7,7 +7,7 @@
   "start_url": "/",
   "display": "standalone",
   "display_override": ["standalone", "minimal-ui"],
-  "orientation": "landscape",
+  "orientation": "any",
   "lang": "en-CA",
   "dir": "ltr",
   "background_color": "#152833",

@@ -388,6 +388,10 @@
   transform-origin: 50% 82%;
 }
 
+.handScrollCue {
+  display: none;
+}
+
 .localHand[data-deal-state='complete'] .handTrack {
   animation: dealFanBloom 360ms var(--ease-pop) backwards;
 }
@@ -1043,18 +1047,121 @@ button.card {
     top: 48%;
     transform: translate(-50%, -50%) scale(0.85);
   }
-  /* Portrait fans the hand across the whole width, so the bottom corners are
-     card, not felt. Everything docked down there rides the same home-indicator
-     inset as the fan — that keeps the strip beneath the cards a fixed height on
-     every phone instead of shrinking to nothing on the notched ones. */
+  /* A fan can expose five cards honestly on a phone, but it cannot expose
+     thirteen 44px targets. Portrait therefore becomes one full-size row: short
+     hands centre, long hands pan, and no game has to guess when to shrink. */
   .localHand {
-    --hand-card-width: 5.1rem;
-    bottom: calc(env(safe-area-inset-bottom) - 0.4rem);
-    width: min(30rem, 100vw);
+    --hand-card-width: 4.5rem;
+    right: 0;
+    bottom: calc(env(safe-area-inset-bottom) + 0.1rem);
+    left: 0;
+    justify-content: flex-start;
+    width: 100%;
+    height: 7.5rem;
+    padding-block: 0.4rem 0.2rem;
+    transform: none;
+    background: linear-gradient(0deg, rgba(9, 20, 27, 0.76), rgba(9, 20, 27, 0));
+  }
+  .handTrack {
+    position: relative;
+    inset: auto;
+    display: flex;
+    flex: 1 1 auto;
+    gap: 0.35rem;
+    width: 100%;
+    min-width: 0;
+    height: 100%;
+    padding-left: max(0.75rem, env(safe-area-inset-left));
+    padding-right: max(0.75rem, env(safe-area-inset-right));
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-inline: contain;
+    scroll-padding-inline: 0.75rem;
+    scroll-snap-type: x proximity;
+    scrollbar-width: thin;
+    touch-action: pan-x;
+    pointer-events: auto;
+    transform: none;
+  }
+  .localHand[data-scroll-state='none'] .handTrack {
+    justify-content: center;
+  }
+  .localHand[data-scroll-state='start'] .handTrack {
+    -webkit-mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 3rem), transparent);
+    mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 3rem), transparent);
+  }
+  .localHand[data-scroll-state='middle'] .handTrack {
+    -webkit-mask-image: linear-gradient(
+      to right,
+      transparent,
+      #000 3rem,
+      #000 calc(100% - 3rem),
+      transparent
+    );
+    mask-image: linear-gradient(
+      to right,
+      transparent,
+      #000 3rem,
+      #000 calc(100% - 3rem),
+      transparent
+    );
+  }
+  .localHand[data-scroll-state='end'] .handTrack {
+    -webkit-mask-image: linear-gradient(to right, transparent, #000 3rem, #000 100%);
+    mask-image: linear-gradient(to right, transparent, #000 3rem, #000 100%);
+  }
+  .handCard {
+    position: relative !important;
+    top: 0;
+    left: auto;
+    flex: 0 0 var(--hand-card-width);
+    width: var(--hand-card-width);
+    min-width: 2.75rem;
+    margin-left: 0;
+    scroll-snap-align: center;
+    transform: none !important;
+  }
+  .handFan {
+    transform: translateY(var(--playable-y, 0rem));
+  }
+  .localHand .card,
+  .handCard > .handFan > button {
+    min-width: 2.75rem;
+    min-height: 2.75rem;
+  }
+  .handScrollCue {
+    position: absolute;
+    z-index: 8;
+    top: 2.35rem;
+    display: grid;
+    place-items: center;
+    width: 2.25rem;
+    height: 2.75rem;
+    border: 1px solid rgba(255, 236, 200, 0.4);
+    border-radius: 999px;
+    background: rgba(9, 25, 32, 0.9);
+    color: rgba(255, 236, 200, 0.94);
+    box-shadow: 0 6px 16px rgba(3, 11, 15, 0.42);
+    font-size: 1.55rem;
+    line-height: 1;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 140ms ease;
+  }
+  .handScrollCueBack {
+    left: max(0.25rem, env(safe-area-inset-left));
+  }
+  .handScrollCueForward {
+    right: max(0.25rem, env(safe-area-inset-right));
+  }
+  .localHand[data-scroll-state='middle'] .handScrollCue,
+  .localHand[data-scroll-state='end'] .handScrollCueBack,
+  .localHand[data-scroll-state='start'] .handScrollCueForward {
+    opacity: 1;
   }
   .ownerStatusRail {
     align-items: stretch;
-    bottom: calc(env(safe-area-inset-bottom) + 0.4rem);
+    bottom: calc(env(safe-area-inset-bottom) + 7.85rem);
     gap: 0.4rem;
   }
   .ownerCount,
@@ -1084,7 +1191,13 @@ button.card {
   }
   .actionRail {
     right: max(0.9rem, env(safe-area-inset-right));
-    bottom: calc(env(safe-area-inset-bottom) + 0.9rem);
+    bottom: calc(env(safe-area-inset-bottom) + 8rem);
+  }
+}
+
+@media (orientation: portrait) and (prefers-reduced-motion: reduce) {
+  .handScrollCue {
+    transition: none;
   }
 }
 

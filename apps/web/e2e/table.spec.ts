@@ -72,14 +72,27 @@ test('a four-hand table keeps its full hand reachable on a portrait phone', asyn
   const hand = page.locator('[role="list"][data-zone^="hand:"]').first();
   await expect(hand.locator('[data-hand-card]')).toHaveCount(13, { timeout: 15_000 });
   await expect(page.getByTestId('spades-rotate-notice')).toHaveCount(0);
+  await expect(hand).toHaveAttribute('data-scroll-state', 'start');
+
+  const targets = await hand.locator('button[data-card-chassis]').evaluateAll((cards) =>
+    cards.map((card) => {
+      const box = card.getBoundingClientRect();
+      return { width: box.width, height: box.height };
+    }),
+  );
+  expect(targets).toHaveLength(13);
+  expect(targets.every(({ width, height }) => width >= 44 && height >= 44)).toBe(true);
 
   // Portrait keeps honest card-sized targets and moves the overflow into one
   // deliberate horizontal rail. Prove the far end is reachable rather than
   // merely present beyond the viewport.
-  const scroll = await hand.evaluate((rail) => {
+  const track = hand.locator('[data-hand-scroll]');
+  const scroll = await track.evaluate((rail) => {
     rail.scrollLeft = rail.scrollWidth;
+    rail.dispatchEvent(new Event('scroll'));
     return { left: rail.scrollLeft, viewport: rail.clientWidth, content: rail.scrollWidth };
   });
   expect(scroll.content).toBeGreaterThan(scroll.viewport);
   expect(scroll.left).toBeGreaterThan(0);
+  await expect(hand).toHaveAttribute('data-scroll-state', 'end');
 });
