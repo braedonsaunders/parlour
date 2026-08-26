@@ -3,6 +3,7 @@ export * from './zones';
 export * from './veil';
 export * from './teams';
 export * from './seats';
+export * from './undo';
 export * from './bots';
 export * from './match';
 export { defineConfig, applyPreset } from './config';
