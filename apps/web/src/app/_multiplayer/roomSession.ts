@@ -75,6 +75,13 @@ export type MultiplayerSecurity = {
   recoveredSeats: readonly number[];
   /** set when a seat left and its layer cannot be recovered — the round stops */
   paused: string | null;
+  /**
+   * The seat this client is holding open, and when the hold expires. The
+   * countdown is machine-readable on purpose: the table renders it, and the
+   * "carry on without them" control calls {@link resumeWithoutSeat} rather
+   * than waiting out the clock.
+   */
+  waitingOn?: { seat: number; endsAtMs: number } | null;
 };
 export type MultiplayerProfile = {
   name: string;
@@ -129,11 +136,16 @@ const REMATCH_TIMEOUT_MS = 10_000;
 /**
  * How long a veiled round holds a seat open for a player who dropped.
  *
- * Long enough to cover a phone changing networks, a locked screen or a reload,
- * because the alternative to waiting is opening their hand to the rest of the
- * table. Finite, because a round cannot wait forever on somebody who has gone.
+ * The old value was 45 seconds, chosen to make waiting the path of least
+ * resistance — but four people staring at a frozen table because one phone
+ * locked its screen is a worse outcome than the privacy the long wait buys.
+ * Twelve seconds still covers a radio handoff and an app switch, the hold is
+ * now announced with a countdown ({@link MultiplayerSecurity.waitingOn}), and
+ * any seat can end it early via {@link resumeWithoutSeat} instead of sitting
+ * through the clock. When the hold does expire, recovery at three or more
+ * seats opens only the dropped hand; at two, it is a walkover.
  */
-const RECONNECT_GRACE_MS = 45_000;
+export const RECONNECT_GRACE_MS = 12_000;
 
 /**
  * Opening a room takes no privacy tier by default, because nobody has asked
@@ -164,6 +176,7 @@ function securityFor(
     ceremony: { laid: 0, seats, ready: tier === 'open' },
     recoveredSeats: [],
     paused: null,
+    waitingOn: null,
   };
 }
 
@@ -1035,18 +1048,43 @@ export class MultiplayerRoomSession {
     // that had not noticed yet and would collect nothing. Noticing is driven by
     // presence, which every peer sees; the hold only delays acting on it.
     this.veil?.room.markSeatLost(seat);
+    const graceMs = this.dependencies.reconnectGraceMs ?? RECONNECT_GRACE_MS;
     this.update({
       security: {
         ...this.snapshot.security,
         paused: `Seat ${seat + 1} dropped. Waiting for them to come back…`,
+        waitingOn: { seat, endsAtMs: Date.now() + graceMs },
       },
     });
     const timer = setTimeout(() => {
       this.pendingReturns.delete(seat);
-      if (this.shouldWalkover(seat)) this.awardWalkover(seat);
-      else void this.recoverLostSeat(seat);
-    }, this.dependencies.reconnectGraceMs ?? RECONNECT_GRACE_MS);
+      this.resumeWithoutSeat(seat);
+    }, graceMs);
     this.pendingReturns.set(seat, timer);
+  }
+
+  /**
+   * Ends the hold on a dropped seat now instead of at the clock.
+   *
+   * This is the "carry on without them" control the countdown names. Recovery
+   * at three or more seats rebuilds the departed layer out of other seats'
+   * shares — a real privacy loss, stated where it happens — and at two it is a
+   * walkover, because the only other player is the opponent and nobody should
+   * get a cryptography lecture instead of a result. Every peer runs its own
+   * copy on its own clock; one seat calling this never forces another peer to
+   * disclose anything that peer's own hold was still protecting.
+   */
+  resumeWithoutSeat(seat: number): void {
+    const timer = this.pendingReturns.get(seat);
+    if (timer !== undefined) {
+      clearTimeout(timer);
+      this.pendingReturns.delete(seat);
+      if (this.shouldWalkover(seat)) {
+        this.awardWalkover(seat);
+        return;
+      }
+    }
+    void this.recoverLostSeat(seat);
   }
 
   /** A seat came back before the room gave up on it. */
@@ -1058,8 +1096,10 @@ export class MultiplayerRoomSession {
     this.veil?.room.markSeatPresent(seat);
     // Their layer came back with them, so nothing was opened and the round
     // simply continues.
-    if (this.snapshot.security.paused?.includes(`Seat ${seat + 1}`)) {
-      this.update({ security: { ...this.snapshot.security, paused: null } });
+    if (this.snapshot.security.waitingOn?.seat === seat) {
+      this.update({
+        security: { ...this.snapshot.security, paused: null, waitingOn: null },
+      });
       this.driveBotSeats();
     }
   }
@@ -1083,7 +1123,7 @@ export class MultiplayerRoomSession {
     }
     this.update({
       error: null,
-      security: { ...this.snapshot.security, paused: null },
+      security: { ...this.snapshot.security, paused: null, waitingOn: null },
     });
     void this.openMyHandles();
   }
@@ -1101,6 +1141,8 @@ export class MultiplayerRoomSession {
       security: {
         ...this.snapshot.security,
         recoveredSeats: veil.room.recoveredSeats(),
+        waitingOn:
+          this.snapshot.security.waitingOn?.seat === seat ? null : this.snapshot.security.waitingOn,
         paused: recovered
           ? null
           : veil.session.recovery.mode === 'none'
@@ -1153,7 +1195,7 @@ export class MultiplayerRoomSession {
         phase: { ...session.phase, actor: null },
       },
       error: null,
-      security: { ...this.snapshot.security, paused: null },
+      security: { ...this.snapshot.security, paused: null, waitingOn: null },
     });
   }
 
