@@ -61,12 +61,7 @@ describe('ginTableView', () => {
     session = sessionApply(matchDef, session, 0, 'draw.stock').session;
 
     const localHand = session.state.hand.hands[0]!;
-    const legal = [
-      ...localHand
-        .filter((card) => card !== session.state.hand.drawnFromStock)
-        .map((card) => ({ id: 'discard', payload: { card } })),
-      ...(bestPartition(localHand).deadwood <= 10 ? [{ id: 'knock' }] : []),
-    ];
+    const legal = matchDef.flow.legalMovesFor!(session.state, session.phase, 0);
     const view = ginTableView(snapshotOf(session), legal);
 
     expect(view.decision).toBe('act');

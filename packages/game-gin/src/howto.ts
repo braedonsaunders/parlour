@@ -21,7 +21,7 @@ export const ginHowToPlay: HowToPlayDoc = {
         { label: 'Draw', text: 'take the top of the stock, or swipe the top of the discard pile' },
         {
           label: 'Discard',
-          text: 'slide one card face-up onto the pile — never a card you drew this turn, from either pile',
+          text: 'slide one card face-up onto the pile — any card may go, except the upcard you just took this turn',
         },
       ],
     },

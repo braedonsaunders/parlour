@@ -44,7 +44,7 @@ export interface GinState {
   passedUpcard: boolean;
   /** set when both seats passed — the non-dealer owes an automatic stock draw */
   forceStockDraw: boolean;
-  drawnFromStock: CardId | null;
+  /** the upcard this seat just took; it cannot go straight back onto the pile */
   drawnFromDiscard: CardId | null;
   knocker: SeatId | null;
   /** completed turns since the last stock draw — the pile-trade stall guard */
