@@ -156,21 +156,21 @@ test('a player can bid and play a Spades card with only the keyboard', async ({
 
   const hand = page.locator('[role="list"][data-zone^="hand:"]').first();
   const playableCards = hand.locator('button[data-card-chassis]:not(:disabled)');
-  await expect(playableCards.first()).toBeVisible({ timeout: 15_000 });
   await expect(hand.locator('[data-hand-card]')).toHaveCount(13);
 
-  await tabTo(page, hand, browserName);
-  await expect(hand).toBeFocused();
-  await page.keyboard.press('ArrowRight');
-  const firstPlayable = playableCards.first();
-  await expect(firstPlayable).toBeFocused();
+  const handEntry = hand.locator(
+    '[data-hand-card][data-playable="true"] button[data-card-chassis][tabindex="0"]',
+  );
+  await expect(handEntry).toHaveCount(1, { timeout: 15_000 });
+  await tabTo(page, handEntry, browserName);
+  await expect(handEntry).toBeFocused();
   const playableCount = await playableCards.count();
-  const initialCard = await firstPlayable.getAttribute('aria-label');
+  const initialCard = await handEntry.getAttribute('aria-label');
   await page.keyboard.press('ArrowRight');
   if (playableCount > 1) {
-    await expect(firstPlayable).not.toBeFocused();
+    await expect(handEntry).not.toBeFocused();
   } else {
-    await expect(firstPlayable).toBeFocused();
+    await expect(handEntry).toBeFocused();
   }
   await page.keyboard.press('Enter');
 

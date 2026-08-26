@@ -6,6 +6,7 @@ import {
   useRef,
   useState,
   type CSSProperties,
+  type FocusEvent as ReactFocusEvent,
   type ReactNode,
 } from 'react';
 import { motion } from 'motion/react';
@@ -226,18 +227,21 @@ export function HandRail({
   }, [count, geometry.cardWidth, measure, updateScrollState]);
 
   /*
-   * A hand is one composite stop, not thirteen sequential stops. The shared
-   * shell moves an arrow press from the list into its enabled card buttons.
-   * Safari users with Full Keyboard Access off reach webpage controls with
-   * Option+Tab; that browser convention cannot be changed by page markup.
+   * A hand is one composite stop, not thirteen sequential stops. Put that stop
+   * on an enabled native card: WebKit's Option+Tab includes form controls but
+   * can skip a generic tabindex container when Full Keyboard Access is off.
+   * During another decision, such as bidding, no disabled hand card competes
+   * for focus; the first legal card enters the sequence when play begins.
    */
   useLayoutEffect(() => {
-    railRef.current
-      ?.querySelectorAll<HTMLButtonElement>('[data-hand-card] button')
-      .forEach((button) => {
-        button.tabIndex = -1;
-      });
+    if (railRef.current) setHandTabStop(railRef.current);
   });
+
+  const keepFocusedCardAsEntry = useCallback((event: ReactFocusEvent<HTMLDivElement>) => {
+    if (!(event.target instanceof HTMLButtonElement) || event.target.disabled) return;
+    if (!event.target.closest('[data-hand-card]')) return;
+    setHandTabStop(event.currentTarget, event.target);
+  }, []);
 
   const step = calculateFanStep(geometry.width, geometry.cardWidth, count, fanStepRatio);
   const fanN = Math.max(count, 1);
@@ -246,7 +250,7 @@ export function HandRail({
       ref={railRef}
       className={styles.localHand}
       role="list"
-      tabIndex={count > 0 ? 0 : -1}
+      onFocusCapture={keepFocusedCardAsEntry}
       style={
         {
           '--fan-n': fanN,
@@ -294,4 +298,19 @@ export function HandRail({
       </span>
     </div>
   );
+}
+
+function setHandTabStop(rail: HTMLElement, preferred?: HTMLButtonElement): void {
+  const buttons = [...rail.querySelectorAll<HTMLButtonElement>('[data-hand-card] button')];
+  const enabled = buttons.filter(
+    (button) => !button.disabled && button.closest('[aria-hidden="true"]') === null,
+  );
+  const focused =
+    document.activeElement instanceof HTMLButtonElement && enabled.includes(document.activeElement)
+      ? document.activeElement
+      : undefined;
+  const entry = preferred && enabled.includes(preferred) ? preferred : (focused ?? enabled[0]);
+  buttons.forEach((button) => {
+    button.tabIndex = button === entry ? 0 : -1;
+  });
 }

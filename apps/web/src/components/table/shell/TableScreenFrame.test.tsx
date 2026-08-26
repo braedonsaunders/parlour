@@ -46,7 +46,7 @@ describe('TableScreenFrame', () => {
     expect(open).toHaveBeenCalledOnce();
   });
 
-  it('enters a hand with an arrow, moves through it, and activates a card with Enter', () => {
+  it('moves through a hand with an arrow and activates the focused card with Enter', () => {
     const play = vi.fn();
     act(() =>
       root.render(
@@ -55,9 +55,9 @@ describe('TableScreenFrame', () => {
           hud={null}
           menu={{ isOpen: false, open: vi.fn(), close: vi.fn(), quit: vi.fn() }}
         >
-          <div role="list" data-zone="hand:0" aria-label="Your hand" tabIndex={0}>
+          <div role="list" data-zone="hand:0" aria-label="Your hand">
             <div data-hand-card>
-              <button type="button" tabIndex={-1}>
+              <button type="button" tabIndex={0}>
                 Ace
               </button>
             </div>
@@ -71,14 +71,8 @@ describe('TableScreenFrame', () => {
       ),
     );
 
-    const hand = container.querySelector<HTMLElement>('[role="list"]')!;
     const cards = [...container.querySelectorAll<HTMLButtonElement>('[data-hand-card] button')];
-    hand.focus();
-    act(() =>
-      hand.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true })),
-    );
-    expect(document.activeElement).toBe(cards[0]);
-
+    cards[0]?.focus();
     act(() =>
       cards[0]?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true })),
     );

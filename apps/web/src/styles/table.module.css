@@ -380,10 +380,9 @@
   pointer-events: none;
 }
 
-.localHand:focus-visible {
+.localHand button.card:focus-visible {
   outline: 3px solid var(--hearth-core);
-  outline-offset: -3px;
-  border-radius: 1.25rem;
+  outline-offset: 2px;
 }
 
 .handTrack {
