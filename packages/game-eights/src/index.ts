@@ -33,6 +33,6 @@ export {
   type EightsPickupReason,
 } from './round';
 export type { EightsRound, EightsRoundOutcome, EightsRoundReason, EightsState } from './state';
-export { EIGHTS_BOTS, eightsTierBot } from './bots';
+export { EIGHTS_BOTS, eightsTierBot } from './bots/index';
 export { eightsHowToPlay } from './howto';
 export { eightsCatalog } from './catalog';
