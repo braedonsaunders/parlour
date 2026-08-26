@@ -1,6 +1,8 @@
 import {
   advanceSeat,
   Fx,
+  VEILED_REDEAL_PENDING,
+  isVeiledDealPayload,
   type BotPolicy,
   type CardId,
   type FlowAdvance,
@@ -12,6 +14,7 @@ import {
   type RuleError,
   type Rng,
   type SeatId,
+  type VeilSupport,
 } from '@parlour/engine';
 import { TIER_BOTS } from './bots';
 import { captureOptions, singleMatches } from './capture';
@@ -39,6 +42,30 @@ export const ScopaFx = {
   Award: 'scopa.award',
   RoundScore: 'scopa.round-score',
 } as const;
+
+/**
+ * Veil support for Scopa.
+ *
+ * Scopa's deal layout takes the first four cards of the deck as the public
+ * tableau and deals the rest as private hands + stock. So the public setup
+ * cards sit at deck positions [0…3], NOT after the hands — the conventional
+ * {@link veilSupport} helper expects them at the end, which is wrong here.
+ *
+ * Constructed directly instead: publicSetupFrom returns 0, and the room
+ * opens four positions before dealing. Each subsequent round needs its own
+ * ceremony ({@link redealMove} says which move that is), because a round
+ * ends with a fresh shuffle that must be unpredictable to every seat.
+ *
+ * The hands carry the private handle list the room's default accessor
+ * already understands — `hands[seat]` at the state root — so no
+ * `privateHandles` override is needed.
+ */
+const scopaVeil: VeilSupport = {
+  deck: () => DECK,
+  publicSetupFrom: () => 0,
+  publicSetupReady: (opened) => opened.length >= 4,
+  redealMove: 'nextRound',
+};
 
 const REDEAL_LIMIT = 1000;
 const TURN_RING_DELAY_MS = 140;
@@ -267,10 +294,21 @@ const finishRound: Move<ScopaState> = {
 
 /** Rotates the dealer and lays the next tableau (redealing king-heavy ones). */
 const nextRound: Move<ScopaState> = {
-  validate: () => true,
+  validate(state, _seat, payload): true | RuleError {
+    if (state.veiled && payload === undefined) {
+      return {
+        code: VEILED_REDEAL_PENDING,
+        message: 'veiled round needs a fresh shuffle ceremony',
+      };
+    }
+    return true;
+  },
 
-  apply(state, _seat, _payload, ctx) {
+  apply(state, _seat, payload, ctx) {
     const dealer = advanceSeat(state.dealer, state.seats);
+    const order = isVeiledDealPayload(payload)
+      ? payload.deckOrder
+      : ctx.rng.shuffle([...DECK.cardIds]);
     return openRound(
       {
         ...state,
@@ -278,8 +316,9 @@ const nextRound: Move<ScopaState> = {
         dealer,
         summary: null,
         lastRound: state.summary ?? state.lastRound,
+        veiled: state.veiled,
       },
-      ctx.rng,
+      order,
       ctx.fx,
     );
   },
@@ -289,14 +328,30 @@ const nextRound: Move<ScopaState> = {
  * Shuffles and deals one round, redealing when the opening tableau shows
  * three or more Kings. Rejected shuffles emit no fx — only the accepted deal
  * belongs on the animation timeline.
+ *
+ * When `order` is given (veiled rooms receive the ceremony's deck), it is
+ * used as-is; the redeal-on-kings loop still runs but re-shuffles in-memory
+ * since the ceremony only delivers one order per round.
  */
-function openRound(base: ScopaState, rng: Rng, fx: FxEmitter): ScopaState {
-  let order = rng.shuffle([...DECK.cardIds]);
+function openRound(
+  base: ScopaState,
+  orderOrRng: readonly CardId[] | Rng,
+  fx: FxEmitter,
+): ScopaState {
+  const hasOrder = Array.isArray(orderOrRng);
+  const order: readonly CardId[] = hasOrder ? orderOrRng : (orderOrRng as Rng).shuffle([...DECK.cardIds]);
+  const rng: Rng | null = hasOrder ? null : (orderOrRng as Rng);
   let layout = dealLayout(order, base.seats, base.rules.scopone);
-  for (let tries = 1; countKings(layout.table) >= 3; tries++) {
-    if (tries > REDEAL_LIMIT) throw new Error('scopa: could not deal a clean tableau');
-    order = rng.shuffle([...DECK.cardIds]);
-    layout = dealLayout(order, base.seats, base.rules.scopone);
+  // Redeal when the opening tableau shows three or more Kings. Under Veil the
+  // ceremony only delivers one order, so a King-heavy one is allowed through
+  // (the redeal limit is there for open-rooms only).
+  if (rng) {
+    let fresh: readonly CardId[] = order;
+    for (let tries = 1; countKings(layout.table) >= 3; tries++) {
+      if (tries > REDEAL_LIMIT) throw new Error('scopa: could not deal a clean tableau');
+      fresh = rng.shuffle([...DECK.cardIds]);
+      layout = dealLayout(fresh, base.seats, base.rules.scopone);
+    }
   }
 
   const flights = layout.hands.flat().length;
@@ -361,6 +416,10 @@ const flow: GameDef<ScopaState, ScopaRules>['flow'] = {
     if (state.stage === 'round-over') {
       const ended = matchResultFor(state);
       if (ended) return { phase: phaseFor(state), ended };
+      // Under Veil the next round needs a shuffle ceremony the room runs
+      // asynchronously; do not auto-move here — the room injects once it
+      // has a fresh deck order.
+      if (state.veiled) return { phase: phaseFor(state) };
       return {
         phase: phaseFor(state),
         autoMoves: [{ seat: null, move: 'nextRound', reason: 'next round' }],
@@ -379,6 +438,11 @@ const flow: GameDef<ScopaState, ScopaRules>['flow'] = {
       };
     }
     return { phase: phaseFor(state) };
+  },
+
+  canInject(_state, _phase, moveId, payload, _meta): true | RuleError {
+    if (moveId === 'nextRound' && isVeiledDealPayload(payload)) return true;
+    return { code: 'injection-unsupported', message: 'only veiled nextRound is injectable' };
   },
 };
 
@@ -402,9 +466,11 @@ export function createScopaDef(options: ScopaDefOptions = {}): GameDef<ScopaStat
       if (!(GAME_SEATS as readonly number[]).includes(ctx.seats)) {
         throw new Error(`scopa needs 2, 3, 4 or 6 seats, got ${ctx.seats}`);
       }
+      const veiled = ctx.veiled === true;
       const base: ScopaState = {
         rules: ctx.config,
         seats: ctx.seats,
+        veiled,
         roundNo: 1,
         dealer: 0,
         hands: Array.from({ length: ctx.seats }, () => []),
@@ -419,12 +485,15 @@ export function createScopaDef(options: ScopaDefOptions = {}): GameDef<ScopaStat
         summary: null,
         lastRound: null,
       };
-      return openRound(base, ctx.rng, ctx.fx);
+      const order = veiled && ctx.deckOrder ? ctx.deckOrder : ctx.rng;
+      return openRound(base, order, ctx.fx);
     },
 
     moves: { playCard, deal, finishRound, nextRound },
 
     flow,
+
+    veil: scopaVeil,
 
     playerView(state, seat) {
       return {
