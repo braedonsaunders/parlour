@@ -44,11 +44,7 @@ export {
   type SolveOutcome,
   type SolveWeights,
 } from './solver';
-export {
-  findWinnableSeed,
-  type WinnableSearchOptions,
-  type WinnableSeed,
-} from './winnable';
+export { findWinnableSeed, type WinnableSearchOptions, type WinnableSeed } from './winnable';
 export type {
   HiddenSpiderCard,
   SpiderColumn,

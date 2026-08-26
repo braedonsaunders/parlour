@@ -105,7 +105,11 @@ const hardBot: BotPolicy<PresidentState> = {
   },
 };
 
-export { easyBot as easyPresidentBot, mediumBot as mediumPresidentBot, hardBot as hardPresidentBot };
+export {
+  easyBot as easyPresidentBot,
+  mediumBot as mediumPresidentBot,
+  hardBot as hardPresidentBot,
+};
 
 export const presidentBots: readonly BotPolicy<PresidentState>[] = [easyBot, mediumBot, hardBot];
 

@@ -95,8 +95,7 @@ interface SpiderColumnInt {
 
 /** A solver move: only `tableau.move` and `stock.deal` exist in Spider. */
 export type SolverMove =
-  | { kind: 'tableauMove'; from: number; card: string; to: number }
-  | { kind: 'stockDeal' };
+  { kind: 'tableauMove'; from: number; card: string; to: number } | { kind: 'stockDeal' };
 
 function boardFrom(state: SpiderState): Board {
   return {
@@ -154,8 +153,6 @@ function canDeal(board: Board): boolean {
     board.tableau.every((column) => column.down.length > 0 || column.up.length > 0)
   );
 }
-
-
 
 /** Rank-1 descent regardless of suit — the engine's placement rule. */
 function canPlace(card: string, target: string | null): boolean {
@@ -373,7 +370,10 @@ export function solveSpider(state: SpiderState, options: SolveOptions = {}): Sol
       if (each.kind === 'stockDeal') {
         line.push({ id: 'stock.deal' });
       } else {
-        line.push({ id: 'tableau.move', payload: { from: each.from, card: each.card, to: each.to } });
+        line.push({
+          id: 'tableau.move',
+          payload: { from: each.from, card: each.card, to: each.to },
+        });
       }
     }
     return line;

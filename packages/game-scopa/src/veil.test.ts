@@ -133,9 +133,16 @@ describe('a veiled Scopa round', () => {
     const face = faces.get(card);
     expect(face).toBeDefined();
 
-    const outcome = sessionApply(GAME, session, seat, 'playCard', { card, take: [] }, {
-      reveals: [[card, face!]],
-    });
+    const outcome = sessionApply(
+      GAME,
+      session,
+      seat,
+      'playCard',
+      { card, take: [] },
+      {
+        reveals: [[card, face!]],
+      },
+    );
     // May fail if a single-card capture is forced — that's fine; the point is
     // that the reveal was applied and the engine validated it structurally.
     if (!outcome.rejected) {

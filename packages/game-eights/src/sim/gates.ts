@@ -1,8 +1,4 @@
-import {
-  aggregateWinRates,
-  simulateGames,
-  type WinRateRow,
-} from '@parlour/engine';
+import { aggregateWinRates, simulateGames, type WinRateRow } from '@parlour/engine';
 import { EIGHTS_BOTS, eightsTierBot } from '../bots/index';
 import { eightsConfig } from '../config';
 import { createEightsDef } from '../game';
@@ -140,15 +136,12 @@ export function runBalanceGates(opts: {
     const easyBest = Math.min(...easyRanks);
     if (sharpBest < easyBest) hardAboveEasyCount++;
   }
-  const hardAboveEasyRate =
-    comparableGames > 0 ? hardAboveEasyCount / comparableGames : 0;
+  const hardAboveEasyRate = comparableGames > 0 ? hardAboveEasyCount / comparableGames : 0;
 
-  const ladderPasses =
-    hardAboveEasyRate >= thresholds.hardAboveEasyMin && games > 0;
+  const ladderPasses = hardAboveEasyRate >= thresholds.hardAboveEasyMin && games > 0;
 
   const tiersPasses = tierRows.every(
-    (row) =>
-      row.winRate >= thresholds.tierBandMin && row.winRate <= thresholds.tierBandMax,
+    (row) => row.winRate >= thresholds.tierBandMin && row.winRate <= thresholds.tierBandMax,
   );
 
   const passed = ladderPasses && tiersPasses && stalls === 0 && games > 0;

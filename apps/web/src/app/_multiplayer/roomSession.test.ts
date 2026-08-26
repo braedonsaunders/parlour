@@ -2133,12 +2133,13 @@ describe('veiled rooms on the shared stack', () => {
     await eventually(
       () => {
         const session = multiplayerSession<BlitzState, BlitzConfig>(peer.getSnapshot(), 'blitz');
-        const state = session?.state ?? multiplayerSession<GinMatchState, GinConfig>(
-          peer.getSnapshot(),
-          'gin',
-        )?.state;
+        const state =
+          session?.state ??
+          multiplayerSession<GinMatchState, GinConfig>(peer.getSnapshot(), 'gin')?.state;
         const hand =
-          state && 'hand' in state ? state.hand.hands[peer.getSnapshot().localSeat ?? 0] : undefined;
+          state && 'hand' in state
+            ? state.hand.hands[peer.getSnapshot().localSeat ?? 0]
+            : undefined;
         const own = hand ?? session?.state.hands[peer.getSnapshot().localSeat ?? 0];
         expect(own?.every((card) => !isVeilHandle(card))).toBe(true);
       },
@@ -2166,7 +2167,11 @@ describe('veiled rooms on the shared stack', () => {
     const rtc = new MockRtcNetwork();
     const host = new MultiplayerRoomSession(
       { name: 'Host', avatarId: 'ember', profileId: 'veil-tier-host' },
-      { signaling: broker.signaling('veil-tier-peer'), peerConnection: rtc.factory('veil-tier'), seed: 3 },
+      {
+        signaling: broker.signaling('veil-tier-peer'),
+        peerConnection: rtc.factory('veil-tier'),
+        seed: 3,
+      },
     );
     sessions.push(host);
     await host.create({ gameId: 'blitz', seats: 2 });
@@ -2174,7 +2179,11 @@ describe('veiled rooms on the shared stack', () => {
 
     const veiled = new MultiplayerRoomSession(
       { name: 'Host', avatarId: 'ember', profileId: 'veil-tier-veiled' },
-      { signaling: broker.signaling('veil-tier-peer2'), peerConnection: rtc.factory('veil-tier2'), seed: 4 },
+      {
+        signaling: broker.signaling('veil-tier-peer2'),
+        peerConnection: rtc.factory('veil-tier2'),
+        seed: 4,
+      },
     );
     sessions.push(veiled);
     await veiled.create({ gameId: 'blitz', seats: 2, security: 'veil' });
@@ -2217,9 +2226,9 @@ describe('veiled rooms on the shared stack', () => {
       expect(security.tier).toBe('veil');
       expect(security.ceremony).toMatchObject({ laid: 2, seats: 2, ready: true });
     }
-    expect(multiplayerSession<BlitzState, BlitzConfig>(host.getSnapshot(), 'blitz')!.log.length).toBe(
-      multiplayerSession<BlitzState, BlitzConfig>(guest.getSnapshot(), 'blitz')!.log.length,
-    );
+    expect(
+      multiplayerSession<BlitzState, BlitzConfig>(host.getSnapshot(), 'blitz')!.log.length,
+    ).toBe(multiplayerSession<BlitzState, BlitzConfig>(guest.getSnapshot(), 'blitz')!.log.length);
   }, 30_000);
 
   it('keeps both logs hash-identical while veiled moves open their own handles', async () => {

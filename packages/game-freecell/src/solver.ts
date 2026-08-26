@@ -232,7 +232,7 @@ function emptyTableauCount(board: Board): number {
  * the game will accept — normalization must never bend a payload.
  */
 function autoplaySafe(board: Board): void {
-  for (let progress = true; progress; ) {
+  for (let progress = true; progress;) {
     progress = false;
     for (let index = 0; index < board.tableau.length; index++) {
       const column = board.tableau[index]!;
@@ -690,7 +690,11 @@ function engineLineFor(state: FreecellState, path: readonly SolverMove[]): Legal
     foundations[suit] = state.foundations[SUIT_NAMES[suit]!].length;
   }
 
-  const seal = { tableau, cells, foundations } as { tableau: number[][]; cells: number[]; foundations: Int8Array };
+  const seal = { tableau, cells, foundations } as {
+    tableau: number[][];
+    cells: number[];
+    foundations: Int8Array;
+  };
   const line: LegalMove[] = [];
 
   const destination = (toCard: number): number =>
@@ -699,7 +703,7 @@ function engineLineFor(state: FreecellState, path: readonly SolverMove[]): Legal
       : seal.tableau.findIndex((column) => column.at(-1) === toCard);
 
   const drain = (): void => {
-    for (let progress = true; progress; ) {
+    for (let progress = true; progress;) {
       progress = false;
       for (let from = 0; from < seal.tableau.length; from++) {
         const column = seal.tableau[from]!;

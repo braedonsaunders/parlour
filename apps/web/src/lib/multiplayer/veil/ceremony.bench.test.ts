@@ -170,20 +170,24 @@ async function runRedeal(table: BenchTable, seats: number): Promise<number> {
 
 describe('veil ceremony cost', () => {
   const timeout = 600_000;
-  it.skipIf(!process.env.PARLOUR_VEIL_BENCH)('measures the real SRA path', { timeout }, async () => {
-    const rows: string[] = [];
-    rows.push('seats   lay-layers   public-open   deal-total   mid-hand-redeal');
-    for (const seats of [2, 3, 4, 6]) {
-      const table = buildTable(seats);
-      const { laidMs, openMs } = await runOpeningDeal(table, seats);
-      const redealMs = await runRedeal(table, seats);
-      const pad = (ms: number) => `${ms.toFixed(0).padStart(7)}ms`;
-      rows.push(
-        `${String(seats).padStart(5)}  ${pad(laidMs)}  ${pad(openMs)}  ${pad(laidMs + openMs)}  ${pad(redealMs)}`,
-      );
-    }
-    // eslint-disable-next-line no-console -- the report is the point of the run
-    console.log(`\nVeil ceremony wall time (Node, real SRA)\n${rows.join('\n')}\n`);
-    expect(rows).toHaveLength(5);
-  });
+  it.skipIf(!process.env.PARLOUR_VEIL_BENCH)(
+    'measures the real SRA path',
+    { timeout },
+    async () => {
+      const rows: string[] = [];
+      rows.push('seats   lay-layers   public-open   deal-total   mid-hand-redeal');
+      for (const seats of [2, 3, 4, 6]) {
+        const table = buildTable(seats);
+        const { laidMs, openMs } = await runOpeningDeal(table, seats);
+        const redealMs = await runRedeal(table, seats);
+        const pad = (ms: number) => `${ms.toFixed(0).padStart(7)}ms`;
+        rows.push(
+          `${String(seats).padStart(5)}  ${pad(laidMs)}  ${pad(openMs)}  ${pad(laidMs + openMs)}  ${pad(redealMs)}`,
+        );
+      }
+      // eslint-disable-next-line no-console -- the report is the point of the run
+      console.log(`\nVeil ceremony wall time (Node, real SRA)\n${rows.join('\n')}\n`);
+      expect(rows).toHaveLength(5);
+    },
+  );
 });

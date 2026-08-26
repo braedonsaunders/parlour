@@ -79,9 +79,7 @@ describe('FreeCell solver', () => {
       expect(payload.from !== 0 || payload.card).toBeTruthy();
       expect(payload).not.toMatchObject({ from: 0, card: 'S13' });
     }
-    const fullLift = moves.find(
-      (move) => (move.payload as { card?: string }).card === 'S13',
-    );
+    const fullLift = moves.find((move) => (move.payload as { card?: string }).card === 'S13');
     expect(fullLift).toBeUndefined();
     const suffix = moves.find((move) => (move.payload as { card?: string }).card === 'H10');
     expect(suffix).toBeDefined();

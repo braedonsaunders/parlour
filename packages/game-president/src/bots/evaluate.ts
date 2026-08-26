@@ -84,8 +84,7 @@ export function exchangePayload(
       ? expected
       : giftCountFor(roleFor(order, seat) ?? 'neutral');
   const hand = handOf(state, seat);
-  let pool =
-    want === 'best' ? sortedByStrength(hand) : [...sortedByStrength(hand)].reverse();
+  let pool = want === 'best' ? sortedByStrength(hand) : [...sortedByStrength(hand)].reverse();
   if (keepTwos && want === 'worst') {
     const spare = pool.filter((card) => tryOrder(card) !== TWO_ORDER);
     const twos = pool.filter((card) => tryOrder(card) === TWO_ORDER);

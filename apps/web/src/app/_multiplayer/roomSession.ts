@@ -1786,8 +1786,7 @@ function resolveRoomSettings(settings: RoomSettings): RoomSettings {
     gameId: pack.id,
     seats: settings.seats,
     config: pack.resolveConfig(settings.config),
-    security:
-      settings.security === 'veil' && pack.veilSupport() !== null ? 'veil' : tierFor(),
+    security: settings.security === 'veil' && pack.veilSupport() !== null ? 'veil' : tierFor(),
   };
 }
 

@@ -339,7 +339,9 @@ function openRound(
   fx: FxEmitter,
 ): ScopaState {
   const hasOrder = Array.isArray(orderOrRng);
-  const order: readonly CardId[] = hasOrder ? orderOrRng : (orderOrRng as Rng).shuffle([...DECK.cardIds]);
+  const order: readonly CardId[] = hasOrder
+    ? orderOrRng
+    : (orderOrRng as Rng).shuffle([...DECK.cardIds]);
   const rng: Rng | null = hasOrder ? null : (orderOrRng as Rng);
   let layout = dealLayout(order, base.seats, base.rules.scopone);
   // Redeal when the opening tableau shows three or more Kings. Under Veil the

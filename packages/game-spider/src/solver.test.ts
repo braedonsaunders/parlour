@@ -58,9 +58,7 @@ describe('Spider solver', () => {
       ...base,
       stage: 'playing',
       stock: base.stock.slice(0, TABLEAU_COLUMNS),
-      tableau: base.tableau.map((column, index) =>
-        index === 0 ? { down: [], up: [] } : column,
-      ),
+      tableau: base.tableau.map((column, index) => (index === 0 ? { down: [], up: [] } : column)),
       foundations: [],
       moves: 0,
     };
