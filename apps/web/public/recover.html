@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+    <meta name="theme-color" content="#172936" />
+    <title>Repair Parlour</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        min-height: 100dvh;
+        margin: 0;
+        display: grid;
+        place-items: center;
+        padding: 24px;
+        color: #fff8e8;
+        background: radial-gradient(circle at top, #315a62, #101b29 68%);
+        font-family: system-ui, sans-serif;
+      }
+      main {
+        max-width: 440px;
+        text-align: center;
+      }
+      .eyebrow {
+        margin: 0 0 8px;
+        color: #ffd17c;
+        font-weight: 800;
+      }
+      h1 {
+        margin: 0 0 12px;
+        font-size: clamp(28px, 8vw, 48px);
+      }
+      #status {
+        min-height: 48px;
+        margin: 0 0 24px;
+        color: #d8e7e8;
+        line-height: 1.5;
+      }
+      button {
+        min-height: 48px;
+        border: 0;
+        border-radius: 999px;
+        padding: 12px 22px;
+        color: #43200a;
+        background: #ffd17c;
+        font: inherit;
+        font-weight: 800;
+      }
+      button:disabled {
+        opacity: 0.65;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <p class="eyebrow">Fresh cards needed</p>
+      <h1>Repairing Parlour…</h1>
+      <p id="status" role="status">
+        Clearing the stuck app version. Your profile stays on this phone.
+      </p>
+      <button id="repair" type="button" disabled>Repair again</button>
+    </main>
+    <script>
+      const status = document.querySelector('#status');
+      const button = document.querySelector('#repair');
+
+      function returnPath() {
+        const requested = new URLSearchParams(location.search).get('next') || '/';
+        try {
+          const target = new URL(requested, location.origin);
+          if (target.origin !== location.origin || target.pathname === '/recover.html') return '/';
+          return `${target.pathname}${target.search}${target.hash}`;
+        } catch {
+          return '/';
+        }
+      }
+
+      async function repair() {
+        button.disabled = true;
+        status.textContent = 'Clearing the stuck app version. Your profile stays on this phone.';
+        try {
+          const registrations =
+            'serviceWorker' in navigator ? await navigator.serviceWorker.getRegistrations() : [];
+          await Promise.allSettled(
+            registrations
+              .filter((registration) => {
+                const worker =
+                  registration.active || registration.waiting || registration.installing;
+                return worker && new URL(worker.scriptURL).pathname === '/sw.js';
+              })
+              .map((registration) => registration.unregister()),
+          );
+          const names = 'caches' in window ? await caches.keys() : [];
+          await Promise.allSettled(
+            names.filter((name) => name.startsWith('parlour-')).map((name) => caches.delete(name)),
+          );
+          status.textContent = 'Clean copy ready. Reopening Parlour…';
+          location.replace(returnPath());
+        } catch (error) {
+          console.error('[parlour] emergency repair failed', error);
+          status.textContent =
+            'The automatic repair was blocked. Close Parlour, reopen this page, and try again.';
+          button.disabled = false;
+        }
+      }
+
+      button.addEventListener('click', repair);
+      void repair();
+    </script>
+  </body>
+</html>

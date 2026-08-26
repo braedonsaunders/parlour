@@ -58,6 +58,14 @@ describe('installable offline shell', () => {
     );
   });
 
+  it('ships a framework-free escape hatch for clients trapped on an old app bundle', () => {
+    const recovery = readFileSync(join(process.cwd(), 'public/recover.html'), 'utf8');
+    expect(recovery).toContain('navigator.serviceWorker.getRegistrations()');
+    expect(recovery).toContain("name.startsWith('parlour-')");
+    expect(recovery).toContain('location.replace(returnPath())');
+    expect(recovery).not.toContain('/_next/');
+  });
+
   it('loads the generated route manifest and activates updates only when requested', () => {
     const worker = readFileSync(join(process.cwd(), 'public/sw.js'), 'utf8');
 
