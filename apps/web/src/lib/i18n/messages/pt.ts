@@ -149,10 +149,6 @@ export const pt: Messages = {
     'Qualquer outro jogador pode restaurar as cartas de um assento desconectado — o que também significa que qualquer um deles poderia abrir uma mão ativa. Escolha uma configuração mais alta para uma mesa competitiva.',
   'security.recovery.threshold':
     '{threshold} dos outros {holders} jogadores precisam concordar em restaurar as cartas de um assento desconectado. Os mesmos {threshold}, se conspirassem, poderiam abrir uma mão ativa.',
-  'security.refusal.scopa':
-    'As salas entre amigos de Scopa usam repetição aberta — Scopa com Veil não está disponível até que as mãos ocultas possam continuar ocultas',
-  'security.refusal.spite':
-    'As salas entre amigos de Spite & Malice usam repetição aberta — Spite & Malice com Veil não está disponível até que as pilhas de pagamento enterradas possam continuar ocultas',
 
   // --- table narration -----------------------------------------------------
   'narration.seat': 'Assento {seat}',

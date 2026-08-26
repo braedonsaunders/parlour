@@ -81,17 +81,16 @@ describe('room game registry', () => {
   it('names itself in its own refusal messages', () => {
     for (const pack of ALL_ROOM_GAMES) {
       expect(seatRefusal(pack)).toContain(pack.name);
-      if (pack.veilRefusal) expect(pack.veilRefusal).toContain(pack.name);
     }
   });
 
-  it('only offers Veil where the pack actually supports it', () => {
+  it('can run Veil in every room, because every pack supports it', () => {
+    // Veil is on everywhere and mentioned nowhere, so a pack without engine-side
+    // support would be a room that deals a hand it cannot hide and says nothing
+    // about it. There is no refusal to fall back on any more — this is the check
+    // that replaced it.
     for (const pack of ALL_ROOM_GAMES) {
-      // A pack that accepts veiled rooms must carry the engine-side support
-      // block; one that refuses must say why. "No veil block and no refusal"
-      // would be a room that advertises a privacy tier and then throws mid-deal.
-      if (pack.veilRefusal === null) expect(pack.veilSupport()).not.toBeNull();
-      else expect(pack.veilRefusal.length).toBeGreaterThan(0);
+      expect(pack.veilSupport()).not.toBeNull();
     }
   });
 

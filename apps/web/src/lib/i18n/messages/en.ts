@@ -146,10 +146,6 @@ export const en = {
     "Any single other player can restore a dropped seat's cards — which means any single other player could also open a live hand. Choose a higher setting for a competitive room.",
   'security.recovery.threshold':
     "{threshold} of the other {holders} players must agree to restore a dropped seat's cards. The same {threshold} could, if they all colluded, open a live hand.",
-  'security.refusal.scopa':
-    'Scopa friend rooms use open replay — veiled Scopa is not available until hidden hands can stay hidden',
-  'security.refusal.spite':
-    'Spite & Malice friend rooms use open replay — veiled Spite & Malice is not available until buried payoff cards can stay hidden',
 
   // --- table narration -----------------------------------------------------
   'narration.seat': 'Seat {seat}',

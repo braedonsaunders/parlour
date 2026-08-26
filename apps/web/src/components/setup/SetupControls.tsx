@@ -2,10 +2,8 @@
 
 import Link from 'next/link';
 import type { ReactNode } from 'react';
-import { GameVeilRefusal } from '@/components/multiplayer/TableSecurity';
 import { useWipeRouter } from '@/hooks/useWipeRouter';
 import { useT } from '@/lib/i18n';
-import { isMultiplayerGameId, type MultiplayerGameId } from '@/lib/rooms/gameIds';
 import styles from '@/styles/modes.module.css';
 
 /**
@@ -192,7 +190,6 @@ export function SetupTableActions({
 }: SetupTableActionsProps) {
   const t = useT();
   const router = useWipeRouter();
-  const roomGameId = createHref ? roomGameIdForCreateHref(createHref) : null;
   const actions: SetupAction[] = [
     {
       label: t('setup.playSolo'),
@@ -216,16 +213,7 @@ export function SetupTableActions({
   }
   return (
     <>
-      {roomGameId ? <GameVeilRefusal gameId={roomGameId} /> : null}
       <SetupActions actions={actions} busy={busy} note={note} />
     </>
   );
-}
-
-function roomGameIdForCreateHref(href: string): MultiplayerGameId | null {
-  const path = href.split(/[?#]/, 1)[0];
-  if (path === '/create') return 'blitz';
-  const slug = /^\/([^/]+)\/create\/?$/.exec(path ?? '')?.[1];
-  const candidate = slug === 'wild' ? 'wildpile' : slug;
-  return isMultiplayerGameId(candidate) ? candidate : null;
 }

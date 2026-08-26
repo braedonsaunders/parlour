@@ -2,12 +2,7 @@
 
 import type { MultiplayerSecurity } from '@/app/_multiplayer/roomSession';
 import { LOCALE_META, useT, type MessageKey, type Translator } from '@/lib/i18n';
-import {
-  localizedRecoveryDisclosure,
-  localizedVeilRefusal,
-  veilRefusalMessageKey,
-} from '@/lib/i18n/security';
-import type { MultiplayerGameId } from '@/lib/rooms/gameIds';
+import { localizedRecoveryDisclosure } from '@/lib/i18n/security';
 
 /**
  * What the room guarantees, stated plainly — and never asked as a question.
@@ -33,17 +28,14 @@ import type { MultiplayerGameId } from '@/lib/rooms/gameIds';
  */
 export function RoomSecurityDisclosure({
   security,
-  gameId,
   hasBot,
 }: {
   security: MultiplayerSecurity;
-  gameId: MultiplayerGameId;
   hasBot: boolean;
 }) {
   const t = useT();
-  const refusal = localizedVeilRefusal(gameId, t);
   const seats = security.ceremony.seats;
-  const open = security.tier === 'open' || hasBot || veilRefusalMessageKey(gameId) !== null;
+  const open = security.tier === 'open' || hasBot;
 
   return (
     <p
@@ -57,7 +49,6 @@ export function RoomSecurityDisclosure({
           <strong className="text-hearth-100">
             {hasBot ? t('security.disclosure.botOpen') : t('security.disclosure.openHands')}
           </strong>{' '}
-          {refusal ? `${refusal}. ` : null}
           {t(
             seats <= 2 ? 'security.disclosure.openDropWalkover' : 'security.disclosure.openDropBot',
           )}
@@ -68,22 +59,6 @@ export function RoomSecurityDisclosure({
           {localizedRecoveryDisclosure(security.recovery, t)}
         </>
       )}
-    </p>
-  );
-}
-
-/** The pack's own reason, shown where its friend-room path is chosen. */
-export function GameVeilRefusal({ gameId }: { gameId: MultiplayerGameId }) {
-  const t = useT();
-  const refusal = localizedVeilRefusal(gameId, t);
-  if (!refusal) return null;
-
-  return (
-    <p
-      className="panel-soft mx-auto w-full max-w-xl border-l-4 border-hearth-400 px-4 py-3 text-center text-sm font-bold text-hearth-100"
-      data-testid="game-veil-refusal"
-    >
-      {refusal}
     </p>
   );
 }

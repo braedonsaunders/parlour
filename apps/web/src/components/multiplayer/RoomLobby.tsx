@@ -168,7 +168,6 @@ export function RoomLobby({
         <div className="mt-4">
           <RoomSecurityDisclosure
             security={snapshot.security}
-            gameId={gameId}
             hasBot={snapshot.seats.some((seat) => seat.bot)}
           />
         </div>

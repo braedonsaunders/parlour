@@ -155,13 +155,6 @@ export interface RoomGamePack {
   /** Where a joined guest lands. */
   readonly route: string;
   readonly seats: SeatRange;
-  /**
-   * Why this game refuses veiled rooms, or `null` when it supports them.
-   * Stated rather than silently downgraded: advertising a cryptographic tier
-   * the engine does not back would be a lie told to the one person relying
-   * on it.
-   */
-  readonly veilRefusal: string | null;
   /** Canonicalises a room's rule values, including any room-only clamp. */
   resolveConfig(config: unknown): RuleValues;
   /** The pack's Veil support block, or `null` when it has none. */
@@ -229,11 +222,6 @@ interface PackSpec<S, C extends RuleValues> {
   configSchema: ConfigSchema<C>;
   createDef(): GameDef<S, C>;
   /**
-   * Why this game cannot be veiled, in the player's terms. The template adds
-   * the "veiled X is not available" clause, so this is only the reason.
-   */
-  veilRefusal?: string;
-  /**
    * Room-only narrowing applied after the schema resolves. Cribbage friend
    * rooms are a single replayable `GameSession`, so a forged announcement must
    * never be able to imply best-of-three.
@@ -265,9 +253,6 @@ function definePack<S, C extends RuleValues>(spec: PackSpec<S, C>): RoomGamePack
     name: spec.name,
     route: tableRouteFor(spec.id),
     seats,
-    veilRefusal: spec.veilRefusal
-      ? `${spec.name} friend rooms use open replay — veiled ${spec.name} is not available ${spec.veilRefusal}`
-      : null,
     resolveConfig,
     veilSupport: () => spec.createDef().veil ?? null,
     redealMove: spec.createDef().veil?.redealMove ?? null,
@@ -450,7 +435,6 @@ export const ROOM_GAMES: Record<MultiplayerGameId, RoomGamePack> = {
     name: 'Scopa',
     configSchema: scopaConfig,
     createDef: createScopaDef,
-    veilRefusal: 'until hidden hands can stay hidden',
   }),
 
   spite: definePack<SpiteState, SpiteRules>({
@@ -458,7 +442,6 @@ export const ROOM_GAMES: Record<MultiplayerGameId, RoomGamePack> = {
     name: 'Spite & Malice',
     configSchema: spiteConfig,
     createDef: () => spiteGame,
-    veilRefusal: 'until buried payoff cards can stay hidden',
   }),
 };
 

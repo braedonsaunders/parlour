@@ -6,7 +6,6 @@ import { es } from './messages/es';
 import { fr } from './messages/fr';
 import { pt } from './messages/pt';
 import { zh } from './messages/zh';
-import { VEIL_REFUSAL_MESSAGE_KEYS, veilRefusalMessageKey } from './security';
 import { ALL_ROOM_GAMES } from '@/lib/rooms/gameRegistry';
 
 const CATALOGUES: Readonly<Record<Locale, Messages>> = { en, es, fr, pt, zh };
@@ -94,16 +93,20 @@ describe('catalogue completeness', () => {
     expect(blank).toEqual([]);
   });
 
-  it('has a localised message for every game that refuses Veil', () => {
-    const refusingGames = ALL_ROOM_GAMES.filter((game) => game.veilRefusal !== null);
-    expect(Object.keys(VEIL_REFUSAL_MESSAGE_KEYS).sort()).toEqual(
-      refusingGames.map((game) => game.id).sort(),
-    );
-    for (const game of refusingGames) {
-      const key = veilRefusalMessageKey(game.id);
-      expect(key).not.toBeNull();
-      if (key) expect(en[key]).toBe(game.veilRefusal);
+  /**
+   * Veil runs in every room now, so no game refuses it and nothing explains it
+   * to a player. The concept used to reach the catalogues as a per-game reason
+   * — and Scopa's survived in five languages for months after its pack grew
+   * real support, telling players about a limitation the game no longer had.
+   * A translation nobody can reach is exactly how that happens twice.
+   */
+  it('carries no refusal copy, because no game refuses Veil', () => {
+    for (const locale of LOCALES) {
+      const catalogue = CATALOGUES[locale] as unknown as Record<string, string>;
+      const refusals = Object.keys(catalogue).filter((key) => key.startsWith('security.refusal'));
+      expect(refusals).toEqual([]);
     }
+    expect(ALL_ROOM_GAMES.every((game) => game.veilSupport() !== null)).toBe(true);
   });
 
   /**

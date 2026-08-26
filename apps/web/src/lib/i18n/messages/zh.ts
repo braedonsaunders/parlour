@@ -143,10 +143,6 @@ export const zh: Messages = {
     '任何一名其他玩家都能恢复掉线座位的牌——这也意味着任何一人都能打开仍在对局中的手牌。竞技牌桌请选更高的门槛。',
   'security.recovery.threshold':
     '其余 {holders} 名玩家中须有 {threshold} 人同意，才能恢复掉线座位的牌。若这 {threshold} 人串通，他们同样可以打开仍在对局中的手牌。',
-  'security.refusal.scopa':
-    'Scopa 好友房使用公开回放——在隐藏手牌能够始终保密之前，暂不支持 Veil Scopa',
-  'security.refusal.spite':
-    'Spite & Malice 好友房使用公开回放——在埋藏的目标牌堆能够始终保密之前，暂不支持 Veil Spite & Malice',
 
   // --- table narration -----------------------------------------------------
   'narration.seat': '{seat}号座位',

@@ -139,10 +139,6 @@ export const fr: Messages = {
     'N’importe quel autre joueur peut rétablir les cartes d’une place déconnectée, ce qui signifie aussi qu’il pourrait ouvrir une main en cours. Choisissez un réglage plus élevé pour une table compétitive.',
   'security.recovery.threshold':
     '{threshold} des {holders} autres joueurs doivent accepter de rétablir les cartes d’une place déconnectée. Ces mêmes {threshold} pourraient, en s’entendant, ouvrir une main en cours.',
-  'security.refusal.scopa':
-    'Les salons amicaux de Scopa utilisent une partie ouverte : Scopa avec Veil ne sera disponible que lorsque les mains cachées pourront le rester',
-  'security.refusal.spite':
-    'Les salons amicaux de Spite & Malice utilisent une partie ouverte : Spite & Malice avec Veil ne sera disponible que lorsque les piles de réserve enfouies pourront rester cachées',
 
   // --- table narration -----------------------------------------------------
   'narration.seat': 'Place {seat}',
