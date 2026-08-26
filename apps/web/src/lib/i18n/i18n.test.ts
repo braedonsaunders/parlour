@@ -6,6 +6,8 @@ import { es } from './messages/es';
 import { fr } from './messages/fr';
 import { pt } from './messages/pt';
 import { zh } from './messages/zh';
+import { VEIL_REFUSAL_MESSAGE_KEYS, veilRefusalMessageKey } from './security';
+import { ALL_ROOM_GAMES } from '@/lib/rooms/gameRegistry';
 
 const CATALOGUES: Readonly<Record<Locale, Messages>> = { en, es, fr, pt, zh };
 const PLACEHOLDER = /\{(\w+)\}/g;
@@ -89,6 +91,18 @@ describe('catalogue completeness', () => {
       .filter(([, value]) => value.trim().length === 0)
       .map(([key]) => key);
     expect(blank).toEqual([]);
+  });
+
+  it('has a localised message for every game that refuses Veil', () => {
+    const refusingGames = ALL_ROOM_GAMES.filter((game) => game.veilRefusal !== null);
+    expect(Object.keys(VEIL_REFUSAL_MESSAGE_KEYS).sort()).toEqual(
+      refusingGames.map((game) => game.id).sort(),
+    );
+    for (const game of refusingGames) {
+      const key = veilRefusalMessageKey(game.id);
+      expect(key).not.toBeNull();
+      if (key) expect(en[key]).toBe(game.veilRefusal);
+    }
   });
 
   /**

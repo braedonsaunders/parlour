@@ -141,6 +141,25 @@ export const es: Messages = {
     '{seats} se desconectaron y sus manos se reabrieron para poder continuar la ronda. Ya no son privadas.',
   'security.seatDropped': 'El asiento {seat} se desconectó. Esperando a que vuelva…',
   'security.waitingPlayers': 'Esperando a más jugadores para poder continuar la ronda.',
+  'security.disclosure.hidden': 'Nadie en esta mesa puede ver tu mano, ni siquiera quien la aloja.',
+  'security.disclosure.openHands':
+    'Mesa abierta: un cliente modificado puede leer todas las manos.',
+  'security.disclosure.botOpen':
+    'Mesa abierta: los bots de la casa no tienen clave de Veil, así que un cliente modificado puede leer todas las manos.',
+  'security.disclosure.openDropWalkover':
+    'Con dos asientos, quien se desconecte pierde por abandono.',
+  'security.disclosure.openDropBot':
+    'Si alguien se desconecta después de empezar, un bot de la casa ocupa su asiento hasta que vuelva.',
+  'security.recovery.none':
+    'Veil no puede recuperar una desconexión con dos asientos. Darle al oponente suficiente material de clave para reanudar también le permitiría leer tu mano, así que la ronda se pausa cuando alguien se desconecta.',
+  'security.recovery.single':
+    'Cualquier otro jugador puede restaurar las cartas de un asiento desconectado; eso también significa que cualquiera podría abrir una mano activa. Elige un ajuste más alto para una mesa competitiva.',
+  'security.recovery.threshold':
+    '{threshold} de los otros {holders} jugadores deben aceptar restaurar las cartas de un asiento desconectado. Esos mismos {threshold}, si se confabularan, podrían abrir una mano activa.',
+  'security.refusal.scopa':
+    'Las salas de amigos de Scopa usan repetición abierta: Scopa con Veil no está disponible hasta que las manos ocultas puedan seguir ocultas',
+  'security.refusal.spite':
+    'Las salas de amigos de Spite & Malice usan repetición abierta: Spite & Malice con Veil no está disponible hasta que las pilas de pago enterradas puedan seguir ocultas',
 
   // --- table narration -----------------------------------------------------
   'narration.seat': 'Asiento {seat}',

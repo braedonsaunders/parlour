@@ -85,12 +85,11 @@ function ActiveOhHellLobby({ session }: { session: MultiplayerRoomSession }) {
         ← Leave
       </Link>
       <RoomLobby
+        snapshot={snapshot}
         code={room.code}
         shareUrl={room.shareUrl}
-        capacity={snapshot.settings?.seats ?? 4}
         isHost
         onAddBot={(seat) => session.addBot(seat)}
-        connection={snapshot.connection === 'closed' ? 'reconnecting' : snapshot.connection}
         seats={snapshot.seats.map((seat) => ({
           seat: seat.seat,
           name: seat.name,
@@ -99,12 +98,10 @@ function ActiveOhHellLobby({ session }: { session: MultiplayerRoomSession }) {
           connected: seat.connected,
         }))}
         onStart={() => session.start()}
-        error={snapshot.error}
       />
       <p className="max-w-xl text-center text-sm text-dusk-100/80">
         Share the code until every seat is filled, then deal. A friend room plays one round at the
-        size you picked — the full arc is a solo match for now. Oh Hell rooms are open replay: every
-        peer can see the whole game state, so a modified client could read your hand.
+        size you picked — the full arc is a solo match for now.
       </p>
     </main>
   );

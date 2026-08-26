@@ -2,6 +2,12 @@
 
 import type { MultiplayerSecurity } from '@/app/_multiplayer/roomSession';
 import { LOCALE_META, useT, type MessageKey, type Translator } from '@/lib/i18n';
+import {
+  localizedRecoveryDisclosure,
+  localizedVeilRefusal,
+  veilRefusalMessageKey,
+} from '@/lib/i18n/security';
+import type { MultiplayerGameId } from '@/lib/rooms/gameIds';
 
 /**
  * What the room guarantees, stated plainly — and never asked as a question.
@@ -17,6 +23,70 @@ import { LOCALE_META, useT, type MessageKey, type Translator } from '@/lib/i18n'
  * modified client. Parlour Veil remains the real guarantee about *hands* and is
  * never described as "cheat-proof" — see apps/web/src/lib/multiplayer/veil.
  */
+
+/**
+ * The promise a player is accepting before the first card is dealt.
+ *
+ * `security.tier` is the room's actual tier, not an aspiration. Bots and a
+ * pack refusal can only narrow it further: a bot holds no layer key, and a
+ * game that cannot keep every private zone hidden must not borrow Veil's name.
+ */
+export function RoomSecurityDisclosure({
+  security,
+  gameId,
+  hasBot,
+}: {
+  security: MultiplayerSecurity;
+  gameId: MultiplayerGameId;
+  hasBot: boolean;
+}) {
+  const t = useT();
+  const refusal = localizedVeilRefusal(gameId, t);
+  const seats = security.ceremony.seats;
+  const open = security.tier === 'open' || hasBot || veilRefusalMessageKey(gameId) !== null;
+
+  return (
+    <p
+      className="panel-soft max-w-4xl border-l-4 border-hearth-400 px-4 py-3 text-sm text-dusk-50"
+      data-testid="room-security-disclosure"
+      data-security={open ? 'open' : 'veil'}
+      role="status"
+    >
+      {open ? (
+        <>
+          <strong className="text-hearth-100">
+            {hasBot ? t('security.disclosure.botOpen') : t('security.disclosure.openHands')}
+          </strong>{' '}
+          {refusal ? `${refusal}. ` : null}
+          {t(
+            seats <= 2 ? 'security.disclosure.openDropWalkover' : 'security.disclosure.openDropBot',
+          )}
+        </>
+      ) : (
+        <>
+          <strong className="text-hearth-100">{t('security.disclosure.hidden')}</strong>{' '}
+          {localizedRecoveryDisclosure(security.recovery, t)}
+        </>
+      )}
+    </p>
+  );
+}
+
+/** The pack's own reason, shown where its friend-room path is chosen. */
+export function GameVeilRefusal({ gameId }: { gameId: MultiplayerGameId }) {
+  const t = useT();
+  const refusal = localizedVeilRefusal(gameId, t);
+  if (!refusal) return null;
+
+  return (
+    <p
+      className="panel-soft mx-auto w-full max-w-xl border-l-4 border-hearth-400 px-4 py-3 text-center text-sm font-bold text-hearth-100"
+      data-testid="game-veil-refusal"
+    >
+      {refusal}
+    </p>
+  );
+}
 
 /**
  * In-room badge: the name of the guarantee, and anything that has changed it.

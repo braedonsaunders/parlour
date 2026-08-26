@@ -226,17 +226,11 @@ function GuestLobby({
       >
         {t('common.leaveArrow')}
       </button>
-      {snapshot.error && (
-        <p className="panel-soft max-w-md px-4 py-2.5 text-sm text-dusk-50" role="alert">
-          {snapshot.error}
-        </p>
-      )}
       <RoomLobby
+        snapshot={snapshot}
         code={room.code}
         shareUrl={room.shareUrl}
-        capacity={snapshot.settings?.seats ?? snapshot.seats.length}
         isHost={false}
-        connection={snapshot.connection === 'closed' ? 'reconnecting' : snapshot.connection}
         seats={snapshot.seats.map((seat) => ({
           seat: seat.seat,
           name: seat.name,

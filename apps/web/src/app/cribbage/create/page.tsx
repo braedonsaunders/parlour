@@ -75,12 +75,11 @@ function ActiveLobby({ session }: { session: MultiplayerRoomSession }) {
         ← Leave
       </Link>
       <RoomLobby
+        snapshot={snapshot}
         code={room.code}
         shareUrl={room.shareUrl}
-        capacity={2}
         isHost
         onAddBot={(seat) => session.addBot(seat)}
-        connection={snapshot.connection === 'closed' ? 'reconnecting' : snapshot.connection}
         seats={snapshot.seats.map((seat) => ({
           seat: seat.seat,
           name: seat.name,
@@ -89,7 +88,6 @@ function ActiveLobby({ session }: { session: MultiplayerRoomSession }) {
           connected: seat.connected,
         }))}
         onStart={() => session.start()}
-        error={snapshot.error}
       />
       <p className="max-w-xl text-center text-sm text-dusk-100/80">
         Share the code with one friend. This room plays a complete race to 121 with deterministic

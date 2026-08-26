@@ -82,12 +82,11 @@ function ActiveSpadesLobby({ session }: { session: MultiplayerRoomSession }) {
         ← Leave
       </Link>
       <RoomLobby
+        snapshot={snapshot}
         code={room.code}
         shareUrl={room.shareUrl}
-        capacity={4}
         isHost
         onAddBot={(seat) => session.addBot(seat)}
-        connection={snapshot.connection === 'closed' ? 'reconnecting' : snapshot.connection}
         seats={snapshot.seats.map((seat) => ({
           seat: seat.seat,
           name: seat.name,
@@ -96,12 +95,10 @@ function ActiveSpadesLobby({ session }: { session: MultiplayerRoomSession }) {
           connected: seat.connected,
         }))}
         onStart={() => session.start()}
-        error={snapshot.error}
       />
       <p className="max-w-xl text-center text-sm text-dusk-100/80">
         You sit across from your partner, and Spades needs all four seats filled — share the code
-        with three friends before starting. Spades rooms are open replay: every peer can see the
-        whole game state, so a modified client could read your hand.
+        with three friends before starting.
       </p>
     </main>
   );

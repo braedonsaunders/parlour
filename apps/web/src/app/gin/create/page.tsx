@@ -81,12 +81,11 @@ function ActiveGinLobby({ session }: { session: MultiplayerRoomSession }) {
         ← Leave
       </Link>
       <RoomLobby
+        snapshot={snapshot}
         code={room.code}
         shareUrl={room.shareUrl}
-        capacity={snapshot.settings?.seats ?? 2}
         isHost
         onAddBot={(seat) => session.addBot(seat)}
-        connection={snapshot.connection === 'closed' ? 'reconnecting' : snapshot.connection}
         seats={snapshot.seats.map((seat) => ({
           seat: seat.seat,
           name: seat.name,
@@ -95,7 +94,6 @@ function ActiveGinLobby({ session }: { session: MultiplayerRoomSession }) {
           connected: seat.connected,
         }))}
         onStart={() => session.start()}
-        error={snapshot.error}
       />
       <p className="max-w-xl text-center text-sm text-dusk-100/80">
         This head-to-head table starts when your opponent pulls up a chair. Share the code — first

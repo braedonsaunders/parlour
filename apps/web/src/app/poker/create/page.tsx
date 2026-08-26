@@ -74,7 +74,6 @@ function ActivePokerLobby({ session }: { session: MultiplayerRoomSession }) {
     );
   }
   if (!room) return <PokerLobbyLoading />;
-  const capacity = snapshot.settings?.seats ?? snapshot.seats.length;
 
   return (
     <main className="flex min-h-dvh flex-col items-center justify-center gap-5 px-6 py-8">
@@ -86,12 +85,11 @@ function ActivePokerLobby({ session }: { session: MultiplayerRoomSession }) {
         ← Leave
       </Link>
       <RoomLobby
+        snapshot={snapshot}
         code={room.code}
         shareUrl={room.shareUrl}
-        capacity={capacity}
         isHost
         onAddBot={(seat) => session.addBot(seat)}
-        connection={snapshot.connection === 'closed' ? 'reconnecting' : snapshot.connection}
         seats={snapshot.seats.map((seat) => ({
           seat: seat.seat,
           name: seat.name,
@@ -100,12 +98,7 @@ function ActivePokerLobby({ session }: { session: MultiplayerRoomSession }) {
           connected: seat.connected,
         }))}
         onStart={() => session.start()}
-        error={snapshot.error}
       />
-      <p className="max-w-xl text-center text-sm text-dusk-100/80">
-        Poker rooms are open replay: every peer holds the whole game state, so a modified client
-        could read your hole cards. Play these with people you would hand your cards to anyway.
-      </p>
     </main>
   );
 }

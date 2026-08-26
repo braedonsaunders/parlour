@@ -1,8 +1,10 @@
 'use client';
 
-import { useT } from '@/lib/i18n';
-
 import { useState } from 'react';
+import type { MultiplayerRoomSnapshot } from '@/app/_multiplayer/roomSession';
+import { useT } from '@/lib/i18n';
+import { isMultiplayerGameId } from '@/lib/rooms/gameIds';
+import { RoomSecurityDisclosure } from './TableSecurity';
 
 export type LobbySeat = {
   seat: number;
@@ -12,33 +14,39 @@ export type LobbySeat = {
   connected: boolean;
 };
 
+type RoomLobbySnapshot = Pick<
+  MultiplayerRoomSnapshot,
+  'settings' | 'security' | 'seats' | 'connection' | 'error'
+>;
+
 type RoomLobbyProps = {
+  snapshot: RoomLobbySnapshot;
   code: string;
   shareUrl: string;
   seats: LobbySeat[];
-  capacity: number;
   isHost: boolean;
-  connection: 'connecting' | 'connected' | 'reconnecting';
   onStart?: () => void | Promise<void>;
   onAddBot?: (seat: number) => void;
-  error?: string | null;
 };
 
 export function RoomLobby({
+  snapshot,
   code,
   shareUrl,
   seats,
-  capacity,
   isHost,
-  connection,
   onStart,
   onAddBot,
-  error,
 }: RoomLobbyProps) {
   const t = useT();
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'error'>('idle');
   const [starting, setStarting] = useState(false);
   const occupied = new Map(seats.map((seat) => [seat.seat, seat]));
+  const capacity = snapshot.settings?.seats ?? seats.length;
+  const gameId = snapshot.settings?.gameId;
+  const liveConnection = snapshot.connection;
+  const connection = liveConnection === 'closed' ? 'reconnecting' : liveConnection;
+  const error = snapshot.error;
 
   async function handleStart() {
     if (!onStart || starting) return;
@@ -154,6 +162,16 @@ export function RoomLobby({
           );
         })}
       </ol>
+
+      {isMultiplayerGameId(gameId) ? (
+        <div className="mt-4">
+          <RoomSecurityDisclosure
+            security={snapshot.security}
+            gameId={gameId}
+            hasBot={snapshot.seats.some((seat) => seat.bot)}
+          />
+        </div>
+      ) : null}
 
       {error && (
         <p className="mt-4 text-sm text-hearth-200" role="alert">

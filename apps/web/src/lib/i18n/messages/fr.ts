@@ -129,6 +129,24 @@ export const fr: Messages = {
     '{seats} se sont déconnectées et leurs mains ont été rouvertes pour poursuivre la manche. Elles ne sont plus privées.',
   'security.seatDropped': 'La place {seat} s’est déconnectée. En attente de son retour…',
   'security.waitingPlayers': 'En attente d’autres joueurs avant de poursuivre la manche.',
+  'security.disclosure.hidden': 'Personne à cette table ne peut voir votre main, pas même l’hôte.',
+  'security.disclosure.openHands': 'Table ouverte : un client modifié peut lire toutes les mains.',
+  'security.disclosure.botOpen':
+    'Table ouverte : les robots de la maison n’ont pas de clé Veil, donc un client modifié peut lire toutes les mains.',
+  'security.disclosure.openDropWalkover':
+    'À deux places, la personne qui se déconnecte perd par forfait.',
+  'security.disclosure.openDropBot':
+    'Si une personne se déconnecte après le début, un robot de la maison prend sa place jusqu’à son retour.',
+  'security.recovery.none':
+    'Veil ne peut pas rétablir une déconnexion à deux places. Donner à votre adversaire assez de matériel de clé pour reprendre lui permettrait aussi de lire votre main ; la manche se met donc en pause quand une personne se déconnecte.',
+  'security.recovery.single':
+    'N’importe quel autre joueur peut rétablir les cartes d’une place déconnectée, ce qui signifie aussi qu’il pourrait ouvrir une main en cours. Choisissez un réglage plus élevé pour une table compétitive.',
+  'security.recovery.threshold':
+    '{threshold} des {holders} autres joueurs doivent accepter de rétablir les cartes d’une place déconnectée. Ces mêmes {threshold} pourraient, en s’entendant, ouvrir une main en cours.',
+  'security.refusal.scopa':
+    'Les salons amicaux de Scopa utilisent une partie ouverte : Scopa avec Veil ne sera disponible que lorsque les mains cachées pourront le rester',
+  'security.refusal.spite':
+    'Les salons amicaux de Spite & Malice utilisent une partie ouverte : Spite & Malice avec Veil ne sera disponible que lorsque les piles de réserve enfouies pourront rester cachées',
 
   // --- table narration -----------------------------------------------------
   'narration.seat': 'Place {seat}',
