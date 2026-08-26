@@ -93,6 +93,11 @@ hidden the same way they are around a kitchen table: honest UI. For tables that 
 parlour carries **veiled-deck play**, where even the wire never sees your cards until you
 reveal them. Multiplayer rides end-to-end-encrypted peer-to-peer channels.
 
+One exception, named plainly: the hosted site loads **Vercel Analytics**, which records page
+views and coarse request metadata (no cookies, no profile identifiers, nothing you type or
+play). Your game itself never talks to it. The desktop apps and the static export carry none
+of it — analytics is a property of the hosted URL, not of parlour.
+
 The fine print (TURN relays, replay verification, exactly what "veiled" guarantees) lives in
 the app and in the engine docs below.
 
