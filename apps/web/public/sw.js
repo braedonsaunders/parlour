@@ -110,6 +110,23 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
 
+  // Never serve a worker entrypoint.
+  //
+  // The bundler boots a worker by hanging its chunk list off the script URL's
+  // fragment, and the worker reads that back out of `location.href`. Answering
+  // the request from here loses the fragment, so the worker starts with no
+  // config, aborts with "Missing worker bootstrap config", and closes — every
+  // time, for every returning visitor, because a first visit has no service
+  // worker yet and a second one does.
+  //
+  // Both of Parlour's workers died this way in the shipped export: Klondike's
+  // winnable search and the Veil shuffle ceremony. Both have in-thread
+  // fallbacks, so nothing broke visibly — they simply ran on the main thread,
+  // which is the one thing the ceremony must never do. It is a deck of
+  // 2048-bit modular exponentiations, and blocking on it starves the heartbeat
+  // that decides whether a player is still at the table.
+  if (request.destination === 'worker' || request.destination === 'sharedworker') return;
+
   if (request.mode === 'navigate') {
     const network = fetch(request).then((response) => ({
       response,
