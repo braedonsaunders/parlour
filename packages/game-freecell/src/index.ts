@@ -24,6 +24,20 @@ export {
 export { freecellConfig, freecellConfig as config, type FreecellRules } from './config';
 export { dailySeed, isDailyKey } from './daily';
 export {
+  solveFreecell,
+  isWinnableDeal,
+  type SolveOutcome,
+  type SolveOptions,
+  type SolveResult,
+  type SolveWeights,
+} from './solver';
+export {
+  findWinnableSeed,
+  freecellDealFor,
+  type WinnableSearchOptions,
+  type WinnableSeed,
+} from './winnable';
+export {
   GAME_ID,
   FreecellFx,
   canAutoFinish,
