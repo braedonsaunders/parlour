@@ -48,9 +48,8 @@ test('a solo table deals and shows a hand', async ({ page }) => {
 });
 
 test('leaving a table returns to its shelf page', async ({ page }) => {
-  // Hearts rather than Spades: Hearts still has no portrait hand rail, so it is
-  // the honest case for "leaving a table returns you to its shelf" on a phone.
-  // That behaviour has its own test below.
+  // Hearts exercises the shared table frame without adding a game-specific
+  // result screen to the route home.
   await page.goto('/hearts/table/');
   await expect(page.locator('[role="list"][data-zone] [role="listitem"]').first()).toBeVisible({
     timeout: 15_000,
@@ -62,37 +61,85 @@ test('leaving a table returns to its shelf page', async ({ page }) => {
   await expect(page).toHaveURL(/\/hearts\/?$/, { timeout: 15_000 });
 });
 
-test('a four-hand table keeps its full hand reachable on a portrait phone', async ({
-  page,
-  browserName,
-}) => {
-  test.skip(browserName !== 'webkit', 'the phone-portrait projects are the WebKit ones');
+test.describe('portrait hand rails', () => {
+  test.use({ viewport: { width: 390, height: 844 } });
 
-  await page.goto('/spades/table/');
-  const hand = page.locator('[role="list"][data-zone^="hand:"]').first();
-  await expect(hand.locator('[data-hand-card]')).toHaveCount(13, { timeout: 15_000 });
-  await expect(page.getByTestId('spades-rotate-notice')).toHaveCount(0);
-  await expect(hand).toHaveAttribute('data-scroll-state', 'start');
+  for (const { game, cards } of [
+    { game: 'spades', cards: 13 },
+    { game: 'hearts', cards: 13 },
+    { game: 'president', cards: 13 },
+    { game: 'gin', cards: 10 },
+  ] as const) {
+    test(`${game} keeps every high-card-count target reachable`, async ({ page }) => {
+      await page.emulateMedia({ reducedMotion: 'reduce' });
+      if (game === 'president') {
+        await page.addInitScript(() => {
+          localStorage.setItem(
+            'parlour.president.setup.v1',
+            JSON.stringify({
+              state: { mode: 'classic', seats: 4, botTier: 2, overrides: {} },
+              version: 1,
+            }),
+          );
+        });
+      }
 
-  const targets = await hand.locator('button[data-card-chassis]').evaluateAll((cards) =>
-    cards.map((card) => {
-      const box = card.getBoundingClientRect();
-      return { width: box.width, height: box.height };
-    }),
-  );
-  expect(targets).toHaveLength(13);
-  expect(targets.every(({ width, height }) => width >= 44 && height >= 44)).toBe(true);
+      await page.goto(`/${game}/table/`);
+      const hand = page.locator('[role="list"][data-zone^="hand:"]').first();
+      await expect(hand.locator('[data-hand-card]')).toHaveCount(cards, { timeout: 15_000 });
+      await expect(page.locator('[data-testid$="-rotate-notice"]')).toHaveCount(0);
+      await expect(hand).toHaveAttribute('data-scroll-state', 'start');
+      await expect(hand.locator('[data-scroll-cue="forward"]')).toHaveCSS('opacity', '1');
 
-  // Portrait keeps honest card-sized targets and moves the overflow into one
-  // deliberate horizontal rail. Prove the far end is reachable rather than
-  // merely present beyond the viewport.
-  const track = hand.locator('[data-hand-scroll]');
-  const scroll = await track.evaluate((rail) => {
-    rail.scrollLeft = rail.scrollWidth;
-    rail.dispatchEvent(new Event('scroll'));
-    return { left: rail.scrollLeft, viewport: rail.clientWidth, content: rail.scrollWidth };
-  });
-  expect(scroll.content).toBeGreaterThan(scroll.viewport);
-  expect(scroll.left).toBeGreaterThan(0);
-  await expect(hand).toHaveAttribute('data-scroll-state', 'end');
+      const layout = await hand.evaluate(async (rail) => {
+        const track = rail.querySelector<HTMLElement>('[data-hand-scroll]');
+        const targets = [
+          ...rail.querySelectorAll<HTMLElement>('[data-hand-card] button[data-card-chassis]'),
+        ];
+        if (!track) throw new Error('hand rail has no scroll track');
+
+        const targetSizes = targets.map((target) => {
+          const box = target.getBoundingClientRect();
+          return { width: box.width, height: box.height };
+        });
+        const reachable: boolean[] = [];
+        for (const target of targets) {
+          target.scrollIntoView({ behavior: 'auto', block: 'nearest', inline: 'center' });
+          await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+          const box = target.getBoundingClientRect();
+          const viewport = track.getBoundingClientRect();
+          reachable.push(box.left >= viewport.left - 1 && box.right <= viewport.right + 1);
+        }
+
+        track.scrollLeft = track.scrollWidth;
+        track.dispatchEvent(new Event('scroll'));
+        await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+        const last = targets.at(-1)?.getBoundingClientRect();
+        const viewport = track.getBoundingClientRect();
+        return {
+          targetSizes,
+          reachable,
+          left: track.scrollLeft,
+          viewportWidth: track.clientWidth,
+          contentWidth: track.scrollWidth,
+          lastVisible: Boolean(
+            last && last.left >= viewport.left - 1 && last.right <= viewport.right + 1,
+          ),
+        };
+      });
+
+      expect(layout.targetSizes).toHaveLength(cards);
+      expect(
+        layout.targetSizes.every(({ width, height }) => width >= 44 && height >= 44),
+        'every card remains an honest 44px interaction target',
+      ).toBe(true);
+      expect(layout.contentWidth).toBeGreaterThan(layout.viewportWidth);
+      expect(layout.left).toBeGreaterThan(0);
+      expect(layout.reachable.every(Boolean), 'every card can be scrolled fully into view').toBe(
+        true,
+      );
+      expect(layout.lastVisible).toBe(true);
+      await expect(hand).toHaveAttribute('data-scroll-state', 'end');
+    });
+  }
 });
