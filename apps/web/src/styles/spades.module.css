@@ -689,8 +689,8 @@
     display: none;
   }
 
-  /* Landscape is the supported orientation for a thirteen-card hand, so the
-     bid chips stay at a full 44px target here rather than shrinking to fit. */
+  /* Short landscape gets the same full 44px bid targets as portrait; the rail
+     pans instead of shrinking a committing control. */
   .bidChip {
     min-width: 2.75rem;
     min-height: 2.75rem;
@@ -727,67 +727,12 @@
 }
 
 /* --- portrait ------------------------------------------------------------
-   A fan cannot expose thirteen honest targets across a phone, but a linear
-   hand can. Keep the cards full-size and let the rail pan; focused cards also
-   scroll into view through the browser's native focus behaviour.
+   The shared hand rail owns the full-size scrolling row. Spades only has to
+   keep its unusually long bid rail and score furniture clear of it.
    ------------------------------------------------------------------------- */
 @media (orientation: portrait) and (max-width: 820px) {
   .screen [data-zone^='hand:'] {
     --hand-card-width: 4.5rem;
-    right: 0;
-    bottom: calc(env(safe-area-inset-bottom) + 0.1rem);
-    left: 0;
-    display: flex;
-    justify-content: flex-start;
-    width: 100%;
-    height: 7.5rem;
-    padding-block: 0.4rem 0.2rem;
-    overflow-x: auto;
-    overflow-y: hidden;
-    overscroll-behavior-inline: contain;
-    scroll-padding-inline: 0.75rem;
-    scroll-snap-type: x proximity;
-    scrollbar-width: thin;
-    touch-action: pan-x;
-    transform: none;
-    pointer-events: auto;
-    background: linear-gradient(0deg, rgba(9, 20, 27, 0.76), rgba(9, 20, 27, 0));
-  }
-
-  .screen [data-zone^='hand:'] > div {
-    position: relative;
-    inset: auto;
-    display: flex;
-    flex: 0 0 auto;
-    gap: 0.35rem;
-    width: max-content;
-    min-width: 100%;
-    height: 100%;
-    padding-inline: max(0.75rem, env(safe-area-inset-left));
-    transform: none;
-  }
-
-  /* Motion writes a transient inline transform on these slots. In the fan it
-     is useful; in a scroll row it changes the scroll width while a card lands,
-     so portrait deliberately settles the slot in normal flow. */
-  .screen [data-hand-card] {
-    position: relative !important;
-    top: 0;
-    left: auto;
-    flex: 0 0 var(--hand-card-width);
-    width: var(--hand-card-width);
-    min-width: 2.75rem;
-    margin-left: 0;
-    scroll-snap-align: center;
-    transform: none !important;
-  }
-
-  .screen [data-hand-fan] {
-    transform: none;
-  }
-
-  .screen [data-hand-card][data-playable='true'] [data-hand-fan] {
-    transform: translateY(-0.45rem);
   }
 
   .bidRail {

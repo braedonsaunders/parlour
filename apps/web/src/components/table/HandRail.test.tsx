@@ -111,6 +111,45 @@ describe('hand rail keyboard surface', () => {
     expect(tabStops[0]?.tagName).toBe('BUTTON');
     expect(tabStops[0]?.getAttribute('aria-label')).toBe('Discard ace of spades');
   });
+
+  it('marks a long hand as scrollable and tracks both reachable ends', () => {
+    act(() => {
+      root.render(
+        <HandRail count={13} zone="hand:0" label="Your hand">
+          {Array.from({ length: 13 }, (_, index) => (
+            <HandRailCard key={index} cardId={`card-${index}`} index={index} count={13} playable>
+              <button type="button">Card {index + 1}</button>
+            </HandRailCard>
+          ))}
+        </HandRail>,
+      );
+    });
+
+    const rail = container.querySelector<HTMLElement>('[role="list"]')!;
+    const track = rail.querySelector<HTMLElement>('[data-hand-scroll]')!;
+    Object.defineProperties(track, {
+      clientWidth: { configurable: true, value: 320 },
+      scrollWidth: { configurable: true, value: 960 },
+      scrollLeft: { configurable: true, value: 0, writable: true },
+    });
+
+    act(() => window.dispatchEvent(new Event('resize')));
+    expect(rail.dataset.scrollState).toBe('start');
+    expect(rail.querySelectorAll('[data-scroll-cue]')).toHaveLength(2);
+
+    act(() => {
+      track.scrollLeft = 320;
+      track.dispatchEvent(new Event('scroll', { bubbles: true }));
+    });
+    expect(rail.dataset.scrollState).toBe('middle');
+
+    act(() => {
+      track.scrollLeft = 640;
+      track.dispatchEvent(new Event('scroll', { bubbles: true }));
+    });
+    expect(rail.dataset.scrollState).toBe('end');
+    expect(rail.querySelectorAll('[role="listitem"]')).toHaveLength(13);
+  });
 });
 
 describe('table chrome', () => {
