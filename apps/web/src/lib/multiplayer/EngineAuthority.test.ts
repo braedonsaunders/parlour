@@ -245,3 +245,67 @@ describe('EngineAuthority snapshots', () => {
     });
   });
 });
+
+/**
+ * A friend room's host is another player. Its packets are a claim about what
+ * the rules allowed, and a guest that takes them on trust has no defence
+ * against a modified client — which is the difference between a desync check
+ * and an audit.
+ */
+describe('EngineAuthority verifies the host it is replaying', () => {
+  function pair(seed = 7) {
+    const config = configSchema.defaults();
+    return { host: authority(config, 2, seed), guest: authority(config, 2, seed) };
+  }
+
+  it('admits a packet the host produced by the rules', () => {
+    const { host, guest } = pair();
+    const result = guest.applyRemote(host.apply({ id: 'a1', seat: 0, move: 'score' }));
+
+    expect(result.accepted).toBe(true);
+    expect(result.fault ?? null).toBeNull();
+    expect(guest.getSession().state).toEqual(host.getSession().state);
+  });
+
+  it('refuses a move the acting seat was not entitled to make', () => {
+    const { host, guest } = pair();
+    guest.applyRemote(host.apply({ id: 'a1', seat: 0, move: 'score' }));
+    const before = guest.getSession().state;
+
+    // Seat 1 holds the turn now. Re-labelling its move as seat 0's keeps the
+    // packet internally consistent — hash included — so only re-running
+    // legality can tell that no honest authority could have logged it.
+    const honest = host.apply({ id: 'a2', seat: 1, move: 'score' });
+    const forged = { ...honest, events: honest.events.map((event) => ({ ...event, seat: 0 })) };
+
+    const result = guest.applyRemote(forged);
+    expect(result.accepted).toBe(false);
+    expect(result.fault?.error.code).toBe('not-your-turn');
+    expect(guest.getSession().state).toEqual(before);
+  });
+
+  it('refuses a move the game does not define', () => {
+    const { host, guest } = pair();
+    const honest = host.apply({ id: 'a1', seat: 0, move: 'score' });
+    const forged = {
+      ...honest,
+      events: honest.events.map((event) => ({ ...event, move: 'teleport' })),
+    };
+
+    const result = guest.applyRemote(forged);
+    expect(result.accepted).toBe(false);
+    expect(result.fault?.error.code).toBe('unknown-move');
+  });
+
+  it('separates a refusal it can prove from one it cannot', () => {
+    const { host, guest } = pair();
+    const packet = host.apply({ id: 'a1', seat: 0, move: 'score' });
+    guest.applyRemote(packet);
+
+    // A replay of the same packet is refused as a duplicate. That is bookkeeping,
+    // not evidence about the host, and must not be reported as cheating.
+    const again = guest.applyRemote(packet);
+    expect(again.accepted).toBe(false);
+    expect(again.fault ?? null).toBeNull();
+  });
+});

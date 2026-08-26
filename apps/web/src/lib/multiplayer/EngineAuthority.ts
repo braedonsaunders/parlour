@@ -13,6 +13,7 @@ import type {
   AppliedPacket,
   AuthorityAdapter,
   PlayerAction,
+  RemoteApplyResult,
   ReplaySnapshot,
   RoomSettings,
 } from './types';
@@ -115,20 +116,36 @@ export class EngineAuthority<S, C extends RuleValues> implements AuthorityAdapte
     };
   }
 
-  applyRemote(packet: AppliedPacket): { stateHash: string; accepted: boolean } {
+  /**
+   * Admits a packet from the host, or refuses it.
+   *
+   * The host in a friend room is another player, not a server anybody controls,
+   * so its log is a claim rather than a fact. Every packet is re-checked against
+   * the rules before it moves this peer's state: `verifyFrom` starts at the end
+   * of the log we already hold, because everything before that arrived through
+   * this same gate. A refusal leaves the session where it was, which makes the
+   * caller's hash comparison disagree and pulls a snapshot down — the same path
+   * an ordinary desync takes, and the right one, because a peer that cannot
+   * agree on the board should stop playing on its own copy of it.
+   */
+  applyRemote(packet: AppliedPacket): RemoteApplyResult {
     const { session, settings } = this.authorityState;
     if (this.acceptedActions.has(packet.actionId)) {
-      return { stateHash: stateHash(session.state), accepted: false };
+      return { stateHash: stateHash(session.state), accepted: false, fault: null };
     }
     const firstSeq = packet.events[0]?.seq;
     if (firstSeq === undefined || firstSeq !== session.log.length) {
-      return { stateHash: stateHash(session.state), accepted: false };
+      return { stateHash: stateHash(session.state), accepted: false, fault: null };
     }
     const nextSession = replaySession(this.def, session.seed, [...session.log, ...packet.events], {
       config: session.config,
       seats: session.seats,
+      verifyFrom: session.log.length,
       ...veilOptions(settings, session.deckOrder),
     });
+    if (nextSession.fault) {
+      return { stateHash: stateHash(session.state), accepted: false, fault: nextSession.fault };
+    }
     // Replay reconstructs state/phase from the authoritative events, then keep
     // the packets themselves as the replicated log. In particular, replay's
     // reducer does not manufacture host wall-clock `ts` metadata; dropping it
@@ -138,7 +155,7 @@ export class EngineAuthority<S, C extends RuleValues> implements AuthorityAdapte
       settings,
     };
     this.acceptedActions.set(packet.actionId, packet.events.at(-1)!.seq);
-    return { stateHash: stateHash(nextSession.state), accepted: true };
+    return { stateHash: stateHash(nextSession.state), accepted: true, fault: null };
   }
 
   exportSnapshot(): ReplaySnapshot {

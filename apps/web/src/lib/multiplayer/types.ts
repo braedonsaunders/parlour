@@ -1,4 +1,11 @@
-import type { AppliedEvent, CardRecycle, FxEvent, RuleValues, SeatId } from '@parlour/engine';
+import type {
+  AppliedEvent,
+  CardRecycle,
+  FxEvent,
+  ReplayFault,
+  RuleValues,
+  SeatId,
+} from '@parlour/engine';
 
 export type PeerId = string;
 export type ProfileId = string;
@@ -92,6 +99,16 @@ export type MigrationSnapshot = {
 export type RemoteApplyResult = {
   stateHash: string;
   accepted: boolean;
+  /**
+   * The logged event that failed re-checking, when a packet was refused because
+   * the rules say the authority could not have produced it.
+   *
+   * A refusal for any other reason — a duplicate, a packet that does not start
+   * where the log ends — leaves this null. The distinction matters because this
+   * one is the room's evidence that the host is not playing the game everyone
+   * else is, rather than evidence that two peers fell out of step.
+   */
+  fault?: ReplayFault | null;
 };
 
 export type PresenceEvent =
