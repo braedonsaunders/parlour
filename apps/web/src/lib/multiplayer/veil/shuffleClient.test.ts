@@ -9,6 +9,7 @@ import {
   generateLayerKey,
   randomPermutation,
   shuffleLayer,
+  shuffleLayerAsync,
 } from './sra';
 import { runShuffleJob } from './shuffleJob';
 import { ShuffleRunner, type ShuffleWorkerLike } from './shuffleClient';
@@ -74,6 +75,31 @@ describe('the shuffle job', () => {
     ).map(elementToHex);
 
     expect(viaJob).toEqual(direct);
+  });
+
+  // The fallback runs shuffleLayerAsync (BigInt, chunked); the worker runs
+  // runShuffleJob (hex, one shot). The file's own comment says a layer that
+  // differed between paths would fail its own commitment check and wedge the
+  // round — this is the byte-identity that promise rests on.
+  it('produces byte-identical layers through the worker path and the fallback', async () => {
+    const deck = await deckHex();
+    const key = generateLayerKey();
+    const order = randomPermutation(CARDS.length);
+    const job = { deck, e: key.e.toString(16), order };
+
+    // The worker path: runShuffleJob, exactly what shuffle.worker.ts runs.
+    const viaWorker = runShuffleJob(job);
+    // The fallback path: shuffleLayerAsync, exactly what shuffleClient's
+    // inThread() runs when the worker is unavailable.
+    const viaFallback = (
+      await shuffleLayerAsync(
+        deck.map((element) => BigInt(`0x${element}`)),
+        key,
+        order,
+      )
+    ).map(elementToHex);
+
+    expect(viaWorker).toEqual(viaFallback);
   });
 });
 
