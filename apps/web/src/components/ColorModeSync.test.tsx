@@ -32,26 +32,23 @@ describe('ColorModeSync', () => {
     delete document.documentElement.dataset.colorMode;
   });
 
-  it('syncs the persisted mode without reserving a global keyboard shortcut', () => {
+  it('applies the palette without reserving a global keyboard shortcut', () => {
     act(() => root.render(createElement(ColorModeSync)));
     expect(document.documentElement.dataset.colorMode).toBe('richer');
 
-    act(() => useTableFxStore.getState().setAppColorMode('original'));
-    expect(document.documentElement.dataset.colorMode).toBe('original');
-
+    // 'c' used to toggle the comparison palette. The palette is fixed now, so
+    // the key must stay ordinary — a table full of card shortcuts cannot afford
+    // a global one that does nothing.
     act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'c' })));
-    expect(document.documentElement.dataset.colorMode).toBe('original');
-    expect(JSON.parse(localStorage.getItem(TABLE_FX_STORAGE_KEY)!).state.appColorMode).toBe(
-      'original',
-    );
+    expect(document.documentElement.dataset.colorMode).toBe('richer');
   });
 
-  it('makes richer the default for clients carrying the comparison version', async () => {
+  it('moves a client that saved the older palette onto the current one', async () => {
     localStorage.setItem(
       TABLE_FX_STORAGE_KEY,
       JSON.stringify({
         state: { dropEffects: 'full', appColorMode: 'original' },
-        version: 3,
+        version: 4,
       }),
     );
 
@@ -60,5 +57,9 @@ describe('ColorModeSync', () => {
 
     expect(useTableFxStore.getState().appColorMode).toBe('richer');
     expect(document.documentElement.dataset.colorMode).toBe('richer');
+    // And it is no longer written back, because nothing can change it.
+    expect(JSON.parse(localStorage.getItem(TABLE_FX_STORAGE_KEY)!).state.appColorMode).toBe(
+      undefined,
+    );
   });
 });

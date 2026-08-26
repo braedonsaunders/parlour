@@ -38,14 +38,18 @@ export function dropEffectScale(level: DropEffectLevel): number {
 
 type TableFxState = {
   dropEffects: DropEffectLevel;
+  /** Fixed. Read by the styling layer; there is no setter and no picker. */
   appColorMode: AppColorMode;
   setDropEffects: (level: DropEffectLevel) => void;
-  setAppColorMode: (mode: AppColorMode) => void;
 };
 
 /**
- * Per-client presentation. App colors and card-drop flourishes are looks, not
- * rules, so they live beside the scene picker rather than in game config.
+ * Per-client presentation. Card-drop flourishes are a look, not a rule, so they
+ * live beside the scene picker rather than in game config.
+ *
+ * The app palette used to be a choice here too. It is now fixed: one palette,
+ * chosen deliberately, applied everywhere. `appColorMode` stays in the store
+ * because the styling layer reads it, but nothing sets it.
  */
 export const useTableFxStore = create<TableFxState>()(
   persist(
@@ -53,29 +57,26 @@ export const useTableFxStore = create<TableFxState>()(
       dropEffects: DEFAULT_DROP_EFFECTS,
       appColorMode: DEFAULT_APP_COLOR_MODE,
       setDropEffects: (dropEffects) => set({ dropEffects }),
-      setAppColorMode: (appColorMode) => set({ appColorMode }),
     }),
     {
       name: TABLE_FX_STORAGE_KEY,
-      version: 4,
-      migrate: (persisted, version) => {
-        const state = persisted as
-          (Partial<TableFxState> & { cardColorMode?: unknown }) | undefined;
-        const persistedColorMode =
-          version < 4 ? DEFAULT_APP_COLOR_MODE : (state?.appColorMode ?? state?.cardColorMode);
+      version: 5,
+      migrate: (persisted) => {
+        const state = persisted as Partial<TableFxState> | undefined;
         return {
           dropEffects: isDropEffectLevel(state?.dropEffects)
             ? state.dropEffects
             : DEFAULT_DROP_EFFECTS,
-          appColorMode: isAppColorMode(persistedColorMode)
-            ? persistedColorMode
-            : DEFAULT_APP_COLOR_MODE,
+          // The palette is no longer a choice, so a client that saved the older
+          // one is moved onto the current look rather than kept on a setting
+          // nothing can change any more. That is the whole reason for the
+          // version bump.
+          appColorMode: DEFAULT_APP_COLOR_MODE,
         };
       },
-      partialize: (state) => ({
-        dropEffects: state.dropEffects,
-        appColorMode: state.appColorMode,
-      }),
+      // `appColorMode` is deliberately not persisted: it is fixed, so writing it
+      // would only create a value a future change has to migrate again.
+      partialize: (state) => ({ dropEffects: state.dropEffects }),
     },
   ),
 );

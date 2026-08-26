@@ -6,13 +6,7 @@ import { HowToPlayButton } from '@/components/HowToPlay';
 import { useT, type MessageKey } from '@/lib/i18n';
 import { useAudioManager, useAudioStore } from '@/stores/audio';
 import { SCENE_IDS, useSceneStore, type SceneId } from '@/stores/scene';
-import {
-  APP_COLOR_MODES,
-  DROP_EFFECT_LEVELS,
-  useTableFxStore,
-  type AppColorMode,
-  type DropEffectLevel,
-} from '@/stores/tableFx';
+import { DROP_EFFECT_LEVELS, useTableFxStore, type DropEffectLevel } from '@/stores/tableFx';
 import { useProfileStore } from '@/stores/profile';
 import { MusicControls } from '@/components/MusicControls';
 import styles from '@/styles/table.module.css';
@@ -28,11 +22,6 @@ const SCENE_KEYS: Record<SceneId, MessageKey> = {
   campfire: 'scene.campfire',
   casino: 'scene.casino',
   snug: 'scene.snug',
-};
-
-const APP_COLOR_KEYS: Record<AppColorMode, MessageKey> = {
-  richer: 'tableMenu.appColorsRicher',
-  original: 'tableMenu.appColorsOriginal',
 };
 
 const DROP_EFFECT_KEYS: Record<DropEffectLevel, MessageKey> = {
@@ -56,8 +45,6 @@ export function TableMenu({ open, onClose, onQuit, howToPlay }: TableMenuProps) 
   const resumeRef = useRef<HTMLButtonElement>(null);
   const dropEffects = useTableFxStore((state) => state.dropEffects);
   const setDropEffects = useTableFxStore((state) => state.setDropEffects);
-  const appColorMode = useTableFxStore((state) => state.appColorMode);
-  const setAppColorMode = useTableFxStore((state) => state.setAppColorMode);
   const [confirmingQuit, setConfirmingQuit] = useState(false);
   const [wasOpen, setWasOpen] = useState(false);
   if (open !== wasOpen) {
@@ -158,36 +145,6 @@ export function TableMenu({ open, onClose, onQuit, howToPlay }: TableMenuProps) 
                   );
                 })}
               </div>
-            </section>
-            <section aria-label={t('tableMenu.appColors')} data-testid="app-colors-picker">
-              <p className="mb-1.5 text-center text-xs font-semibold uppercase tracking-[0.25em] text-dusk-200">
-                {t('tableMenu.appColors')}
-              </p>
-              <div role="radiogroup" className="flex items-center justify-center gap-1">
-                {APP_COLOR_MODES.map((mode) => {
-                  const active = mode === appColorMode;
-                  return (
-                    <button
-                      key={mode}
-                      type="button"
-                      role="radio"
-                      aria-checked={active}
-                      data-testid={`app-colors-${mode}`}
-                      onClick={() => setAppColorMode(mode)}
-                      className={`rounded-full px-2.5 py-1 text-xs font-semibold transition-all duration-150 ease-pop ${
-                        active
-                          ? 'bg-hearth-400/25 text-hearth-100'
-                          : 'text-dusk-200/70 hover:-translate-y-0.5 hover:text-dusk-100'
-                      }`}
-                    >
-                      {t(APP_COLOR_KEYS[mode])}
-                    </button>
-                  );
-                })}
-              </div>
-              <small className="mt-1 block text-center text-[0.65rem] text-dusk-200/60">
-                {t('tableMenu.appliesEverywhere')}
-              </small>
             </section>
             <section aria-label={t('tableMenu.cardEffects')} data-testid="drop-effects-picker">
               <p className="mb-1.5 text-center text-xs font-semibold uppercase tracking-[0.25em] text-dusk-200">

@@ -6,12 +6,7 @@ import { resetAudioManagerForTests } from '@/lib/audio/AudioManager';
 import { MUSIC_STORAGE_KEY, resetMusicControllerForTests } from '@/lib/audio/MusicController';
 import { SCENE_STORAGE_KEY, DEFAULT_SCENE, useSceneStore } from '@/stores/scene';
 import { resetMusicBindingsForTests } from '@/stores/audio';
-import {
-  DEFAULT_APP_COLOR_MODE,
-  DEFAULT_DROP_EFFECTS,
-  TABLE_FX_STORAGE_KEY,
-  useTableFxStore,
-} from '@/stores/tableFx';
+import { DEFAULT_APP_COLOR_MODE, DEFAULT_DROP_EFFECTS, useTableFxStore } from '@/stores/tableFx';
 import { useLocaleStore } from '@/stores/locale';
 import { TableMenu } from './TableMenu';
 
@@ -211,22 +206,13 @@ describe('TableMenu', () => {
     expect(JSON.parse(localStorage.getItem(SCENE_STORAGE_KEY)!).state.sceneId).toBe('casino');
   });
 
-  it('switches the whole app between richer and original colors', async () => {
+  it('offers no palette choice — the app has one look', async () => {
     await render({ open: true, onClose: () => {}, onQuit: () => {} });
 
-    const richer = container.querySelector<HTMLButtonElement>('[data-testid="app-colors-richer"]');
-    const original = container.querySelector<HTMLButtonElement>(
-      '[data-testid="app-colors-original"]',
-    );
-    expect(richer?.getAttribute('aria-checked')).toBe('true');
-    expect(original?.getAttribute('aria-checked')).toBe('false');
-
-    act(() => original?.click());
-    expect(richer?.getAttribute('aria-checked')).toBe('false');
-    expect(original?.getAttribute('aria-checked')).toBe('true');
-    expect(JSON.parse(localStorage.getItem(TABLE_FX_STORAGE_KEY)!).state.appColorMode).toBe(
-      'original',
-    );
+    // The picker used to live here. The palette is fixed now, so the menu must
+    // not offer a control that cannot change anything.
+    expect(container.querySelector('[data-testid="app-colors-picker"]')).toBeNull();
+    expect(container.querySelector('[data-testid="app-colors-original"]')).toBeNull();
   });
 
   it('plays music from the music section and reflects the state', async () => {
@@ -253,7 +239,6 @@ describe('TableMenu', () => {
     );
     expect(buttonByText('Volver a la mesa')).toBeDefined();
     expect(buttonByText('Salir al menú principal')).toBeDefined();
-    expect(container.textContent).toContain('Colores de la app');
     expect(container.textContent).toContain('Efectos de las cartas');
   });
 });
