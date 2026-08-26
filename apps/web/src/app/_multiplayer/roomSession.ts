@@ -1967,25 +1967,44 @@ function startFault(error: unknown, fallback = 'The match could not start'): str
  * Waits for the ceremony to reach `laid` layers. Peers publish their layers
  * over the mesh, so the host has to let those land before laying the next one.
  */
+/**
+ * How long the room waits on a ceremony before dealing without it.
+ *
+ * This used to be thirty seconds, which was the wrong shape of patience. A
+ * ceremony that is going to succeed takes one to three: measured on the real
+ * SRA path, 963ms at two seats and 2721ms at six, and a slow phone is a small
+ * multiple of that rather than an order of magnitude. So a wait past this point
+ * is not a slow ceremony, it is a seat that is never going to answer — and the
+ * room's answer to that is to deal openly, which it can do immediately.
+ *
+ * Thirty seconds of it meant the silent fallback was silent but not invisible:
+ * half a minute of a table doing nothing is the most conspicuous thing Veil
+ * could possibly do, and the whole point is that nobody notices it at all.
+ */
+const CEREMONY_TIMEOUT_MS = 8_000;
+const CEREMONY_POLL_MS = 50;
+
 async function waitForCeremony(
   session: VeilSession,
   epoch: number,
   seats: number,
   onProgress?: () => void,
 ): Promise<void> {
-  for (let attempt = 0; attempt < 600; attempt++) {
+  const attempts = Math.ceil(CEREMONY_TIMEOUT_MS / CEREMONY_POLL_MS);
+  for (let attempt = 0; attempt < attempts; attempt++) {
     const progress = session.progress(epoch);
     onProgress?.();
     if (progress.ready || progress.laid >= seats) return;
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    await new Promise((resolve) => setTimeout(resolve, CEREMONY_POLL_MS));
   }
   throw new Error('the shuffle ceremony stalled — a seat never published its layer');
 }
 
 async function waitForVeilKeys(room: VeilRoom): Promise<void> {
-  for (let attempt = 0; attempt < 600; attempt++) {
+  const attempts = Math.ceil(CEREMONY_TIMEOUT_MS / CEREMONY_POLL_MS);
+  for (let attempt = 0; attempt < attempts; attempt++) {
     if (room.keysReady) return;
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    await new Promise((resolve) => setTimeout(resolve, CEREMONY_POLL_MS));
   }
   throw new Error('the shuffle ceremony stalled — a seat never published its key');
 }
