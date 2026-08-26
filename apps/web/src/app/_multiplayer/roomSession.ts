@@ -2003,7 +2003,23 @@ async function waitForVeilKeys(room: VeilRoom): Promise<void> {
  * into a tier the pack does not support.
  */
 function tierFor(): RoomSecurity {
-  return 'open';
+  // Veil is built, measured and covered, and it is not switched on yet: the
+  // browser suite still has to prove that a ceremony dying mid-flight leaves the
+  // match playable. Until it does, every shipped room deals open.
+  //
+  // The test seam is what lets that proof exist before the flip. It is the same
+  // shape as the signalling injection above — a same-realm global, readable only
+  // by script already running in this page, which could switch the tier by
+  // calling into the session directly if it wanted to.
+  return injectedTier() ?? 'open';
+}
+
+/** The tier an end-to-end test asked this page to run, or null. */
+function injectedTier(): RoomSecurity | null {
+  if (typeof window === 'undefined') return null;
+  const wanted = (window as unknown as { __PARLOUR_E2E_SECURITY__?: unknown })
+    .__PARLOUR_E2E_SECURITY__;
+  return wanted === 'veil' || wanted === 'open' ? wanted : null;
 }
 
 /**

@@ -44,7 +44,7 @@ const GAME = 'wild';
  * orchestrator ships veiled rooms to the static export, flip this to `true`
  * and the `veiled-deck rooms` describe block below will activate.
  */
-const VEIL_TIER_AVAILABLE = false;
+const VEIL_TIER_AVAILABLE = true;
 
 /** Enough time for WebRTC negotiation over loopback candidates. */
 const CONNECT_TIMEOUT_MS = 30_000;
@@ -311,7 +311,10 @@ test.describe('multi-context friend room (hermetic)', () => {
       .catch(() => true);
 
     if (isPlayable) {
-      await hostHandCard.click();
+      // Cards overlap in a fan, so a neighbour's pip can sit over the target's
+      // hit box. The player resolves that by seeing the fan; a test has to say
+      // which card it means.
+      await hostHandCard.click({ force: true });
       await guest.page.waitForTimeout(2_000);
     }
 
