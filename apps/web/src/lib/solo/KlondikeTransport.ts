@@ -37,7 +37,14 @@ export interface KlondikeSnapshot {
   dailyKey: string | null;
   session: PublicKlondikeSession;
   eventCount: number;
+  /** True exactly when `undoDepth` is above zero; the two never disagree. */
   canUndo: boolean;
+  /**
+   * Player actions still on the log, and so the number of times Undo can be
+   * pressed. Not the move counter: a move and whatever the flow settled from
+   * it come off together, so this counts presses rather than log entries.
+   */
+  undoDepth: number;
   canFinish: boolean;
   hint: KlondikeHint | null;
 }
@@ -77,6 +84,7 @@ export class KlondikeTransport {
 
   getSnapshot(): KlondikeSnapshot {
     const state = klondikePlayerView(this.session.state);
+    const undo = undoPolicy(this.session);
     return {
       mode: this.options.mode,
       dailyKey: this.options.dailyKey,
@@ -88,7 +96,8 @@ export class KlondikeTransport {
         setupFx: this.session.setupFx,
       },
       eventCount: this.session.log.length,
-      canUndo: undoPolicy(this.session).available,
+      canUndo: undo.available,
+      undoDepth: undo.depth,
       canFinish: this.session.status === 'playing' && canAutoFinish(state),
       hint: this.session.status === 'playing' ? this.planner.hint(this.session.state) : null,
     };

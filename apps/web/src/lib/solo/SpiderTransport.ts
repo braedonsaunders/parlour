@@ -35,7 +35,14 @@ export interface SpiderSnapshot {
   dailyKey: string | null;
   session: PublicSpiderSession;
   eventCount: number;
+  /** True exactly when `undoDepth` is above zero; the two never disagree. */
   canUndo: boolean;
+  /**
+   * Player actions still on the log, and so the number of times Undo can be
+   * pressed. Not the move counter: a move and whatever the flow settled from
+   * it come off together, so this counts presses rather than log entries.
+   */
+  undoDepth: number;
   canFinish: boolean;
   hint: SpiderHint | null;
 }
@@ -71,6 +78,7 @@ export class SpiderTransport {
 
   getSnapshot(): SpiderSnapshot {
     const state = spiderPlayerView(this.session.state);
+    const undo = undoPolicy(this.session);
     return {
       mode: this.options.mode,
       dailyKey: this.options.dailyKey,
@@ -82,7 +90,8 @@ export class SpiderTransport {
         setupFx: this.session.setupFx,
       },
       eventCount: this.session.log.length,
-      canUndo: undoPolicy(this.session).available,
+      canUndo: undo.available,
+      undoDepth: undo.depth,
       canFinish: false,
       hint: this.session.status === 'playing' ? hintFor(state) : null,
     };

@@ -36,7 +36,14 @@ export interface FreecellSnapshot {
   dailyKey: string | null;
   session: PublicFreecellSession;
   eventCount: number;
+  /** True exactly when `undoDepth` is above zero; the two never disagree. */
   canUndo: boolean;
+  /**
+   * Player actions still on the log, and so the number of times Undo can be
+   * pressed. Not the move counter: a move and whatever the flow settled from
+   * it come off together, so this counts presses rather than log entries.
+   */
+  undoDepth: number;
   canFinish: boolean;
   hint: FreecellHint | null;
 }
@@ -72,6 +79,7 @@ export class FreecellTransport {
 
   getSnapshot(): FreecellSnapshot {
     const state = freecellPlayerView(this.session.state);
+    const undo = undoPolicy(this.session);
     return {
       mode: this.options.mode,
       dailyKey: this.options.dailyKey,
@@ -83,7 +91,8 @@ export class FreecellTransport {
         setupFx: this.session.setupFx,
       },
       eventCount: this.session.log.length,
-      canUndo: undoPolicy(this.session).available,
+      canUndo: undo.available,
+      undoDepth: undo.depth,
       canFinish: this.session.status === 'playing' && canAutoFinish(state),
       hint: this.session.status === 'playing' ? hintFor(state) : null,
     };
