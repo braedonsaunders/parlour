@@ -1,8 +1,20 @@
 name: CI
 
+# Main and pull requests only.
+#
+# This used to run on every branch push, which made sense when branches were
+# occasional. With several agents pushing work-in-progress branches through the
+# day it turned the Actions tab into a wall of expected red — every unfinished
+# push failing on its way to being finished — and a failing run nobody is
+# supposed to act on is worse than no run at all, because it trains everyone to
+# ignore the ones that matter.
+#
+# The gate that decides anything is main, and nothing reaches main without the
+# full gate having been run against the merge first. A branch that wants a
+# verdict can open a pull request.
 on:
   push:
-    branches: ['**']
+    branches: [main]
   pull_request:
 
 jobs:
