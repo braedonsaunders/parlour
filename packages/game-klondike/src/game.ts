@@ -525,11 +525,12 @@ function rankTableauMove(
   if (meta.destEmpty && isKing(meta.card) && meta.empties) return null;
   if (meta.uncovers) return { score: 100 + meta.downs, kind: 'uncover' };
   if (meta.exposed) {
+    // Splitting a packed run only ever buys the card it exposes, so it is worth
+    // suggesting only when that card can go straight up. Without the test the
+    // hinter happily shuttles a Queen between two Kings for ever.
     const suit = suitOfCard(meta.exposed);
-    const freesFoundation = Boolean(
-      suit && canPlaceOnFoundation(meta.exposed, state.foundations[suit]),
-    );
-    return { score: freesFoundation ? 90 : 70, kind: 'expose' };
+    if (!suit || !canPlaceOnFoundation(meta.exposed, state.foundations[suit])) return null;
+    return { score: 90, kind: 'expose' };
   }
   if (meta.empties && !hasEmptyColumn(state) && kingNeedsEmpty(state)) {
     return { score: 60, kind: 'empty-for-king' };

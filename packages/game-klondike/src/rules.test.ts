@@ -196,6 +196,31 @@ describe('public assistance', () => {
     expect(hintFor(klondikePlayerView(onlySlide))).toBeNull();
   });
 
+  it('never splits a run onto a twin target the exposed card cannot use', () => {
+    const pingPong = emptyState({ stock: ['S9'] });
+    pingPong.tableau[0] = { down: [], up: ['S13', 'D12'] };
+    pingPong.tableau[2] = { down: [], up: ['C13'] };
+    const hint = hintFor(klondikePlayerView(pingPong));
+    expect(hint?.move.id).toBe('stock.draw');
+    expect(hint?.reason).toBe('Turn the stock.');
+
+    const dead = emptyState();
+    dead.tableau[0] = { down: [], up: ['S13', 'D12'] };
+    dead.tableau[2] = { down: [], up: ['C13'] };
+    expect(hintFor(klondikePlayerView(dead))).toBeNull();
+  });
+
+  it('splits a run when the card it exposes can go straight up', () => {
+    const state = emptyState();
+    state.foundations.spades = ['S1', 'S2', 'S3', 'S4'];
+    state.tableau[0] = { down: [], up: ['S5', 'H4'] };
+    state.tableau[2] = { down: [], up: ['C5'] };
+    expect(hintFor(klondikePlayerView(state))).toEqual({
+      move: { id: 'tableau.move', payload: { from: 0, card: 'H4', to: 2 } },
+      reason: 'Move the 4 of hearts onto the 5 of clubs to free the 5 of spades.',
+    });
+  });
+
   it('prefers turning a hidden card over shuffling a parked king', () => {
     const state = emptyState();
     state.tableau[0] = { down: [], up: ['D13'] };
