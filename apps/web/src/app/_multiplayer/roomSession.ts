@@ -916,6 +916,47 @@ export class MultiplayerRoomSession {
     return packFor(settings).recyclableStock(this.authority.getSession().state, move);
   }
 
+  /**
+   * Shuffles and injects the next hand, retrying rather than stranding a match.
+   *
+   * Mid-match is the one place Veil cannot fall back to an open deal: the round
+   * is already veiled, handles are already in play, and the game's own redeal
+   * refuses a deck order it was not given. So the answer here is to try again
+   * rather than to give up.
+   *
+   * Retrying is not hope. The overwhelmingly common failure is a seat that
+   * dropped during the ceremony, and the next attempt shuffles with whoever is
+   * actually at the table — a smaller, live participant set that succeeds where
+   * the last one could not. The primed run is discarded first for exactly that
+   * reason: it was laid by a table that no longer exists.
+   *
+   * If every attempt fails, the table still has an answer, because a room that
+   * has run out of seats to shuffle with is a room where everyone has left, and
+   * the drop path awards that as a walkover.
+   */
+  private async dealVeiledHand(move: string, attempt = 0): Promise<void> {
+    const MAX_ATTEMPTS = 3;
+    try {
+      const deck =
+        attempt === 0 ? (this.takePrimedDeck() ?? this.shuffleNextHand()) : this.shuffleNextHand();
+      await this.inject(move, { deckOrder: await deck });
+    } catch (error: unknown) {
+      this.primedDeck = null;
+      if (attempt + 1 < MAX_ATTEMPTS && this.ceremonySeats().length > 0) {
+        await new Promise((resolve) => setTimeout(resolve, 250));
+        return this.dealVeiledHand(move, attempt + 1);
+      }
+      const departed = this.departedHumanSeat();
+      if (departed !== null && this.shouldWalkover(departed)) {
+        this.awardWalkover(departed);
+        return;
+      }
+      this.update({
+        error: error instanceof Error ? error.message : 'The next hand could not be shuffled',
+      });
+    }
+  }
+
   /** Runs one new epoch and returns the unpaired exchange the engine logs. */
   /**
    * Deals a veiled game's next hand, once it says it is waiting for one.
@@ -938,17 +979,8 @@ export class MultiplayerRoomSession {
     if (!move || !pack.redealPending(this.authority.getSession().state)) return;
 
     this.redealPending = true;
-    // Already shuffled during the hand that just ended, unless the table
-    // changed shape underneath it — in which case shuffle now, as before.
-    const deck = this.takePrimedDeck() ?? this.shuffleNextHand();
-    void deck
-      .then((deckOrder) => this.inject(move, { deckOrder }))
+    void this.dealVeiledHand(move)
       .then(() => this.primeNextHand())
-      .catch((error: unknown) => {
-        this.update({
-          error: error instanceof Error ? error.message : 'The next hand could not be shuffled',
-        });
-      })
       .finally(() => {
         this.redealPending = false;
       });
