@@ -1,5 +1,5 @@
 import { Howl, Howler } from 'howler';
-import { isAppleTouchDevice } from '@/lib/audio/platform';
+import { isAppleTouchDevice, suspendsAudioWhenBackgrounded } from '@/lib/audio/platform';
 
 export const AUDIO_STORAGE_KEY = 'parlour.audio.v1';
 
@@ -111,7 +111,10 @@ export class AudioManager {
   private entries = new Map<string, Entry>();
   private listeners = new Set<(settings: AudioSettings) => void>();
   private unlocked = false;
-  private pageActive = typeof document === 'undefined' || document.visibilityState !== 'hidden';
+  private pageActive =
+    !suspendsAudioWhenBackgrounded() ||
+    typeof document === 'undefined' ||
+    document.visibilityState !== 'hidden';
   private gestureBound = false;
   private gestureHandler: (() => void) | null = null;
   private lifecycleHandlers: {
@@ -349,10 +352,18 @@ export class AudioManager {
   private watchPageLifecycle(): void {
     if (this.lifecycleHandlers || typeof window === 'undefined') return;
     const visibilityChange = () => {
-      this.setPageActive(document.visibilityState !== 'hidden');
+      if (suspendsAudioWhenBackgrounded()) {
+        this.setPageActive(document.visibilityState !== 'hidden');
+      }
     };
-    const pageHide = () => this.setPageActive(false);
-    const pageShow = () => this.setPageActive(document.visibilityState !== 'hidden');
+    const pageHide = () => {
+      if (suspendsAudioWhenBackgrounded()) this.setPageActive(false);
+    };
+    const pageShow = () => {
+      if (suspendsAudioWhenBackgrounded()) {
+        this.setPageActive(document.visibilityState !== 'hidden');
+      }
+    };
     this.lifecycleHandlers = { visibilityChange, pageHide, pageShow };
     document.addEventListener('visibilitychange', visibilityChange);
     window.addEventListener('pagehide', pageHide);

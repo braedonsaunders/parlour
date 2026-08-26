@@ -9,3 +9,9 @@ export function isAppleTouchDevice(): boolean {
   if (/iPad|iPhone|iPod/.test(ua)) return true;
   return navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1;
 }
+
+/** Phones and tablets whose app audio must yield when the app is minimized. */
+export function suspendsAudioWhenBackgrounded(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  return isAppleTouchDevice() || /Android/i.test(navigator.userAgent ?? '');
+}

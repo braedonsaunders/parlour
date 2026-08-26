@@ -88,6 +88,7 @@ describe('AudioDirector', () => {
     container?.remove();
     resetAudioManagerForTests();
     resetMusicBindingsForTests();
+    vi.unstubAllGlobals();
   });
 
   it('starts the title theme on the first gesture, not a later effect', async () => {
@@ -117,6 +118,13 @@ describe('AudioDirector', () => {
   });
 
   it('silences the title theme while hidden and resumes it on foreground', async () => {
+    vi.stubGlobal('navigator', {
+      userAgent: 'Mozilla/5.0 (Linux; Android 15; Pixel 9)',
+      platform: 'Linux armv8l',
+      maxTouchPoints: 5,
+    });
+    resetAudioManagerForTests();
+    resetMusicBindingsForTests();
     await act(async () => root.render(createElement(AudioDirector)));
     act(() => window.dispatchEvent(new Event('pointerdown')));
     const theme = FakeHowl.instances.find((howl) => howl.src.includes('music-title.m4a'));
@@ -137,6 +145,27 @@ describe('AudioDirector', () => {
       document.dispatchEvent(new Event('visibilitychange'));
       await Promise.resolve();
     });
+    expect(theme?.playing()).toBe(true);
+  });
+
+  it('keeps the title theme playing when a fullscreen Mac app loses visibility', async () => {
+    vi.stubGlobal('navigator', {
+      userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Chrome/128',
+      platform: 'MacIntel',
+      maxTouchPoints: 0,
+    });
+    resetAudioManagerForTests();
+    resetMusicBindingsForTests();
+    await act(async () => root.render(createElement(AudioDirector)));
+    act(() => window.dispatchEvent(new Event('pointerdown')));
+    const theme = FakeHowl.instances.find((howl) => howl.src.includes('music-title.m4a'));
+    expect(theme?.playing()).toBe(true);
+
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      value: 'hidden',
+    });
+    act(() => document.dispatchEvent(new Event('visibilitychange')));
     expect(theme?.playing()).toBe(true);
   });
 });

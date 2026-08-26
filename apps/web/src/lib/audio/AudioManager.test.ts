@@ -116,6 +116,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.useRealTimers();
+  vi.unstubAllGlobals();
 });
 
 describe('settings persistence', () => {
@@ -335,6 +336,11 @@ describe('unlock', () => {
   });
 
   it('stops and blocks sounds while hidden, then resumes the Web Audio context', async () => {
+    vi.stubGlobal('navigator', {
+      userAgent: 'Mozilla/5.0 (Linux; Android 15; Pixel 9)',
+      platform: 'Linux armv8l',
+      maxTouchPoints: 5,
+    });
     const context = {
       state: 'running',
       suspend: vi.fn(async () => {
@@ -371,6 +377,36 @@ describe('unlock', () => {
     expect(manager.isPageActive()).toBe(true);
     expect(context.resume).toHaveBeenCalledTimes(1);
     expect(activeStates).toEqual([false, true]);
+    manager.dispose();
+  });
+
+  it('keeps desktop audio active when a fullscreen Mac app loses visibility', () => {
+    vi.stubGlobal('navigator', {
+      userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Chrome/128',
+      platform: 'MacIntel',
+      maxTouchPoints: 0,
+    });
+    const context = {
+      state: 'running',
+      suspend: vi.fn(() => Promise.resolve()),
+      resume: vi.fn(() => Promise.resolve()),
+    };
+    (Howler as unknown as { ctx: typeof context }).ctx = context;
+    const manager = makeManager();
+    manager.unlock();
+    expect(manager.play('pop')).not.toBeNull();
+
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      value: 'hidden',
+    });
+    document.dispatchEvent(new Event('visibilitychange'));
+    window.dispatchEvent(new Event('pagehide'));
+
+    expect(manager.isPageActive()).toBe(true);
+    expect(manager.activeVoices('pop')).toBe(1);
+    expect(manager.play('pop')).not.toBeNull();
+    expect(context.suspend).not.toHaveBeenCalled();
     manager.dispose();
   });
 });
