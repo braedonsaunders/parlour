@@ -79,6 +79,7 @@ The browser version is the full game. If you want it closer:
 - **iPhone / iPad** — open the web app, tap **Add to Home Screen**, then **Share → Add to Home Screen**.
 - **Android** — tap the in-app **Install app** button.
 - **macOS, Windows, Linux** — grab the installer from the [latest release](https://github.com/braedonsaunders/parlour/releases/latest).
+- **Linux AppImage / `.deb`** — the shell already turns off WebKitGTK's DMA-BUF compositor so NVIDIA, Hyprland, and GPU-less VMs do not paint then quit. If it still dies, start it with `WEBKIT_DISABLE_COMPOSITING_MODE=1`.
 
 ## Privacy & trust, honestly stated
 
