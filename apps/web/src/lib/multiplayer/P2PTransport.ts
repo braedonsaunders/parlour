@@ -5,7 +5,12 @@ import {
   validateRoomCode,
 } from '../rooms/code';
 import { seatRangeFor } from '../rooms/seatRange';
-import { NostrSignaling, type RoomAnnouncement, type SignalPayload } from './NostrSignaling';
+import {
+  NostrSignaling,
+  type RoomAnnouncement,
+  type RoomSignaling,
+  type SignalPayload,
+} from './NostrSignaling';
 import {
   HEARTBEAT_INTERVAL_MS,
   HEARTBEAT_TIMEOUT_MS,
@@ -60,7 +65,7 @@ type P2PTransportOptions = {
   profileId: string;
   profileName?: string;
   profileAvatarId?: string;
-  signaling?: NostrSignaling;
+  signaling?: RoomSignaling;
   iceServers?: RTCIceServer[];
   origin?: string;
   now?: () => number;
@@ -74,7 +79,7 @@ export class P2PTransport implements Transport {
   private readonly authority: AuthorityAdapter;
   private readonly profileId: string;
   private readonly profile: PlayerProfile;
-  private readonly signaling: NostrSignaling;
+  private readonly signaling: RoomSignaling;
   private readonly iceServers: RTCIceServer[];
   private readonly origin: string;
   private readonly now: () => number;

@@ -32,7 +32,11 @@ import {
   type VeilAuditState,
 } from '@/lib/multiplayer/veil';
 import { botTurnKey } from './botSeats';
-import { NostrSignaling, type RoomAnnouncement } from '@/lib/multiplayer/NostrSignaling';
+import {
+  NostrSignaling,
+  type RoomAnnouncement,
+  type RoomSignaling,
+} from '@/lib/multiplayer/NostrSignaling';
 import {
   createDealNonce,
   dealCommitment,
@@ -119,7 +123,13 @@ export type MultiplayerRoomSnapshot = {
 };
 
 type SessionDependencies = {
-  signaling?: NostrSignaling;
+  /**
+   * Signalling for this room. Typed as the interface rather than the Nostr
+   * class so a test can supply an in-memory bus: NostrSignaling carries private
+   * fields, and TypeScript private members are nominal, so nothing else was
+   * assignable to the concrete type however identical its shape.
+   */
+  signaling?: RoomSignaling;
   peerConnection?: (configuration: RTCConfiguration) => RTCPeerConnection;
   seed?: number;
   heartbeatIntervalMs?: number;
@@ -1419,7 +1429,7 @@ export class MultiplayerRoomSession {
     this.transport = null;
   }
 
-  private prepare(settings: RoomSettings, signaling?: NostrSignaling): void {
+  private prepare(settings: RoomSettings, signaling?: RoomSignaling): void {
     if (this.transport) throw new Error('this session already has an active room');
     const seed = normalizeSeed(this.dependencies.seed ?? randomSeed());
     this.seed = seed;
