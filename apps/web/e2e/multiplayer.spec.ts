@@ -29,7 +29,6 @@
 
 import { expect, test, type Browser, type BrowserContext, type Page } from '@playwright/test';
 import { HermeticSignalingBroker } from './hermetic-signaling';
-import type { RoomSignaling } from '../src/lib/multiplayer/NostrSignaling';
 
 /**
  * The base game for multiplayer tests. Wild is the simplest multiplayer game
@@ -95,10 +94,12 @@ async function openSeat(
 }
 
 /** Creates a room from the Wild create page and reads the four-character code. */
-async function createRoom(page: Page): Promise<string> {
+async function createRoom(page: Page, broker: HermeticSignalingBroker): Promise<string> {
   await page.goto(`/${GAME}/create`);
+  await broker.drain(page);
   const heading = page.locator(ROOM_HEADING);
   await expect(heading).toBeVisible({ timeout: CONNECT_TIMEOUT_MS });
+  await broker.drain(page);
   const code = (await heading.textContent())?.trim() ?? '';
   expect(code).toHaveLength(4);
   expect(code).toMatch(/^[A-HJ-NP-Z2-9]{4}$/);
@@ -106,26 +107,52 @@ async function createRoom(page: Page): Promise<string> {
 }
 
 /** Joins a room by typing the code into the join page. */
-async function joinRoomByCode(page: Page, code: string): Promise<void> {
+async function joinRoomByCode(
+  page: Page,
+  code: string,
+  broker: HermeticSignalingBroker,
+): Promise<void> {
   await page.goto('/join/');
+  await broker.drain(page);
   const input = page.locator(JOIN_INPUT);
   await input.fill(code);
-  // The label is localised — English idles at "Pull up a chair" — so matching on
-  // copy found nothing until the button happened to be mid-flight.
-  await page.getByTestId('join-submit').click();
+  await page.getByRole('button', { name: /join|knocking/i }).click();
+  // Drain repeatedly — the join triggers resolve, announce, and WebRTC
+  // signalling ops on the same outbox.
+  for (let i = 0; i < 20; i++) {
+    await broker.drain(page);
+    await page.waitForTimeout(500);
+    const visible = await page
+      .locator(ROOM_HEADING)
+      .isVisible()
+      .catch(() => false);
+    if (visible) break;
+  }
   await expect(page.locator(ROOM_HEADING)).toBeVisible({ timeout: CONNECT_TIMEOUT_MS });
   await expect(page.locator(ROOM_HEADING)).toContainText(code);
 }
 
 /** Adds a bot to every empty chair, then presses Start and waits for the table. */
-async function fillBotsAndStart(page: Page): Promise<void> {
+async function fillBotsAndStart(page: Page, broker: HermeticSignalingBroker): Promise<void> {
   const addBotButtons = page.getByRole('button', { name: /add bot/i });
   const count = await addBotButtons.count();
   for (let i = 0; i < count; i++) {
     await addBotButtons.first().click();
     await page.waitForTimeout(300);
   }
+  await broker.drain(page);
   await page.getByRole('button', { name: /start/i }).click({ timeout: 5_000 });
+  // Drain repeatedly during the deal: the seed round, snapshot publish, and
+  // WebRTC state-sync all go through the outbox.
+  for (let i = 0; i < 30; i++) {
+    await broker.drain(page);
+    await page.waitForTimeout(500);
+    const menu = await page
+      .getByTestId('table-menu')
+      .isVisible()
+      .catch(() => false);
+    if (menu) break;
+  }
   await expect(page.getByTestId('table-menu')).toBeVisible({ timeout: 20_000 });
   const hand = page.locator('[role="list"][data-zone]').first();
   await expect(hand.locator('[role="listitem"]').first()).toBeVisible({ timeout: 15_000 });
@@ -175,45 +202,63 @@ test.describe('bridge isolation diagnostic', () => {
     });
     expect(shape.ok, JSON.stringify(shape)).toBe(true);
 
-    // 2. page → Node announce, then Node-side resolve.
+    // 2. page → Node announce. Uses the outbox; drain to process.
     await page.evaluate(() =>
       (
-        window as unknown as { __PARLOUR_E2E_SIGNALING__: RoomSignaling }
+        window as unknown as {
+          __PARLOUR_E2E_SIGNALING__: {
+            announce(code: string, settings: Record<string, unknown>): Promise<void>;
+          };
+        }
       ).__PARLOUR_E2E_SIGNALING__.announce('ZZZZ', {
         gameId: 'wildpile',
         seats: 2,
         config: {},
       }),
     );
+    await broker.drain(page);
     expect(broker.resolve('ZZZZ')?.hostPubkey).toBe(key);
 
-    // 3. page → Node resolve returns the announcement.
-    const resolved = await page.evaluate(() =>
+    // 3. page → Node resolve returns the announcement. Drain first.
+    const resolveP = page.evaluate(() =>
       (
-        window as unknown as { __PARLOUR_E2E_SIGNALING__: RoomSignaling }
+        window as unknown as {
+          __PARLOUR_E2E_SIGNALING__: {
+            resolve(code: string): Promise<{ hostPubkey: string }>;
+          };
+        }
       ).__PARLOUR_E2E_SIGNALING__.resolve('ZZZZ'),
     );
+    await broker.drain(page);
+    const resolved = await resolveP;
     expect(resolved.hostPubkey).toBe(key);
 
-    // 4. Node → page: subscribe on a second seat, then deliver to it.
+    // 4. Node → page: subscribe on a second seat, then deliver.
     const context2 = await browser.newContext();
     const page2 = await context2.newPage();
     const key2 = peerKey('diag-2');
     await broker.install(page2, key2);
     await page2.goto('/');
 
+    // Fire subscribe from the page.
     const delivery = page2.evaluate(
       () =>
         new Promise<string>((resolve) => {
           (
-            window as unknown as { __PARLOUR_E2E_SIGNALING__: RoomSignaling }
+            window as unknown as {
+              __PARLOUR_E2E_SIGNALING__: {
+                subscribe(
+                  code: string,
+                  cb: (sender: string, payload: { type: string }) => void,
+                ): { close(): void };
+              };
+            }
           ).__PARLOUR_E2E_SIGNALING__.subscribe('ZZZZ', (author, payload) =>
             resolve(`${author}:${payload.type}`),
           );
         }),
     );
-    // Give the subscribe message a beat to reach Node, then deliver.
-    await page2.waitForTimeout(200);
+    await broker.drain(page2);
     broker.deliver('sender-key', 'ZZZZ', key2, { type: 'offer', sdp: 'x' });
     await expect(delivery).resolves.toBe('sender-key:offer');
 
@@ -244,16 +289,16 @@ test.describe('multi-context friend room (hermetic)', () => {
   });
 
   test('D1a — create a room and read the four-character code', async () => {
-    roomCode = await createRoom(host.page);
+    roomCode = await createRoom(host.page, broker);
   });
 
   test('D1b — join from a second context by code', async () => {
-    await joinRoomByCode(guest.page, roomCode);
+    await joinRoomByCode(guest.page, roomCode, broker);
     await expect(host.page.locator(ROOM_HEADING)).toContainText(roomCode);
   });
 
   test('D1c — the collaborative deal reaches both contexts after start', async () => {
-    await fillBotsAndStart(host.page);
+    await fillBotsAndStart(host.page, broker);
     await expect(guest.page.getByTestId('table-menu')).toBeVisible({
       timeout: CONNECT_TIMEOUT_MS,
     });
@@ -308,10 +353,10 @@ test.describe('multiplayer resilience (hermetic)', () => {
     const guest1 = await openSeat(browser, broker, 'guest-1');
     const guest2 = await openSeat(browser, broker, 'guest-2');
 
-    const code = await createRoom(host.page);
-    await joinRoomByCode(guest1.page, code);
-    await joinRoomByCode(guest2.page, code);
-    await fillBotsAndStart(host.page);
+    const code = await createRoom(host.page, broker);
+    await joinRoomByCode(guest1.page, code, broker);
+    await joinRoomByCode(guest2.page, code, broker);
+    await fillBotsAndStart(host.page, broker);
 
     // Kill the host. This closes its WebRTC links; the guests detect the loss
     // through heartbeats (3.5s) and re-elect the lowest surviving peer.
@@ -342,10 +387,10 @@ test.describe('multiplayer resilience (hermetic)', () => {
     const guest1 = await openSeat(browser, broker, 'guest-1');
     const guest2 = await openSeat(browser, broker, 'guest-2');
 
-    const code = await createRoom(host.page);
-    await joinRoomByCode(guest1.page, code);
-    await joinRoomByCode(guest2.page, code);
-    await fillBotsAndStart(host.page);
+    const code = await createRoom(host.page, broker);
+    await joinRoomByCode(guest1.page, code, broker);
+    await joinRoomByCode(guest2.page, code, broker);
+    await fillBotsAndStart(host.page, broker);
 
     // guest2 occupies seat 2 (host=0, guest1=1, guest2=2). Drop it.
     await guest2.context.close();
@@ -373,9 +418,9 @@ test.describe('multiplayer resilience (hermetic)', () => {
     const host = await openSeat(browser, broker, 'host');
     const guest = await openSeat(browser, broker, 'guest');
 
-    const code = await createRoom(host.page);
-    await joinRoomByCode(guest.page, code);
-    await fillBotsAndStart(host.page);
+    const code = await createRoom(host.page, broker);
+    await joinRoomByCode(guest.page, code, broker);
+    await fillBotsAndStart(host.page, broker);
 
     // Drop the only other human.
     await guest.context.close();
@@ -398,8 +443,8 @@ test.describe('multiplayer resilience (hermetic)', () => {
     const host = await openSeat(browser, broker, 'host');
     const guest = await openSeat(browser, broker, 'guest');
 
-    const code = await createRoom(host.page);
-    await joinRoomByCode(guest.page, code);
+    const code = await createRoom(host.page, broker);
+    await joinRoomByCode(guest.page, code, broker);
     await expect(host.page.locator(ROOM_HEADING)).toBeVisible({ timeout: 5_000 });
 
     // Reload the guest — the join page reconnects using the code in the URL.
@@ -424,8 +469,8 @@ test.describe('multiplayer resilience (hermetic)', () => {
     const host = await openSeat(browser, broker, 'host');
     const guest = await openSeat(browser, broker, 'guest');
 
-    const code = await createRoom(host.page);
-    await joinRoomByCode(guest.page, code);
+    const code = await createRoom(host.page, broker);
+    await joinRoomByCode(guest.page, code, broker);
 
     await guest.page.evaluate(() => {
       Object.defineProperty(document, 'visibilityState', {
@@ -460,9 +505,9 @@ test.describe('multiplayer resilience (hermetic)', () => {
     const host = await openSeat(browser, broker, 'host');
     const guest = await openSeat(browser, broker, 'guest');
 
-    const code = await createRoom(host.page);
-    await joinRoomByCode(guest.page, code);
-    await fillBotsAndStart(host.page);
+    const code = await createRoom(host.page, broker);
+    await joinRoomByCode(guest.page, code, broker);
+    await fillBotsAndStart(host.page, broker);
 
     await expect(guest.page.getByTestId('table-menu')).toBeVisible({
       timeout: CONNECT_TIMEOUT_MS,
@@ -499,9 +544,9 @@ test.describe('multiplayer resilience (hermetic)', () => {
     const host = await openSeat(browser, broker, 'host');
     const guest = await openSeat(browser, broker, 'guest');
 
-    const code = await createRoom(host.page);
-    await joinRoomByCode(guest.page, code);
-    await fillBotsAndStart(host.page);
+    const code = await createRoom(host.page, broker);
+    await joinRoomByCode(guest.page, code, broker);
+    await fillBotsAndStart(host.page, broker);
 
     await playOutWildMatch(host.page, guest.page);
 
