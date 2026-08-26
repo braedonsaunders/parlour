@@ -67,6 +67,7 @@ describe('catalogue completeness', () => {
         (key) =>
           key.startsWith('tableMenu.') ||
           key.startsWith('security.') ||
+          key.startsWith('narration.') ||
           key.startsWith('pwa.') ||
           key === 'room.share' ||
           key === 'room.shareFailed' ||

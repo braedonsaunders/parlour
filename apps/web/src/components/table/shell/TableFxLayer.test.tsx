@@ -8,6 +8,7 @@ import tableStyles from '@/styles/table.module.css';
 import { PlayingCard } from '../PlayingCard';
 import { EuchreTableScreen } from '../euchre/EuchreTableScreen';
 import { TableCardFlight, TableFxLayer, TableTurnPop } from './TableFxLayer';
+import { TableShell } from './TableShell';
 
 const GOOD_FX: FxEvent[] = [
   { kind: Fx.DealCard, payload: { card: 'S1', from: 'stock', to: 'hand:0', dur: 220 }, at: 0 },
@@ -19,30 +20,39 @@ const BAD_FX: FxEvent[] = [
   { kind: Fx.DealCard, payload: { card: 'S1', from: 'stock', to: '', dur: 220 }, at: 0 },
 ];
 
+const NARRATED_FX: FxEvent[] = [
+  { kind: 'tricks.play', payload: { card: 'H5', seat: 1, index: 0 }, at: 0 },
+  { kind: 'eights.score', payload: { seat: 1, points: 10, total: 25 }, at: 80 },
+  { kind: Fx.TurnRing, payload: { seat: 2 }, at: 120 },
+];
+
 function Harness({
   fx,
   renderCue,
   presentation,
+  reduced,
   children,
 }: {
   fx: readonly FxEvent[];
   renderCue: (cue: FxCue) => ReactNode;
   presentation?: 'live' | 'hidden';
+  reduced?: boolean;
   children?: ReactNode;
 }) {
   const rootRef = useRef<HTMLElement>(null);
   return (
-    <main ref={rootRef}>
+    <TableShell rootRef={rootRef}>
       <TableFxLayer
         fx={fx}
         fxKey="k"
         rootRef={rootRef}
         renderCue={renderCue}
         presentation={presentation}
+        reduced={reduced}
       >
         {children}
       </TableFxLayer>
-    </main>
+    </TableShell>
   );
 }
 
@@ -82,7 +92,8 @@ describe('TableFxLayer', () => {
     act(() => root.render(<Harness fx={GOOD_FX} renderCue={renderFlights} />));
 
     const layer = container.querySelector<HTMLElement>(`.${tableStyles.fxLayer}`)!;
-    expect(layer.getAttribute('aria-live')).toBe('polite');
+    expect(layer.getAttribute('aria-hidden')).toBe('true');
+    expect(layer.hasAttribute('aria-live')).toBe(false);
     expect(layer.querySelector(`.${tableStyles.fxError}`)).toBeNull();
 
     const flights = [...layer.querySelectorAll<HTMLElement>('[data-card-flight]')];
@@ -105,6 +116,23 @@ describe('TableFxLayer', () => {
     const layer = container.querySelector<HTMLElement>(`.${tableStyles.fxLayer}`)!;
     expect(layer.getAttribute('aria-hidden')).toBe('true');
     expect(layer.hasAttribute('aria-live')).toBe(false);
+  });
+
+  it('announces a terse action, score change and turn from the fx timeline', () => {
+    act(() => root.render(<Harness fx={NARRATED_FX} renderCue={renderFlights} />));
+
+    const announcer = container.querySelector<HTMLElement>('[data-table-announcer]')!;
+    expect(announcer.getAttribute('aria-live')).toBe('polite');
+    expect(announcer.getAttribute('aria-atomic')).toBe('true');
+    expect(announcer.textContent).toBe(
+      'Seat 2 played H5. Seat 2 now has 25 points. Seat 3’s turn.',
+    );
+  });
+
+  it('does not narrate setup flights, even when calm motion skips their travel', () => {
+    act(() => root.render(<Harness fx={GOOD_FX} renderCue={renderFlights} reduced />));
+
+    expect(container.querySelector('[data-table-announcer]')?.textContent).toBe('');
   });
 
   it('contains a malformed batch: no flights, a skipped note, and extra children survive', () => {

@@ -45,6 +45,77 @@ describe('TableScreenFrame', () => {
     });
     expect(open).toHaveBeenCalledOnce();
   });
+
+  it('moves through a hand with arrow keys and activates the focused card with Enter', () => {
+    const play = vi.fn();
+    act(() =>
+      root.render(
+        <TableScreenFrame
+          rootRef={{ current: null }}
+          hud={null}
+          menu={{ isOpen: false, open: vi.fn(), close: vi.fn(), quit: vi.fn() }}
+        >
+          <div role="list" data-zone="hand:0" aria-label="Your hand">
+            <div data-hand-card>
+              <button type="button">Ace</button>
+            </div>
+            <div data-hand-card>
+              <button type="button" onClick={play}>
+                Two
+              </button>
+            </div>
+          </div>
+        </TableScreenFrame>,
+      ),
+    );
+
+    const cards = [...container.querySelectorAll<HTMLButtonElement>('[data-hand-card] button')];
+    cards[0]?.focus();
+    act(() =>
+      cards[0]?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true })),
+    );
+    expect(document.activeElement).toBe(cards[1]);
+
+    act(() =>
+      cards[1]?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })),
+    );
+    expect(play).toHaveBeenCalledOnce();
+  });
+
+  it('moves from a solitaire source to a pointer-equivalent target', () => {
+    const move = vi.fn();
+    act(() =>
+      root.render(
+        <TableScreenFrame
+          rootRef={{ current: null }}
+          hud={null}
+          menu={{ isOpen: false, open: vi.fn(), close: vi.fn(), quit: vi.fn() }}
+        >
+          <div data-zone="tableau:0">
+            <button type="button">Select ace</button>
+          </div>
+          <div data-zone="foundation:spades" data-legal-target>
+            <button type="button" onClick={move}>
+              Move to spades foundation
+            </button>
+          </div>
+        </TableScreenFrame>,
+      ),
+    );
+
+    const source = container.querySelector<HTMLButtonElement>('[data-zone="tableau:0"] button')!;
+    const target = container.querySelector<HTMLButtonElement>(
+      '[data-zone="foundation:spades"] button',
+    )!;
+    source.focus();
+    act(() =>
+      source.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true })),
+    );
+    expect(document.activeElement).toBe(target);
+
+    act(() => target.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
+    expect(move).toHaveBeenCalledOnce();
+  });
 });
 
 describe('table screen frame convention', () => {
