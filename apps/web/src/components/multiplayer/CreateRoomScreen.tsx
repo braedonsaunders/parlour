@@ -4,71 +4,95 @@ import Link from 'next/link';
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { RoomLobby } from '@/components/multiplayer/RoomLobby';
 import { HostRoomMatch } from '@/lib/games/RoomGameTable';
+import { createScreenFor, type CreateScreen } from '@/lib/rooms/createScreens';
+import type { MultiplayerGameId } from '@/lib/rooms/gameIds';
 import { useProfileStore } from '@/stores/profile';
-import { cribbageRulesFor, useCribbageSetupStore } from '@/stores/cribbageSetup';
+import { usePersistHydrated } from '@/stores/usePersistHydrated';
 import {
   activateMultiplayerSession,
   clearActiveMultiplayerSession,
   multiplayerProfile,
   MultiplayerRoomSession,
-} from '../../_multiplayer/roomSession';
+} from '@/app/_multiplayer/roomSession';
 
-export default function CreateCribbageRoomPage() {
+/**
+ * The host's side of opening a friend room, for every game.
+ *
+ * This is a straight lift of what all fourteen create pages already did, with
+ * the parts that differed moved into {@link CREATE_SCREENS}. It renders the same
+ * markup, in the same order, with the same classes: the point of the collapse
+ * was to stop maintaining one screen fourteen times, not to redesign it.
+ */
+export function CreateRoomScreen({ gameId }: { gameId: MultiplayerGameId }) {
+  const screen = createScreenFor(gameId);
   const name = useProfileStore((state) => state.name);
   const avatarId = useProfileStore((state) => state.avatarId);
-  const mode = useCribbageSetupStore((state) => state.mode);
-  const overrides = useCribbageSetupStore((state) => state.overrides);
-  const rulesKey = JSON.stringify({ ...cribbageRulesFor(mode, overrides), gamesToWin: 1 });
+  const ready = usePersistHydrated(screen.hydrate);
   const sessionRef = useRef<MultiplayerRoomSession | null>(null);
   const [session, setSession] = useState<MultiplayerRoomSession | null>(null);
 
   useEffect(() => {
-    if (sessionRef.current) return;
+    if (!ready || sessionRef.current) return;
     const next = new MultiplayerRoomSession(multiplayerProfile(name, avatarId));
     sessionRef.current = next;
     setSession(next);
+    const { seats, config } = screen.room();
     void next
-      .create({ gameId: 'cribbage', seats: 2, config: JSON.parse(rulesKey) })
+      .create({ gameId, seats, config })
       .then(() => activateMultiplayerSession(next))
       .catch(() => undefined);
-  }, [avatarId, name, rulesKey]);
+    // `screen` is a stable module constant and the room is read once inside,
+    // which is why the rule values are not dependencies here. Each old page
+    // listed its own — and then guarded the body so a change could never open a
+    // second room, so the dependency never did anything but re-run a no-op.
+  }, [avatarId, gameId, name, ready, screen]);
 
-  if (!session) return <Loading />;
+  if (!ready || !session) return <CreateRoomLoading screen={screen} />;
   return (
     <HostRoomMatch session={session}>
-      <ActiveLobby session={session} />
+      <ActiveLobby session={session} screen={screen} />
     </HostRoomMatch>
   );
 }
 
-function ActiveLobby({ session }: { session: MultiplayerRoomSession }) {
+function ActiveLobby({
+  session,
+  screen,
+}: {
+  session: MultiplayerRoomSession;
+  screen: CreateScreen;
+}) {
   const snapshot = useSyncExternalStore(
     session.subscribe,
     session.getSnapshot,
     session.getSnapshot,
   );
   const room = snapshot.room;
+
   const leave = () => {
     session.close();
     clearActiveMultiplayerSession();
   };
+
   if (snapshot.error && !room) {
     return (
       <main className="flex min-h-dvh flex-col items-center justify-center gap-5 px-6 text-center">
         <p className="panel-soft max-w-md p-5 text-dusk-50" role="alert">
           {snapshot.error}
         </p>
-        <Link href="/cribbage" onClick={leave} className="btn-fat btn-fat--ghost">
-          Back to Cribbage
+        <Link href={screen.backHref} onClick={leave} className="btn-fat btn-fat--ghost">
+          {screen.backLabel}
         </Link>
       </main>
     );
   }
-  if (!room) return <Loading />;
+  if (!room) return <CreateRoomLoading screen={screen} />;
+  const capacity = snapshot.settings?.seats ?? snapshot.seats.length;
+
   return (
     <main className="flex min-h-dvh flex-col items-center justify-center gap-5 px-6 py-8">
       <Link
-        href="/cribbage"
+        href={screen.backHref}
         onClick={leave}
         className="pill-soft chrome-nw absolute z-30 text-sm font-bold text-dusk-100 hover:text-hearth-200"
       >
@@ -83,26 +107,25 @@ function ActiveLobby({ session }: { session: MultiplayerRoomSession }) {
         seats={snapshot.seats.map((seat) => ({
           seat: seat.seat,
           name: seat.name,
-          avatar: seat.bot ? 'P' : '◆',
+          avatar: seat.bot ? screen.botGlyph : screen.humanGlyph,
           bot: seat.bot,
           connected: seat.connected,
         }))}
         onListedChange={(listed) => session.setListed(listed)}
         onStart={() => session.start()}
       />
-      <p className="max-w-xl text-center text-sm text-dusk-100/80">
-        Share the code with one friend. This room plays a complete race to 121 with deterministic
-        host and guest replays.
-      </p>
+      {screen.blurb && (
+        <p className="max-w-xl text-center text-sm text-dusk-100/80">{screen.blurb(capacity)}</p>
+      )}
     </main>
   );
 }
 
-function Loading() {
+function CreateRoomLoading({ screen }: { screen: CreateScreen }) {
   return (
     <main className="flex min-h-dvh items-center justify-center" aria-busy="true">
       <p className="panel-soft animate-pulse px-5 py-3 font-bold text-hearth-100">
-        Drilling a friend board…
+        {screen.loading}
       </p>
     </main>
   );
