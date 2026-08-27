@@ -15,7 +15,11 @@ on your phone, your laptop, or a native desktop app.
 
 </div>
 
-<img src="docs/shots/title-fable.png" alt="parlour title screen — a campfire under the northern lights" width="100%" />
+<div align="center">
+
+https://github.com/user-attachments/assets/a035a3ba-7118-499c-950a-8c32bf587368
+
+</div>
 
 ---
 
