@@ -510,10 +510,38 @@ function rankHint(
     case 'stock.draw':
       return { score: 10, kind: 'draw' };
     case 'stock.recycle':
-      return { score: 10, kind: 'recycle' };
+      return recycleUnlocksPlay(state) ? { score: 10, kind: 'recycle' } : null;
     default:
       return null;
   }
+}
+
+function wasteCardHasHome(state: KlondikePlayerView, card: CardId): boolean {
+  const suit = suitOfCard(card);
+  if (suit && canPlaceOnFoundation(card, state.foundations[suit])) return true;
+  for (let to = 0; to < TABLEAU_COLUMNS; to++) {
+    if (canPlaceOnTableau(card, state.tableau[to]?.up.at(-1) ?? null)) return true;
+  }
+  return false;
+}
+
+/**
+ * Recycle is only a hint when the next pass puts a playable card on top.
+ * Otherwise the hinter flips a spent stock forever — one leftover card in
+ * particular just bounces between draw and recycle.
+ */
+function recycleUnlocksPlay(state: KlondikePlayerView): boolean {
+  if (state.waste.length === 0) return false;
+  const stock = state.waste.slice().reverse();
+  const waste: CardId[] = [];
+  const drawCount = state.rules.drawCount;
+  while (stock.length > 0) {
+    const count = Math.min(drawCount, stock.length);
+    for (let index = 0; index < count; index++) waste.push(stock.pop() as CardId);
+    const top = waste.at(-1);
+    if (top && wasteCardHasHome(state, top)) return true;
+  }
+  return false;
 }
 
 function rankTableauMove(

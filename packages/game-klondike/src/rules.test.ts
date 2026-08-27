@@ -263,6 +263,28 @@ describe('public assistance', () => {
     expect(hintFor(klondikePlayerView(drawThree))?.reason).toBe('Turn three from the stock.');
   });
 
+  it('does not bounce the last stock card against an unplayable waste', () => {
+    const lastStock = emptyState({ stock: ['S9'], waste: ['C2', 'D6'] });
+    lastStock.tableau[0] = { down: [], up: ['D13'] };
+    expect(hintFor(klondikePlayerView(lastStock))).toEqual({
+      move: { id: 'stock.draw' },
+      reason: 'Turn the stock.',
+    });
+
+    const drawn = applyMove(sessionWithState(lastStock), { id: 'stock.draw' });
+    expect(drawn.state.stock).toEqual([]);
+    expect(hintFor(klondikePlayerView(drawn.state))).toBeNull();
+  });
+
+  it('still recycles when the next pass puts a playable card on top', () => {
+    const state = emptyState({ waste: ['C2', 'S4', 'H8', 'D6', 'S11'] });
+    state.tableau[0] = { down: [], up: ['S9'] };
+    expect(hintFor(klondikePlayerView(state))).toEqual({
+      move: { id: 'stock.recycle' },
+      reason: 'Flip the waste back into the stock.',
+    });
+  });
+
   it('only offers auto-finish when every hidden card is open and ordinary foundation moves finish', () => {
     const state = emptyState();
     for (const suit of SUITS) {
