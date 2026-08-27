@@ -1,4 +1,4 @@
-import { type MultiplayerGameId } from './gameIds';
+import { MULTIPLAYER_GAME_IDS, type MultiplayerGameId } from './gameIds';
 
 /**
  * Where a joined guest lands, per game.
@@ -49,6 +49,24 @@ export function roomSegmentFor(gameId: MultiplayerGameId): string | null {
   const parts = TABLE_ROUTES[gameId].split('/').filter(Boolean);
   return parts.length === 2 && parts[1] === 'table' ? (parts[0] as string) : null;
 }
+
+/**
+ * The URL segments `app/[game]/create/page.tsx` builds a route for.
+ *
+ * It lives HERE, in the leaf, and not beside the create screens — because the
+ * route that reads it is a server component, and `generateStaticParams` runs
+ * during page-data collection. The screen table imports every setup store, and
+ * those are `'use client'`; reaching them from the server is not a lint nit but
+ * a hard build failure ("Attempted to call defineRulesSetup() from the server").
+ * The route needs the vocabulary, not the screens, so the vocabulary is what it
+ * gets to import.
+ *
+ * Blitz is absent because it owns no segment: its room has lived at `/create`
+ * since before there was a second game to generalise from.
+ */
+export const CREATE_ROUTE_SEGMENTS: readonly string[] = MULTIPLAYER_GAME_IDS.map(
+  roomSegmentFor,
+).filter((segment): segment is string => segment !== null);
 
 /** The game that owns a URL segment, or null. */
 export function gameForRoomSegment(segment: string): MultiplayerGameId | null {

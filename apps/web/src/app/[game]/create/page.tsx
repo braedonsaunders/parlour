@@ -1,7 +1,6 @@
 import { notFound } from 'next/navigation';
 import { CreateRoomScreen } from '@/components/multiplayer/CreateRoomScreen';
-import { CREATE_ROUTE_SEGMENTS } from '@/lib/rooms/createScreens';
-import { gameForRoomSegment } from '@/lib/rooms/tableRoute';
+import { CREATE_ROUTE_SEGMENTS, gameForRoomSegment } from '@/lib/rooms/tableRoute';
 
 /**
  * Every game's create route, built from the room vocabulary.
@@ -16,6 +15,12 @@ import { gameForRoomSegment } from '@/lib/rooms/tableRoute';
  * dynamic branch when the static one has no matching child, so `/spades/create`
  * resolves here even though `app/spades/` exists. Verified against the export,
  * because it is the assumption the whole layout rests on.
+ *
+ * This file is a SERVER component and `generateStaticParams` runs during page
+ * data collection, so it imports the room vocabulary and nothing else. Reaching
+ * for the create-screen table here pulls in every setup store, and those are
+ * `'use client'` — which is not a lint nit but a hard build failure that no
+ * type-check or unit test can see.
  */
 export function generateStaticParams() {
   return CREATE_ROUTE_SEGMENTS.map((game) => ({ game }));

@@ -22,8 +22,7 @@ import { useSpadesSetupStore } from '@/stores/spadesSetup';
 import { useSpiteSetupStore } from '@/stores/spiteSetup';
 import { useWildSetupStore, wildRulesFor } from '@/stores/wildSetup';
 import type { PersistApi } from '@/stores/usePersistHydrated';
-import { MULTIPLAYER_GAME_IDS, type MultiplayerGameId } from './gameIds';
-import { roomSegmentFor } from './tableRoute';
+import { type MultiplayerGameId } from './gameIds';
 
 /**
  * Everything one game's create screen does differently, and nothing it does the
@@ -341,20 +340,4 @@ export function createScreenFor(gameId: MultiplayerGameId): CreateScreen {
   return CREATE_SCREENS[gameId];
 }
 
-/**
- * The URL segments `app/[game]/create/page.tsx` builds a route for.
- *
- * Segments, not game ids — Wild Pile is `wildpile` in the room vocabulary and
- * `wild` in the URL, and generating this list off the id put its lobby at
- * `/wildpile/create` while the shelf went on linking to `/wild/create`. The
- * segment comes from the same table that decides where a joined guest lands, so
- * a game's room and its table cannot end up on different ones.
- *
- * Blitz is absent because it owns no segment: its room has lived at `/create`
- * since before there was a second game to generalise from. That URL is out
- * there — the shelf links to it and it may be on a home screen — so it keeps a
- * four-line route file rather than being moved for tidiness.
- */
-export const CREATE_ROUTE_SEGMENTS: readonly string[] = MULTIPLAYER_GAME_IDS.map(
-  roomSegmentFor,
-).filter((segment): segment is string => segment !== null);
+export { CREATE_ROUTE_SEGMENTS } from './tableRoute';

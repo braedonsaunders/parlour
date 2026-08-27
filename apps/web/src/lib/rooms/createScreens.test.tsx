@@ -252,6 +252,30 @@ describe('create routes', () => {
   });
 
   /**
+   * The server route must not reach into the client store graph.
+   *
+   * `generateStaticParams` runs during page-data collection, and the
+   * create-screen table imports every setup store — all of which are
+   * `'use client'`. Importing it from this file is a hard build failure
+   * ("Attempted to call defineRulesSetup() from the server"), and it is
+   * invisible to type-check and to vitest: neither collects page data. So the
+   * import list is asserted directly, because the only other thing that catches
+   * it is a full `next build`.
+   */
+  it('keeps the server route on the room vocabulary and off the stores', () => {
+    const source = fs.readFileSync(path.join(APP, '[game]', 'create', 'page.tsx'), 'utf8');
+    const imports = [...source.matchAll(/from '([^']+)'/g)].map((match) => match[1] as string);
+
+    expect(imports).toContain('@/lib/rooms/tableRoute');
+    for (const specifier of imports) {
+      // The screen itself is fine — it is a client component, rendered rather
+      // than evaluated here. Anything reaching a store directly is not.
+      expect([specifier, specifier.startsWith('@/stores/')]).toEqual([specifier, false]);
+      expect([specifier, specifier.includes('createScreens')]).toEqual([specifier, false]);
+    }
+  });
+
+  /**
    * The guard that keeps the collapse collapsed.
    *
    * A game that grows its own create page again would not fail any other test —
