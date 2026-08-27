@@ -384,4 +384,12 @@ button.pileButton {
     max-width: calc(100vw - 1.4rem);
     translate: 0 0;
   }
+
+  /* At a phone's card width "diamonds · 0" is wider than the pile it labels,
+     so the words ran into each other across the foundations row. The glyph on
+     the pile already says which suit it is; this only has to stay legible. */
+  .pileLabel {
+    font-size: 0.46rem;
+    letter-spacing: 0.02em;
+  }
 }

@@ -460,7 +460,13 @@ button.pileButton {
     padding-right: max(0.65rem, env(safe-area-inset-right));
   }
 
+  /* The run picker is a control, not a pile, and a phone's width belongs to
+     the piles. Wrapping it onto its own line above them is the same decision
+     in all three games that have one: FreeCell cannot fit eight piles and a
+     picker side by side at any card size worth playing, and a rule that only
+     holds where there happens to be slack is not a rule. */
   .topRow {
+    flex-wrap: wrap;
     justify-content: flex-start;
     gap: 0.55rem;
     min-height: calc(var(--sp-card) * 1.4 + 0.7rem);
@@ -474,7 +480,9 @@ button.pileButton {
 
   .runPicker {
     order: -1;
-    max-width: 8rem;
+    flex: 1 0 100%;
+    max-width: none;
+    overflow-x: visible;
   }
 
   .titlePill {
@@ -499,5 +507,13 @@ button.pileButton {
     left: auto;
     max-width: calc(100vw - 1.4rem);
     translate: 0 0;
+  }
+
+  /* At a phone's card width "diamonds · 0" is wider than the pile it labels,
+     so the words ran into each other across the foundations row. The glyph on
+     the pile already says which suit it is; this only has to stay legible. */
+  .pileLabel {
+    font-size: 0.46rem;
+    letter-spacing: 0.02em;
   }
 }
