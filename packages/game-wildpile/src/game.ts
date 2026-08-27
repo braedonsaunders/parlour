@@ -925,11 +925,29 @@ const challengeDrawFour: Move<WildpileState> = {
  * Last-card protection. Usually this arms while holding two; Drop All can make
  * a larger hand fall straight to one, so the real question is whether any
  * playable card would leave exactly one behind.
+ *
+ * Under Veil that question cannot be asked here. The hand is opaque handles to
+ * everyone except its owner, and legality is decided by the host — which is
+ * exactly the seat that must not be able to read it. The owner's own client
+ * resolves its hand and offers the button correctly; the host then refused the
+ * move it had just watched light up, and the player got
+ * "move callLastCard is not legal right now" holding four cards with a Drop All
+ * that would have taken them to one.
+ *
+ * So a veiled table takes the seat at its word. This is a declaration about
+ * your own hand, which is what calling last card is at a real table too, and
+ * the part that actually matters is still enforced: reaching one card
+ * unprotected is caught and costs two, and hand SIZE is visible under Veil even
+ * when the faces are not. What is lost is the ability to refuse a premature
+ * call — a veiled player can arm early to be safe. That is a smaller price than
+ * either removing last-card protection from every veiled room or asking a
+ * player to reveal the card they are about to play in order to claim it.
  */
 const callLastCard: Move<WildpileState> = {
   validate(state, seat) {
     if (state.calledLastCard[seat]) return error('already-called', 'protection is already armed');
     const cards = hand(state, seat);
+    if (state.veiled) return cards.length > 1 ? true : error('not-last-card', 'nothing to protect');
     const canReachOne = cards.some(
       (card) =>
         canPlay(state, card) && cards.length - wildpileDiscardAllCards(cards, card).length === 1,
@@ -1110,14 +1128,18 @@ const timeout: Move<WildpileState> = {
 
 /** Offered alongside the seat's real options — arming never costs the turn. */
 function lastCardMoves(state: WildpileState, seat: SeatId): LegalMove[] {
+  if (state.calledLastCard[seat]) return [];
   const cards = hand(state, seat);
+  const offer: LegalMove[] = [{ id: 'callLastCard', hint: 'protect your last card' }];
+  // The host decides what is legal and, under Veil, cannot read this hand. It
+  // offers the move to any seat still holding cards; the owner's own client
+  // resolves its hand and shows the button only when it is really reachable.
+  if (state.veiled) return cards.length > 1 ? offer : [];
   const canReachOne = cards.some(
     (card) =>
       canPlay(state, card) && cards.length - wildpileDiscardAllCards(cards, card).length === 1,
   );
-  return canReachOne && !state.calledLastCard[seat]
-    ? [{ id: 'callLastCard', hint: 'protect your last card' }]
-    : [];
+  return canReachOne ? offer : [];
 }
 
 function legalMoves(state: WildpileState): LegalMove[] {

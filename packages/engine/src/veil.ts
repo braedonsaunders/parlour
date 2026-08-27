@@ -290,6 +290,31 @@ export function resolveVeiledState<S>(state: S, known: ReadonlyMap<CardId, CardI
   return substituteCardIds(state, usable);
 }
 
+/**
+ * The same resolution, for the fx timeline that narrates a move.
+ *
+ * `resolveVeiledState` puts real faces on the table; without this the flights
+ * that carry cards there still name handles. The card element in the DOM is
+ * keyed by its resolved id, the cue names `v#12`, nothing matches, and no
+ * flight is planned — so the card does not travel, it simply appears where it
+ * landed. Reported as cards "jumping to the finished location", most often on a
+ * discard, and seen by BOTH peers at once, which is what separates it from a
+ * dropped frame: the fx payload was wrong for everybody, not late for one.
+ *
+ * Unlike the state resolution this does not require the handle to still be on
+ * the table. A played card has already left the hand it flew out of, and that
+ * flight is exactly the one worth drawing.
+ */
+export function resolveVeiledFx<T>(fx: T, known: ReadonlyMap<CardId, CardId>): T {
+  if (known.size === 0) return fx;
+  const usable = new Map<CardId, CardId>();
+  for (const [handle, card] of known) {
+    if (veilHandleIndex(handle) === null || isVeilHandle(card)) continue;
+    usable.set(handle, card);
+  }
+  return substituteCardIds(fx, usable);
+}
+
 // ---------------------------------------------------------------------------
 // Deal order
 // ---------------------------------------------------------------------------

@@ -133,6 +133,54 @@ describe('wildpile under Veil', () => {
   });
 });
 
+/*
+ * Reported from a real table: four cards, a Drop All that would have taken the
+ * seat to one, the Last card button correctly lit — and pressing it produced
+ * "move callLastCard is not legal right now".
+ *
+ * The owner's client could see its own hand and offered the move honestly. The
+ * host, which decides legality, sees handles and could not confirm it. Under
+ * Veil the seat is taken at its word, because the host must not be able to read
+ * the hand it would need to read in order to judge.
+ */
+describe('calling last card on a veiled table', () => {
+  it('lets a seat arm protection the host cannot verify', () => {
+    const { session } = veiled();
+    const state = session.state as WildpileState;
+    const actor = state.turn;
+
+    expect(state.hands[actor]!.every((card) => card.startsWith('v#'))).toBe(true);
+    expect(
+      wildpileGame.flow.legalMoves(state, session.phase).some((move) => move.id === 'callLastCard'),
+    ).toBe(true);
+
+    const armed = sessionApply(wildpileGame, session, actor, 'callLastCard');
+    expect(armed.rejected).toBeUndefined();
+    expect((armed.session.state as WildpileState).calledLastCard[actor]).toBe(true);
+  });
+
+  it('still refuses a second call, so the declaration stays a single act', () => {
+    const { session } = veiled();
+    const actor = (session.state as WildpileState).turn;
+    const armed = sessionApply(wildpileGame, session, actor, 'callLastCard');
+
+    const again = sessionApply(wildpileGame, armed.session, actor, 'callLastCard');
+    expect(again.rejected?.code).toBe('illegal-move');
+  });
+
+  /*
+   * The half that Veil does not weaken: hand SIZE stays visible even when the
+   * faces do not, so a seat that forgets to call is still caught and still pays
+   * for it. That is the part of the rule worth protecting.
+   */
+  it('keeps the penalty for reaching one card unprotected', () => {
+    const { session } = veiled();
+    const state = session.state as WildpileState;
+    expect(state.hands.every((cards) => cards.length === defaults.handSize)).toBe(true);
+    expect(state.calledLastCard.every((armed) => armed === false)).toBe(true);
+  });
+});
+
 describe('veiled jump-in', () => {
   const jumpy = wildpileConfig.resolve({ jumpIn: true, sevenZero: false, swapCards: false });
 

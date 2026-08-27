@@ -3,6 +3,7 @@
 import {
   isActingSeat,
   isVeilHandle,
+  resolveVeiledFx,
   resolveVeiledState,
   stateContainsCardId,
   type CardRecycle,
@@ -654,7 +655,7 @@ export class MultiplayerRoomSession {
       this.transport.publishRematch();
       this.update({
         session: this.presented(this.authority.getSession()),
-        fx: runtime.session.setupFx ?? [],
+        fx: this.presentedFx(runtime.session.setupFx ?? []),
         fxKey: this.snapshot.fxKey + 1,
         stage: 'table',
         error: null,
@@ -698,7 +699,7 @@ export class MultiplayerRoomSession {
     this.transport.publishSnapshot();
     this.update({
       session: this.presented(this.authority.getSession()),
-      fx: runtime.session.setupFx ?? [],
+      fx: this.presentedFx(runtime.session.setupFx ?? []),
       fxKey: this.snapshot.fxKey + 1,
     });
   }
@@ -868,7 +869,7 @@ export class MultiplayerRoomSession {
     this.transport.publishSnapshot();
     this.update({
       session: this.presented(this.authority!.getSession()),
-      fx: runtime.session.setupFx ?? [],
+      fx: this.presentedFx(runtime.session.setupFx ?? []),
       fxKey: this.snapshot.fxKey + 1,
       security: {
         ...this.snapshot.security,
@@ -1640,6 +1641,21 @@ export class MultiplayerRoomSession {
     }
   }
 
+  /**
+   * The fx timeline, resolved the same way the state is.
+   *
+   * `presented` puts real faces on the table; a flight that still names a
+   * handle cannot find the element it is supposed to move, so the card appears
+   * at its destination instead of travelling there. Every publisher of fx goes
+   * through here for the same reason every publisher of state goes through
+   * `presented` — the two have to agree about what a card is called.
+   */
+  private presentedFx(fx: readonly FxEvent[]): readonly FxEvent[] {
+    const known = this.veil?.session.visibleFaces();
+    if (!known || known.size === 0) return fx;
+    return resolveVeiledFx(fx, known);
+  }
+
   private presented(session: MultiplayerGameSession): MultiplayerGameSession {
     const known = this.veil?.session.visibleFaces();
     if (!known || known.size === 0) return session;
@@ -1730,7 +1746,7 @@ export class MultiplayerRoomSession {
       const openDeal = imported.settings.security !== 'veil';
       this.update({
         session: this.presented(this.authority!.getSession()),
-        fx: this.authority!.getSession().setupFx ?? [],
+        fx: this.presentedFx(this.authority!.getSession().setupFx ?? []),
         fxKey: this.snapshot.fxKey + 1,
         stage: 'table',
         localSeat: this.snapshot.localSeat ?? this.seatForLocalProfile(),
@@ -1756,7 +1772,7 @@ export class MultiplayerRoomSession {
       gameId: settings.gameId as MultiplayerGameId,
       settings,
       session: runtime.session,
-      fx: runtime.session.setupFx ?? [],
+      fx: this.presentedFx(runtime.session.setupFx ?? []),
       fxKey: 0,
       error: null,
       security: securityFor(tier, settings.seats, tier === 'veil' ? 'veiled' : 'open'),
@@ -1766,7 +1782,7 @@ export class MultiplayerRoomSession {
   private accept(packet: AppliedPacket): void {
     this.update({
       session: this.presented(this.authority!.getSession()),
-      fx: packet.fx,
+      fx: this.presentedFx(packet.fx),
       fxKey: this.snapshot.fxKey + 1,
       error: null,
       stage: 'table',
