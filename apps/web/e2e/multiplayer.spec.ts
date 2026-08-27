@@ -413,6 +413,33 @@ test.describe('multiplayer resilience (hermetic)', () => {
     // bot's opening hand. All of that takes at least one heartbeat cycle.
     await guest1.page.waitForTimeout(8_000);
 
+    // Diagnostic dump: the question is whether seat 0 is marked as bot in
+    // the session snapshot AND in the rendered DOM. The result pins which
+    // layer is skipping the transition.
+    for (const [label, page] of [
+      ['guest1', guest1.page],
+      ['guest2', guest2.page],
+    ] as const) {
+      const snap = await page.evaluate(() => {
+        const session = (
+          globalThis as unknown as {
+            __parlourActiveRoom?: {
+              getSnapshot(): { seats: { seat: number; bot: boolean; connected: boolean }[] };
+            };
+          }
+        ).__parlourActiveRoom?.getSnapshot();
+        const s0 = session?.seats?.find((s) => s.seat === 0);
+        const el = document.querySelector('[data-seat="0"]');
+        return {
+          bot: s0?.bot ?? null,
+          connected: s0?.connected ?? null,
+          domHtml: el?.innerHTML?.slice(0, 200) ?? null,
+          hasBotSmall: el?.querySelector('small')?.textContent?.includes('bot') ?? false,
+        };
+      });
+      console.warn(`[diag] ${label} seat-0:`, JSON.stringify(snap));
+    }
+
     // Both guests stay on the table — no lobby dissolution, no error alert.
     await expectAtTable(guest1.page, 20_000);
     await expectAtTable(guest2.page, 20_000);
