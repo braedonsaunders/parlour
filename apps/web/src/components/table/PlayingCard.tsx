@@ -10,13 +10,17 @@ const SUITS: Record<string, { glyph: string; name: string }> = {
 
 const RANKS = ['?', 'A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
 
+/** Pinochle (and any double-deck) ids: `SQ-1`, `S10-0`, `HA-1`. */
+const COPY_ID = /^([SHDC])(A|K|Q|J|10|[2-9])-\d+$/;
+
 /**
  * A face supplied by a game pack, for decks the shared parser cannot read.
  *
- * `parseCard` assumes the standard `S1`..`C13` ids, so a pack with its own deck
- * — Spite's four-colour cards, say — would otherwise render as the raw id with
- * its first character eaten. Passing the pack's own `DeckDef.faces` entry keeps
- * the card component shared without teaching it every deck on the shelf.
+ * `parseCard` reads standard `S1`..`C13` ids and copy-suffixed ids like
+ * `SQ-1`. A pack with its own deck — Spite's four-colour cards, say — would
+ * otherwise render as the raw id with its first character eaten. Passing the
+ * pack's own `DeckDef.faces` entry keeps the card component shared without
+ * teaching it every deck on the shelf.
  */
 export type CardFaceHint = {
   short: string;
@@ -128,6 +132,20 @@ function faceToParsed(face: CardFaceHint): ParsedCard {
 }
 
 function parseCard(card: string): ParsedCard {
+  const copy = COPY_ID.exec(card);
+  if (copy) {
+    const suitLetter = copy[1] ?? '';
+    const rank = copy[2] ?? '?';
+    const suit = SUITS[suitLetter];
+    if (!suit) return { rank, glyph: '✦', red: false, label: card };
+    return {
+      rank,
+      glyph: suit.glyph,
+      red: suitLetter === 'H' || suitLetter === 'D',
+      label: `${rank} of ${suit.name}`,
+    };
+  }
+
   const suit = SUITS[card[0] ?? ''];
   const rankIndex = Number.parseInt(card.slice(1), 10);
   const rank = RANKS[rankIndex] ?? (card.slice(1) || '?');
