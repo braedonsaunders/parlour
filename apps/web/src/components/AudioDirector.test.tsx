@@ -240,4 +240,73 @@ describe('AudioDirector', () => {
       FakeHowl.instances.find((howl) => howl.src.includes('president-pass.mp3'))?.playing(),
     ).toBe(true);
   });
+
+  /*
+   * The games shelf is a row of tiles that are themselves buttons, so on iOS
+   * every swipe along it starts by pressing one. Sounding on `pointerdown`
+   * meant the shelf clicked at the player for the whole length of a scroll.
+   */
+  describe('the press sound follows a press, not a scroll', () => {
+    function pointer(
+      type: string,
+      target: Element,
+      { x = 0, y = 0, id = 1, pointerType = 'touch' } = {},
+    ) {
+      const event = new MouseEvent(type, { bubbles: true, clientX: x, clientY: y });
+      Object.defineProperty(event, 'pointerId', { value: id });
+      Object.defineProperty(event, 'pointerType', { value: pointerType });
+      act(() => void target.dispatchEvent(event));
+    }
+
+    const pressed = () =>
+      FakeHowl.instances.some((howl) => howl.src.includes('ui-press.mp3') && howl.playing());
+
+    let tile: HTMLButtonElement;
+
+    beforeEach(async () => {
+      tile = document.createElement('button');
+      document.body.append(tile);
+      await act(async () => root.render(createElement(AudioDirector)));
+      // Audio has to be unlocked before anything can sound at all.
+      act(() => window.dispatchEvent(new Event('pointerdown')));
+      FakeHowl.instances = [];
+    });
+
+    afterEach(() => tile.remove());
+
+    it('stays quiet while a finger drags a tile past the slop', () => {
+      pointer('pointerdown', tile, { x: 100, y: 100 });
+      expect(pressed()).toBe(false);
+      pointer('pointerup', tile, { x: 220, y: 104 });
+      expect(pressed()).toBe(false);
+    });
+
+    it('stays quiet when the browser takes the gesture for scrolling', () => {
+      pointer('pointerdown', tile, { x: 100, y: 100 });
+      pointer('pointercancel', tile, { x: 100, y: 100 });
+      pointer('pointerup', tile, { x: 100, y: 100 });
+      expect(pressed()).toBe(false);
+    });
+
+    it('sounds when a finger taps and lifts on the same control', () => {
+      pointer('pointerdown', tile, { x: 100, y: 100 });
+      expect(pressed()).toBe(false);
+      pointer('pointerup', tile, { x: 102, y: 101 });
+      expect(pressed()).toBe(true);
+    });
+
+    it('stays quiet when a finger lifts somewhere else', () => {
+      const other = document.createElement('button');
+      document.body.append(other);
+      pointer('pointerdown', tile, { x: 100, y: 100 });
+      pointer('pointerup', other, { x: 101, y: 100 });
+      expect(pressed()).toBe(false);
+      other.remove();
+    });
+
+    it('still sounds a mouse the instant it goes down, since a mouse cannot scroll', () => {
+      pointer('pointerdown', tile, { x: 100, y: 100, pointerType: 'mouse' });
+      expect(pressed()).toBe(true);
+    });
+  });
 });

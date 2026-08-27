@@ -74,15 +74,59 @@ export function AudioDirector() {
     return manager.subscribePageActive((active) => controller.setPageActive(active));
   }, [controller, manager]);
 
+  /*
+   * The press sound belongs to a press, and on a touch screen `pointerdown`
+   * cannot yet tell one from the start of a scroll. The games shelf is a row of
+   * tiles that are themselves buttons, so on iOS every swipe along it began by
+   * pressing a button and the shelf clicked at you the whole way down.
+   *
+   * A mouse or a pen cannot scroll the page by pressing, so those still sound
+   * immediately. A finger has to finish the gesture first: it sounds on release,
+   * and only if it stayed put and lifted on the control it started on.
+   */
   useEffect(() => {
+    const CONTROLS = 'button, a, [role="switch"]';
+    /** How far a finger may wander and still have meant to press. */
+    const PRESS_SLOP_PX = 10;
+    let pending: { id: number; x: number; y: number; control: Element } | null = null;
+
+    const controlUnder = (target: EventTarget | null) =>
+      target instanceof Element ? target.closest(CONTROLS) : null;
+
     const onPointerDown = (event: PointerEvent) => {
-      const target = event.target;
-      if (target instanceof Element && target.closest('button, a, [role="switch"]')) {
+      const control = controlUnder(event.target);
+      if (!control) return;
+      if (event.pointerType !== 'touch') {
         manager.play(PARLOUR_SFX.uiPress);
+        return;
       }
+      pending = { id: event.pointerId, x: event.clientX, y: event.clientY, control };
     };
+
+    const onPointerUp = (event: PointerEvent) => {
+      const armed = pending;
+      pending = null;
+      if (!armed || armed.id !== event.pointerId) return;
+      const travelled = Math.hypot(event.clientX - armed.x, event.clientY - armed.y);
+      if (travelled > PRESS_SLOP_PX) return;
+      if (controlUnder(event.target) !== armed.control) return;
+      manager.play(PARLOUR_SFX.uiPress);
+    };
+
+    // Fired the moment the browser claims the gesture for scrolling — the one
+    // unambiguous signal that this touch was never going to be a press.
+    const onPointerCancel = () => {
+      pending = null;
+    };
+
     document.addEventListener('pointerdown', onPointerDown, { passive: true });
-    return () => document.removeEventListener('pointerdown', onPointerDown);
+    document.addEventListener('pointerup', onPointerUp, { passive: true });
+    document.addEventListener('pointercancel', onPointerCancel, { passive: true });
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown);
+      document.removeEventListener('pointerup', onPointerUp);
+      document.removeEventListener('pointercancel', onPointerCancel);
+    };
   }, [manager]);
 
   return null;
