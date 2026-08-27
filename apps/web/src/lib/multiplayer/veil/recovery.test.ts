@@ -334,6 +334,30 @@ describe('what recovery refuses to do', () => {
       pack.shares.map((share) => share.share),
       policy,
     );
+    // On the rare under-load failure the value has been observed as `false`
+    // rather than a fault. `recoverLayer` has no such return path, so print
+    // exactly what came back before asserting — one failing run then answers
+    // whether this is a test-runner timeout (a rejected/aborted promise) or a
+    // genuine Veil regression, instead of a guess.
+    const observed = fault as unknown;
+    if (
+      observed === false ||
+      observed === null ||
+      observed === undefined ||
+      !('code' in (observed as object))
+    ) {
+      console.error(
+        'recoverLayer returned an unexpected shape:',
+        JSON.stringify({
+          type: typeof observed,
+          isPromise: observed instanceof Promise,
+          ctor: (observed as { constructor?: { name?: string } })?.constructor?.name ?? null,
+          ownKeys:
+            observed && typeof observed === 'object' ? Object.keys(observed as object) : null,
+          value: String(observed),
+        }),
+      );
+    }
     expect('code' in fault && fault.code).toBe('tampered');
   });
 
