@@ -94,6 +94,7 @@ function ActiveSpadesLobby({ session }: { session: MultiplayerRoomSession }) {
           bot: seat.bot,
           connected: seat.connected,
         }))}
+        onListedChange={(listed) => session.setListed(listed)}
         onStart={() => session.start()}
       />
       <p className="max-w-xl text-center text-sm text-dusk-100/80">

@@ -5,10 +5,20 @@ import {
   nip44,
   SimplePool,
   verifyEvent,
-  type Event,
-  type Filter,
 } from 'nostr-tools';
+import {
+  LISTING_TTL_SECONDS,
+  OPEN_TABLE_KIND,
+  OPEN_TABLE_TAG,
+  listingContent,
+  withdrawalContent,
+  type OwnTableListing,
+  type RoomListingPublisher,
+} from './RoomDirectory';
+import { DEFAULT_RELAYS, relaysFromEnv, type RelayPool, type Subscription } from './relays';
 import type { RoomSettings } from './types';
+
+export { DEFAULT_RELAYS, relaysFromEnv, type RelayPool };
 
 /**
  * Addressable room directory (NIP-01 30000–39999).
@@ -24,54 +34,6 @@ export const ROOM_ANNOUNCEMENT_KIND = 31288;
 export const SIGNAL_KIND = 21089;
 const ROOM_TTL_SECONDS = 60 * 60 * 4;
 const MIN_RELAY_QUORUM = 3;
-
-/**
- * Relays that still accept anonymous writes of parlour's kinds.
- *
- * The previous list (damus / nos.lol / nostr.band / wine / primal) no longer
- * reaches a write quorum: several no longer accept connections, and wine is
- * paid. Creating a room requires three successful publishes, so a list of five
- * with one writer looks like "the app is broken" on every host — Vercel and
- * `next dev` alike, because the browser talks to these relays directly.
- *
- * `NEXT_PUBLIC_PARLOUR_RELAYS` replaces this list at bundle time (comma-
- * separated `wss://` urls), the same way TURN is overridden.
- */
-export const DEFAULT_RELAYS = [
-  'wss://relay.primal.net',
-  'wss://relay.snort.social',
-  'wss://offchain.pub',
-  'wss://nostr.mom',
-  'wss://nostr-pub.wellorder.net',
-  'wss://nostr.oxtr.dev',
-  'wss://relay.nostr.net',
-  'wss://relay.mostr.pub',
-  'wss://relay.nostr.wirednet.jp',
-  'wss://relay.damus.io',
-  'wss://nos.lol',
-] as const;
-
-export function relaysFromEnv(value: string | undefined): string[] | undefined {
-  const urls = (value ?? '')
-    .split(',')
-    .map((url) => url.trim())
-    .filter((url) => url.length > 0);
-  return urls.length > 0 ? urls : undefined;
-}
-
-type Subscription = { close(): void };
-
-export interface RelayPool {
-  ensureRelay(url: string, params?: { connectionTimeout?: number }): Promise<unknown>;
-  publish(relays: string[], event: Event, params?: { maxWait?: number }): Promise<string>[];
-  querySync(relays: string[], filter: Filter, params?: { maxWait?: number }): Promise<Event[]>;
-  subscribeMany(
-    relays: string[],
-    filter: Filter,
-    params: { onevent(event: Event): void; maxWait?: number },
-  ): Subscription;
-  close(relays: string[]): void;
-}
 
 export type SignalPayload =
   | { type: 'offer'; sdp: string }
@@ -148,7 +110,7 @@ type SignalingOptions = {
   now?: () => number;
 };
 
-export class NostrSignaling implements RoomSignaling {
+export class NostrSignaling implements RoomSignaling, RoomListingPublisher {
   readonly publicKey: string;
   private readonly relays: string[];
   private readonly pool: RelayPool;
@@ -198,6 +160,57 @@ export class NostrSignaling implements RoomSignaling {
     const results = await Promise.allSettled(this.pool.publish(healthy, event, { maxWait: 5_000 }));
     if (results.filter((result) => result.status === 'fulfilled').length < MIN_RELAY_QUORUM) {
       throw new Error('Nostr relay quorum unavailable');
+    }
+  }
+
+  /**
+   * Publishes or refreshes this room's open-table row.
+   *
+   * Signed with the same key as the room announcement, which is the point: the
+   * browser hands the row's pubkey straight back to `join` as `expectedHost`,
+   * so picking a table off a public list is host-pinned in the way a typed code
+   * can never be.
+   *
+   * Best-effort by design — one relay is enough, and unlike {@link announce}
+   * there is no quorum. A row that reaches fewer relays is a table fewer people
+   * see; a room that reaches fewer relays is a table nobody can join.
+   */
+  async list(listing: OwnTableListing): Promise<void> {
+    await this.publishListing(listing.code, listingContent(listing));
+  }
+
+  /**
+   * Withdraws the row.
+   *
+   * Relays have no reliable delete, so this is a replacement that says `closed`
+   * rather than an erasure: addressable events supersede in place, and a
+   * browser watching live drops the table the moment it arrives instead of
+   * waiting out the TTL.
+   */
+  async unlist(code: string): Promise<void> {
+    await this.publishListing(code, withdrawalContent());
+  }
+
+  private async publishListing(code: string, content: string): Promise<void> {
+    const createdAt = Math.floor(this.now() / 1_000);
+    const event = finalizeEvent(
+      {
+        kind: OPEN_TABLE_KIND,
+        created_at: createdAt,
+        tags: [
+          ['d', code],
+          ['t', OPEN_TABLE_TAG],
+          ['expiration', String(createdAt + LISTING_TTL_SECONDS)],
+        ],
+        content,
+      },
+      this.secretKey,
+    );
+    const results = await Promise.allSettled(
+      this.pool.publish(this.relays, event, { maxWait: 5_000 }),
+    );
+    if (!results.some((result) => result.status === 'fulfilled')) {
+      throw new Error('Unable to publish the table listing');
     }
   }
 

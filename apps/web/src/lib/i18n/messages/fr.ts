@@ -92,6 +92,23 @@ export const fr: Messages = {
   'room.waitingFor_other': 'En attente de {count} joueurs',
   'room.shareText': 'Salle {code}',
 
+  'room.listPublicly': 'Rendre cette table publique',
+  'room.listPubliclyDetail':
+    'Toute personne qui parcourt les tables ouvertes verra le jeu, ton nom et ce code, et pourra s’asseoir.',
+  'room.listedDetail':
+    'Publiée jusqu’à ce que la dernière chaise soit prise ou que tu distribues. Décoche pour la retirer.',
+
+  // --- open-table browser ---------------------------------------------------
+  'browse.heading': 'Tables ouvertes',
+  'browse.searching': 'Recherche de tables ouvertes…',
+  'browse.empty':
+    'Aucune table ouverte pour l’instant. Saisis un code, ou ouvre-en une et publie-la.',
+  'browse.hostedBy': 'Hôte : {host}',
+  'browse.openHands': 'Mains ouvertes',
+  'browse.seatsOpen_one': '{count} chaise libre',
+  'browse.seatsOpen_other': '{count} chaises libres',
+  'browse.strangersNote': 'Les tables ouvertes sont tenues par des inconnus, pas par parlour.',
+
   // --- table ----------------------------------------------------------------
   'table.menu': 'Menu de la table',
   'table.dealing': 'La donne…',

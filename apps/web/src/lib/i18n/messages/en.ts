@@ -101,6 +101,21 @@ export const en = {
   'room.waitingFor_other': 'Waiting for {count} more',
   'room.shareText': 'Room {code}',
 
+  'room.listPublicly': 'List this table publicly',
+  'room.listPubliclyDetail':
+    'Anyone browsing open tables will see the game, your name and this code, and can sit down.',
+  'room.listedDetail': 'Listed until the last chair fills or you deal. Untick to take it down.',
+
+  // --- open-table browser ---------------------------------------------------
+  'browse.heading': 'Open tables',
+  'browse.searching': 'Looking for open tables…',
+  'browse.empty': 'No open tables right now. Type a code, or host one and list it.',
+  'browse.hostedBy': 'Hosted by {host}',
+  'browse.openHands': 'Open hands',
+  'browse.seatsOpen_one': '{count} chair open',
+  'browse.seatsOpen_other': '{count} chairs open',
+  'browse.strangersNote': 'Open tables are hosted by strangers, not by parlour.',
+
   // --- table ----------------------------------------------------------------
   'table.menu': 'Table menu',
   'table.dealing': 'Dealing…',

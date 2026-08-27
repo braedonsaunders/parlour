@@ -105,6 +105,22 @@ export const es: Messages = {
   'room.waitingFor_other': 'Faltan {count} más',
   'room.shareText': 'Sala {code}',
 
+  'room.listPublicly': 'Publicar esta mesa',
+  'room.listPubliclyDetail':
+    'Quien mire las mesas abiertas verá el juego, tu nombre y este código, y podrá sentarse.',
+  'room.listedDetail':
+    'Publicada hasta que se llene la última silla o repartas. Desmarca para quitarla.',
+
+  // --- open-table browser ---------------------------------------------------
+  'browse.heading': 'Mesas abiertas',
+  'browse.searching': 'Buscando mesas abiertas…',
+  'browse.empty': 'Ahora mismo no hay mesas abiertas. Escribe un código, o abre una y publícala.',
+  'browse.hostedBy': 'Anfitrión: {host}',
+  'browse.openHands': 'Manos abiertas',
+  'browse.seatsOpen_one': '{count} silla libre',
+  'browse.seatsOpen_other': '{count} sillas libres',
+  'browse.strangersNote': 'Las mesas abiertas las abren desconocidos, no parlour.',
+
   // --- table ----------------------------------------------------------------
   'table.menu': 'Menú de la mesa',
   'table.dealing': 'Repartiendo…',

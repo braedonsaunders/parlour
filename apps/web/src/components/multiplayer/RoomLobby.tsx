@@ -16,7 +16,7 @@ export type LobbySeat = {
 
 type RoomLobbySnapshot = Pick<
   MultiplayerRoomSnapshot,
-  'settings' | 'security' | 'seats' | 'connection' | 'error'
+  'settings' | 'security' | 'seats' | 'connection' | 'error' | 'listed'
 >;
 
 type RoomLobbyProps = {
@@ -27,6 +27,8 @@ type RoomLobbyProps = {
   isHost: boolean;
   onStart?: () => void | Promise<void>;
   onAddBot?: (seat: number) => void;
+  /** Host-only: put this table on the public open-table list, or take it off. */
+  onListedChange?: (listed: boolean) => void;
 };
 
 export function RoomLobby({
@@ -37,6 +39,7 @@ export function RoomLobby({
   isHost,
   onStart,
   onAddBot,
+  onListedChange,
 }: RoomLobbyProps) {
   const t = useT();
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'error'>('idle');
@@ -172,6 +175,26 @@ export function RoomLobby({
           />
         </div>
       ) : null}
+
+      {isHost && onListedChange && (
+        <label
+          className="panel-soft mt-4 flex cursor-pointer items-start gap-3 p-4"
+          data-testid="list-publicly"
+        >
+          <input
+            type="checkbox"
+            checked={snapshot.listed}
+            onChange={(event) => onListedChange(event.currentTarget.checked)}
+            className="mt-1 size-5 shrink-0 accent-hearth-300"
+          />
+          <span>
+            <strong className="font-display text-dusk-50">{t('room.listPublicly')}</strong>
+            <span className="mt-0.5 block text-sm text-dusk-100/85">
+              {snapshot.listed ? t('room.listedDetail') : t('room.listPubliclyDetail')}
+            </span>
+          </span>
+        </label>
+      )}
 
       {error && (
         <p className="mt-4 text-sm text-hearth-200" role="alert">

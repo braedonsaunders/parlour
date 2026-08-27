@@ -101,6 +101,20 @@ export const zh: Messages = {
   'room.waitingFor_other': '还差 {count} 人',
   'room.shareText': '房间 {code}',
 
+  'room.listPublicly': '公开这张牌桌',
+  'room.listPubliclyDetail': '浏览公开牌桌的人都能看到牌局、你的名字和房间码，并可以直接入座。',
+  'room.listedDetail': '已公开，直到最后一个座位坐满或你开牌为止。取消勾选即可撤下。',
+
+  // --- open-table browser ---------------------------------------------------
+  'browse.heading': '公开牌桌',
+  'browse.searching': '正在寻找公开牌桌…',
+  'browse.empty': '目前没有公开牌桌。输入房间码，或自己开一桌并公开它。',
+  'browse.hostedBy': '房主：{host}',
+  'browse.openHands': '明牌',
+  'browse.seatsOpen_one': '空位 {count} 个',
+  'browse.seatsOpen_other': '空位 {count} 个',
+  'browse.strangersNote': '公开牌桌由陌生人开设，并非由 parlour 提供。',
+
   // --- table ----------------------------------------------------------------
   'table.menu': '牌桌菜单',
   'table.dealing': '发牌中…',

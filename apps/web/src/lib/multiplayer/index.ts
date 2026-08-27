@@ -4,6 +4,7 @@ export * from './resilience';
 export * from './emotes';
 export * from './NostrSignaling';
 export * from './MemorySignaling';
+export * from './RoomDirectory';
 export * from './P2PTransport';
 export * from './EngineAuthority';
 export {

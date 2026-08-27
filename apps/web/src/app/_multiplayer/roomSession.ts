@@ -37,6 +37,7 @@ import {
   type RoomAnnouncement,
   type RoomSignaling,
 } from '@/lib/multiplayer/NostrSignaling';
+import { LISTING_REFRESH_MS } from '@/lib/multiplayer/RoomDirectory';
 import {
   createDealNonce,
   dealCommitment,
@@ -120,6 +121,14 @@ export type MultiplayerRoomSnapshot = {
    * to blame.
    */
   dealFault: string | null;
+  /**
+   * This host is advertising the table in the open-table directory.
+   *
+   * Off unless the host asks. Listing publishes a display name to relays
+   * parlour does not run and cannot moderate, which is not something to do to
+   * somebody who only meant to deal cards with three friends.
+   */
+  listed: boolean;
 };
 
 type SessionDependencies = {
@@ -163,6 +172,9 @@ const REMATCH_TIMEOUT_MS = 10_000;
  * seats opens only the dropped hand; at two, it is a walkover.
  */
 export const RECONNECT_GRACE_MS = 12_000;
+
+/** How long a seating burst is allowed to settle before the row is republished. */
+const LISTING_DEBOUNCE_MS = 1_000;
 
 /**
  * Opening a room takes no privacy tier by default, because nobody has asked
@@ -306,7 +318,12 @@ export class MultiplayerRoomSession {
     isHost: false,
     security: securityFor('open', 2, 'open'),
     dealFault: null,
+    listed: false,
   };
+  /** Refresh timer for the open-table row; only ever set while listed. */
+  private listingTimer: ReturnType<typeof setInterval> | null = null;
+  /** Trailing debounce, so four peers seating does not publish four rows. */
+  private listingSync: ReturnType<typeof setTimeout> | null = null;
 
   constructor(
     private readonly profile: MultiplayerProfile,
@@ -432,6 +449,87 @@ export class MultiplayerRoomSession {
     }
   }
 
+  /**
+   * Puts this table on — or takes it off — the public open-table list.
+   *
+   * Host-only and lobby-only. Everything else about the room is unchanged:
+   * the code, the share link, the seats and the deal are what they always
+   * were, and a listed table is joined through exactly the same path a typed
+   * code takes. All listing does is tell strangers the code exists.
+   */
+  setListed(listed: boolean): void {
+    if (!this.snapshot.isHost || this.snapshot.listed === listed) return;
+    if (listed && this.snapshot.stage !== 'lobby') return;
+    this.update({ listed });
+    if (listed) {
+      this.syncListing();
+      this.listingTimer ??= setInterval(() => this.syncListing(), LISTING_REFRESH_MS);
+      return;
+    }
+    this.stopListingTimers();
+    this.withdrawListing();
+  }
+
+  /**
+   * Publishes what the row should say right now, or withdraws it.
+   *
+   * A table that has filled its last chair is withdrawn rather than shown as
+   * full: the browser exists to answer "where can I sit", and a list padded
+   * with tables nobody can join is the version of this feature that gets
+   * ignored. It comes back if a chair frees up before the deal.
+   */
+  private syncListing(): void {
+    if (!this.snapshot.listed) return;
+    const publisher = this.transport?.listingPublisher();
+    const { room, settings, seats, stage } = this.snapshot;
+    if (!publisher || !room || !settings) return;
+    if (stage !== 'lobby' || seats.length >= settings.seats) {
+      this.withdrawListing();
+      return;
+    }
+    void publisher
+      .list({
+        code: room.code,
+        gameId: settings.gameId as MultiplayerGameId,
+        seats: settings.seats,
+        filled: seats.length,
+        hostName: this.profile.name,
+        security: settings.security ?? 'open',
+      })
+      // A relay that refuses the row costs this table some visibility and
+      // nothing else. It must never reach `error`, which the lobby renders.
+      .catch(() => undefined);
+  }
+
+  private withdrawListing(): void {
+    const publisher = this.transport?.listingPublisher();
+    const code = this.snapshot.room?.code;
+    if (!publisher || !code) return;
+    void publisher.unlist(code).catch(() => undefined);
+  }
+
+  private stopListingTimers(): void {
+    if (this.listingTimer) clearInterval(this.listingTimer);
+    if (this.listingSync) clearTimeout(this.listingSync);
+    this.listingTimer = null;
+    this.listingSync = null;
+  }
+
+  /**
+   * Coalesces the republishes a seating burst would otherwise cause.
+   *
+   * Four friends joining a spades lobby is four presence updates inside a
+   * second. Publishing a row for each is how a public relay's rate limiter
+   * decides this client is the problem and drops the row that mattered.
+   */
+  private scheduleListingSync(): void {
+    if (!this.snapshot.listed || this.listingSync) return;
+    this.listingSync = setTimeout(() => {
+      this.listingSync = null;
+      this.syncListing();
+    }, LISTING_DEBOUNCE_MS);
+  }
+
   async start(): Promise<void> {
     if (!this.snapshot.isHost) {
       const error = new Error('only the host can start the match');
@@ -444,6 +542,9 @@ export class MultiplayerRoomSession {
       this.update({ error: startFault(error) });
       throw error;
     }
+    // Off the list before the deal, not after: the row is an invitation to sit
+    // down, and every chair is now taken by someone about to be dealt in.
+    this.setListed(false);
     try {
       if (this.snapshot.security.tier === 'veil') {
         // Veil is infrastructure, not a promise made to anyone: nothing in the
@@ -1549,6 +1650,14 @@ export class MultiplayerRoomSession {
     if (this.snapshot.isHost && this.snapshot.stage === 'lobby') {
       this.transport?.announceClosed();
     }
+    // Withdraw before the transport goes, because withdrawing needs it. A row
+    // left behind is a table in the browser that nobody is sitting at, which
+    // is the one thing a directory must not do.
+    this.stopListingTimers();
+    if (this.snapshot.listed) {
+      this.withdrawListing();
+      this.update({ listed: false });
+    }
     this.teardownTransport();
     this.update({ connection: 'closed' });
   }
@@ -1789,6 +1898,11 @@ export class MultiplayerRoomSession {
 
   private update(patch: Partial<MultiplayerRoomSnapshot>): void {
     this.snapshot = { ...this.snapshot, ...patch };
+    // A listed row states how many chairs are taken, so it goes stale the
+    // moment one changes. Driving it from here catches every seating path —
+    // a guest arriving, a bot filling in, a peer dropping — rather than
+    // needing each of them to remember.
+    if (patch.seats !== undefined || patch.stage !== undefined) this.scheduleListingSync();
     for (const listener of this.listeners) listener();
   }
 }
@@ -2021,16 +2135,36 @@ async function waitForVeilKeys(room: VeilRoom): Promise<void> {
  * the same answer from the same game id — an announcement cannot talk a room
  * into a tier the pack does not support.
  */
+/**
+ * Every room deals veiled.
+ *
+ * The condition this was waiting on has been met: a ceremony dying mid-flight
+ * leaves the match playable. `D2a — ceremony failure degrades silently to open
+ * play` is green in a real browser, and that is the property that makes turning
+ * this on safe rather than brave. A table that cannot complete a shuffle does
+ * not stall and does not surface cryptography to the players — it deals openly
+ * and the game goes on, which is exactly what a room did before Veil existed.
+ * So the worst case of being wrong here is the behaviour we already shipped.
+ *
+ * What sits behind it: an eight-second wait before that fallback (a real
+ * ceremony takes one to three), a retry rather than a stranded table if a
+ * shuffle fails mid-match, veil coverage in all fourteen multiplayer packs,
+ * and proof that the worker and its in-thread fallback produce byte-identical
+ * layers.
+ *
+ * Known gap, stated because it is the honest one: `D2c — a seat drops and
+ * returns during the grace period` is still flaky in the browser suite. The
+ * failure is the returning page not finding the room, which the non-veiled
+ * rejoin scenarios share, so it reads as harness rather than protocol — but it
+ * is not proven, and a drop-and-return is a normal thing for a friend game to
+ * do. If a returning seat misbehaves in the wild, this line is the switch.
+ *
+ * The test seam stays: it is the same shape as the signalling injection above —
+ * a same-realm global, readable only by script already running in this page —
+ * and it is what lets a scenario pin one tier rather than inheriting this one.
+ */
 function tierFor(): RoomSecurity {
-  // Veil is built, measured and covered, and it is not switched on yet: the
-  // browser suite still has to prove that a ceremony dying mid-flight leaves the
-  // match playable. Until it does, every shipped room deals open.
-  //
-  // The test seam is what lets that proof exist before the flip. It is the same
-  // shape as the signalling injection above — a same-realm global, readable only
-  // by script already running in this page, which could switch the tier by
-  // calling into the session directly if it wanted to.
-  return injectedTier() ?? 'open';
+  return injectedTier() ?? 'veil';
 }
 
 /** The tier an end-to-end test asked this page to run, or null. */

@@ -10,6 +10,7 @@ import {
   normalizeRoomCode,
   validateRoomHostPubkey,
 } from '@/lib/rooms/code';
+import { OpenTables } from '@/components/multiplayer/OpenTables';
 import { RoomLobby } from '@/components/multiplayer/RoomLobby';
 import { RoomGameTable } from '@/lib/games/RoomGameTable';
 import { useProfileStore } from '@/stores/profile';
@@ -177,6 +178,17 @@ export default function JoinPage() {
       >
         {checking ? t('join.knocking') : t('join.submit')}
       </button>
+
+      {/* Browsing sits under the code box rather than beside it: a code from a
+          friend is still the ordinary way in, and the list is what you read
+          when you have no code at all. */}
+      <OpenTables
+        disabled={checking}
+        onPick={(pickedCode, hostPubkey) => {
+          setTyped(pickedCode);
+          void submit(pickedCode, hostPubkey);
+        }}
+      />
     </main>
   );
 }

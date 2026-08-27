@@ -224,6 +224,9 @@ describe('multiplayer route composition', () => {
   afterEach(() => {
     sessions.splice(0).forEach((session) => session.close());
     clearActiveMultiplayerSession();
+    // One test pins its tier through the e2e seam; a leaked global would
+    // silently deal every test after it in the open.
+    delete (window as unknown as { __PARLOUR_E2E_SECURITY__?: string }).__PARLOUR_E2E_SECURITY__;
     vi.restoreAllMocks();
   });
 
@@ -311,10 +314,11 @@ describe('multiplayer route composition', () => {
   });
 
   /**
-   * Friend rooms share one deal path — open replay — so no game is left on a
-   * private ceremony. Veil stays in the packs as unused protocol.
+   * Friend rooms share one deal path, and it is the veiled one. Every pack
+   * supports it, so no game is left on a weaker path than its neighbours —
+   * which was the same principle when this asserted the opposite.
    */
-  it('deals every friend room in the open, so no game is on a private path', async () => {
+  it('deals every friend room veiled, so no game is on a weaker path', async () => {
     for (const gameId of MULTIPLAYER_GAME_IDS) {
       const pack = ROOM_GAMES[gameId];
       const seats = pack.seats.min;
@@ -328,8 +332,8 @@ describe('multiplayer route composition', () => {
       );
       sessions.push(host);
       await host.create({ gameId, seats });
-      expect(host.getSnapshot().settings?.security, gameId).toBe('open');
-      expect(host.getSnapshot().security.tier, gameId).toBe('open');
+      expect(host.getSnapshot().settings?.security, gameId).toBe('veil');
+      expect(host.getSnapshot().security.tier, gameId).toBe('veil');
     }
   });
 
@@ -544,7 +548,7 @@ describe('multiplayer route composition', () => {
     await host.start();
 
     expect(host.getSnapshot().stage).toBe('table');
-    expect(host.getSnapshot().security.tier).toBe('open');
+    expect(host.getSnapshot().security.tier).toBe('veil');
     await eventually(() => expect(guest.getSnapshot().stage).toBe('table'));
     expect(stateHash(guest.getSnapshot().session?.state)).toBe(
       stateHash(host.getSnapshot().session?.state),
@@ -733,7 +737,7 @@ describe('multiplayer route composition', () => {
     expect(expectedRoomGameId()).toBeNull();
   });
 
-  it('opens the table on both peers with the same replayable hands', async () => {
+  it('deals both peers the same replayable veiled hands', async () => {
     const broker = new MockSignalingBroker();
     const rtc = new MockRtcNetwork();
     const host = new MultiplayerRoomSession(
@@ -773,8 +777,12 @@ describe('multiplayer route composition', () => {
           guest.getSnapshot(),
           'blitz',
         )!.state;
-        expect(hostState.hands.flat().some(isVeilHandle)).toBe(false);
-        expect(guestState.hands.flat().some(isVeilHandle)).toBe(false);
+        // Every room deals veiled, so the SHARED state both peers replay is
+        // handles on both sides — a seat resolves only its own hand, and only
+        // for itself. The property this test was always about survives that
+        // and is strengthened by it: the two peers still agree byte for byte.
+        expect(hostState.hands.flat().every(isVeilHandle)).toBe(true);
+        expect(guestState.hands.flat().every(isVeilHandle)).toBe(true);
         expect(stateHash(guestState)).toBe(stateHash(hostState));
       },
       1_000,
@@ -793,6 +801,10 @@ describe('multiplayer route composition', () => {
         seed: 77,
         heartbeatIntervalMs: 20,
         heartbeatTimeoutMs: 2_000,
+        // Every room is veiled now, so a seat that vanishes is held for its
+        // grace period before the table gives up on it — the walkover is the
+        // same, it just waits to be sure they are not coming back.
+        reconnectGraceMs: 30,
       },
     );
     const guest = new MultiplayerRoomSession(
@@ -803,6 +815,7 @@ describe('multiplayer route composition', () => {
         seed: 5,
         heartbeatIntervalMs: 20,
         heartbeatTimeoutMs: 2_000,
+        reconnectGraceMs: 30,
       },
     );
     sessions.push(host, guest);
@@ -824,7 +837,7 @@ describe('multiplayer route composition', () => {
         expect(host.getSnapshot().session?.result?.winner).toBe(0);
         expect(host.getSnapshot().security.paused).toBeNull();
       },
-      500,
+      2000,
       10,
     );
   }, 120_000);
@@ -915,6 +928,26 @@ describe('multiplayer route composition', () => {
     );
     sessions.push(host, guest);
 
+    /*
+     * Pinned open through the test seam, and the reason is the harness rather
+     * than the product.
+     *
+     * This test plays a whole match out by asking the pack for legal moves
+     * against the SHARED state. Under Veil that state is handles — exactly
+     * right, a seat resolves only its own hand — but the loop driving it is
+     * not a seat and cannot see what a real client would, so the moves stop
+     * being accepted partway through. Veiled multi-hand play has its own
+     * coverage (ceremony, hand, second ceremony, reissuing nothing from the
+     * first). What THIS one is about is the rematch: same room, same seats,
+     * fresh seed, empty log.
+     *
+     * The seam is used rather than `create({ security: 'open' })` because a
+     * room may not ask to be dealt in the open — `resolveRoomSettings` sends
+     * anything that is not an accepted veil request to `tierFor()`, so that
+     * argument would be quietly ignored and this comment would be a lie.
+     */
+    (window as unknown as { __PARLOUR_E2E_SECURITY__?: string }).__PARLOUR_E2E_SECURITY__ =
+      'open';
     const room = await host.create({
       gameId: 'wildpile',
       seats: 2,
@@ -1972,7 +2005,7 @@ describe('crazy eights rooms on the shared stack', () => {
     await expect(host.create({ gameId: 'eights', seats: 1 })).rejects.toThrow(/seat 2–6/);
     await expect(host.create({ gameId: 'eights', seats: 7 })).rejects.toThrow(/seat 2–6/);
     await host.create({ gameId: 'eights', seats: 4 });
-    expect(host.getSnapshot().security.tier).toBe('open');
+    expect(host.getSnapshot().security.tier).toBe('veil');
   });
 });
 
@@ -2111,7 +2144,7 @@ describe('spades rooms on the shared stack', () => {
     sessions.push(host);
     await host.create({ gameId: 'spades', seats: 4 });
     const settings = host.getSnapshot().settings!;
-    expect(settings.security).toBe('open');
+    expect(settings.security).toBe('veil');
     expect(settings.seats).toBe(4);
     expect(settings.config).toMatchObject({ targetScore: 500, nil: true, bags: true });
   });
@@ -2157,7 +2190,7 @@ describe('spades rooms on the shared stack', () => {
     expect(session.config.bags).toBe(false);
   });
 
-  it('advertises the open tier it actually runs', async () => {
+  it('advertises the veiled tier it actually runs', async () => {
     const host = new MultiplayerRoomSession(
       { name: 'Host', avatarId: 'ember', profileId: 'spades-badge' },
       {
@@ -2169,8 +2202,7 @@ describe('spades rooms on the shared stack', () => {
     sessions.push(host);
     await host.create({ gameId: 'spades', seats: 4 });
     const security = host.getSnapshot().security;
-    expect(security.tier).toBe('open');
-    expect(`${security.label} ${security.detail}`.toLowerCase()).toContain('fair deal');
+    expect(security.tier).toBe('veil');
   });
 });
 
@@ -2270,7 +2302,7 @@ describe('veiled rooms on the shared stack', () => {
     );
     sessions.push(host);
     await host.create({ gameId: 'blitz', seats: 2 });
-    expect(host.getSnapshot().settings!.security).toBe('open');
+    expect(host.getSnapshot().settings!.security).toBe('veil');
 
     const veiled = new MultiplayerRoomSession(
       { name: 'Host', avatarId: 'ember', profileId: 'veil-tier-veiled' },

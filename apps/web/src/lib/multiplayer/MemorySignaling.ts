@@ -1,5 +1,11 @@
 import type { RoomSettings } from './types';
 import type { RoomAnnouncement, RoomSignaling, SignalPayload } from './NostrSignaling';
+import {
+  LISTING_TTL_SECONDS,
+  type OpenTableListing,
+  type OwnTableListing,
+  type RoomListingPublisher,
+} from './RoomDirectory';
 
 /**
  * The shared routing layer between {@link MemorySignaling} instances.
@@ -40,6 +46,17 @@ export interface SignalingBus {
     receiver: string,
     callback: (author: string, payload: SignalPayload) => void,
   ): () => void;
+  /**
+   * Record an open-table row, for buses that model the directory.
+   *
+   * Optional, because not every bus does. The hermetic Playwright bridge
+   * implements this interface across a `page.exposeFunction` boundary and has
+   * no directory at all; making these required would break it for a feature it
+   * never exercises.
+   */
+  list?(author: string, listing: OwnTableListing, atMs: number): void;
+  /** Withdraw a row this author published. */
+  unlist?(author: string, code: string): void;
 }
 
 /**
@@ -56,6 +73,8 @@ export class InMemorySignalingBus implements SignalingBus {
     string,
     Map<string, (author: string, payload: SignalPayload) => void>
   >();
+  /** Open-table rows, keyed `author:code` — one per host per code, as on a relay. */
+  private readonly tables = new Map<string, OpenTableListing>();
 
   announce(author: string, code: string, settings: RoomSettings): void {
     const existing = this.rooms.get(code) ?? [];
@@ -91,6 +110,25 @@ export class InMemorySignalingBus implements SignalingBus {
     this.handlers.set(code, roomHandlers);
     return () => roomHandlers.delete(receiver);
   }
+
+  list(author: string, listing: OwnTableListing, atMs: number): void {
+    const listedAt = Math.floor(atMs / 1_000);
+    this.tables.set(`${author}:${listing.code}`, {
+      ...listing,
+      hostPubkey: author,
+      listedAt,
+      expiresAt: listedAt + LISTING_TTL_SECONDS,
+    });
+  }
+
+  unlist(author: string, code: string): void {
+    this.tables.delete(`${author}:${code}`);
+  }
+
+  /** Every open table this bus is currently advertising. For assertions. */
+  openTables(): readonly OpenTableListing[] {
+    return [...this.tables.values()];
+  }
 }
 
 /**
@@ -101,14 +139,30 @@ export class InMemorySignalingBus implements SignalingBus {
  * different browser contexts and still reach each other through a bus that
  * lives in the test runner.
  */
-export class MemorySignaling implements RoomSignaling {
+export class MemorySignaling implements RoomSignaling, RoomListingPublisher {
   readonly publicKey: string;
 
   constructor(
     publicKey: string,
     private readonly bus: SignalingBus,
+    private readonly now: () => number = () => Date.now(),
   ) {
     this.publicKey = publicKey;
+  }
+
+  /**
+   * Lists the table, when the bus behind this seat models a directory.
+   *
+   * A bus without one is not an error here: on the relays a listing that
+   * reaches nobody is a table nobody browses to, and the room carries on
+   * regardless. Silently doing nothing is that same outcome.
+   */
+  async list(listing: OwnTableListing): Promise<void> {
+    this.bus.list?.(this.publicKey, listing, this.now());
+  }
+
+  async unlist(code: string): Promise<void> {
+    this.bus.unlist?.(this.publicKey, code);
   }
 
   async announce(code: string, settings: RoomSettings): Promise<void> {

@@ -97,6 +97,7 @@ function ActivePokerLobby({ session }: { session: MultiplayerRoomSession }) {
           bot: seat.bot,
           connected: seat.connected,
         }))}
+        onListedChange={(listed) => session.setListed(listed)}
         onStart={() => session.start()}
       />
     </main>

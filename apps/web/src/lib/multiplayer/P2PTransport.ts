@@ -19,6 +19,7 @@ import {
   houseBotProfile,
   validatePresenceSnapshot,
 } from './resilience';
+import { canPublishListings, type RoomListingPublisher } from './RoomDirectory';
 import { validateEmote } from './emotes';
 import { DEFAULT_ICE_SERVERS } from './iceServers';
 import { DuplicateActionError } from './EngineAuthority';
@@ -294,6 +295,18 @@ export class P2PTransport implements Transport {
   peerIdForSeat(seat: SeatId): string | null {
     const occupant = this.resilience?.seats.get(seat);
     return occupant && !occupant.bot ? occupant.peerId : null;
+  }
+
+  /**
+   * The directory this room can advertise itself through, or null.
+   *
+   * Null is an ordinary answer, not a failure: the hermetic test bridge signals
+   * fine and lists nothing, and a host on that build simply cannot make its
+   * table public. The room session treats it as "the toggle does nothing here"
+   * rather than as an error to show anyone.
+   */
+  listingPublisher(): RoomListingPublisher | null {
+    return canPublishListings(this.signaling) ? this.signaling : null;
   }
 
   seatForPeerId(peerId: string): SeatId | null {
