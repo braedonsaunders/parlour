@@ -165,9 +165,26 @@ export class MultiplayerState {
     return occupant;
   }
 
+  /**
+   * Gives a returning player their own chair back.
+   *
+   * Keyed on the profile, not on the peer: a phone that drops its connection
+   * and dials again is the same person behind a brand-new peer id, which is
+   * exactly the case this exists to serve.
+   *
+   * It used to also require the seat to be marked `bot` — that is, to wait for
+   * the heartbeat to time the old peer out first. Anyone who reconnected faster
+   * than that timeout found their seat still warm, still counted as occupied,
+   * and no chair free: the host refused them with "Room is full" and their own
+   * screen said the host had closed the lobby. Coming back quickly is the good
+   * case, and it was the one the room handled worst.
+   *
+   * A profile match is enough. Two peers claiming one profile is one player on
+   * two devices, and the newest connection is the one they are looking at.
+   */
   reclaimSeat(peerId: string, profileId: ProfileId): number | null {
     for (const [seat, occupant] of this.seats) {
-      if (occupant.profileId === profileId && occupant.bot) {
+      if (occupant.profileId === profileId) {
         this.seats.set(seat, { peerId, profileId, bot: false });
         this.presenceVersion++;
         return seat;

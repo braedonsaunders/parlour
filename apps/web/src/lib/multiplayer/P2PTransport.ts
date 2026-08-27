@@ -552,6 +552,23 @@ export class P2PTransport implements Transport {
         ) {
           throw new Error('welcome seat does not match joining profile');
         }
+        /*
+         * A welcome carries the whole running match, and importing it told the
+         * engine but nobody else. A player rejoining a table mid-hand — a phone
+         * that dropped and dialled again — got their seat back, imported the
+         * position, and then sat in the lobby reading "the table opens when the
+         * host deals" while their own hand was live in memory behind it.
+         *
+         * Only when the match has actually started: a peer joining a room that
+         * is still seating belongs in the lobby, which is where it already is.
+         */
+        if (message.dealt) {
+          this.emitSnapshot({
+            kind: 'snapshot',
+            reason: 'rejoin',
+            snapshot: this.authority.exportSnapshot(),
+          });
+        }
         return;
       case 'mesh.peers':
         await this.connectMesh(message.peers);
@@ -724,6 +741,10 @@ export class P2PTransport implements Transport {
       seat,
       peers: this.peerDescriptors(),
       snapshot: this.exportMigration(),
+      // The host is the only peer that knows whether this table has dealt yet,
+      // and a rejoining player needs to be put back at it rather than left
+      // reading "the table opens when the host deals" over a live hand.
+      dealt: !this.lobbyHold,
     });
     this.broadcast({ type: 'mesh.peers', peers: this.peerDescriptors() });
     this.broadcastPresence();

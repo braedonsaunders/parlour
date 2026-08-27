@@ -48,6 +48,8 @@ export type WireMessage =
       seat: SeatId;
       peers: PeerDescriptor[];
       snapshot: MigrationSnapshot;
+      /** The host has already dealt, so this welcome is a rejoin mid-match. */
+      dealt?: boolean;
     }
   | { type: 'mesh.peers'; peers: PeerDescriptor[] }
   | { type: 'presence.state'; presence: PresenceSnapshot }
@@ -411,9 +413,14 @@ function isWireMessage(value: unknown): value is WireMessage {
       return hasOnlyKeys(value, ['type', 'profile']) && isPlayerProfile(value.profile);
     case 'welcome': {
       if (
-        !hasOnlyKeys(value, ['type', 'hostId', 'seat', 'peers', 'snapshot'], ['hostTerm']) ||
+        !hasOnlyKeys(
+          value,
+          ['type', 'hostId', 'seat', 'peers', 'snapshot'],
+          ['hostTerm', 'dealt'],
+        ) ||
         !isBoundedString(value.hostId) ||
         (value.hostTerm !== undefined && !isBoundedInteger(value.hostTerm, MAX_SEQUENCE)) ||
+        (value.dealt !== undefined && typeof value.dealt !== 'boolean') ||
         !isSeat(value.seat) ||
         !isPeerDescriptors(value.peers) ||
         !isMigrationSnapshot(value.snapshot)

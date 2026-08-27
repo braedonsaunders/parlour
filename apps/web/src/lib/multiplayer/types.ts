@@ -75,8 +75,10 @@ export type SnapshotNotification = {
    * `opening` — the host published the round's starting position, which a
    * veiled room does once its shuffle ceremony closes.
    * `rematch` — the same room replaced its completed match with a fresh deal.
+   * `rejoin` — this peer came back to a match already in progress and was
+   *   handed the running position in its welcome.
    */
-  reason: 'divergence' | 'opening' | 'rematch';
+  reason: 'divergence' | 'opening' | 'rematch' | 'rejoin';
   snapshot: ReplaySnapshot;
 };
 

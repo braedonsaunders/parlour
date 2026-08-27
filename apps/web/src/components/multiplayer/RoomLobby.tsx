@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import type { MultiplayerRoomSnapshot } from '@/app/_multiplayer/roomSession';
 import { useT } from '@/lib/i18n';
-import { isMultiplayerGameId } from '@/lib/rooms/gameIds';
 
 export type LobbySeat = {
   seat: number;
@@ -45,7 +44,6 @@ export function RoomLobby({
   const [starting, setStarting] = useState(false);
   const occupied = new Map(seats.map((seat) => [seat.seat, seat]));
   const capacity = snapshot.settings?.seats ?? seats.length;
-  const gameId = snapshot.settings?.gameId;
   const liveConnection = snapshot.connection;
   const connection = liveConnection === 'closed' ? 'reconnecting' : liveConnection;
   const error = snapshot.error;

@@ -823,7 +823,18 @@ test.describe('veiled-deck rooms', () => {
 
     // Same profile id, new context: the host's grace-period reclaim fires.
     const guest2b = await openReturningSeat(browser, broker, 'v-g2-return', profileId!);
-    await joinRoomByCode(guest2b.page, code);
+
+    /*
+     * Not `joinRoomByCode`, which waits for the lobby heading. A seat returning
+     * to a match already in progress does not pass through the lobby — the
+     * welcome carries the running position and the table opens directly. Making
+     * this wait for the lobby would assert the very bug that was fixed: a player
+     * rejoining mid-hand used to sit reading "the table opens when the host
+     * deals" while their own hand was live behind it.
+     */
+    await guest2b.page.goto('/join/');
+    await guest2b.page.locator(JOIN_INPUT).fill(code);
+    await guest2b.page.getByTestId('join-submit').click();
 
     // The table should resume: guest2 reclaims seat 2.
     await expectAtTable(host.page, 10_000);

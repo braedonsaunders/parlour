@@ -47,6 +47,7 @@ import {
 import { validateRoomCode } from '@/lib/rooms/code';
 import { hasValidSeatCount } from '@/lib/rooms/seatRange';
 import type { MultiplayerGameId } from '@/lib/rooms/gameIds';
+import { delayUntilFxSettles } from '@/lib/table/fx-motion';
 import {
   roomGame,
   seatRefusal,
@@ -1520,7 +1521,23 @@ export class MultiplayerRoomSession {
       const key = botTurnKey(session, turn.seat);
       if (this.scheduledBotTurns.has(key)) continue;
       this.scheduledBotTurns.add(key);
-      setTimeout(() => void this.submitBotTurn(key, turn.seat, turn.move), turn.thinkMs);
+      /*
+       * Wait for the cards already in the air to land before adding more.
+       *
+       * Every accepted packet replaces the fx burst and bumps its key, and the
+       * animation driver reverts the previous GSAP context when that happens —
+       * so a bot acting while the previous card is still flying cancels that
+       * flight, and the card appears at its destination instead of travelling.
+       * Reported on a phone, which is where it shows: the same flight takes
+       * longer in wall-clock there, so it is the device most likely to still be
+       * mid-animation when the next move lands.
+       *
+       * `thinkMs` is a floor, not a schedule. Solo tables have always paced
+       * their bots this way (`useSoloTable`); room tables were the ones adding
+       * to the pile regardless of what was still moving.
+       */
+      const pace = delayUntilFxSettles(turn.thinkMs, this.snapshot.fx);
+      setTimeout(() => void this.submitBotTurn(key, turn.seat, turn.move), pace);
     }
   }
 
