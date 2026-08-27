@@ -428,7 +428,16 @@ export function hintFor(state: PyramidPlayerView): PyramidHint | null {
   const draw = legal.find((move) => move.id === 'stock.draw');
   if (draw) return { move: draw, reason: 'Turn the next stock card.' };
   const recycle = legal.find((move) => move.id === 'stock.recycle');
-  return recycle ? { move: recycle, reason: 'Flip the waste back into the stock.' } : null;
+  return recycle && recycleUnlocksPlay(state)
+    ? { move: recycle, reason: 'Flip the waste back into the stock.' }
+    : null;
+}
+
+function recycleUnlocksPlay(state: PyramidPlayerView): boolean {
+  for (const card of state.waste) {
+    if (hasPairOrRemove({ pyramid: state.pyramid, waste: [card] })) return true;
+  }
+  return false;
 }
 
 export function pyramidPlayerView(state: PyramidState): PyramidPlayerView {

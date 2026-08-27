@@ -1,9 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { createSession, sessionApply } from '@parlour/engine';
 import { DECK, TABLEAU_SIZE } from './cards';
-import { leftoverOf, legalMovesFor } from './game';
-import { tripeaksGame } from './game';
-import { emptyState, openSession, sessionWithState } from './test-util';
+import { hintFor, leftoverOf, legalMovesFor, tripeaksGame, tripeaksPlayerView } from './game';
+import { applyMove, emptyState, openSession, sessionWithState } from './test-util';
 
 function allStateCards(state: ReturnType<typeof emptyState>): string[] {
   return [
@@ -167,5 +166,36 @@ describe('TriPeaks moves', () => {
     expect(leftoverOf(outcome.session.state)).toBe(1);
     expect(outcome.fx.map((event) => event.kind)).toContain('tripeaks.hole-out');
     expect(legalMovesFor(outcome.session.state)).toEqual([]);
+  });
+});
+
+describe('public assistance', () => {
+  it('does not bounce the last stock card against a dead hole', () => {
+    const lastStock = emptyState({
+      rules: { wrap: true, recycle: true },
+      hole: ['C5'],
+      stock: ['H2'],
+    });
+    lastStock.tableau[9] = 'S10';
+    expect(hintFor(tripeaksPlayerView(lastStock))).toEqual({
+      move: { id: 'stock.flip' },
+      reason: 'Turn the next stock card.',
+    });
+
+    const flipped = applyMove(sessionWithState(lastStock), { id: 'stock.flip' });
+    expect(flipped.state.stock).toEqual([]);
+    expect(hintFor(tripeaksPlayerView(flipped.state))).toBeNull();
+  });
+
+  it('still recycles when a buried hole card can take a free tableau card', () => {
+    const state = emptyState({
+      rules: { wrap: true, recycle: true },
+      hole: ['S10', 'H2'],
+    });
+    state.tableau[9] = 'C9';
+    expect(hintFor(tripeaksPlayerView(state))).toEqual({
+      move: { id: 'stock.recycle' },
+      reason: 'Shuffle the hole back into the stock.',
+    });
   });
 });

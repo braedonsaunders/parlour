@@ -1,8 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createSession, sessionApply } from '@parlour/engine';
 import { DECK, PYRAMID_ROWS, PYRAMID_SIZE, STOCK_SIZE } from './cards';
-import { leftoverOf, legalMovesFor } from './game';
-import { pyramidGame } from './game';
+import { hintFor, leftoverOf, legalMovesFor, pyramidGame, pyramidPlayerView } from './game';
 import { applyMove, emptyState, openSession, sessionWithState } from './test-util';
 
 function allStateCards(state: ReturnType<typeof emptyState>): string[] {
@@ -189,5 +188,29 @@ describe('Pyramid moves', () => {
     expect(leftoverOf(outcome.session.state)).toBe(2);
     expect(outcome.fx.map((event) => event.kind)).toContain('pyramid.hole-out');
     expect(legalMovesFor(outcome.session.state)).toEqual([]);
+  });
+});
+
+describe('public assistance', () => {
+  it('does not bounce the last stock card against an unplayable waste', () => {
+    const lastStock = emptyState({ stock: ['S2'], waste: ['H4'] });
+    lastStock.pyramid[6]![0] = 'S10';
+    expect(hintFor(pyramidPlayerView(lastStock))).toEqual({
+      move: { id: 'stock.draw' },
+      reason: 'Turn the next stock card.',
+    });
+
+    const drawn = applyMove(sessionWithState(lastStock), { id: 'stock.draw' });
+    expect(drawn.state.stock).toEqual([]);
+    expect(hintFor(pyramidPlayerView(drawn.state))).toBeNull();
+  });
+
+  it('still recycles when a buried waste card can pair', () => {
+    const state = emptyState({ waste: ['H8', 'S2'] });
+    state.pyramid[6]![0] = 'S5';
+    expect(hintFor(pyramidPlayerView(state))).toEqual({
+      move: { id: 'stock.recycle' },
+      reason: 'Flip the waste back into the stock.',
+    });
   });
 });

@@ -236,7 +236,22 @@ export function hintFor(state: TripeaksPlayerView): TripeaksHint | null {
   const flip = legal.find((move) => move.id === 'stock.flip');
   if (flip) return { move: flip, reason: 'Turn the next stock card.' };
   const recycle = legal.find((move) => move.id === 'stock.recycle');
-  return recycle ? { move: recycle, reason: 'Shuffle the hole back into the stock.' } : null;
+  return recycle && recycleUnlocksPlay(state)
+    ? { move: recycle, reason: 'Shuffle the hole back into the stock.' }
+    : null;
+}
+
+function recycleUnlocksPlay(state: TripeaksPlayerView): boolean {
+  const buried = state.hole.slice(0, -1);
+  if (buried.length === 0) return false;
+  for (let from = 0; from < TABLEAU_SIZE; from++) {
+    const card = state.tableau[from];
+    if (!card || !isFree(state.tableau, from)) continue;
+    for (const hole of buried) {
+      if (canPlayOnHole(card, hole, state.rules.wrap)) return true;
+    }
+  }
+  return false;
 }
 
 export function tripeaksPlayerView(state: TripeaksState): TripeaksPlayerView {
