@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { FxEvent } from '@parlour/engine';
 import { delayUntilFxSettles } from './fx-motion';
+import { isStaleMoveFault } from './useRoomTable';
 
 /**
  * The solo-table runtime, written once.
@@ -125,7 +126,12 @@ export function useSoloTable<TSnapshot, TDispatch extends SoloTableDispatch<TSna
   const accept = useCallback(
     (outcome: TDispatch) => {
       if (outcome.rejected) {
-        setError(outcome.rejected.message);
+        // A control drawn from the previous frame can be tapped after the
+        // position has moved past it — the engine refuses, correctly, and the
+        // next render already shows the truth. Solo tables get the same
+        // treatment as room tables: a stale tap does nothing, rather than
+        // replacing the game with an error screen.
+        if (!isStaleMoveFault(outcome.rejected.message)) setError(outcome.rejected.message);
         return;
       }
       setError(null);

@@ -43,6 +43,19 @@ export interface RoomTable<S, C extends RuleValues> {
 
 export const SEND_FAILED = 'The move could not be sent.';
 
+/**
+ * A refusal that means "the position moved", not "the table broke".
+ *
+ * The engine words these as `move <id> is not legal right now`
+ * (runtime.ts `illegal-move`), and a duplicate is the same story told from the
+ * other end: the move already landed. Both describe a tap that arrived a beat
+ * late against a table that is otherwise perfectly healthy.
+ */
+export function isStaleMoveFault(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return /is not legal right now/i.test(message) || /duplicate action/i.test(message);
+}
+
 export function useRoomTable<S, C extends RuleValues>(
   room: MultiplayerRoomSession,
   gameId: string,
@@ -57,6 +70,23 @@ export function useRoomTable<S, C extends RuleValues>(
         room.send(move, payload, reveals);
         setLocalError(null);
       } catch (caught) {
+        /*
+         * A move the engine refuses is a stale tap, not a lost table.
+         *
+         * Every control is drawn from a snapshot, and on a real table the state
+         * moves between the render and the thumb: a seat plays while you are
+         * reaching for "Last card!", the turn passes, the button you are
+         * looking at describes a position that no longer exists. The engine
+         * correctly refuses, and this used to hand that refusal to the error
+         * screen — so a mistimed tap on an optional, cost-free control replaced
+         * a live game with "The table lost the thread."
+         *
+         * Nothing is lost. The authoritative state is intact and every peer
+         * still agrees on it; the render that follows shows the position that
+         * actually holds. Swallowing it is the honest response, and it is the
+         * difference between a button that did nothing and a table that died.
+         */
+        if (isStaleMoveFault(caught)) return;
         setLocalError(caught instanceof Error ? caught.message : SEND_FAILED);
       }
     },

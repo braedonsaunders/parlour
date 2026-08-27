@@ -147,18 +147,6 @@ export const zh: Messages = {
   'security.recovered_other': '{seats}已断开连接，其手牌已公开以继续本轮，现已不再保密。',
   'security.seatDropped': '{seat}号座位已掉线，正在等待其返回…',
   'security.waitingPlayers': '正在等待更多玩家，然后才能继续本轮。',
-  'security.disclosure.hidden': '这张桌上的任何人都看不到你的手牌，包括房主。',
-  'security.disclosure.openHands': '公开牌桌：修改过的客户端可以读取所有人的手牌。',
-  'security.disclosure.botOpen':
-    '公开牌桌：房间机器人没有 Veil 密钥，因此修改过的客户端可以读取所有人的手牌。',
-  'security.disclosure.openDropWalkover': '双人桌中，掉线的一方将被判负。',
-  'security.disclosure.openDropBot': '开局后若有人掉线，房间机器人会代打该座位，直到玩家返回。',
-  'security.recovery.none':
-    '双人 Veil 无法恢复掉线。若把足以恢复牌局的密钥材料交给对手，对手也能读取你的手牌，因此有人掉线时本轮会暂停。',
-  'security.recovery.single':
-    '任何一名其他玩家都能恢复掉线座位的牌——这也意味着任何一人都能打开仍在对局中的手牌。竞技牌桌请选更高的门槛。',
-  'security.recovery.threshold':
-    '其余 {holders} 名玩家中须有 {threshold} 人同意，才能恢复掉线座位的牌。若这 {threshold} 人串通，他们同样可以打开仍在对局中的手牌。',
 
   // --- table narration -----------------------------------------------------
   'narration.seat': '{seat}号座位',

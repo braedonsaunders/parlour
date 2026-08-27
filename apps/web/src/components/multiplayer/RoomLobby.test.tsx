@@ -104,9 +104,6 @@ describe('RoomLobby localisation', () => {
     );
 
     expect(container.textContent).toContain('Río (bot)');
-    expect(container.querySelector('[data-security="open"]')?.textContent).toContain(
-      'los bots de la casa no tienen clave de Veil',
-    );
     expect(
       [...container.querySelectorAll('button')].some(
         (button) => button.textContent === 'Compartir',
@@ -120,57 +117,6 @@ describe('RoomLobby localisation', () => {
     expect(container.querySelector('[role="alert"]')?.textContent).toContain(
       'No se pudo abrir la opción de compartir',
     );
-  });
-
-  it('changes the pre-deal disclosure when Add bot fills a chair', () => {
-    useLocaleStore.setState({ locale: 'en', chosen: true });
-
-    function LobbyHarness() {
-      const [snapshot, setSnapshot] = useState(() => lobbySnapshot({ tier: 'veil', seats: 4 }));
-      return (
-        <RoomLobby
-          snapshot={snapshot}
-          code="VEIL"
-          shareUrl="https://example.test/VEIL"
-          seats={snapshot.seats.map((seat) => ({
-            seat: seat.seat,
-            name: seat.name,
-            avatar: seat.bot ? 'W' : '◆',
-            bot: seat.bot,
-            connected: seat.connected,
-          }))}
-          isHost
-          onAddBot={(seat) =>
-            setSnapshot((live) => ({
-              ...live,
-              seats: [
-                ...live.seats,
-                {
-                  seat,
-                  name: `Bot ${seat + 1}`,
-                  avatarId: 'bot',
-                  profileId: `bot-${seat}`,
-                  bot: true,
-                  connected: true,
-                },
-              ],
-            }))
-          }
-          onStart={() => undefined}
-        />
-      );
-    }
-
-    act(() => root.render(<LobbyHarness />));
-    expect(container.querySelector('[data-security="veil"]')).not.toBeNull();
-
-    const addBot = [...container.querySelectorAll<HTMLButtonElement>('button')].find(
-      (button) => button.textContent === 'Add bot',
-    );
-    act(() => addBot?.click());
-
-    const disclosure = container.querySelector('[data-security="open"]');
-    expect(disclosure?.textContent).toContain('house bots hold no Veil key');
   });
 
   /**

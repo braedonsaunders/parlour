@@ -4,7 +4,6 @@ import { useState } from 'react';
 import type { MultiplayerRoomSnapshot } from '@/app/_multiplayer/roomSession';
 import { useT } from '@/lib/i18n';
 import { isMultiplayerGameId } from '@/lib/rooms/gameIds';
-import { RoomSecurityDisclosure } from './TableSecurity';
 
 export type LobbySeat = {
   seat: number;
@@ -166,15 +165,6 @@ export function RoomLobby({
           );
         })}
       </ol>
-
-      {isMultiplayerGameId(gameId) ? (
-        <div className="mt-4">
-          <RoomSecurityDisclosure
-            security={snapshot.security}
-            hasBot={snapshot.seats.some((seat) => seat.bot)}
-          />
-        </div>
-      ) : null}
 
       {isHost && onListedChange && (
         <label

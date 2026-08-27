@@ -155,19 +155,6 @@ export const pt: Messages = {
     '{seats} se desconectaram e suas mãos foram reabertas para a rodada continuar. Elas não são mais privadas.',
   'security.seatDropped': 'O assento {seat} caiu. Aguardando seu retorno…',
   'security.waitingPlayers': 'Aguardando mais jogadores antes de continuar a rodada.',
-  'security.disclosure.hidden': 'Ninguém nesta mesa pode ver sua mão, nem mesmo o anfitrião.',
-  'security.disclosure.openHands': 'Mesa aberta: um cliente modificado pode ler todas as mãos.',
-  'security.disclosure.botOpen':
-    'Mesa aberta: os bots da casa não têm chave do Veil, então um cliente modificado pode ler todas as mãos.',
-  'security.disclosure.openDropWalkover': 'Com dois assentos, quem cair perde por abandono.',
-  'security.disclosure.openDropBot':
-    'Se alguém cair depois do início, um bot da casa ocupa o assento até essa pessoa voltar.',
-  'security.recovery.none':
-    'O Veil não pode recuperar uma desconexão com dois assentos. Dar ao adversário material de chave suficiente para retomar também permitiria que ele lesse sua mão, então a rodada pausa quando alguém cai.',
-  'security.recovery.single':
-    'Qualquer outro jogador pode restaurar as cartas de um assento desconectado — o que também significa que qualquer um deles poderia abrir uma mão ativa. Escolha uma configuração mais alta para uma mesa competitiva.',
-  'security.recovery.threshold':
-    '{threshold} dos outros {holders} jogadores precisam concordar em restaurar as cartas de um assento desconectado. Os mesmos {threshold}, se conspirassem, poderiam abrir uma mão ativa.',
 
   // --- table narration -----------------------------------------------------
   'narration.seat': 'Assento {seat}',

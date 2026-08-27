@@ -2,7 +2,6 @@
 
 import type { MultiplayerSecurity } from '@/app/_multiplayer/roomSession';
 import { LOCALE_META, useT, type MessageKey, type Translator } from '@/lib/i18n';
-import { localizedRecoveryDisclosure } from '@/lib/i18n/security';
 
 /**
  * What the room guarantees, stated plainly — and never asked as a question.
@@ -18,50 +17,6 @@ import { localizedRecoveryDisclosure } from '@/lib/i18n/security';
  * modified client. Parlour Veil remains the real guarantee about *hands* and is
  * never described as "cheat-proof" — see apps/web/src/lib/multiplayer/veil.
  */
-
-/**
- * The promise a player is accepting before the first card is dealt.
- *
- * `security.tier` is the room's actual tier, not an aspiration. Bots and a
- * pack refusal can only narrow it further: a bot holds no layer key, and a
- * game that cannot keep every private zone hidden must not borrow Veil's name.
- */
-export function RoomSecurityDisclosure({
-  security,
-  hasBot,
-}: {
-  security: MultiplayerSecurity;
-  hasBot: boolean;
-}) {
-  const t = useT();
-  const seats = security.ceremony.seats;
-  const open = security.tier === 'open' || hasBot;
-
-  return (
-    <p
-      className="panel-soft max-w-4xl border-l-4 border-hearth-400 px-4 py-3 text-sm text-dusk-50"
-      data-testid="room-security-disclosure"
-      data-security={open ? 'open' : 'veil'}
-      role="status"
-    >
-      {open ? (
-        <>
-          <strong className="text-hearth-100">
-            {hasBot ? t('security.disclosure.botOpen') : t('security.disclosure.openHands')}
-          </strong>{' '}
-          {t(
-            seats <= 2 ? 'security.disclosure.openDropWalkover' : 'security.disclosure.openDropBot',
-          )}
-        </>
-      ) : (
-        <>
-          <strong className="text-hearth-100">{t('security.disclosure.hidden')}</strong>{' '}
-          {localizedRecoveryDisclosure(security.recovery, t)}
-        </>
-      )}
-    </p>
-  );
-}
 
 /**
  * In-room badge: the name of the guarantee, and anything that has changed it.

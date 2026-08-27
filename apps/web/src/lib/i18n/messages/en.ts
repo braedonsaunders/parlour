@@ -151,19 +151,6 @@ export const en = {
     '{seats} disconnected and their hands were reopened so the round could continue. They are no longer private.',
   'security.seatDropped': 'Seat {seat} dropped. Waiting for them to come back…',
   'security.waitingPlayers': 'Waiting for more players before the round can continue.',
-  'security.disclosure.hidden': 'Nobody at this table can see your hand, including the host.',
-  'security.disclosure.openHands': 'Open table: a modified client can read every hand.',
-  'security.disclosure.botOpen':
-    'Open table: house bots hold no Veil key, so a modified client can read every hand.',
-  'security.disclosure.openDropWalkover': 'At two seats, a player who drops loses by walkover.',
-  'security.disclosure.openDropBot':
-    'If a player drops after play starts, a house bot takes their seat until they return.',
-  'security.recovery.none':
-    'Two-seat Veil cannot recover a disconnect. Handing your opponent enough key material to resume would also let them read your hand, so a dropped player pauses the round instead.',
-  'security.recovery.single':
-    "Any single other player can restore a dropped seat's cards — which means any single other player could also open a live hand. Choose a higher setting for a competitive room.",
-  'security.recovery.threshold':
-    "{threshold} of the other {holders} players must agree to restore a dropped seat's cards. The same {threshold} could, if they all colluded, open a live hand.",
 
   // --- table narration -----------------------------------------------------
   'narration.seat': 'Seat {seat}',
