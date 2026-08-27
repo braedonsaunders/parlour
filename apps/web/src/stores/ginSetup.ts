@@ -1,24 +1,12 @@
 import { applyPreset } from '@parlour/engine';
 import { ginConfigSchema, type GinConfig } from '@parlour/game-gin';
-import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
 import { getGameMode, modePreset } from '@/lib/games';
 import { isGinModeId, type GinModeId } from '@/lib/gin/modes';
-import { clampBotTier, type BotTier } from '@/stores/setup';
-import { setupPersistence, storedOverrides } from '@/stores/setupPersistence';
+import { defineRulesSetup, type RulesSetup } from './setupFactories';
 
 export const GIN_SETUP_STORAGE_KEY = 'parlour.gin.setup.v1';
 
-export type GinSetupState = {
-  mode: GinModeId;
-  botTier: BotTier;
-  /** Per-key overrides layered on top of the selected mode's preset. */
-  overrides: Partial<GinConfig>;
-  setMode: (mode: string) => void;
-  setBotTier: (tier: number) => void;
-  setRule: (key: string, value: GinConfig[string]) => void;
-  resetRules: () => void;
-};
+export type GinSetupState = RulesSetup<GinModeId, GinConfig>;
 
 /** The rules a table will actually deal with: mode preset + any overrides. */
 export function ginRulesFor(mode: GinModeId, overrides: Partial<GinConfig>): GinConfig {
@@ -28,26 +16,8 @@ export function ginRulesFor(mode: GinModeId, overrides: Partial<GinConfig>): Gin
 }
 
 /** Gin session setup — UI state only; rule values come from game-gin's schema. */
-export const useGinSetupStore = create<GinSetupState>()(
-  persist(
-    (set) => ({
-      mode: 'classic',
-      botTier: 2,
-      overrides: {},
-      setMode: (mode) => {
-        if (isGinModeId(mode)) set({ mode, overrides: {} });
-      },
-      setBotTier: (tier) => {
-        if (tier === 1 || tier === 2 || tier === 3) set({ botTier: tier });
-      },
-      setRule: (key, value) =>
-        set((state) => ({ overrides: { ...state.overrides, [key]: value } })),
-      resetRules: () => set({ overrides: {} }),
-    }),
-    setupPersistence<GinSetupState>(GIN_SETUP_STORAGE_KEY, (stored) => ({
-      mode: isGinModeId(stored.mode) ? stored.mode : 'classic',
-      botTier: clampBotTier(Number(stored.botTier)),
-      overrides: storedOverrides<GinConfig>(stored.overrides),
-    })),
-  ),
-);
+export const useGinSetupStore = defineRulesSetup<GinModeId, GinConfig>({
+  gameId: 'gin',
+  defaultMode: 'classic',
+  isMode: isGinModeId,
+});

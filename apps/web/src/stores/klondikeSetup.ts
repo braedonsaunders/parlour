@@ -1,8 +1,9 @@
-import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
 import { dealKlondikeRun, type KlondikeModeId, type KlondikeRun } from '@/lib/klondike/modes';
+import { defineSetup } from '@/stores/gameSetup';
 
 export const KLONDIKE_SETUP_STORAGE_KEY = 'parlour.klondike.setup.v1';
+
+const MODES: readonly KlondikeModeId[] = ['daily', 'classic', 'relaxed'];
 
 export type KlondikeSetupState = {
   mode: KlondikeModeId;
@@ -22,29 +23,41 @@ export type KlondikeSetupState = {
   replaceRun: (run: KlondikeRun) => void;
 };
 
-/** Klondike setup is UI-only. Rules remain owned by the game pack. */
-export const useKlondikeSetupStore = create<KlondikeSetupState>()(
-  persist(
-    (set, get) => ({
-      mode: 'daily',
-      winnableOnly: true,
-      run: null,
-      setMode: (mode) => set({ mode }),
-      setWinnableOnly: (winnableOnly) => set({ winnableOnly }),
-      start: async (mode, options) => {
-        const run = await dealKlondikeRun(mode, {
-          ...options,
-          winnableOnly: get().winnableOnly,
-        });
-        set({ mode, run });
-        return run;
-      },
-      replaceRun: (run) => set({ mode: run.mode, run }),
+/**
+ * Defined against the primitive rather than `defineSolitaireSetup`: Klondike
+ * keeps a winnable-only preference the other three solitaires do not have, and
+ * its deal is asynchronous because the solver has to prove the board first.
+ */
+export const useKlondikeSetupStore = defineSetup<
+  { mode: KlondikeModeId; winnableOnly: boolean },
+  Pick<KlondikeSetupState, 'setMode' | 'setWinnableOnly' | 'start' | 'replaceRun'>,
+  KlondikeRun
+>(
+  'klondike',
+  {
+    defaults: { mode: 'daily', winnableOnly: true },
+    coerce: (stored) => ({
+      mode: MODES.includes(stored.mode as KlondikeModeId)
+        ? (stored.mode as KlondikeModeId)
+        : 'daily',
+      winnableOnly: stored.winnableOnly !== false,
     }),
-    {
-      name: KLONDIKE_SETUP_STORAGE_KEY,
-      // The run itself is per-sitting; only the preferences are worth keeping.
-      partialize: (state) => ({ mode: state.mode, winnableOnly: state.winnableOnly }),
+  },
+  (setup) => ({
+    setMode: (mode) => setup.patch({ mode }),
+    setWinnableOnly: (winnableOnly) => setup.patch({ winnableOnly }),
+    start: async (mode, options) => {
+      const run = await dealKlondikeRun(mode, {
+        ...options,
+        winnableOnly: setup.get().winnableOnly,
+      });
+      setup.patch({ mode });
+      setup.putRun(run);
+      return run;
     },
-  ),
+    replaceRun: (run) => {
+      setup.patch({ mode: run.mode });
+      setup.putRun(run);
+    },
+  }),
 );

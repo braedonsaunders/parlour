@@ -1,35 +1,19 @@
 import { applyPreset } from '@parlour/engine';
 import { presidentConfig, type PresidentRules } from '@parlour/game-president';
-import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
 import { getGameMode, modePreset } from '@/lib/games';
 import { isPresidentModeId, type PresidentModeId } from '@/lib/president/modes';
-import { clampBotTier, type BotTier } from '@/stores/setup';
-import { setupPersistence, storedOverrides } from '@/stores/setupPersistence';
+import { defineSeatedRulesSetup, type SeatedRulesSetup } from './setupFactories';
 
 export const PRESIDENT_SEAT_OPTIONS = [4, 5, 6, 7, 8] as const;
 
 export const PRESIDENT_SETUP_STORAGE_KEY = 'parlour.president.setup.v1';
 
-export type PresidentSetupState = {
-  mode: PresidentModeId;
-  seats: number;
-  botTier: BotTier;
-  /** Per-key overrides layered on top of the selected mode's preset. */
-  overrides: Partial<PresidentRules>;
-  /** Takes the registry's string ids; anything unknown is ignored. */
-  setMode: (mode: string) => void;
-  setSeats: (seats: number) => void;
-  setBotTier: (tier: number) => void;
-  setRule: (key: string, value: PresidentRules[string]) => void;
-  resetRules: () => void;
-};
+export type PresidentSetupState = SeatedRulesSetup<PresidentModeId, PresidentRules>;
 
 function clampSeats(value: number): number {
   return (PRESIDENT_SEAT_OPTIONS as readonly number[]).includes(value) ? value : 5;
 }
 
-/** The rules a table will actually deal with: mode preset + any overrides. */
 export function presidentRulesFor(
   mode: PresidentModeId,
   overrides: Partial<PresidentRules>,
@@ -41,33 +25,11 @@ export function presidentRulesFor(
   return presidentConfig.resolve({ ...base, ...overrides });
 }
 
-/**
- * President session setup — UI state only. Rule *values* still come from
- * game-president's schema; this just records which preset is selected and
- * which individual knobs the host has turned since.
- */
-export const usePresidentSetupStore = create<PresidentSetupState>()(
-  persist(
-    (set) => ({
-      mode: 'classic',
-      seats: 5,
-      botTier: 2,
-      overrides: {},
-      // Switching preset drops per-knob overrides: the tile you picked is the table.
-      setMode: (mode) => set(isPresidentModeId(mode) ? { mode, overrides: {} } : {}),
-      setSeats: (seats) => set({ seats: clampSeats(seats) }),
-      setBotTier: (tier) => set({ botTier: clampBotTier(tier) }),
-      setRule: (key, value) =>
-        set((state) => ({
-          overrides: { ...state.overrides, [key]: value } as Partial<PresidentRules>,
-        })),
-      resetRules: () => set({ overrides: {} }),
-    }),
-    setupPersistence<PresidentSetupState>(PRESIDENT_SETUP_STORAGE_KEY, (stored) => ({
-      mode: isPresidentModeId(stored.mode) ? stored.mode : 'classic',
-      seats: clampSeats(Number(stored.seats)),
-      botTier: clampBotTier(Number(stored.botTier)),
-      overrides: storedOverrides<PresidentRules>(stored.overrides),
-    })),
-  ),
-);
+/** President session setup — UI state only; rule values come from the pack's schema. */
+export const usePresidentSetupStore = defineSeatedRulesSetup<PresidentModeId, PresidentRules>({
+  gameId: 'president',
+  defaultMode: 'classic',
+  isMode: isPresidentModeId,
+  defaultSeats: 5,
+  clampSeats,
+});

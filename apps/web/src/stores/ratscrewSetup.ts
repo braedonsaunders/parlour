@@ -1,11 +1,10 @@
 import { applyPreset } from '@parlour/engine';
 import { ratscrewConfigSchema, type RatscrewConfig } from '@parlour/game-ratscrew';
-import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
 import { getGameMode, modePreset } from '@/lib/games';
 import { isRatscrewModeId, type RatscrewModeId } from '@/lib/ratscrew/modes';
+import { defineSetup } from '@/stores/gameSetup';
 import { clampBotTier, type BotTier, type SeatCount } from '@/stores/setup';
-import { setupPersistence, storedOverrides } from '@/stores/setupPersistence';
+import { storedOverrides } from '@/stores/setupPersistence';
 
 export const RATSCREW_SETUP_STORAGE_KEY = 'parlour.ratscrew.setup.v1';
 
@@ -28,7 +27,6 @@ function clampSeats(value: number): SeatCount {
   return 4;
 }
 
-/** The rules a table will actually deal with: mode preset + any overrides. */
 export function ratscrewRulesFor(
   mode: RatscrewModeId,
   overrides: Partial<RatscrewConfig>,
@@ -41,32 +39,38 @@ export function ratscrewRulesFor(
 }
 
 /**
- * Rat Screw session setup — UI state only. Rule *values* still come from
- * game-ratscrew's schema; this just records which preset is selected and which
- * individual knobs the host has turned since.
+ * Defined against the primitive rather than `defineSeatedRulesSetup` for one
+ * reason: Rat Screw's `setMode` FALLS BACK to classic for an id it does not
+ * know, where every other game ignores the call and keeps the mode it had.
+ * That is a real difference in what a player sees, so it is preserved rather
+ * than smoothed over — and written down here so the next person can decide
+ * whether it was ever intended.
  */
-export const useRatscrewSetupStore = create<RatscrewSetupState>()(
-  persist(
-    (set) => ({
-      mode: 'classic',
-      seats: 4,
-      botTier: 2,
-      overrides: {},
-      // Switching preset drops per-knob overrides: the tile you picked is the table.
-      setMode: (mode) => set({ mode: isRatscrewModeId(mode) ? mode : 'classic', overrides: {} }),
-      setSeats: (seats) => set({ seats: clampSeats(seats) }),
-      setBotTier: (tier) => set({ botTier: clampBotTier(tier) }),
-      setRule: (key, value) =>
-        set((state) => ({
-          overrides: { ...state.overrides, [key]: value } as Partial<RatscrewConfig>,
-        })),
-      resetRules: () => set({ overrides: {} }),
-    }),
-    setupPersistence<RatscrewSetupState>(RATSCREW_SETUP_STORAGE_KEY, (stored) => ({
+export const useRatscrewSetupStore = defineSetup<
+  {
+    mode: RatscrewModeId;
+    seats: SeatCount;
+    botTier: BotTier;
+    overrides: Partial<RatscrewConfig>;
+  },
+  Pick<RatscrewSetupState, 'setMode' | 'setSeats' | 'setBotTier' | 'setRule' | 'resetRules'>
+>(
+  'ratscrew',
+  {
+    defaults: { mode: 'classic', seats: 4, botTier: 2, overrides: {} },
+    coerce: (stored) => ({
       mode: isRatscrewModeId(stored.mode) ? stored.mode : 'classic',
       seats: clampSeats(Number(stored.seats)),
       botTier: clampBotTier(Number(stored.botTier)),
       overrides: storedOverrides<RatscrewConfig>(stored.overrides),
-    })),
-  ),
+    }),
+  },
+  (setup) => ({
+    setMode: (mode) =>
+      setup.patch({ mode: isRatscrewModeId(mode) ? mode : 'classic', overrides: {} }),
+    setSeats: (seats) => setup.patch({ seats: clampSeats(seats) }),
+    setBotTier: (tier) => setup.patch({ botTier: clampBotTier(tier) }),
+    setRule: (key, value) => setup.patch({ overrides: { ...setup.get().overrides, [key]: value } }),
+    resetRules: () => setup.patch({ overrides: {} }),
+  }),
 );

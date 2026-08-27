@@ -1,13 +1,21 @@
-import { makeSpiderRun, type SpiderModeId, type SpiderRun } from '@/lib/spider/modes';
-import { createSolitaireSetupStore, type SolitaireRunState } from './setupFactories';
+import {
+  isSpiderModeId,
+  makeSpiderRun,
+  type SpiderModeId,
+  type SpiderRun,
+} from '@/lib/spider/modes';
+import { defineSolitaireSetup, type SolitaireSetup } from './setupFactories';
 
 export const SPIDER_SETUP_STORAGE_KEY = 'parlour.spider.setup.v1';
 
-export type SpiderSetupState = SolitaireRunState<SpiderModeId, SpiderRun>;
+type SpiderRunOptions = Parameters<typeof makeSpiderRun>[1];
+
+export type SpiderSetupState = SolitaireSetup<SpiderModeId, SpiderRun, SpiderRunOptions>;
 
 /** Spider setup is UI-only. Rules remain owned by the game pack. */
-export const useSpiderSetupStore = createSolitaireSetupStore<SpiderModeId, SpiderRun>({
-  storageKey: SPIDER_SETUP_STORAGE_KEY,
+export const useSpiderSetupStore = defineSolitaireSetup<SpiderModeId, SpiderRun, SpiderRunOptions>({
+  gameId: 'spider',
   defaultMode: 'daily',
+  isMode: isSpiderModeId,
   makeRun: makeSpiderRun,
 });

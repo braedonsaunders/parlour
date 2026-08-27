@@ -1,7 +1,7 @@
-import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+'use client';
+
 import { isModeId, type ModeId } from '@/lib/modes';
-import { setupPersistence } from '@/stores/setupPersistence';
+import { defineSetup } from '@/stores/gameSetup';
 
 export const BLITZ_SETUP_STORAGE_KEY = 'parlour.blitz.setup.v1';
 
@@ -28,20 +28,21 @@ export function clampBotTier(value: number): BotTier {
 }
 
 /** Solo session setup — UI/session state only; rule config comes from game-blitz's schema. */
-export const useSetupStore = create<SetupState>()(
-  persist(
-    (set) => ({
-      mode: 'classic',
-      seats: 4,
-      botTier: 2,
-      setMode: (mode) => set(isModeId(mode) ? { mode } : {}),
-      setSeats: (seats) => set({ seats: clampSeats(seats) }),
-      setBotTier: (tier) => set({ botTier: clampBotTier(tier) }),
-    }),
-    setupPersistence<SetupState>(BLITZ_SETUP_STORAGE_KEY, (stored) => ({
+export const useSetupStore = defineSetup(
+  'blitz',
+  {
+    defaults: { mode: 'classic' as ModeId, seats: 4 as SeatCount, botTier: 2 as BotTier },
+    coerce: (stored) => ({
       mode: isModeId(stored.mode) ? stored.mode : 'classic',
       seats: clampSeats(Number(stored.seats)),
       botTier: clampBotTier(Number(stored.botTier)),
-    })),
-  ),
+    }),
+  },
+  (setup) => ({
+    setMode: (mode: string) => {
+      if (isModeId(mode)) setup.patch({ mode });
+    },
+    setSeats: (seats: number) => setup.patch({ seats: clampSeats(seats) }),
+    setBotTier: (tier: number) => setup.patch({ botTier: clampBotTier(tier) }),
+  }),
 );

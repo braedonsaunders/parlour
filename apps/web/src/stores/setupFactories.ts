@@ -1,88 +1,224 @@
-import { create, type StoreApi, type UseBoundStore } from 'zustand';
-import { persist } from 'zustand/middleware';
+'use client';
+
+import { defineSetup, type SetupStore } from '@/stores/gameSetup';
 import { clampBotTier, type BotTier } from '@/stores/setup';
-import { setupPersistence } from '@/stores/setupPersistence';
+import { storedOverrides } from '@/stores/setupPersistence';
 
 /**
- * The two setup stores that were written more than once.
+ * The four shapes a game's setup actually takes, over the one store.
  *
- * Of the eighteen setup stores, sixteen are genuinely different — seats,
- * rule overrides, difficulty, run state, all real per-game shape. Exactly two
- * shapes were copies: four solitaires keep a mode and a run, and two
- * trick-takers keep a mode and a bot tier. Those six files diffed to nothing
- * within their group once the game name was substituted out.
+ * Nineteen setup stores turned out to be four ideas:
  *
- * Only those two are factored. Pulling the other twelve into a shared shape
- * would mean a default that is right for most games and quietly wrong for one,
- * which is a worse outcome than the copies were: a copy that is wrong is wrong
- * loudly, in its own file, where the game's own tests look.
+ *   mode + bots                     Euchre, Spades
+ *   mode + bots + rule overrides    Cribbage, Gin, Hearts
+ *   mode + bots + seats             Oh Hell, Poker, Scopa, Spite, Blitz
+ *   mode + bots + seats + overrides Crazy Eights, President, Rat Screw, Wild
+ *
+ * plus the solitaires, which keep a mode and a live deal and no bots at all.
+ *
+ * They are four helpers rather than one with optional fields because the
+ * absence of a field is load-bearing: Hearts seats exactly four and must NOT
+ * carry a seat count, or a seat picker appears for a game that has none and a
+ * stored `seats` starts overriding the rules. A shape you can only get by
+ * asking for it is a shape nobody gets by accident.
  */
 
-/** A solitaire run: mode plus whatever the pack needs to rebuild the deal. */
-export type SolitaireRunState<Mode extends string, Run extends { mode: Mode }> = {
-  mode: Mode;
-  run: Run | null;
-  setMode: (mode: Mode) => void;
-  start: (mode: Mode, options?: unknown) => Run;
-  replaceRun: (run: Run) => void;
-};
+const OVERRIDES_DROP_ON_MODE_CHANGE =
+  'Switching preset drops per-knob overrides: the tile you picked is the table.';
 
-export function createSolitaireSetupStore<
-  Mode extends string,
-  Run extends { mode: Mode },
->(options: {
-  storageKey: string;
-  defaultMode: Mode;
-  makeRun: (mode: Mode, options?: never) => Run;
-}): UseBoundStore<StoreApi<SolitaireRunState<Mode, Run>>> {
-  return create<SolitaireRunState<Mode, Run>>()(
-    persist(
-      (set) => ({
-        mode: options.defaultMode,
-        run: null,
-        setMode: (mode) => set({ mode }),
-        start: (mode, runOptions) => {
-          const run = options.makeRun(mode, runOptions as never);
-          set({ mode, run });
-          return run;
-        },
-        replaceRun: (run) => set({ mode: run.mode, run }),
-      }),
-      {
-        name: options.storageKey,
-        // The run itself is deliberately not persisted: a deal is a session,
-        // and only the mode outlives it.
-        partialize: (state) => ({ mode: state.mode }),
-      },
-    ),
-  );
-}
-
-/** A seated game whose only setup is which preset and how hard the bots play. */
-export type ModeAndBotsState<Mode extends string> = {
-  mode: Mode;
+export type ModeSetup<M extends string> = {
+  mode: M;
   botTier: BotTier;
-  setMode: (mode: Mode) => void;
+  setMode: (mode: string) => void;
   setBotTier: (tier: number) => void;
 };
 
-export function createModeAndBotsStore<Mode extends string>(options: {
-  storageKey: string;
-  defaultMode: Mode;
-  isMode: (value: unknown) => value is Mode;
-}): UseBoundStore<StoreApi<ModeAndBotsState<Mode>>> {
-  return create<ModeAndBotsState<Mode>>()(
-    persist(
-      (set) => ({
-        mode: options.defaultMode,
-        botTier: 2,
-        setMode: (mode) => set({ mode }),
-        setBotTier: (tier) => set({ botTier: clampBotTier(tier) }),
-      }),
-      setupPersistence<ModeAndBotsState<Mode>>(options.storageKey, (stored) => ({
+export type RulesSetup<M extends string, R extends object> = ModeSetup<M> & {
+  /** Per-key overrides layered on top of the selected mode's preset. */
+  overrides: Partial<R>;
+  setRule: (key: string, value: R[keyof R & string]) => void;
+  resetRules: () => void;
+};
+
+export type SeatedSetup<M extends string, S extends number = number> = ModeSetup<M> & {
+  seats: S;
+  setSeats: (seats: number) => void;
+};
+
+export type SeatedRulesSetup<
+  M extends string,
+  R extends object,
+  S extends number = number,
+> = SeatedSetup<M, S> & Omit<RulesSetup<M, R>, keyof ModeSetup<M>>;
+
+type ModeOptions<M extends string> = {
+  gameId: string;
+  defaultMode: M;
+  isMode: (value: unknown) => value is M;
+};
+
+type SeatOptions<S extends number> = {
+  defaultSeats: S;
+  clampSeats: (value: number) => S;
+};
+
+/** Mode and bot difficulty, and nothing else. */
+export function defineModeSetup<M extends string>(
+  options: ModeOptions<M>,
+): SetupStore<ModeSetup<M>> {
+  return defineSetup<{ mode: M; botTier: BotTier }, Omit<ModeSetup<M>, 'mode' | 'botTier'>>(
+    options.gameId,
+    {
+      defaults: { mode: options.defaultMode, botTier: 2 },
+      coerce: (stored) => ({
         mode: options.isMode(stored.mode) ? stored.mode : options.defaultMode,
         botTier: clampBotTier(Number(stored.botTier)),
-      })),
-    ),
-  );
+      }),
+    },
+    (setup) => ({
+      setMode: (mode) => {
+        if (options.isMode(mode)) setup.patch({ mode });
+      },
+      setBotTier: (tier) => setup.patch({ botTier: clampBotTier(tier) }),
+    }),
+  ) as SetupStore<ModeSetup<M>>;
 }
+
+/** Mode, bots, and a bag of hand-turned rule knobs. */
+export function defineRulesSetup<M extends string, R extends object>(
+  options: ModeOptions<M>,
+): SetupStore<RulesSetup<M, R>> {
+  type Doc = { mode: M; botTier: BotTier; overrides: Partial<R> };
+  return defineSetup<Doc, Omit<RulesSetup<M, R>, keyof Doc>>(
+    options.gameId,
+    {
+      defaults: { mode: options.defaultMode, botTier: 2, overrides: {} },
+      coerce: (stored) => ({
+        mode: options.isMode(stored.mode) ? stored.mode : options.defaultMode,
+        botTier: clampBotTier(Number(stored.botTier)),
+        overrides: storedOverrides<R>(stored.overrides),
+      }),
+    },
+    (setup) => ({
+      // See OVERRIDES_DROP_ON_MODE_CHANGE.
+      setMode: (mode) => {
+        if (options.isMode(mode)) setup.patch({ mode, overrides: {} } as Partial<Doc>);
+      },
+      setBotTier: (tier) => setup.patch({ botTier: clampBotTier(tier) } as Partial<Doc>),
+      setRule: (key, value) =>
+        setup.patch({
+          overrides: { ...setup.get().overrides, [key]: value } as Partial<R>,
+        } as Partial<Doc>),
+      resetRules: () => setup.patch({ overrides: {} } as Partial<Doc>),
+    }),
+  ) as SetupStore<RulesSetup<M, R>>;
+}
+
+/** Mode, bots, and how many chairs. */
+export function defineSeatedSetup<M extends string, S extends number = number>(
+  options: ModeOptions<M> & SeatOptions<S>,
+): SetupStore<SeatedSetup<M, S>> {
+  type Doc = { mode: M; botTier: BotTier; seats: S };
+  return defineSetup<Doc, Omit<SeatedSetup<M, S>, keyof Doc>>(
+    options.gameId,
+    {
+      defaults: { mode: options.defaultMode, botTier: 2, seats: options.defaultSeats },
+      coerce: (stored) => ({
+        mode: options.isMode(stored.mode) ? stored.mode : options.defaultMode,
+        botTier: clampBotTier(Number(stored.botTier)),
+        seats: options.clampSeats(Number(stored.seats)),
+      }),
+    },
+    (setup) => ({
+      setMode: (mode) => {
+        if (options.isMode(mode)) setup.patch({ mode } as Partial<Doc>);
+      },
+      setBotTier: (tier) => setup.patch({ botTier: clampBotTier(tier) } as Partial<Doc>),
+      setSeats: (seats) => setup.patch({ seats: options.clampSeats(seats) } as Partial<Doc>),
+    }),
+  ) as SetupStore<SeatedSetup<M, S>>;
+}
+
+/** All of it: mode, bots, chairs and hand-turned rules. */
+export function defineSeatedRulesSetup<
+  M extends string,
+  R extends object,
+  S extends number = number,
+>(options: ModeOptions<M> & SeatOptions<S>): SetupStore<SeatedRulesSetup<M, R, S>> {
+  type Doc = { mode: M; botTier: BotTier; seats: S; overrides: Partial<R> };
+  return defineSetup<Doc, Omit<SeatedRulesSetup<M, R, S>, keyof Doc>>(
+    options.gameId,
+    {
+      defaults: {
+        mode: options.defaultMode,
+        botTier: 2,
+        seats: options.defaultSeats,
+        overrides: {},
+      },
+      coerce: (stored) => ({
+        mode: options.isMode(stored.mode) ? stored.mode : options.defaultMode,
+        botTier: clampBotTier(Number(stored.botTier)),
+        seats: options.clampSeats(Number(stored.seats)),
+        overrides: storedOverrides<R>(stored.overrides),
+      }),
+    },
+    (setup) => ({
+      // See OVERRIDES_DROP_ON_MODE_CHANGE.
+      setMode: (mode) => {
+        if (options.isMode(mode)) setup.patch({ mode, overrides: {} } as Partial<Doc>);
+      },
+      setBotTier: (tier) => setup.patch({ botTier: clampBotTier(tier) } as Partial<Doc>),
+      setSeats: (seats) => setup.patch({ seats: options.clampSeats(seats) } as Partial<Doc>),
+      setRule: (key, value) =>
+        setup.patch({
+          overrides: { ...setup.get().overrides, [key]: value } as Partial<R>,
+        } as Partial<Doc>),
+      resetRules: () => setup.patch({ overrides: {} } as Partial<Doc>),
+    }),
+  ) as SetupStore<SeatedRulesSetup<M, R, S>>;
+}
+
+/** A solitaire: which mode, and the deal currently on the table. */
+export type SolitaireSetup<M extends string, Run extends { mode: M }, Opts = never> = {
+  mode: M;
+  run: Run | null;
+  setMode: (mode: M) => void;
+  start: (mode: M, options?: Opts) => Run;
+  replaceRun: (run: Run) => void;
+};
+
+export function defineSolitaireSetup<
+  M extends string,
+  Run extends { mode: M },
+  Opts = never,
+>(options: {
+  gameId: string;
+  defaultMode: M;
+  isMode: (value: unknown) => value is M;
+  makeRun: (mode: M, runOptions?: Opts) => Run;
+}): SetupStore<SolitaireSetup<M, Run, Opts>> {
+  return defineSetup<{ mode: M }, Omit<SolitaireSetup<M, Run, Opts>, 'mode' | 'run'>, Run>(
+    options.gameId,
+    {
+      defaults: { mode: options.defaultMode },
+      coerce: (stored) => ({
+        mode: options.isMode(stored.mode) ? stored.mode : options.defaultMode,
+      }),
+    },
+    (setup) => ({
+      setMode: (mode) => setup.patch({ mode }),
+      start: (mode, runOptions) => {
+        const run = options.makeRun(mode, runOptions);
+        setup.patch({ mode });
+        setup.putRun(run);
+        return run;
+      },
+      replaceRun: (run) => {
+        setup.patch({ mode: run.mode });
+        setup.putRun(run);
+      },
+    }),
+  ) as SetupStore<SolitaireSetup<M, Run, Opts>>;
+}
+
+export { OVERRIDES_DROP_ON_MODE_CHANGE };
