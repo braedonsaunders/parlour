@@ -7,6 +7,7 @@ import {
   type KlondikeSuit,
 } from '@parlour/game-klondike';
 import type { KlondikeSnapshot } from '@/lib/solo/KlondikeTransport';
+import { attachDeferredHint } from '@/lib/solo/deferHint';
 
 export type KlondikeZone = 'stock' | 'waste' | `tableau:${number}` | `foundation:${KlondikeSuit}`;
 
@@ -39,27 +40,27 @@ export function klondikeTableView(
   legal: readonly LegalMove[],
 ): KlondikeTableView {
   const state = snapshot.session.state;
-  return {
-    mode: snapshot.mode,
-    dailyKey: snapshot.dailyKey,
-    stage: state.stage,
-    drawCount: state.rules.drawCount,
-    moves: state.moves,
-    recycles: state.recycles,
-    stockCount: state.stock.length,
-    waste: state.waste,
-    foundations: state.foundations,
-    tableau: state.tableau,
-    legal,
-    canUndo: snapshot.canUndo,
-    undoDepth: snapshot.undoDepth,
-    canFinish: snapshot.canFinish,
+  return attachDeferredHint(
+    {
+      mode: snapshot.mode,
+      dailyKey: snapshot.dailyKey,
+      stage: state.stage,
+      drawCount: state.rules.drawCount,
+      moves: state.moves,
+      recycles: state.recycles,
+      stockCount: state.stock.length,
+      waste: state.waste,
+      foundations: state.foundations,
+      tableau: state.tableau,
+      legal,
+      canUndo: snapshot.canUndo,
+      undoDepth: snapshot.undoDepth,
+      canFinish: snapshot.canFinish,
+    },
     // Forwarded lazily: reading this runs the solver, and the table only reads
     // it while a hint is on screen. See KlondikeTransport.getSnapshot.
-    get hint() {
-      return snapshot.hint;
-    },
-  };
+    () => snapshot.hint,
+  );
 }
 
 export function selectionForCard(

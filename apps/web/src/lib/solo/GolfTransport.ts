@@ -21,6 +21,7 @@ import {
   type GolfState,
 } from '@parlour/game-golf';
 import type { GolfModeId } from '@/lib/golf/modes';
+import { attachDeferredHint } from './deferHint';
 
 type LiveSession = GameSession<GolfState, GolfRules>;
 export interface PublicGolfSession {
@@ -83,33 +84,29 @@ export class GolfTransport {
     const undo = undoPolicy(this.session);
     const session = this.session;
     const planner = this.planner;
-    let hinted: GolfHint | null | undefined;
-    return {
-      mode: this.options.mode,
-      dailyKey: this.options.dailyKey,
-      session: {
-        state,
-        phase: this.session.phase,
-        status: this.session.status,
-        result: this.session.result,
-        setupFx: this.session.setupFx,
+    return attachDeferredHint(
+      {
+        mode: this.options.mode,
+        dailyKey: this.options.dailyKey,
+        session: {
+          state,
+          phase: this.session.phase,
+          status: this.session.status,
+          result: this.session.result,
+          setupFx: this.session.setupFx,
+        },
+        eventCount: this.session.log.length,
+        canUndo: undo.available,
+        undoDepth: undo.depth,
       },
-      eventCount: this.session.log.length,
-      canUndo: undo.available,
-      undoDepth: undo.depth,
       /**
        * Golf is perfect information, so the solver can prove a line out. The
        * greedy hinter took the first column that fits, which is often the one
        * that buries a card the hole needs later. Deferred until shown, so a
        * hidden hint costs nothing.
        */
-      get hint(): GolfHint | null {
-        if (hinted === undefined) {
-          hinted = session.status === 'playing' ? planner.hint(session.state as GolfState) : null;
-        }
-        return hinted;
-      },
-    };
+      () => (session.status === 'playing' ? planner.hint(session.state as GolfState) : null),
+    );
   }
 
   legalMoves(): readonly LegalMove[] {

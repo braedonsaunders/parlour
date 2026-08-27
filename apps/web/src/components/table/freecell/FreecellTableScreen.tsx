@@ -19,6 +19,7 @@ import {
   TablePlayfield,
   TableScreenFrame,
   TableTitlePill,
+  canOfferSolitaireHint,
   SolitaireUndoButton,
   useGameTextSurface,
   useTableMenu,
@@ -425,7 +426,7 @@ function ReadyFreecellTable({
           className="btn-fat btn-fat--ghost"
           data-testid="freecell-hint"
           onClick={() => setShowHint(true)}
-          disabled={!view.hint || deal.dealing}
+          disabled={!canOfferSolitaireHint(deal.dealing, view)}
         >
           Hint
         </button>

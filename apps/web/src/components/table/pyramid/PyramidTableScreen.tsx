@@ -11,6 +11,7 @@ import {
   TablePlayfield,
   TableScreenFrame,
   TableTitlePill,
+  canOfferSolitaireHint,
   SolitaireUndoButton,
   useGameTextSurface,
   useTableMenu,
@@ -366,7 +367,7 @@ function ReadyPyramidTable({
           className="btn-fat btn-fat--ghost"
           data-testid="pyramid-hint"
           onClick={() => setShowHint(true)}
-          disabled={!view.hint || deal.dealing}
+          disabled={!canOfferSolitaireHint(deal.dealing, view)}
         >
           Hint
         </button>

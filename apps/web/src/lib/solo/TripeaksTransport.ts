@@ -20,6 +20,7 @@ import {
   type TripeaksState,
 } from '@parlour/game-tripeaks';
 import type { TripeaksModeId } from '@/lib/tripeaks/modes';
+import { attachDeferredHint } from './deferHint';
 
 type LiveSession = GameSession<TripeaksState, TripeaksRules>;
 export interface PublicTripeaksSession {
@@ -78,21 +79,24 @@ export class TripeaksTransport {
   getSnapshot(): TripeaksSnapshot {
     const state = tripeaksPlayerView(this.session.state);
     const undo = undoPolicy(this.session);
-    return {
-      mode: this.options.mode,
-      dailyKey: this.options.dailyKey,
-      session: {
-        state,
-        phase: this.session.phase,
-        status: this.session.status,
-        result: this.session.result,
-        setupFx: this.session.setupFx,
+    const session = this.session;
+    return attachDeferredHint(
+      {
+        mode: this.options.mode,
+        dailyKey: this.options.dailyKey,
+        session: {
+          state,
+          phase: this.session.phase,
+          status: this.session.status,
+          result: this.session.result,
+          setupFx: this.session.setupFx,
+        },
+        eventCount: this.session.log.length,
+        canUndo: undo.available,
+        undoDepth: undo.depth,
       },
-      eventCount: this.session.log.length,
-      canUndo: undo.available,
-      undoDepth: undo.depth,
-      hint: this.session.status === 'playing' ? hintFor(state) : null,
-    };
+      () => (session.status === 'playing' ? hintFor(state) : null),
+    );
   }
 
   legalMoves(): readonly LegalMove[] {

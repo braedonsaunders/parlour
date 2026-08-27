@@ -1,6 +1,7 @@
 import type { LegalMove } from '@parlour/engine';
 import { leftoverOf, type GolfHint, type GolfPlayerView } from '@parlour/game-golf';
 import type { GolfSnapshot } from '@/lib/solo/GolfTransport';
+import { attachDeferredHint } from '@/lib/solo/deferHint';
 
 export type GolfZone = 'stock' | 'waste' | `tableau:${number}`;
 
@@ -22,21 +23,25 @@ export interface GolfTableView {
 
 export function golfTableView(snapshot: GolfSnapshot, legal: readonly LegalMove[]): GolfTableView {
   const state = snapshot.session.state;
-  return {
-    mode: snapshot.mode,
-    dailyKey: snapshot.dailyKey,
-    stage: state.stage,
-    wrap: state.rules.wrap,
-    moves: state.moves,
-    leftover: leftoverOf(state),
-    stockCount: state.stock.length,
-    waste: state.waste,
-    tableau: state.tableau,
-    legal,
-    canUndo: snapshot.canUndo,
-    undoDepth: snapshot.undoDepth,
-    hint: snapshot.hint,
-  };
+  return attachDeferredHint(
+    {
+      mode: snapshot.mode,
+      dailyKey: snapshot.dailyKey,
+      stage: state.stage,
+      wrap: state.rules.wrap,
+      moves: state.moves,
+      leftover: leftoverOf(state),
+      stockCount: state.stock.length,
+      waste: state.waste,
+      tableau: state.tableau,
+      legal,
+      canUndo: snapshot.canUndo,
+      undoDepth: snapshot.undoDepth,
+    },
+    // Forwarded lazily: reading this runs the solver, and the table only reads
+    // it while a hint is on screen. See GolfTransport.getSnapshot.
+    () => snapshot.hint,
+  );
 }
 
 export function sourceOfMove(move: LegalMove): GolfZone | null {

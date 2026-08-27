@@ -6,6 +6,7 @@ import {
   type PyramidSource,
 } from '@parlour/game-pyramid';
 import type { PyramidSnapshot } from '@/lib/solo/PyramidTransport';
+import { attachDeferredHint } from '@/lib/solo/deferHint';
 
 export type PyramidZone = 'stock' | 'waste' | `pyramid:${number}:${number}`;
 
@@ -33,22 +34,26 @@ export function pyramidTableView(
   legal: readonly LegalMove[],
 ): PyramidTableView {
   const state = snapshot.session.state;
-  return {
-    mode: snapshot.mode,
-    dailyKey: snapshot.dailyKey,
-    stage: state.stage,
-    recyclesLimit: state.rules.recyclesLimit,
-    moves: state.moves,
-    recycles: state.recycles,
-    leftover: leftoverOf(state),
-    stockCount: state.stock.length,
-    waste: state.waste,
-    pyramid: state.pyramid,
-    legal,
-    canUndo: snapshot.canUndo,
-    undoDepth: snapshot.undoDepth,
-    hint: snapshot.hint,
-  };
+  return attachDeferredHint(
+    {
+      mode: snapshot.mode,
+      dailyKey: snapshot.dailyKey,
+      stage: state.stage,
+      recyclesLimit: state.rules.recyclesLimit,
+      moves: state.moves,
+      recycles: state.recycles,
+      leftover: leftoverOf(state),
+      stockCount: state.stock.length,
+      waste: state.waste,
+      pyramid: state.pyramid,
+      legal,
+      canUndo: snapshot.canUndo,
+      undoDepth: snapshot.undoDepth,
+    },
+    // Forwarded lazily: reading this runs the solver, and the table only reads
+    // it while a hint is on screen. See PyramidTransport.getSnapshot.
+    () => snapshot.hint,
+  );
 }
 
 export function zoneOfSource(source: PyramidSource): PyramidZone {

@@ -7,6 +7,7 @@ import {
   type FreecellSuit,
 } from '@parlour/game-freecell';
 import type { FreecellSnapshot } from '@/lib/solo/FreecellTransport';
+import { attachDeferredHint } from '@/lib/solo/deferHint';
 
 export type FreecellZone = `cell:${number}` | `tableau:${number}` | `foundation:${FreecellSuit}`;
 
@@ -37,21 +38,25 @@ export function freecellTableView(
   legal: readonly LegalMove[],
 ): FreecellTableView {
   const state = snapshot.session.state;
-  return {
-    mode: snapshot.mode,
-    dailyKey: snapshot.dailyKey,
-    stage: state.stage,
-    freeCells: state.rules.freeCells,
-    moves: state.moves,
-    cells: state.cells,
-    foundations: state.foundations,
-    tableau: state.tableau,
-    legal,
-    canUndo: snapshot.canUndo,
-    undoDepth: snapshot.undoDepth,
-    canFinish: snapshot.canFinish,
-    hint: snapshot.hint,
-  };
+  return attachDeferredHint(
+    {
+      mode: snapshot.mode,
+      dailyKey: snapshot.dailyKey,
+      stage: state.stage,
+      freeCells: state.rules.freeCells,
+      moves: state.moves,
+      cells: state.cells,
+      foundations: state.foundations,
+      tableau: state.tableau,
+      legal,
+      canUndo: snapshot.canUndo,
+      undoDepth: snapshot.undoDepth,
+      canFinish: snapshot.canFinish,
+    },
+    // Forwarded lazily: reading this runs the solver, and the table only reads
+    // it while a hint is on screen. See FreecellTransport.getSnapshot.
+    () => snapshot.hint,
+  );
 }
 
 export function selectionForCard(

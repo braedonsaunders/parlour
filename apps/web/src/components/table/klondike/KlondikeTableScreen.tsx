@@ -19,6 +19,7 @@ import {
   TablePlayfield,
   TableScreenFrame,
   TableTitlePill,
+  canOfferSolitaireHint,
   SolitaireUndoButton,
   useGameTextSurface,
   useTableMenu,
@@ -466,7 +467,7 @@ function ReadyKlondikeTable({
           className="btn-fat btn-fat--ghost"
           data-testid="klondike-hint"
           onClick={() => setShowHint(true)}
-          disabled={!view.hint || deal.dealing}
+          disabled={!canOfferSolitaireHint(deal.dealing, view)}
         >
           Hint
         </button>

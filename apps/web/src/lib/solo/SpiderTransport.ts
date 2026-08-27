@@ -21,6 +21,7 @@ import {
   type SpiderState,
 } from '@parlour/game-spider';
 import type { SpiderModeId } from '@/lib/spider/modes';
+import { attachDeferredHint } from './deferHint';
 
 type LiveSession = GameSession<SpiderState, SpiderRules>;
 export interface PublicSpiderSession {
@@ -88,36 +89,34 @@ export class SpiderTransport {
    * instead, and the planner walks it for free; only a player leaving that line
    * pays for a fresh search.
    *
-   * Deferred and memoised per snapshot, the way Klondike does it: the table
-   * reads `hint` only while a hint is on screen, so a hidden one costs nothing.
+   * Deferred and memoised per snapshot, the way Klondike does it. The table
+   * view forwards the getter, and the Hint button never reads it — only the
+   * on-screen banner does — so a hidden hint costs nothing and a move can
+   * animate before anyone asks the solver.
    */
   getSnapshot(): SpiderSnapshot {
     const state = spiderPlayerView(this.session.state);
     const undo = undoPolicy(this.session);
     const session = this.session;
     const planner = this.planner;
-    let hinted: SpiderHint | null | undefined;
-    return {
-      mode: this.options.mode,
-      dailyKey: this.options.dailyKey,
-      session: {
-        state,
-        phase: this.session.phase,
-        status: this.session.status,
-        result: this.session.result,
-        setupFx: this.session.setupFx,
+    return attachDeferredHint(
+      {
+        mode: this.options.mode,
+        dailyKey: this.options.dailyKey,
+        session: {
+          state,
+          phase: this.session.phase,
+          status: this.session.status,
+          result: this.session.result,
+          setupFx: this.session.setupFx,
+        },
+        eventCount: this.session.log.length,
+        canUndo: undo.available,
+        undoDepth: undo.depth,
+        canFinish: false,
       },
-      eventCount: this.session.log.length,
-      canUndo: undo.available,
-      undoDepth: undo.depth,
-      canFinish: false,
-      get hint(): SpiderHint | null {
-        if (hinted === undefined) {
-          hinted = session.status === 'playing' ? planner.hint(session.state as SpiderState) : null;
-        }
-        return hinted;
-      },
-    };
+      () => (session.status === 'playing' ? planner.hint(session.state as SpiderState) : null),
+    );
   }
 
   legalMoves(): readonly LegalMove[] {

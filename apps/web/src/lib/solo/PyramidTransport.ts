@@ -21,6 +21,7 @@ import {
   type PyramidState,
 } from '@parlour/game-pyramid';
 import type { PyramidModeId } from '@/lib/pyramid/modes';
+import { attachDeferredHint } from './deferHint';
 
 type LiveSession = GameSession<PyramidState, PyramidRules>;
 export interface PublicPyramidSession {
@@ -83,33 +84,28 @@ export class PyramidTransport {
     const undo = undoPolicy(this.session);
     const session = this.session;
     const planner = this.planner;
-    let hinted: PyramidHint | null | undefined;
-    return {
-      mode: this.options.mode,
-      dailyKey: this.options.dailyKey,
-      session: {
-        state,
-        phase: this.session.phase,
-        status: this.session.status,
-        result: this.session.result,
-        setupFx: this.session.setupFx,
+    return attachDeferredHint(
+      {
+        mode: this.options.mode,
+        dailyKey: this.options.dailyKey,
+        session: {
+          state,
+          phase: this.session.phase,
+          status: this.session.status,
+          result: this.session.result,
+          setupFx: this.session.setupFx,
+        },
+        eventCount: this.session.log.length,
+        canUndo: undo.available,
+        undoDepth: undo.depth,
       },
-      eventCount: this.session.log.length,
-      canUndo: undo.available,
-      undoDepth: undo.depth,
       /**
        * The losing pair looks exactly like the winning one, so a greedy hint
        * cannot tell them apart. Pyramid is perfect information; the solver can.
        * Deferred until shown, so a hidden hint costs nothing.
        */
-      get hint(): PyramidHint | null {
-        if (hinted === undefined) {
-          hinted =
-            session.status === 'playing' ? planner.hint(session.state as PyramidState) : null;
-        }
-        return hinted;
-      },
-    };
+      () => (session.status === 'playing' ? planner.hint(session.state as PyramidState) : null),
+    );
   }
 
   legalMoves(): readonly LegalMove[] {

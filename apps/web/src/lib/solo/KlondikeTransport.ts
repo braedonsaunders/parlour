@@ -22,6 +22,7 @@ import {
   type KlondikeState,
 } from '@parlour/game-klondike';
 import type { KlondikeModeId } from '@/lib/klondike/modes';
+import { attachDeferredHint } from './deferHint';
 
 type LiveSession = GameSession<KlondikeState, KlondikeRules>;
 export interface PublicKlondikeSession {
@@ -94,35 +95,33 @@ export class KlondikeTransport {
    * carry the cheap greedy hinter, did not.
    *
    * The getter defers the search to the first read and memoises it per
-   * snapshot, so a hidden hint costs nothing and a shown one costs one solve.
+   * snapshot. The table view forwards that getter, and the Hint button never
+   * reads it — only the on-screen banner does — so a hidden hint costs
+   * nothing and a move can animate before anyone asks the solver.
    */
   getSnapshot(): KlondikeSnapshot {
     const state = klondikePlayerView(this.session.state);
     const undo = undoPolicy(this.session);
     const session = this.session;
     const planner = this.planner;
-    let hinted: KlondikeHint | null | undefined;
-    return {
-      mode: this.options.mode,
-      dailyKey: this.options.dailyKey,
-      session: {
-        state,
-        phase: this.session.phase,
-        status: this.session.status,
-        result: this.session.result,
-        setupFx: this.session.setupFx,
+    return attachDeferredHint(
+      {
+        mode: this.options.mode,
+        dailyKey: this.options.dailyKey,
+        session: {
+          state,
+          phase: this.session.phase,
+          status: this.session.status,
+          result: this.session.result,
+          setupFx: this.session.setupFx,
+        },
+        eventCount: this.session.log.length,
+        canUndo: undo.available,
+        undoDepth: undo.depth,
+        canFinish: this.session.status === 'playing' && canAutoFinish(state),
       },
-      eventCount: this.session.log.length,
-      canUndo: undo.available,
-      undoDepth: undo.depth,
-      canFinish: this.session.status === 'playing' && canAutoFinish(state),
-      get hint(): KlondikeHint | null {
-        if (hinted === undefined) {
-          hinted = session.status === 'playing' ? planner.hint(session.state) : null;
-        }
-        return hinted;
-      },
-    };
+      () => (session.status === 'playing' ? planner.hint(session.state) : null),
+    );
   }
 
   legalMoves(): readonly LegalMove[] {

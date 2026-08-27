@@ -10,6 +10,7 @@ import {
   TablePlayfield,
   TableScreenFrame,
   TableTitlePill,
+  canOfferSolitaireHint,
   SolitaireUndoButton,
   useGameTextSurface,
   useTableMenu,
@@ -337,7 +338,7 @@ function ReadyTripeaksTable({
           className="btn-fat btn-fat--ghost"
           data-testid="tripeaks-hint"
           onClick={() => setShowHint(true)}
-          disabled={!view.hint || deal.dealing}
+          disabled={!canOfferSolitaireHint(deal.dealing, view)}
         >
           Hint
         </button>

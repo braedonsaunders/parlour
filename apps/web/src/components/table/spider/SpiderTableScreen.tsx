@@ -20,6 +20,7 @@ import {
   TablePlayfield,
   TableScreenFrame,
   TableTitlePill,
+  canOfferSolitaireHint,
   SolitaireUndoButton,
   useGameTextSurface,
   useTableMenu,
@@ -384,7 +385,7 @@ function ReadySpiderTable({
           className="btn-fat btn-fat--ghost"
           data-testid="spider-hint"
           onClick={() => setShowHint(true)}
-          disabled={!view.hint || deal.dealing}
+          disabled={!canOfferSolitaireHint(deal.dealing, view)}
         >
           Hint
         </button>

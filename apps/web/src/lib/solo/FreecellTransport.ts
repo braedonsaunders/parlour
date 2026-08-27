@@ -22,6 +22,7 @@ import {
   type FreecellState,
 } from '@parlour/game-freecell';
 import type { FreecellModeId } from '@/lib/freecell/modes';
+import { attachDeferredHint } from './deferHint';
 
 type LiveSession = GameSession<FreecellState, FreecellRules>;
 export interface PublicFreecellSession {
@@ -84,37 +85,33 @@ export class FreecellTransport {
    * The solver-backed hint existed in the pack and nothing ever asked for it —
    * this screen still called the greedy hinter, which ranks each move on local
    * merit and will happily suggest a shuffle back and forth. The planner walks
-   * a proven line instead, and the getter defers the search until the hint is
-   * actually shown, so a hidden one costs nothing.
+   * a proven line instead. The getter defers the search until the hint is
+   * actually shown; the table view forwards it, and the Hint button never
+   * reads it, so a hidden one costs nothing.
    */
   getSnapshot(): FreecellSnapshot {
     const state = freecellPlayerView(this.session.state);
     const undo = undoPolicy(this.session);
     const session = this.session;
     const planner = this.planner;
-    let hinted: FreecellHint | null | undefined;
-    return {
-      mode: this.options.mode,
-      dailyKey: this.options.dailyKey,
-      session: {
-        state,
-        phase: this.session.phase,
-        status: this.session.status,
-        result: this.session.result,
-        setupFx: this.session.setupFx,
+    return attachDeferredHint(
+      {
+        mode: this.options.mode,
+        dailyKey: this.options.dailyKey,
+        session: {
+          state,
+          phase: this.session.phase,
+          status: this.session.status,
+          result: this.session.result,
+          setupFx: this.session.setupFx,
+        },
+        eventCount: this.session.log.length,
+        canUndo: undo.available,
+        undoDepth: undo.depth,
+        canFinish: this.session.status === 'playing' && canAutoFinish(state),
       },
-      eventCount: this.session.log.length,
-      canUndo: undo.available,
-      undoDepth: undo.depth,
-      canFinish: this.session.status === 'playing' && canAutoFinish(state),
-      get hint(): FreecellHint | null {
-        if (hinted === undefined) {
-          hinted =
-            session.status === 'playing' ? planner.hint(session.state as FreecellState) : null;
-        }
-        return hinted;
-      },
-    };
+      () => (session.status === 'playing' ? planner.hint(session.state as FreecellState) : null),
+    );
   }
 
   legalMoves(): readonly LegalMove[] {

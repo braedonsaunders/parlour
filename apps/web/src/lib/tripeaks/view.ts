@@ -6,6 +6,7 @@ import {
   type TripeaksPlayerView,
 } from '@parlour/game-tripeaks';
 import type { TripeaksSnapshot } from '@/lib/solo/TripeaksTransport';
+import { attachDeferredHint } from '@/lib/solo/deferHint';
 
 export type TripeaksZone = 'stock' | 'hole' | `tableau:${number}`;
 
@@ -32,23 +33,27 @@ export function tripeaksTableView(
   legal: readonly LegalMove[],
 ): TripeaksTableView {
   const state = snapshot.session.state;
-  return {
-    mode: snapshot.mode,
-    dailyKey: snapshot.dailyKey,
-    stage: state.stage,
-    wrap: state.rules.wrap,
-    recycle: state.rules.recycle,
-    moves: state.moves,
-    recycles: state.recycles,
-    leftover: leftoverOf(state),
-    stockCount: state.stock.length,
-    hole: state.hole,
-    tableau: state.tableau,
-    legal,
-    canUndo: snapshot.canUndo,
-    undoDepth: snapshot.undoDepth,
-    hint: snapshot.hint,
-  };
+  return attachDeferredHint(
+    {
+      mode: snapshot.mode,
+      dailyKey: snapshot.dailyKey,
+      stage: state.stage,
+      wrap: state.rules.wrap,
+      recycle: state.rules.recycle,
+      moves: state.moves,
+      recycles: state.recycles,
+      leftover: leftoverOf(state),
+      stockCount: state.stock.length,
+      hole: state.hole,
+      tableau: state.tableau,
+      legal,
+      canUndo: snapshot.canUndo,
+      undoDepth: snapshot.undoDepth,
+    },
+    // Forwarded lazily: reading this runs the hinter, and the table only reads
+    // it while a hint is on screen. See TripeaksTransport.getSnapshot.
+    () => snapshot.hint,
+  );
 }
 
 export function zoneOfIndex(index: number): TripeaksZone {
