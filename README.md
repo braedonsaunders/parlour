@@ -230,7 +230,7 @@ parlour/
 - [x] Installable PWA and native macOS, Windows, and Linux releases
 - [x] Nineteen games built entirely on the public engine API
 - [x] Veiled-deck primitives in the engine
-- [ ] Platform paydown — shared table shell, room registry, harder CI
+- [x] Shared table shell and room registry — a new title is a pack, a shelf line, and a table pack
 - [ ] Daily-seeded Klondike / FreeCell
 
 ## License
