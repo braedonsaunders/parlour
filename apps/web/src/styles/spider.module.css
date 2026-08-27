@@ -461,6 +461,7 @@ button.pileButton {
   }
 
   .topRow {
+    justify-content: flex-start;
     gap: 0.55rem;
     min-height: calc(var(--sp-card) * 1.4 + 0.7rem);
   }
@@ -472,6 +473,7 @@ button.pileButton {
   }
 
   .runPicker {
+    order: -1;
     max-width: 8rem;
   }
 
