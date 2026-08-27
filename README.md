@@ -165,7 +165,7 @@ Spectating is still not built.
 ### Add a game
 
 A game is one package exporting one object. Rules module + one registry entry + one table pack,
-and you inherit everything above — see [`docs/ADDING-A-GAME.md`](docs/ADDING-A-GAME.md).
+and you inherit everything above.
 
 ```ts
 export const myGame: GameDef<MyState, MyConfig> = {
@@ -220,18 +220,6 @@ parlour/
     web/             # the app — Next.js, static export
     desktop/         # thin Tauri shell around that same export
 ```
-
-## Roadmap
-
-- [x] Deterministic engine, gated by 10,000-game headless simulation
-- [x] The feel milestone — fx-driven animation, art, audio, celebrations
-- [x] Local profiles, lifetime stats, friend head-to-head history, PWA
-- [x] P2P multiplayer — room codes, share links, host election, bot takeover, rejoin
-- [x] Installable PWA and native macOS, Windows, and Linux releases
-- [x] Nineteen games built entirely on the public engine API
-- [x] Veiled-deck primitives in the engine
-- [x] Shared table shell and room registry — a new title is a pack, a shelf line, and a table pack
-- [ ] Daily-seeded Klondike / FreeCell
 
 ## License
 

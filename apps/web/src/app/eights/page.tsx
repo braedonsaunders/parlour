@@ -32,7 +32,6 @@ export default function EightsSetupPage() {
   const resetRules = useEightsSetupStore((s) => s.resetRules);
   const [starting, setStarting] = useState(false);
   const t = useT();
-  // The pack keeps its English; each locale overlays it. See ADDING-A-GAME.md §6.
   const shelfEntry = useLocalizedGame('eights');
   const modes = useLocalizedModes('eights', EIGHTS_MODES);
   const schema = useLocalizedSchema('eights', eightsConfig);
