@@ -104,6 +104,26 @@ export function pyramidCuesForFx(fx: readonly FxEvent[]): SoundCue[] {
   });
 }
 
+export function tripeaksCuesForFx(fx: readonly FxEvent[]): SoundCue[] {
+  return fx.flatMap((event) => {
+    const atMs = Math.max(0, event.at ?? 0);
+    switch (event.kind) {
+      case 'tripeaks.stock-flip':
+        return [{ id: 'tripeaks.flip', atMs }];
+      case 'tripeaks.play':
+        return [{ id: 'tripeaks.move', atMs }];
+      case 'tripeaks.stock-recycle':
+        return [{ id: 'tripeaks.recycle', atMs }];
+      case 'tripeaks.hole-out':
+        return [{ id: 'tripeaks.hole-out', atMs }];
+      case 'tripeaks.win':
+        return [{ id: 'tripeaks.win', atMs }];
+      default:
+        return [];
+    }
+  });
+}
+
 export function heartsCuesForFx(fx: readonly FxEvent[]): SoundCue[] {
   const hasSharedTrickCollect = fx.some((event) => event.kind === 'tricks.collect');
 
@@ -463,6 +483,66 @@ export function scopaCuesForFx(fx: readonly FxEvent[]): SoundCue[] {
         return [{ id: 'scopa.sweep', atMs }];
       case 'scopa.round-score':
         return [{ id: 'scopa.score', atMs }];
+      default:
+        return [];
+    }
+  });
+}
+
+export function durakCuesForFx(fx: readonly FxEvent[]): SoundCue[] {
+  return fx.flatMap((event) => {
+    const atMs = Math.max(0, event.at ?? 0);
+    switch (event.kind) {
+      case 'durak.beat':
+        return [{ id: 'durak.beat', atMs }];
+      case 'durak.pickup':
+        return [{ id: 'durak.pickup', atMs }];
+      case 'durak.transfer':
+        return [{ id: 'durak.transfer', atMs }];
+      default:
+        return [];
+    }
+  });
+}
+
+export function palaceCuesForFx(fx: readonly FxEvent[]): SoundCue[] {
+  return fx.flatMap((event) => {
+    const atMs = Math.max(0, event.at ?? 0);
+    switch (event.kind) {
+      case 'palace.burn':
+        return [{ id: 'palace.burn', atMs }];
+      case 'palace.flipDown':
+        return [{ id: 'palace.flip-down', atMs }];
+      case 'palace.pickup':
+        return [{ id: 'palace.pickup', atMs: atMs + 60 }];
+      case 'palace.out':
+        return [{ id: 'palace.out', atMs }];
+      default:
+        return [];
+    }
+  });
+}
+
+export function pinochleCuesForFx(fx: readonly FxEvent[]): SoundCue[] {
+  return fx.flatMap((event) => {
+    const atMs = Math.max(0, event.at ?? 0);
+    switch (event.kind) {
+      case 'pinochle.bid': {
+        const bid = payloadNumber(event, 'bid');
+        return [{ id: bid === null ? 'pinochle.pass' : 'pinochle.bid', atMs }];
+      }
+      case 'pinochle.trump':
+        return [{ id: 'pinochle.trump', atMs }];
+      case 'pinochle.meld':
+        return [{ id: 'pinochle.meld', atMs }];
+      case 'pinochle.trick-collect':
+        return [{ id: 'pinochle.trick-collect', atMs }];
+      case 'pinochle.hand-score':
+        return payloadBoolean(event, 'set') ? [] : [{ id: 'pinochle.contract-made', atMs }];
+      case 'pinochle.set':
+        return [{ id: 'pinochle.set', atMs }];
+      case 'pinochle.score-chip':
+        return [{ id: 'pinochle.score-chime', atMs }];
       default:
         return [];
     }

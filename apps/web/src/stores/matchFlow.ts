@@ -16,6 +16,9 @@ import type { PokerModeId } from '@/lib/poker/modes';
 import type { SpadesModeId } from '@/lib/spades/modes';
 import type { ScopaModeId } from '@/lib/scopa/modes';
 import type { SpiteModeId } from '@/lib/spite/modes';
+import type { DurakModeId } from '@/lib/durak/modes';
+import type { PalaceModeId } from '@/lib/palace/modes';
+import type { PinochleModeId } from '@/lib/pinochle/modes';
 import type { RecordedSeat } from '@/stores/history';
 
 /** Everything the podium needs about the finished match. */
@@ -47,7 +50,10 @@ export interface MatchSnapshot {
     | PokerModeId
     | OhHellModeId
     | ScopaModeId
-    | SpiteModeId;
+    | SpiteModeId
+    | DurakModeId
+    | PalaceModeId
+    | PinochleModeId;
   /** The human's seat, for jingle-vs-sting and the "you" framing; null when absent. */
   localSeat: number | null;
 }

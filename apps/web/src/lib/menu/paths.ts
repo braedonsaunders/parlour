@@ -29,6 +29,10 @@ export const MENU_VIEW_ROUTES = [
   '/hearts',
   '/gin',
   '/president',
+  '/durak',
+  '/palace',
+  '/pinochle',
+  '/tripeaks',
 ] as const;
 
 const MENU_VIEW_SET = new Set<string>(MENU_VIEW_ROUTES);

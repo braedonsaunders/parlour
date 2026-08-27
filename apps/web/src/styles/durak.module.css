@@ -1,0 +1,142 @@
+.stockPile {
+  translate: -1.4rem 0;
+}
+
+.trumpBadge {
+  position: absolute;
+  z-index: 5;
+  left: 50%;
+  top: 50%;
+  translate: -50% -50%;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  pointer-events: none;
+}
+
+.trumpChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.28rem 0.7rem;
+  border-radius: 999px;
+  background: linear-gradient(
+    180deg,
+    var(--eights-suit, #8a4f7d),
+    color-mix(in srgb, var(--eights-suit, #8a4f7d) 55%, black)
+  );
+  color: white;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  box-shadow: 0 5px 12px rgba(4, 14, 20, 0.45);
+}
+
+.tableArea {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  translate: -50% -25%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  min-width: 10rem;
+  min-height: 4.5rem;
+}
+
+.pairSlot {
+  position: relative;
+  display: grid;
+  place-items: center;
+}
+
+.pairDefend {
+  position: absolute;
+  left: 0.6rem;
+  top: 0.6rem;
+  rotate: 6deg;
+}
+
+.cardCount {
+  margin-top: -0.2rem;
+  font-size: clamp(0.6rem, 1vw, 0.76rem);
+  opacity: 0.85;
+}
+
+.cardCount[data-low='true'] {
+  color: #e8b86a;
+  font-weight: 700;
+}
+
+.roleTag {
+  position: absolute;
+  top: -0.6rem;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.58rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.roleTag[data-role='attacker'] {
+  background: #c8566b;
+  color: white;
+}
+
+.roleTag[data-role='defender'] {
+  background: #3f8f96;
+  color: white;
+}
+
+.actionRail {
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.transferRow {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.announcer {
+  position: absolute;
+  left: 50%;
+  top: 30%;
+  translate: -50% -50%;
+  z-index: 8;
+  display: grid;
+  gap: 0.3rem;
+  justify-items: center;
+  text-align: center;
+  pointer-events: none;
+}
+
+.announcement {
+  display: grid;
+  gap: 0.1rem;
+  justify-items: center;
+  padding: 0.3rem 0.85rem;
+  border-radius: 0.9rem;
+  background: rgba(10, 30, 34, 0.72);
+  color: #ffe9c9;
+  box-shadow: 0 6px 16px rgba(4, 14, 20, 0.4);
+}
+
+.announcement strong {
+  font:
+    800 1rem/1 var(--font-display),
+    sans-serif;
+}
+
+.announcement small {
+  opacity: 0.85;
+  font-size: 0.66rem;
+}

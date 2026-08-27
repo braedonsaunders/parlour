@@ -18,6 +18,10 @@ import { freecellZh } from './freecell';
 import { spiderZh } from './spider';
 import { pyramidZh } from './pyramid';
 import { eightsZh } from './eights';
+import { durakZh } from './durak';
+import { palaceZh } from './palace';
+import { pinochleZh } from './pinochle';
+import { tripeaksZh } from './tripeaks';
 
 /** Simplified Chinese game copy, one file per shelf entry. */
 export const ZH_GAMES: GameCopyBook = {
@@ -40,4 +44,8 @@ export const ZH_GAMES: GameCopyBook = {
   spider: spiderZh,
   pyramid: pyramidZh,
   eights: eightsZh,
+  durak: durakZh,
+  palace: palaceZh,
+  pinochle: pinochleZh,
+  tripeaks: tripeaksZh,
 };

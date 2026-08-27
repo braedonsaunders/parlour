@@ -25,7 +25,10 @@ export type MultiplayerGameId =
   | 'poker'
   | 'ohhell'
   | 'scopa'
-  | 'spite';
+  | 'spite'
+  | 'durak'
+  | 'palace'
+  | 'pinochle';
 
 export const MULTIPLAYER_GAME_IDS = [
   'blitz',
@@ -42,6 +45,9 @@ export const MULTIPLAYER_GAME_IDS = [
   'ohhell',
   'scopa',
   'spite',
+  'durak',
+  'palace',
+  'pinochle',
 ] as const satisfies readonly MultiplayerGameId[];
 
 const KNOWN = new Set<string>(MULTIPLAYER_GAME_IDS);

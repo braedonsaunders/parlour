@@ -1,0 +1,360 @@
+.screen {
+  --tp-select: #7ee0b0;
+  --tp-card: clamp(3.6rem, 6vw, 5rem);
+  --tp-col: calc(var(--tp-card) * 0.62);
+  --tp-row: calc(var(--tp-card) * 0.72);
+}
+
+.playfield {
+  background:
+    radial-gradient(ellipse at 50% 40%, rgba(75, 161, 186, 0.16), transparent 56%),
+    linear-gradient(180deg, rgba(8, 31, 28, 0.08), rgba(5, 22, 22, 0.2));
+}
+
+.titlePill {
+  min-width: 15rem;
+}
+
+.metrics {
+  display: block;
+  margin-top: 0.24rem;
+  color: rgba(255, 241, 213, 0.78);
+  font-size: 0.68rem;
+  letter-spacing: 0.05em;
+}
+
+.metrics b {
+  color: #fff4df;
+}
+
+.board {
+  position: absolute;
+  z-index: 5;
+  inset: clamp(5.35rem, 11vh, 6.5rem) max(1rem, env(safe-area-inset-right))
+    max(4.7rem, calc(env(safe-area-inset-bottom) + 4rem)) max(1rem, env(safe-area-inset-left));
+  display: grid;
+  grid-template-rows: auto 1fr;
+  gap: clamp(0.7rem, 2vh, 1.2rem);
+  max-width: 68rem;
+  margin-inline: auto;
+}
+
+.topRow {
+  display: flex;
+  justify-content: center;
+  gap: clamp(1.4rem, 4vw, 2.4rem);
+  min-height: calc(var(--tp-card) * 1.4 + 1.3rem);
+}
+
+.pileWrap {
+  display: grid;
+  justify-items: center;
+  gap: 0.28rem;
+}
+
+.pileButton {
+  position: relative;
+  display: block;
+  width: var(--tp-card);
+  aspect-ratio: 5 / 7;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+button.pileButton {
+  border-radius: 0.75rem;
+}
+
+.pileButton > [data-card],
+.pileButton > [data-selected] {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.pileButton [data-card-chassis],
+.peakCard [data-card-chassis] {
+  width: 100%;
+}
+
+.pileButton[data-hint],
+.peakCard[data-hint] {
+  filter: drop-shadow(0 0 12px rgba(117, 225, 204, 0.9));
+}
+
+.peakCard[data-playable='true'] > [data-card-chassis] {
+  box-shadow:
+    0 0 0 3px var(--tp-select),
+    0 0 22px rgba(126, 224, 176, 0.45);
+}
+
+.board [data-just-flipped] > [data-card-chassis] {
+  box-shadow:
+    0 0 0 3px #ffc46a,
+    0 0 22px rgba(255, 196, 106, 0.5);
+}
+
+.pileButton [data-card-chassis],
+.peakCard [data-card-chassis] {
+  transition:
+    filter var(--dur-feedback) var(--ease-settle),
+    opacity var(--dur-feedback) var(--ease-settle);
+}
+
+.emptyPile {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  border: 0.17rem dashed rgba(255, 241, 213, 0.28);
+  border-radius: 0.72rem;
+  background: rgba(5, 27, 26, 0.28);
+  color: rgba(255, 234, 198, 0.45);
+  font:
+    800 clamp(1.5rem, 4vw, 2.5rem)/1 var(--font-display),
+    sans-serif;
+}
+
+.pileCount {
+  position: absolute;
+  z-index: 4;
+  right: -0.42rem;
+  bottom: -0.3rem;
+  min-width: 1.45rem;
+  padding: 0.12rem 0.3rem;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 999px;
+  background: #163d35;
+  color: white;
+  font-size: 0.65rem;
+  font-weight: 800;
+}
+
+.pileLabel {
+  max-width: var(--tp-card);
+  color: rgba(255, 241, 213, 0.72);
+  font-size: clamp(0.55rem, 0.85vw, 0.68rem);
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-align: center;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/** Three peaks, four visual rows: apex, mid, base, and the hole/stock row above. */
+.peaks {
+  position: relative;
+  min-height: calc(3 * var(--tp-row) + var(--tp-card) * 1.4);
+  margin-inline: auto;
+  width: calc(9 * var(--tp-col) + var(--tp-card));
+  max-width: 100%;
+}
+
+.peakCard {
+  position: absolute;
+  z-index: calc(var(--peak-row) + 1);
+  left: calc(var(--peak-col) * var(--tp-col) + var(--tp-card) / 2);
+  top: calc(var(--peak-row) * var(--tp-row));
+  display: block;
+  width: var(--tp-card);
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  translate: -50% 0;
+}
+
+.peakCard > [data-card-chassis] {
+  min-width: 2.75rem;
+  min-height: 3.85rem;
+}
+
+.actions {
+  max-width: calc(100vw - 2rem);
+  align-items: center;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.actions::-webkit-scrollbar {
+  display: none;
+}
+
+.dailyChip {
+  display: grid;
+  place-items: center;
+  min-height: 2.75rem;
+  padding: 0.45rem 0.75rem;
+  border: 1px solid rgba(255, 224, 161, 0.45);
+  border-radius: 0.85rem;
+  background: rgba(226, 176, 73, 0.15);
+  color: #ffe0a1;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.hintBanner {
+  position: absolute;
+  z-index: 24;
+  left: 50%;
+  bottom: max(4.4rem, calc(env(safe-area-inset-bottom) + 3.8rem));
+  max-width: min(34rem, calc(100vw - 2rem));
+  translate: -50% 0;
+  padding: 0.48rem 0.85rem;
+  border: 1px solid rgba(133, 232, 210, 0.54);
+  border-radius: 999px;
+  background: rgba(14, 57, 51, 0.94);
+  color: #eafff8;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-align: center;
+  box-shadow: 0 8px 20px rgba(1, 15, 16, 0.46);
+}
+
+.winPanel {
+  position: absolute;
+  z-index: 36;
+  left: 50%;
+  top: 50%;
+  display: grid;
+  justify-items: center;
+  gap: 0.55rem;
+  width: min(25rem, calc(100vw - 2rem));
+  translate: -50% -50%;
+  padding: 1.5rem;
+  text-align: center;
+}
+
+.winPanel h2 {
+  color: #fff1d5;
+  font:
+    800 2rem/1 var(--font-display),
+    sans-serif;
+}
+
+.winPanel strong {
+  color: #ffe0a1;
+}
+
+.winMoment {
+  position: absolute;
+  left: 50%;
+  top: 48%;
+  translate: -50% -50%;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: #fff1d5;
+  font-size: 2.4rem;
+  text-shadow: 0 4px 15px rgba(0, 0, 0, 0.7);
+}
+
+.winMoment strong {
+  color: #ffe0a1;
+  font:
+    800 clamp(2.4rem, 7vw, 5rem)/1 var(--font-display),
+    sans-serif;
+}
+
+@media (orientation: landscape) and (max-height: 560px) {
+  .screen {
+    --tp-card: clamp(2.6rem, 5.4vw, 3.2rem);
+  }
+
+  .board {
+    inset: 3.55rem 0.75rem 3.6rem;
+    gap: 0.32rem;
+  }
+
+  .topRow {
+    min-height: calc(var(--tp-card) * 1.4 + 0.65rem);
+  }
+
+  .pileLabel {
+    font-size: 0.48rem;
+  }
+
+  .titlePill {
+    min-width: 10.5rem;
+    margin-left: 6rem;
+    padding: 0.35rem 0.55rem;
+  }
+
+  .metrics {
+    display: none;
+  }
+
+  .actions {
+    left: 0.65rem;
+    right: auto;
+    bottom: 0.45rem;
+    max-width: calc(100vw - 1.3rem);
+  }
+
+  .actions button {
+    min-height: 2.75rem;
+    padding: 0.42rem 0.66rem;
+    font-size: 0.67rem;
+  }
+
+  .hintBanner {
+    right: 0.7rem;
+    bottom: 3.45rem;
+    left: auto;
+    max-width: 20rem;
+    translate: 0 0;
+  }
+}
+
+@media (orientation: portrait) and (max-width: 700px) {
+  .screen {
+    /* Nine base-card half-widths always fit at 2.9rem: 3.2rem side padding,
+       width-derived so no peak clips at small phones. */
+    --tp-card: min(2.9rem, calc((100vw - 3.2rem) / 6));
+  }
+
+  .board {
+    inset: 5.15rem 0 4.8rem;
+    gap: 0.65rem;
+    max-width: none;
+    margin: 0;
+    padding-left: max(0.65rem, env(safe-area-inset-left));
+    padding-right: max(0.65rem, env(safe-area-inset-right));
+  }
+
+  .topRow {
+    min-height: calc(var(--tp-card) * 1.4 + 0.7rem);
+  }
+
+  .titlePill {
+    min-width: 0;
+    max-width: calc(100vw - 6.5rem);
+  }
+
+  .metrics {
+    font-size: 0.58rem;
+  }
+
+  .actions {
+    right: auto;
+    left: 0.65rem;
+    bottom: max(0.45rem, env(safe-area-inset-bottom));
+    max-width: calc(100vw - 1.3rem);
+  }
+
+  .hintBanner {
+    right: 0.7rem;
+    bottom: max(3.45rem, calc(env(safe-area-inset-bottom) + 3.1rem));
+    left: auto;
+    max-width: calc(100vw - 1.4rem);
+    translate: 0 0;
+  }
+
+  .pileLabel {
+    font-size: 0.46rem;
+    letter-spacing: 0.02em;
+  }
+}

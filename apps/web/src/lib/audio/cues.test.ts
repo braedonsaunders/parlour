@@ -380,6 +380,93 @@ describe('fx-driven table audio', () => {
     ]);
   });
 
+  it('maps Durak beat, pickup, and transfer moments, and leaves the rest to shared card Foley', () => {
+    expect(
+      soundCuesForFx(
+        [
+          { kind: 'durak.beat', payload: { seat: 1, attack: 'S10', card: 'H6' }, at: 0 },
+          { kind: 'durak.pickup', payload: { seat: 1, cards: 3 }, at: 20 },
+          { kind: 'durak.transfer', payload: { seat: 0, card: 'H10', to: 1 }, at: 40 },
+          { kind: 'durak.attack', payload: { seat: 0, card: 'S10' }, at: 60 },
+          { kind: 'durak.out', payload: { seat: 0 }, at: 80 },
+        ],
+        'durak',
+      ),
+    ).toEqual([
+      { id: 'durak.beat', atMs: 0 },
+      { id: 'durak.pickup', atMs: 20 },
+      { id: 'durak.transfer', atMs: 40 },
+    ]);
+  });
+
+  it('maps Palace burn, flip-down, pickup, and out moments', () => {
+    expect(
+      soundCuesForFx(
+        [
+          { kind: 'palace.burn', payload: {}, at: 0 },
+          { kind: 'palace.flipDown', payload: {}, at: 20 },
+          { kind: 'palace.pickup', payload: {}, at: 40 },
+          { kind: 'palace.out', payload: {}, at: 80 },
+        ],
+        'palace',
+      ),
+    ).toEqual([
+      { id: 'palace.burn', atMs: 0 },
+      { id: 'palace.flip-down', atMs: 20 },
+      { id: 'palace.pickup', atMs: 100 },
+      { id: 'palace.out', atMs: 80 },
+    ]);
+  });
+
+  it('maps pinochle bid, meld, and set moments to their own generated stings', () => {
+    expect(
+      soundCuesForFx(
+        [
+          { kind: 'pinochle.bid', payload: { seat: 0, bid: 20 }, at: 0 },
+          { kind: 'pinochle.bid', payload: { seat: 1, bid: null }, at: 10 },
+          { kind: 'pinochle.trump', payload: { seat: 0, team: 0, suit: 'S' }, at: 20 },
+          { kind: 'pinochle.meld', payload: { seat: 0, team: 0, breakdown: {} }, at: 30 },
+          { kind: 'pinochle.trick-collect', payload: {}, at: 40 },
+          { kind: 'pinochle.hand-score', payload: { set: false }, at: 50 },
+          { kind: 'pinochle.hand-score', payload: { set: true }, at: 60 },
+          { kind: 'pinochle.set', payload: { team: 0, bid: 20 }, at: 70 },
+          { kind: 'pinochle.score-chip', payload: {}, at: 80 },
+        ],
+        'pinochle',
+      ),
+    ).toEqual([
+      { id: 'pinochle.bid', atMs: 0 },
+      { id: 'pinochle.pass', atMs: 10 },
+      { id: 'pinochle.trump', atMs: 20 },
+      { id: 'pinochle.meld', atMs: 30 },
+      { id: 'pinochle.trick-collect', atMs: 40 },
+      { id: 'pinochle.contract-made', atMs: 50 },
+      { id: 'pinochle.set', atMs: 70 },
+      { id: 'pinochle.score-chime', atMs: 80 },
+    ]);
+  });
+
+  it('maps TriPeaks flip, play, recycle, hole-out, and win moments', () => {
+    expect(
+      soundCuesForFx(
+        [
+          { kind: 'tripeaks.stock-flip', payload: {}, at: 0 },
+          { kind: 'tripeaks.play', payload: {}, at: 20 },
+          { kind: 'tripeaks.stock-recycle', payload: {}, at: 40 },
+          { kind: 'tripeaks.hole-out', payload: {}, at: 60 },
+          { kind: 'tripeaks.win', payload: {}, at: 80 },
+        ],
+        'tripeaks',
+      ),
+    ).toEqual([
+      { id: 'tripeaks.flip', atMs: 0 },
+      { id: 'tripeaks.move', atMs: 20 },
+      { id: 'tripeaks.recycle', atMs: 40 },
+      { id: 'tripeaks.hole-out', atMs: 60 },
+      { id: 'tripeaks.win', atMs: 80 },
+    ]);
+  });
+
   it('plays the Blitz knock immediately and leaves later celebration sounds choreographed', () => {
     expect(
       soundCuesForFx(

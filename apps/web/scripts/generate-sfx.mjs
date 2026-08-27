@@ -596,6 +596,92 @@ const sounds = [
     prompt:
       'A leftover-score settle for Pyramid solitaire: remaining cards hush onto felt, then one gentle rounded chime. Good-natured hole-complete, not a victory fanfare.',
   },
+  {
+    name: 'durak-beat',
+    duration: 0.55,
+    outputDuration: 0.4,
+    mono: true,
+    prompt:
+      'One playing card slaps sharply down onto another face-up card on felt, beating it: crisp confident paperboard clap, firm decisive landing. Exactly one strike, no flight.',
+  },
+  {
+    name: 'durak-pickup',
+    duration: 0.75,
+    outputDuration: 0.6,
+    prompt:
+      'A defender scoops a small scattered pile of playing cards off felt into one hand in one smooth sweep: soft multi-card paperboard rustle gathering into a compact stack.',
+  },
+  {
+    name: 'durak-transfer',
+    duration: 0.6,
+    outputDuration: 0.45,
+    mono: true,
+    prompt:
+      'One playing card slides briskly across felt toward another seat, handing off an attack: a light continuous paperboard slide ending in a soft precise stop.',
+  },
+  {
+    name: 'palace-burn',
+    outputPath: 'sfx/palace/burn.mp3',
+    duration: 0.6,
+    outputDuration: 0.42,
+    prompt:
+      'A loose stack of playing cards launches up and off a felt table in one sharp rising paperboard whoosh, vanishing with no landing or settle. Decisive and final — cards leaving the game for good.',
+  },
+  {
+    name: 'palace-flip-down',
+    outputPath: 'sfx/palace/flip-down.mp3',
+    duration: 0.65,
+    outputDuration: 0.45,
+    mono: true,
+    prompt:
+      'One face-down playing card flips over on felt with a brief suspenseful beat: soft held paper flutter, a short pause, then a clean revealing snap into place. More tense than a routine card flip.',
+  },
+  {
+    name: 'palace-pickup',
+    outputPath: 'sfx/palace/pickup.mp3',
+    duration: 0.55,
+    outputDuration: 0.4,
+    mono: true,
+    prompt:
+      'A hand slowly gathers a modest loose pile of playing cards across felt into a stack: one soft continuous paperboard scrape and a gentle squaring tap, unhurried and slightly reluctant, not a grab.',
+  },
+  {
+    name: 'pinochle-bid',
+    duration: 0.55,
+    outputDuration: 0.36,
+    prompt:
+      'One firm wooden knuckle rap on a solid card table, immediately followed by a short assertive plucked string rise. Bold, decisive, and warmer than a light double knock, meaning the bid confidently stands.',
+  },
+  {
+    name: 'pinochle-meld',
+    duration: 0.8,
+    outputDuration: 0.62,
+    prompt:
+      'A small fan of playing cards spreads open on felt with a crisp papery ripple, resolving into one bright rewarding wooden-and-glass chime. Celebratory reveal, bigger and warmer than a simple score tick.',
+  },
+  {
+    name: 'pinochle-set',
+    duration: 0.75,
+    outputDuration: 0.68,
+    tempo: 0.6,
+    prompt:
+      'A comic bittersweet oof: one soft low wood thud lands, then two muted descending pub-instrument notes wobble apart like a deflating balloon. Friendly and wry, never harsh, distinct from a card-table sting.',
+  },
+  {
+    name: 'tripeaks-play',
+    duration: 0.5,
+    outputDuration: 0.32,
+    mono: true,
+    prompt:
+      'One free playing card snaps off a solitaire peak onto a waste pile one rank away: a light paperboard peel and a crisp compact snap landing. Single quick action, not a shuffle.',
+  },
+  {
+    name: 'tripeaks-hole-out',
+    duration: 0.65,
+    outputDuration: 0.5,
+    prompt:
+      'A leftover-score settle for TriPeaks solitaire: remaining cards hush onto felt, then one gentle rounded chime. Good-natured stuck-deal moment, not a victory fanfare.',
+  },
 ];
 
 const masterTargets = {
@@ -678,6 +764,17 @@ const masterTargets = {
   'pyramid-pair': -18,
   'pyramid-king': -18,
   'pyramid-hole-out': -18,
+  'durak-beat': -18,
+  'durak-pickup': -18,
+  'durak-transfer': -18,
+  'palace-burn': -18,
+  'palace-flip-down': -18,
+  'palace-pickup': -18,
+  'pinochle-bid': -18,
+  'pinochle-meld': -18,
+  'pinochle-set': -18,
+  'tripeaks-play': -18,
+  'tripeaks-hole-out': -18,
 };
 
 function option(name) {

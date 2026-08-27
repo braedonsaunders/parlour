@@ -1,0 +1,24 @@
+{
+  "name": "@parlour/game-pinochle",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "tsc --noEmit",
+    "lint": "eslint src --ext .ts",
+    "type-check": "tsc --noEmit",
+    "test": "vitest run",
+    "sim": "tsx src/cli/sim.ts"
+  },
+  "dependencies": {
+    "@parlour/engine": "workspace:*",
+    "@parlour/tricks": "workspace:*"
+  },
+  "devDependencies": {
+    "tsx": "^4.20.0",
+    "vitest": "^4.0.18"
+  }
+}

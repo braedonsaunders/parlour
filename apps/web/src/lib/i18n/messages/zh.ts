@@ -404,6 +404,25 @@ export const zh: Messages = {
   'setup.pyramid.bestClear': '最快清台',
   'setup.pyramid.note': '单人离线。撤销和提示都留在你这台设备上；不用账号，也不用房间码。',
 
+  'setup.modes.tripeaksDeal': '三峰发牌',
+  'setup.tripeaks.posted': '每日牌局已记录',
+  'setup.tripeaks.waiting': '今天的牌局在等你',
+  'setup.tripeaks.best': '最佳：剩 {score} 张 · {time}',
+  'setup.tripeaks.waitingHint':
+    '每人都打同一局定死的经典牌局。清空压着的牌即可解锁下方的牌。剩下越少越好。',
+  'setup.tripeaks.deals': '牌局',
+  'setup.tripeaks.clears': '清台',
+  'setup.tripeaks.bestScore': '最佳分数',
+  'setup.tripeaks.bestClear': '最快清台',
+  'setup.tripeaks.note': '单人离线。撤销和提示都留在你这台设备上；不用账号，也不用房间码。',
+
+  // --- install --------------------------------------------------------------
+  'setup.eyebrow.beatTheAttack': '击破攻牌',
+  'setup.busy.turningTrump': '正在翻出主牌…',
+  'setup.eyebrow.emptyEveryLayer': '清空每一层',
+  'setup.note.pinochle':
+    '和搭档一起叫牌，报出你手上的组合，然后去吃墩。好友房间用同样的四字符房间码、实时回放同步和重连流程，和客厅里每张牌桌一样。',
+
   // --- install --------------------------------------------------------------
   'install.add': '添加',
   'install.install': '安装',

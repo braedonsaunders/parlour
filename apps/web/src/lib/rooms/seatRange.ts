@@ -39,6 +39,9 @@ const SEAT_RANGES: Readonly<Record<MultiplayerGameId, SeatRange>> = {
   ohhell: { min: 3, max: 7 },
   scopa: { min: 2, max: 6, allowed: [2, 3, 4, 6] },
   spite: { min: 2, max: 4 },
+  durak: { min: 2, max: 6 },
+  palace: { min: 2, max: 6 },
+  pinochle: { min: 4, max: 4 },
 };
 
 export function seatRangeFor(gameId: string | null | undefined): SeatRange {

@@ -430,6 +430,26 @@ export const es: Messages = {
   'setup.pyramid.note':
     'En solitario y sin conexión. El deshacer y las pistas se quedan en tu dispositivo; no hace falta cuenta ni código de sala.',
 
+  'setup.modes.tripeaksDeal': 'Reparto de TriPeaks',
+  'setup.tripeaks.posted': 'Reparto diario anotado',
+  'setup.tripeaks.waiting': 'Tu reparto diario te espera',
+  'setup.tripeaks.best': 'Mejor: {score} restantes · {time}',
+  'setup.tripeaks.waitingHint':
+    'Un reparto Clásico determinado, el mismo para todo el mundo. Libera una carta despejando lo que la cubre. Gana quien deja menos.',
+  'setup.tripeaks.deals': 'Repartos',
+  'setup.tripeaks.clears': 'Limpiezas',
+  'setup.tripeaks.bestScore': 'Mejor puntuación',
+  'setup.tripeaks.bestClear': 'Mejor limpieza',
+  'setup.tripeaks.note':
+    'En solitario y sin conexión. El deshacer y las pistas se quedan en tu dispositivo; no hace falta cuenta ni código de sala.',
+
+  // --- install --------------------------------------------------------------
+  'setup.eyebrow.beatTheAttack': 'vence el ataque',
+  'setup.busy.turningTrump': 'Descubriendo el triunfo…',
+  'setup.eyebrow.emptyEveryLayer': 'vacía cada capa',
+  'setup.note.pinochle':
+    'Puja con tu compañero, declara lo que tengas y después hazte con las bazas. Las salas de amistades usan los mismos códigos de cuatro caracteres, la misma sincronización en vivo y el mismo reconexión que cualquier mesa del parlour.',
+
   // --- install --------------------------------------------------------------
   'install.add': 'Añadir',
   'install.install': 'Instalar',

@@ -5,7 +5,8 @@ import type { FxEvent } from '@parlour/engine';
 import { useT, type MessageKey, type Translator } from '@/lib/i18n';
 import { useTableAnnouncer } from './TableShell';
 
-export type SolitaireNarrationGame = 'klondike' | 'freecell' | 'spider' | 'pyramid' | 'golf';
+export type SolitaireNarrationGame =
+  'klondike' | 'freecell' | 'spider' | 'pyramid' | 'golf' | 'tripeaks';
 
 /** Summarises one solitaire action instead of reading every card flight. */
 export function useSolitaireNarration(
@@ -39,6 +40,24 @@ export function narrateSolitaireFx(
       if (cards.length > 0 && from && to) {
         actions.push(movedCards(game, cards, from, to, t));
       }
+      continue;
+    }
+
+    if (event.kind === 'tripeaks.play') {
+      const cards = stringArray(payload.cards);
+      const from = stringField(payload, 'from');
+      const to = stringField(payload, 'to');
+      if (cards.length > 0 && from && to) {
+        actions.push(movedCards(game, cards, from, to, t));
+      }
+      continue;
+    }
+
+    if (event.kind === 'tripeaks.stock-flip') {
+      const card = stringField(payload, 'card');
+      const from = stringField(payload, 'from');
+      const to = stringField(payload, 'to');
+      if (card && from && to) actions.push(movedCards(game, [card], from, to, t));
       continue;
     }
 
@@ -150,6 +169,7 @@ function zoneName(game: SolitaireNarrationGame, zone: string, t: Translator): st
   if (zone === 'waste') {
     return t(game === 'golf' ? 'solitaire.zone.hole' : 'solitaire.zone.waste');
   }
+  if (zone === 'hole') return t('solitaire.zone.hole');
 
   const tableau = /^tableau:(\d+)$/.exec(zone);
   if (tableau) return t('solitaire.zone.tableau', { column: Number(tableau[1]) + 1 });

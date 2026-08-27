@@ -5,6 +5,7 @@ import { useLocaleStore } from '@/stores/locale';
 import modeStyles from '@/styles/modes.module.css';
 import BlitzSetupPage from '@/app/play/page';
 import CribbageSetupPage from '@/app/cribbage/page';
+import DurakSetupPage from '@/app/durak/page';
 import EightsSetupPage from '@/app/eights/page';
 import EuchreSetupPage from '@/app/euchre/page';
 import GinSetupPage from '@/app/gin/page';
@@ -12,8 +13,11 @@ import HeartsSetupPage from '@/app/hearts/page';
 import FreecellSetupPage from '@/app/freecell/page';
 import GolfSetupPage from '@/app/golf/page';
 import KlondikeSetupPage from '@/app/klondike/page';
+import PalaceSetupPage from '@/app/palace/page';
+import PinochleSetupPage from '@/app/pinochle/page';
 import PyramidSetupPage from '@/app/pyramid/page';
 import SpiderSetupPage from '@/app/spider/page';
+import TripeaksSetupPage from '@/app/tripeaks/page';
 import OhHellSetupPage from '@/app/ohhell/page';
 import PokerSetupPage from '@/app/poker/page';
 import ScopaSetupPage from '@/app/scopa/page';
@@ -45,6 +49,7 @@ vi.mock('@/lib/transitions/runTableWipe', () => ({
 const SETUP_PAGES: readonly [string, ComponentType][] = [
   ['Blitz', BlitzSetupPage],
   ['Cribbage', CribbageSetupPage],
+  ['Durak', DurakSetupPage],
   ['Crazy Eights', EightsSetupPage],
   ['Euchre', EuchreSetupPage],
   ['Gin', GinSetupPage],
@@ -52,8 +57,11 @@ const SETUP_PAGES: readonly [string, ComponentType][] = [
   ['FreeCell', FreecellSetupPage],
   ['Golf', GolfSetupPage],
   ['Klondike', KlondikeSetupPage],
+  ['Palace', PalaceSetupPage],
+  ['Pinochle', PinochleSetupPage],
   ['Pyramid', PyramidSetupPage],
   ['Spider', SpiderSetupPage],
+  ['TriPeaks', TripeaksSetupPage],
   ['Oh Hell', OhHellSetupPage],
   ['Poker', PokerSetupPage],
   ['President', PresidentSetupPage],
@@ -154,11 +162,14 @@ describe('setup screen contract across every shipped game', () => {
   const ROOM_SETUP_PAGES: readonly [string, ComponentType][] = [
     ['Blitz', BlitzSetupPage],
     ['Cribbage', CribbageSetupPage],
+    ['Durak', DurakSetupPage],
     ['Crazy Eights', EightsSetupPage],
     ['Euchre', EuchreSetupPage],
     ['Gin', GinSetupPage],
     ['Hearts', HeartsSetupPage],
     ['Oh Hell', OhHellSetupPage],
+    ['Palace', PalaceSetupPage],
+    ['Pinochle', PinochleSetupPage],
     ['Poker', PokerSetupPage],
     ['President', PresidentSetupPage],
     ['Rat Screw', RatscrewSetupPage],

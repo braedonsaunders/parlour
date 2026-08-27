@@ -1,6 +1,7 @@
 import { modePreset, type GameCatalogEntry, type GameMode, type RuleValues } from '@parlour/engine';
 import { blitzCatalog } from '@parlour/game-blitz';
 import { cribbageCatalog } from '@parlour/game-cribbage';
+import { durakCatalog } from '@parlour/game-durak';
 import { eightsCatalog } from '@parlour/game-eights';
 import { euchreCatalog } from '@parlour/game-euchre';
 import { ginCatalog } from '@parlour/game-gin';
@@ -9,6 +10,8 @@ import { golfCatalog } from '@parlour/game-golf';
 import { heartsCatalog } from '@parlour/game-hearts';
 import { klondikeCatalog } from '@parlour/game-klondike';
 import { ohhellCatalog } from '@parlour/game-ohhell';
+import { palaceCatalog } from '@parlour/game-palace';
+import { pinochleCatalog } from '@parlour/game-pinochle';
 import { pokerCatalog } from '@parlour/game-poker';
 import { presidentCatalog } from '@parlour/game-president';
 import { pyramidCatalog } from '@parlour/game-pyramid';
@@ -18,6 +21,7 @@ import { scopaCatalog } from '@parlour/game-scopa';
 import { spadesCatalog } from '@parlour/game-spades';
 import { spiderCatalog } from '@parlour/game-spider';
 import { spiteCatalog } from '@parlour/game-spite';
+import { tripeaksCatalog } from '@parlour/game-tripeaks';
 
 /**
  * Pack catalogs are generic over their rule config. `ConfigSchema<C>` is
@@ -66,7 +70,11 @@ export type GameId =
   | 'golf'
   | 'freecell'
   | 'spider'
-  | 'pyramid';
+  | 'pyramid'
+  | 'durak'
+  | 'palace'
+  | 'pinochle'
+  | 'tripeaks';
 
 const SHELF: readonly GameCatalogEntry[] = [
   shelfEntry(blitzCatalog),
@@ -88,6 +96,10 @@ const SHELF: readonly GameCatalogEntry[] = [
   shelfEntry(heartsCatalog),
   shelfEntry(ginCatalog),
   shelfEntry(presidentCatalog),
+  shelfEntry(durakCatalog),
+  shelfEntry(palaceCatalog),
+  shelfEntry(pinochleCatalog),
+  shelfEntry(tripeaksCatalog),
 ];
 
 export type { GameCatalogEntry, GameMode };

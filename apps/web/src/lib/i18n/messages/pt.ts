@@ -429,6 +429,26 @@ export const pt: Messages = {
   'setup.pyramid.note':
     'Sozinho e offline. Desfazer e dicas ficam no seu aparelho; sem conta nem código de sala.',
 
+  'setup.modes.tripeaksDeal': 'Baralho de TriPeaks',
+  'setup.tripeaks.posted': 'Baralho diário registrado',
+  'setup.tripeaks.waiting': 'Seu baralho diário está esperando',
+  'setup.tripeaks.best': 'Melhor: {score} restantes · {time}',
+  'setup.tripeaks.waitingHint':
+    'Um baralho Clássico determinístico, o mesmo para todo mundo. Libere uma carta limpando o que a cobre. Quanto menos sobrar, melhor.',
+  'setup.tripeaks.deals': 'Baralhos',
+  'setup.tripeaks.clears': 'Limpezas',
+  'setup.tripeaks.bestScore': 'Melhor pontuação',
+  'setup.tripeaks.bestClear': 'Melhor limpeza',
+  'setup.tripeaks.note':
+    'Sozinho e offline. Desfazer e dicas ficam no seu aparelho; sem conta nem código de sala.',
+
+  // --- install --------------------------------------------------------------
+  'setup.eyebrow.beatTheAttack': 'vença o ataque',
+  'setup.busy.turningTrump': 'Virando o trunfo…',
+  'setup.eyebrow.emptyEveryLayer': 'esvazie cada camada',
+  'setup.note.pinochle':
+    'Dê o lance com seu parceiro, declare o que você tiver e depois vença as vazas. As salas de amigos usam os mesmos códigos de quatro caracteres, a mesma sincronização ao vivo e o mesmo fluxo de reconexão de qualquer mesa do parlour.',
+
   // --- install --------------------------------------------------------------
   'install.add': 'Adicionar',
   'install.install': 'Instalar',

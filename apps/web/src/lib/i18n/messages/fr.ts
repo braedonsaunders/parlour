@@ -421,6 +421,26 @@ export const fr: Messages = {
   'setup.pyramid.note':
     'Solo et hors ligne. L’annulation et les indices restent sur ton appareil ; pas de compte ni de code de salle.',
 
+  'setup.modes.tripeaksDeal': 'Donne de TriPeaks',
+  'setup.tripeaks.posted': 'Donne du jour enregistrée',
+  'setup.tripeaks.waiting': 'Ta donne du jour t’attend',
+  'setup.tripeaks.best': 'Meilleur : {score} restantes · {time}',
+  'setup.tripeaks.waitingHint':
+    'Une donne Classique déterministe, la même pour tout le monde. Libère une carte en dégageant ce qui la recouvre. Moins il en reste, mieux c’est.',
+  'setup.tripeaks.deals': 'Donnes',
+  'setup.tripeaks.clears': 'Vidages',
+  'setup.tripeaks.bestScore': 'Meilleur score',
+  'setup.tripeaks.bestClear': 'Meilleur vidage',
+  'setup.tripeaks.note':
+    'Solo et hors ligne. L’annulation et les indices restent sur ton appareil ; pas de compte ni de code de salle.',
+
+  // --- install --------------------------------------------------------------
+  'setup.eyebrow.beatTheAttack': 'pare l’attaque',
+  'setup.busy.turningTrump': 'On retourne l’atout…',
+  'setup.eyebrow.emptyEveryLayer': 'videz chaque couche',
+  'setup.note.pinochle':
+    'Enchéris avec ton partenaire, déclare ce que tu tiens, puis ramasse les plis. Les salles entre amis utilisent les mêmes codes à quatre caractères, la même synchro live et le même retour à table que n’importe quelle table du parlour.',
+
   // --- install --------------------------------------------------------------
   'install.add': 'Ajouter',
   'install.install': 'Installer',

@@ -18,6 +18,10 @@ import { freecellPt } from './freecell';
 import { spiderPt } from './spider';
 import { pyramidPt } from './pyramid';
 import { eightsPt } from './eights';
+import { durakPt } from './durak';
+import { palacePt } from './palace';
+import { pinochlePt } from './pinochle';
+import { tripeaksPt } from './tripeaks';
 
 /** Brazilian Portuguese game copy, one file per shelf entry. */
 export const PT_GAMES: GameCopyBook = {
@@ -40,4 +44,8 @@ export const PT_GAMES: GameCopyBook = {
   spider: spiderPt,
   pyramid: pyramidPt,
   eights: eightsPt,
+  durak: durakPt,
+  palace: palacePt,
+  pinochle: pinochlePt,
+  tripeaks: tripeaksPt,
 };

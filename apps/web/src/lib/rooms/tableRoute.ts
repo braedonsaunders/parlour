@@ -27,6 +27,9 @@ const TABLE_ROUTES: Record<MultiplayerGameId, string> = {
   ohhell: '/ohhell/table',
   scopa: '/scopa/table',
   spite: '/spite/table',
+  durak: '/durak/table',
+  palace: '/palace/table',
+  pinochle: '/pinochle/table',
 };
 
 export function tableRouteFor(gameId: MultiplayerGameId): string {

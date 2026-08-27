@@ -12,7 +12,11 @@ import {
   freecellCuesForFx,
   spiderCuesForFx,
   pyramidCuesForFx,
+  tripeaksCuesForFx,
   presidentCuesForFx,
+  palaceCuesForFx,
+  pinochleCuesForFx,
+  durakCuesForFx,
   ratscrewCuesForFx,
   pokerCuesForFx,
   ohhellCuesForFx,
@@ -163,6 +167,38 @@ export const PYRAMID_SFX = {
   king: 'pyramid.king',
   holeOut: 'pyramid.hole-out',
   win: 'pyramid.win',
+} as const;
+
+export const TRIPEAKS_SFX = {
+  flip: 'tripeaks.flip',
+  move: 'tripeaks.move',
+  recycle: 'tripeaks.recycle',
+  holeOut: 'tripeaks.hole-out',
+  win: 'tripeaks.win',
+} as const;
+
+export const DURAK_SFX = {
+  beat: 'durak.beat',
+  pickup: 'durak.pickup',
+  transfer: 'durak.transfer',
+} as const;
+
+export const PALACE_SFX = {
+  burn: 'palace.burn',
+  flipDown: 'palace.flip-down',
+  pickup: 'palace.pickup',
+  out: 'palace.out',
+} as const;
+
+export const PINOCHLE_SFX = {
+  bid: 'pinochle.bid',
+  pass: 'pinochle.pass',
+  trump: 'pinochle.trump',
+  meld: 'pinochle.meld',
+  trickCollect: 'pinochle.trick-collect',
+  contractMade: 'pinochle.contract-made',
+  set: 'pinochle.set',
+  scoreChime: 'pinochle.score-chime',
 } as const;
 
 export const GIN_SFX = {
@@ -551,6 +587,58 @@ export const PYRAMID_SFX_PACK: SfxPack = {
   cuesForFx: pyramidCuesForFx,
 };
 
+export const TRIPEAKS_SFX_PACK: SfxPack = {
+  id: 'tripeaks',
+  label: 'TriPeaks',
+  sounds: [
+    sound(TRIPEAKS_SFX.flip, '/audio/sfx/card-draw-stock.mp3', 0.74, 3, 70),
+    sound(TRIPEAKS_SFX.move, '/audio/sfx/tripeaks-play.mp3', 0.78, 4, 45),
+    sound(TRIPEAKS_SFX.recycle, '/audio/sfx/stock-shuffle.mp3', 0.72, 1, 400),
+    sound(TRIPEAKS_SFX.holeOut, '/audio/sfx/tripeaks-hole-out.mp3', 0.72, 1, 400),
+    sound(TRIPEAKS_SFX.win, '/audio/sfx/win-celebration.mp3', 0.88, 1, 1_000),
+  ],
+  cuesForFx: tripeaksCuesForFx,
+};
+
+export const DURAK_SFX_PACK: SfxPack = {
+  id: 'durak',
+  label: 'Durak',
+  sounds: [
+    sound(DURAK_SFX.beat, '/audio/sfx/durak-beat.mp3', 0.82, 4, 45),
+    sound(DURAK_SFX.pickup, '/audio/sfx/durak-pickup.mp3', 0.78, 2, 150),
+    sound(DURAK_SFX.transfer, '/audio/sfx/durak-transfer.mp3', 0.72, 3, 80),
+  ],
+  cuesForFx: durakCuesForFx,
+};
+
+export const PALACE_SFX_PACK: SfxPack = {
+  id: 'palace',
+  label: 'Palace',
+  sounds: [
+    sound(PALACE_SFX.burn, '/audio/sfx/palace/burn.mp3', 0.85, 2, 100),
+    sound(PALACE_SFX.flipDown, '/audio/sfx/palace/flip-down.mp3', 0.74, 3, 60),
+    sound(PALACE_SFX.pickup, '/audio/sfx/palace/pickup.mp3', 0.72, 2, 100),
+    sound(PALACE_SFX.out, '/audio/sfx/blitz-burst.mp3', 0.85, 1, 600),
+  ],
+  cuesForFx: palaceCuesForFx,
+};
+
+export const PINOCHLE_SFX_PACK: SfxPack = {
+  id: 'pinochle',
+  label: 'Pinochle',
+  sounds: [
+    sound(PINOCHLE_SFX.bid, '/audio/sfx/pinochle-bid.mp3', 0.8, 2, 120),
+    sound(PINOCHLE_SFX.pass, '/audio/sfx/euchre-pass.mp3', 0.58, 4, 60),
+    sound(PINOCHLE_SFX.trump, '/audio/sfx/euchre-trump-called.mp3', 0.76, 2, 100),
+    sound(PINOCHLE_SFX.meld, '/audio/sfx/pinochle-meld.mp3', 0.85, 4, 90),
+    sound(PINOCHLE_SFX.trickCollect, '/audio/sfx/euchre-trick-collect.mp3', 0.76, 2, 100),
+    sound(PINOCHLE_SFX.contractMade, '/audio/sfx/euchre-march-fanfare.mp3', 0.88, 1, 500),
+    sound(PINOCHLE_SFX.set, '/audio/sfx/pinochle-set.mp3', 0.86, 1, 500),
+    sound(PINOCHLE_SFX.scoreChime, '/audio/sfx/euchre-score-chime.mp3', 0.68, 6, 50),
+  ],
+  cuesForFx: pinochleCuesForFx,
+};
+
 const packs = new Map<string, SfxPack>();
 
 /**
@@ -585,6 +673,10 @@ for (const pack of [
   FREECELL_SFX_PACK,
   SPIDER_SFX_PACK,
   PYRAMID_SFX_PACK,
+  TRIPEAKS_SFX_PACK,
+  DURAK_SFX_PACK,
+  PALACE_SFX_PACK,
+  PINOCHLE_SFX_PACK,
 ]) {
   registerSfxPack(pack);
 }

@@ -18,6 +18,10 @@ import { freecellFr } from './freecell';
 import { spiderFr } from './spider';
 import { pyramidFr } from './pyramid';
 import { eightsFr } from './eights';
+import { durakFr } from './durak';
+import { palaceFr } from './palace';
+import { pinochleFr } from './pinochle';
+import { tripeaksFr } from './tripeaks';
 
 /** French game copy, one file per shelf entry. */
 export const FR_GAMES: GameCopyBook = {
@@ -40,4 +44,8 @@ export const FR_GAMES: GameCopyBook = {
   spider: spiderFr,
   pyramid: pyramidFr,
   eights: eightsFr,
+  durak: durakFr,
+  palace: palaceFr,
+  pinochle: pinochleFr,
+  tripeaks: tripeaksFr,
 };

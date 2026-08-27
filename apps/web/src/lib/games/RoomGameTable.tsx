@@ -6,11 +6,14 @@ import { type MultiplayerRoomSession } from '@/app/_multiplayer/roomSession';
 import type { MultiplayerGameId } from '@/lib/rooms/gameIds';
 import { blitzTablePack } from './tablePacks/blitz';
 import { cribbageTablePack } from './tablePacks/cribbage';
+import { durakTablePack } from './tablePacks/durak';
 import { eightsTablePack } from './tablePacks/eights';
 import { euchreTablePack } from './tablePacks/euchre';
 import { ginTablePack } from './tablePacks/gin';
 import { heartsTablePack } from './tablePacks/hearts';
 import { ohhellTablePack } from './tablePacks/ohhell';
+import { palaceTablePack } from './tablePacks/palace';
+import { pinochleTablePack } from './tablePacks/pinochle';
 import { pokerTablePack } from './tablePacks/poker';
 import { presidentTablePack } from './tablePacks/president';
 import { ratscrewTablePack } from './tablePacks/ratscrew';
@@ -32,6 +35,8 @@ export function RoomGameTable({ gameId }: { gameId: MultiplayerGameId }) {
       return <GameTablePage pack={blitzTablePack} />;
     case 'cribbage':
       return <GameTablePage pack={cribbageTablePack} />;
+    case 'durak':
+      return <GameTablePage pack={durakTablePack} />;
     case 'eights':
       return <GameTablePage pack={eightsTablePack} />;
     case 'euchre':
@@ -42,6 +47,10 @@ export function RoomGameTable({ gameId }: { gameId: MultiplayerGameId }) {
       return <GameTablePage pack={heartsTablePack} />;
     case 'ohhell':
       return <GameTablePage pack={ohhellTablePack} />;
+    case 'palace':
+      return <GameTablePage pack={palaceTablePack} />;
+    case 'pinochle':
+      return <GameTablePage pack={pinochleTablePack} />;
     case 'scopa':
       return <GameTablePage pack={scopaTablePack} />;
     case 'spite':

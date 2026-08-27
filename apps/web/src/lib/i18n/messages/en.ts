@@ -423,6 +423,26 @@ export const en = {
   'setup.pyramid.note':
     'Solo and offline. Undo and hints stay on your device; no account or room code needed.',
 
+  'setup.modes.tripeaksDeal': 'TriPeaks deal',
+  'setup.tripeaks.posted': 'Daily deal posted',
+  'setup.tripeaks.waiting': 'Your daily deal is waiting',
+  'setup.tripeaks.best': 'Best: {score} left · {time}',
+  'setup.tripeaks.waitingHint':
+    'A deterministic Classic deal shared by every player. Free a card by clearing what rests on it. Lower leftover wins.',
+  'setup.tripeaks.deals': 'Deals',
+  'setup.tripeaks.clears': 'Clears',
+  'setup.tripeaks.bestScore': 'Best score',
+  'setup.tripeaks.bestClear': 'Best clear',
+  'setup.tripeaks.note':
+    'Solo and offline. Undo and hints stay on your device; no account or room code needed.',
+
+  // --- install --------------------------------------------------------------
+  'setup.eyebrow.beatTheAttack': 'beat the attack',
+  'setup.busy.turningTrump': 'Turning up the trump…',
+  'setup.eyebrow.emptyEveryLayer': 'empty every layer',
+  'setup.note.pinochle':
+    'Bid with your partner, meld what you are holding, then take tricks. Friend rooms use the same four-character codes, live replay sync, and reconnect flow as every parlour table.',
+
   // --- install --------------------------------------------------------------
   'install.add': 'Add',
   'install.install': 'Install',

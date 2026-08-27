@@ -8,6 +8,10 @@ import { golfCatalog } from '@parlour/game-golf';
 import { klondikeCatalog } from '@parlour/game-klondike';
 import { pyramidCatalog } from '@parlour/game-pyramid';
 import { spiderCatalog } from '@parlour/game-spider';
+import { durakCatalog } from '@parlour/game-durak';
+import { palaceCatalog } from '@parlour/game-palace';
+import { pinochleCatalog } from '@parlour/game-pinochle';
+import { tripeaksCatalog } from '@parlour/game-tripeaks';
 import { presidentCatalog } from '@parlour/game-president';
 import { ratscrewCatalog } from '@parlour/game-ratscrew';
 import { wildpileCatalog } from '@parlour/game-wildpile';
@@ -37,6 +41,10 @@ describe('game shelf catalog', () => {
       'hearts',
       'gin',
       'president',
+      'durak',
+      'palace',
+      'pinochle',
+      'tripeaks',
     ]);
   });
 
@@ -83,10 +91,14 @@ describe('game shelf catalog', () => {
     expect(getGame('freecell').href).toBe('/freecell');
     expect(getGame('spider').href).toBe('/spider');
     expect(getGame('pyramid').href).toBe('/pyramid');
+    expect(getGame('durak').href).toBe('/durak');
+    expect(getGame('palace').href).toBe('/palace');
+    expect(getGame('pinochle').href).toBe('/pinochle');
+    expect(getGame('tripeaks').href).toBe('/tripeaks');
   });
 
   it('every multi-seat shelf game has a friend room, and solitaire does not', () => {
-    const SOLO_ONLY = new Set(['klondike', 'golf', 'freecell', 'spider', 'pyramid']);
+    const SOLO_ONLY = new Set(['klondike', 'golf', 'freecell', 'spider', 'pyramid', 'tripeaks']);
     for (const game of GAMES) {
       if (SOLO_ONLY.has(game.id)) {
         expect(game.seats, game.id).toEqual([1]);
@@ -127,6 +139,10 @@ describe('game shelf catalog', () => {
     expect(getGame('freecell')).toBe(freecellCatalog);
     expect(getGame('spider')).toBe(spiderCatalog);
     expect(getGame('pyramid')).toBe(pyramidCatalog);
+    expect(getGame('durak')).toBe(durakCatalog);
+    expect(getGame('palace')).toBe(palaceCatalog);
+    expect(getGame('pinochle')).toBe(pinochleCatalog);
+    expect(getGame('tripeaks')).toBe(tripeaksCatalog);
   });
 
   it('gives every shelved game what the picker screens need', () => {

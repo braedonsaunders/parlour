@@ -18,6 +18,10 @@ import { freecellEs } from './freecell';
 import { spiderEs } from './spider';
 import { pyramidEs } from './pyramid';
 import { eightsEs } from './eights';
+import { durakEs } from './durak';
+import { palaceEs } from './palace';
+import { pinochleEs } from './pinochle';
+import { tripeaksEs } from './tripeaks';
 
 /**
  * Spanish game copy, one file per shelf entry.
@@ -47,4 +51,8 @@ export const ES_GAMES: GameCopyBook = {
   spider: spiderEs,
   pyramid: pyramidEs,
   eights: eightsEs,
+  durak: durakEs,
+  palace: palaceEs,
+  pinochle: pinochleEs,
+  tripeaks: tripeaksEs,
 };

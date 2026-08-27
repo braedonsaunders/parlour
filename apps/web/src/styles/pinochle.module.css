@@ -1,0 +1,361 @@
+/* Pinochle-specific table furniture: trick zone, bid rail, meld panel, team scores. */
+
+.hudCluster {
+  display: grid;
+  justify-items: start;
+  gap: 0.45rem;
+}
+
+.teamScores {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.scoreTarget {
+  color: rgba(253, 246, 234, 0.58);
+  font-size: 0.58rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.teamChip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.3rem;
+  padding: 0.28rem 0.56rem;
+  border-radius: 999px;
+  background: rgba(16, 24, 32, 0.72);
+  border: 2px solid rgba(255, 255, 255, 0.08);
+  font-family: var(--font-display, inherit);
+}
+
+.teamChip[data-maker='true'] {
+  border-color: var(--team-accent, #8a5a44);
+  box-shadow: 0 0 12px -4px var(--team-accent, #8a5a44);
+}
+
+.teamChip strong {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #fdf6ea;
+  min-width: 1.2ch;
+  text-align: center;
+}
+
+.teamChip small {
+  font-size: 0.6rem;
+  letter-spacing: 0.055em;
+  text-transform: uppercase;
+  color: rgba(253, 246, 234, 0.66);
+  white-space: nowrap;
+}
+
+.trickZone {
+  position: absolute;
+  left: 50%;
+  top: 47%;
+  transform: translate(-50%, -50%);
+  width: clamp(9rem, 20vw, 13rem);
+  height: clamp(6.5rem, 14vw, 9rem);
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+
+.trickCard {
+  position: absolute;
+  transition: transform 160ms cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+.trickCard[data-seat='0'] {
+  transform: translate(0%, 26%) rotate(-3deg);
+}
+.trickCard[data-seat='1'] {
+  transform: translate(-58%, 0%) rotate(6deg);
+}
+.trickCard[data-seat='2'] {
+  transform: translate(0%, -30%) rotate(4deg);
+}
+.trickCard[data-seat='3'] {
+  transform: translate(58%, 0%) rotate(-5deg);
+}
+
+@media (orientation: landscape) and (max-height: 560px) {
+  /* Keep the south trick card clear of the local fan on short phones. */
+  .trickZone {
+    top: 42%;
+    transform: translate(-50%, -50%) scale(0.78);
+  }
+}
+
+.trumpBadge {
+  position: absolute;
+  left: 50%;
+  top: clamp(6.4rem, 17vh, 7.8rem);
+  z-index: 5;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.35rem 0.85rem;
+  border-radius: 999px;
+  background: rgba(16, 24, 32, 0.78);
+  border: 2px solid var(--trump-color, #8a5a44);
+  color: #fdf6ea;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+
+.trumpBadge i {
+  width: 0.8rem;
+  height: 0.8rem;
+  display: inline-block;
+  color: var(--trump-color, #8a5a44);
+  font-style: normal;
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.dealerChip {
+  position: absolute;
+  right: 0.4rem;
+  bottom: -0.5rem;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #f0c04e, #c2891f);
+  color: #3b2707;
+  font-size: 0.58rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+}
+
+.auctionBadge {
+  position: absolute;
+  left: 50%;
+  bottom: -1.35rem;
+  transform: translateX(-50%);
+  padding: 0.08rem 0.5rem;
+  border-radius: 999px;
+  background: rgba(16, 24, 32, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: rgba(253, 246, 234, 0.85);
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.auctionBadge[data-confirmed] {
+  border-color: #5fae7b;
+  color: #a8e0ba;
+}
+
+.bidRail {
+  position: fixed;
+  left: 50%;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 11.5rem);
+  transform: translateX(-50%);
+  z-index: 40;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 0.6rem;
+  max-width: min(94vw, 44rem);
+  padding: 0.7rem 0.9rem;
+  border-radius: 1.4rem;
+  background: rgba(12, 18, 26, 0.88);
+  border: 2px solid rgba(255, 255, 255, 0.09);
+  backdrop-filter: blur(6px);
+}
+
+.bidPrompt {
+  width: 100%;
+  text-align: center;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(253, 246, 234, 0.75);
+}
+
+.bidOptions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.34rem;
+}
+
+.bidChip {
+  min-width: 2.5rem;
+  min-height: 2.5rem;
+  border-radius: 0.8rem;
+  border: 2px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.05);
+  color: #fdf6ea;
+  font-family: var(--font-display, inherit);
+  font-size: 1rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition:
+    transform 140ms ease-pop,
+    border-color 140ms ease,
+    background 140ms ease;
+}
+
+.bidChip:hover {
+  transform: translateY(-2px) scale(1.06);
+  border-color: #8a5a44;
+}
+
+.bidChip:focus-visible {
+  outline: 3px solid var(--hearth-core, #e2b049);
+  outline-offset: 2px;
+  border-color: #e2b049;
+  background: rgba(226, 176, 73, 0.16);
+}
+
+.suitRow {
+  display: flex;
+  gap: 0.55rem;
+}
+
+.suitPick {
+  width: 2.9rem;
+  height: 2.9rem;
+  border-radius: 0.9rem;
+  border: 2px solid rgba(255, 255, 255, 0.14);
+  display: grid;
+  place-items: center;
+  font-size: 1.35rem;
+  color: var(--suit-color, #fdf6ea);
+  background: rgba(255, 255, 255, 0.05);
+  cursor: pointer;
+  transition:
+    transform 140ms ease-pop,
+    border-color 140ms ease;
+}
+
+.suitPick:hover {
+  transform: translateY(-2px) scale(1.06);
+  border-color: var(--suit-color, #fdf6ea);
+}
+
+.bidAction {
+  display: inline-flex;
+  width: 8rem;
+  min-height: 3.25rem;
+  box-sizing: border-box;
+  align-items: center;
+  justify-content: center;
+  padding: 0.65rem 0.85rem;
+  border-radius: var(--radius-fat);
+  font-size: 0.82rem;
+  line-height: 1;
+}
+
+.meldPanel {
+  position: fixed;
+  left: 50%;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 11.5rem);
+  transform: translateX(-50%);
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  max-width: min(92vw, 30rem);
+  padding: 0.8rem 1rem;
+  border-radius: 1.4rem;
+  background: rgba(12, 18, 26, 0.9);
+  border: 2px solid rgba(240, 192, 78, 0.4);
+  backdrop-filter: blur(6px);
+}
+
+.meldRows {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  gap: 0.15rem;
+}
+
+.meldRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.6rem;
+  font-size: 0.76rem;
+  color: rgba(253, 246, 234, 0.82);
+}
+
+.meldRow strong {
+  color: #f0c04e;
+  font-variant-numeric: tabular-nums;
+}
+
+.meldTotal {
+  font-family: var(--font-display, inherit);
+  font-size: 1.4rem;
+  font-weight: 900;
+  color: #f0c04e;
+}
+
+.fxSeatPop {
+  position: absolute;
+  padding: 0.35rem 0.8rem;
+  border-radius: 999px;
+  background: rgba(12, 18, 26, 0.92);
+  border: 2px solid var(--pop-accent, #8a5a44);
+  color: #fdf6ea;
+  font-weight: 800;
+  font-size: 0.86rem;
+  white-space: nowrap;
+  opacity: 0;
+  z-index: 60;
+  pointer-events: none;
+}
+
+.fxBanner {
+  position: absolute;
+  left: 50%;
+  top: 34%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  opacity: 0;
+  z-index: 70;
+  pointer-events: none;
+}
+
+.fxBanner strong {
+  display: block;
+  font-family: var(--font-display, inherit);
+  font-size: clamp(1.6rem, 4vw, 2.6rem);
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  color: var(--banner-accent, #8a5a44);
+  text-shadow:
+    0 2px 0 rgba(0, 0, 0, 0.4),
+    0 6px 22px rgba(0, 0, 0, 0.5);
+}
+
+.fxBanner span {
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(253, 246, 234, 0.8);
+}
+
+.flyingTrickCard {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  z-index: 55;
+  pointer-events: none;
+}

@@ -30,6 +30,10 @@ export const MENU_VIEW_LOADERS: Record<string, () => Promise<PageModule>> = {
   '/hearts': () => import('@/app/hearts/page'),
   '/gin': () => import('@/app/gin/page'),
   '/president': () => import('@/app/president/page'),
+  '/durak': () => import('@/app/durak/page'),
+  '/palace': () => import('@/app/palace/page'),
+  '/pinochle': () => import('@/app/pinochle/page'),
+  '/tripeaks': () => import('@/app/tripeaks/page'),
 };
 
 const cache = new Map<string, ComponentType>();

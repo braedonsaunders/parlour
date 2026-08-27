@@ -87,6 +87,19 @@ import { ohhellConfig, ohhellGame, type OhHellRules, type OhHellState } from '@p
 import { createPokerDef, pokerConfig, type PokerRules, type PokerState } from '@parlour/game-poker';
 import { createScopaDef, scopaConfig, type ScopaRules, type ScopaState } from '@parlour/game-scopa';
 import { spiteConfig, spiteGame, type SpiteRules, type SpiteState } from '@parlour/game-spite';
+import { createDurakDef, durakConfig, type DurakRules, type DurakState } from '@parlour/game-durak';
+import {
+  createPalaceDef,
+  palaceConfig,
+  type PalaceRules,
+  type PalaceState,
+} from '@parlour/game-palace';
+import {
+  createPinochleDef,
+  pinochleConfig,
+  type PinochleRules,
+  type PinochleState,
+} from '@parlour/game-pinochle';
 import {
   wildpileConfig,
   wildpileGame,
@@ -118,7 +131,10 @@ export type MultiplayerGameSession =
   | GameSession<PokerState, PokerRules>
   | GameSession<OhHellState, OhHellRules>
   | GameSession<ScopaState, ScopaRules>
-  | GameSession<SpiteState, SpiteRules>;
+  | GameSession<SpiteState, SpiteRules>
+  | GameSession<DurakState, DurakRules>
+  | GameSession<PalaceState, PalaceRules>
+  | GameSession<PinochleState, PinochleRules>;
 
 export type SessionAuthority = AuthorityAdapter & {
   getSession(): MultiplayerGameSession;
@@ -442,6 +458,28 @@ export const ROOM_GAMES: Record<MultiplayerGameId, RoomGamePack> = {
     name: 'Spite & Malice',
     configSchema: spiteConfig,
     createDef: () => spiteGame,
+  }),
+
+  durak: definePack<DurakState, DurakRules>({
+    id: 'durak',
+    name: 'Durak',
+    configSchema: durakConfig,
+    createDef: createDurakDef,
+  }),
+
+  palace: definePack<PalaceState, PalaceRules>({
+    id: 'palace',
+    name: 'Palace',
+    configSchema: palaceConfig,
+    createDef: createPalaceDef,
+    privateHandles: (state, seat) => [...(state.hands[seat] ?? []), ...(state.down[seat] ?? [])],
+  }),
+
+  pinochle: definePack<PinochleState, PinochleRules>({
+    id: 'pinochle',
+    name: 'Pinochle',
+    configSchema: pinochleConfig,
+    createDef: createPinochleDef,
   }),
 };
 

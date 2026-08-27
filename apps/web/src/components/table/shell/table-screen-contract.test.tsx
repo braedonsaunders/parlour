@@ -17,6 +17,11 @@ import { rulesForPyramidMode } from '@/lib/pyramid/modes';
 import { pyramidTableView, type PyramidTableView } from '@/lib/pyramid/view';
 import { rulesForSpiderMode } from '@/lib/spider/modes';
 import { spiderTableView, type SpiderTableView } from '@/lib/spider/view';
+import { rulesForTripeaksMode } from '@/lib/tripeaks/modes';
+import { tripeaksTableView, type TripeaksTableView } from '@/lib/tripeaks/view';
+import type { DurakTableView } from '@/lib/durak/view';
+import type { PalaceTableView } from '@/lib/palace/view';
+import type { PinochleTableView } from '@/lib/pinochle/view';
 import type { PresidentTableView } from '@/lib/president/view';
 import type { RatscrewTableView } from '@/lib/ratscrew/view';
 import type { SpadesTableView } from '@/lib/spades/view';
@@ -26,6 +31,7 @@ import { GolfTransport } from '@/lib/solo/GolfTransport';
 import { KlondikeTransport } from '@/lib/solo/KlondikeTransport';
 import { PyramidTransport } from '@/lib/solo/PyramidTransport';
 import { SpiderTransport } from '@/lib/solo/SpiderTransport';
+import { TripeaksTransport } from '@/lib/solo/TripeaksTransport';
 import tableStyles from '@/styles/table.module.css';
 import { TableScreen, type TableView } from '../TableScreen';
 import { CribbageTableScreen } from '../cribbage/CribbageTableScreen';
@@ -38,6 +44,10 @@ import { GolfTableScreen } from '../golf/GolfTableScreen';
 import { KlondikeTableScreen } from '../klondike/KlondikeTableScreen';
 import { PyramidTableScreen } from '../pyramid/PyramidTableScreen';
 import { SpiderTableScreen } from '../spider/SpiderTableScreen';
+import { TripeaksTableScreen } from '../tripeaks/TripeaksTableScreen';
+import { DurakTableScreen } from '../durak/DurakTableScreen';
+import { PalaceTableScreen } from '../palace/PalaceTableScreen';
+import { PinochleTableScreen } from '../pinochle/PinochleTableScreen';
 import { PresidentTableScreen } from '../president/PresidentTableScreen';
 import { RatscrewTableScreen } from '../ratscrew/RatscrewTableScreen';
 import { SpadesTableScreen } from '../spades/SpadesTableScreen';
@@ -219,6 +229,18 @@ const PYRAMID_VIEW: PyramidTableView = pyramidTableView(
   PYRAMID_TRANSPORT.legalMoves(),
 );
 const PYRAMID_DEAL_FX = PYRAMID_TRANSPORT.getSnapshot().session.setupFx ?? [];
+
+const TRIPEAKS_TRANSPORT = new TripeaksTransport({
+  mode: 'daily',
+  dailyKey: '2026-08-24',
+  seed: 31,
+  rules: rulesForTripeaksMode('daily'),
+});
+const TRIPEAKS_VIEW: TripeaksTableView = tripeaksTableView(
+  TRIPEAKS_TRANSPORT.getSnapshot(),
+  TRIPEAKS_TRANSPORT.legalMoves(),
+);
+const TRIPEAKS_DEAL_FX = TRIPEAKS_TRANSPORT.getSnapshot().session.setupFx ?? [];
 
 const CRIBBAGE_VIEW: CribbageTableView = {
   players: [
@@ -507,6 +529,156 @@ const EIGHTS_VIEW: EightsTableView = {
   matchOver: false,
 };
 
+const DURAK_VIEW: DurakTableView = {
+  players: [0, 1].map((seat) => ({
+    seat,
+    name: seat === 0 ? 'You' : 'Seat 1',
+    avatarId: seat === 0 ? 'ember' : 'slate',
+    handCount: 6,
+    isLocal: seat === 0,
+    isBot: seat !== 0,
+    isAttacker: seat === 0,
+    isDefender: seat === 1,
+    isOut: false,
+    passed: false,
+  })),
+  localSeat: 0,
+  attacker: 0,
+  defender: 1,
+  actingSeats: [0],
+  phaseLabel: 'attack',
+  trumpSuit: 'S',
+  trumpCard: 'S6',
+  stockCount: 24,
+  table: [],
+  hand: ['S10', 'H6', 'D11'],
+  decision: 'attack',
+  legal: {
+    attackCards: ['S10'],
+    defendOptions: [],
+    transferCards: [],
+    takeCards: false,
+    pass: false,
+  },
+  outcome: null,
+  matchOver: false,
+};
+
+const PALACE_VIEW: PalaceTableView = {
+  players: [0, 1, 2].map((seat) => ({
+    seat,
+    name: seat === 0 ? 'You' : `Seat ${seat}`,
+    avatarId: seat === 0 ? 'ember' : 'slate',
+    isLocal: seat === 0,
+    isBot: seat !== 0,
+    handCount: 3,
+    up: ['S9', 'H10', 'C11'],
+    downCount: 3,
+    roundsWon: 0,
+    swapped: false,
+    readied: true,
+  })),
+  localSeat: 0,
+  activeSeat: 0,
+  roundNumber: 1,
+  winsTo: 3,
+  phaseLabel: 'round 1 · first to 3',
+  pile: [],
+  floor: null,
+  burnCount: 0,
+  hand: ['S3', 'H4', 'D5'],
+  layer: 'hand',
+  decision: 'play',
+  legal: {
+    playableCards: ['S3', 'H4', 'D5'],
+    pickup: false,
+    playDown: false,
+    swap: false,
+    ready: false,
+  },
+  matchOver: false,
+};
+
+const PINOCHLE_VIEW: PinochleTableView = {
+  players: [0, 1, 2, 3].map((seat) => ({
+    seat,
+    name: seat === 0 ? 'You' : `Seat ${seat}`,
+    avatarId: seat === 0 ? 'ember' : 'slate',
+    isLocal: seat === 0,
+    isBot: seat !== 0,
+    team: (seat % 2) as 0 | 1,
+    handCount: 12,
+    isDealer: seat === 3,
+    lastBid: null,
+    hasPassed: false,
+    isInAuction: true,
+    meld: null,
+    hasConfirmedMeld: false,
+  })),
+  localSeat: 0,
+  activeSeat: 0,
+  stageLabel: 'classic · bidding',
+  scores: [0, 0],
+  targetScore: 150,
+  teams: [
+    {
+      team: 0,
+      score: 0,
+      isBidTeam: false,
+      tricks: 0,
+      trickPoints: 0,
+      meld: 0,
+      label: 'North–South',
+    },
+    { team: 1, score: 0, isBidTeam: false, tricks: 0, trickPoints: 0, meld: 0, label: 'East–West' },
+  ],
+  handNo: 1,
+  dealer: 3,
+  turn: 0,
+  bids: [],
+  highBid: null,
+  highBidder: null,
+  minBid: 25,
+  maxBid: 60,
+  activeBidders: [0, 1, 2, 3],
+  trump: null,
+  melds: [null, null, null, null],
+  meldConfirmed: [false, false, false, false],
+  localMeld: null,
+  trick: [],
+  ledSuit: null,
+  leader: null,
+  tricksPlayed: 0,
+  totalTricks: 12,
+  lastTrickWinner: null,
+  tricksBySeat: [0, 0, 0, 0],
+  trickPointsBySeat: [0, 0, 0, 0],
+  hand: [
+    'SA-0',
+    'S10-0',
+    'SK-0',
+    'SQ-0',
+    'SJ-0',
+    'S9-0',
+    'HA-0',
+    'H10-0',
+    'HK-0',
+    'HQ-0',
+    'HJ-0',
+    'H9-0',
+  ],
+  legalCards: [],
+  decision: 'bid',
+  canPass: true,
+  bidOptions: [25, 26, 27],
+  trumpOptions: [],
+  summary: null,
+  lastHand: null,
+  matchOver: false,
+  mode: 'classic',
+  rules: { target: 150, minBid: 25, opponentsScoreMeld: true },
+};
+
 const SCREENS: readonly ScreenCase[] = [
   {
     name: 'blitz',
@@ -697,6 +869,56 @@ const SCREENS: readonly ScreenCase[] = [
     loadingCopy: 'Shuffling the pile…',
     dealState: true,
     gameText: 'wild',
+  },
+  {
+    name: 'durak',
+    Screen: DurakTableScreen as ComponentType<never>,
+    view: DURAK_VIEW,
+    eyebrow: 'Durak',
+    playfield: 'Durak table',
+    feltMark: 'D',
+    errorHeadline: 'The table lost the thread.',
+    loadingCopy: 'Turning up the trump…',
+    dealState: true,
+    gameText: 'durak',
+  },
+  {
+    name: 'palace',
+    Screen: PalaceTableScreen as ComponentType<never>,
+    view: PALACE_VIEW,
+    eyebrow: 'Palace',
+    playfield: 'Palace table',
+    feltMark: '♜',
+    errorHeadline: 'The table lost the thread.',
+    loadingCopy: 'Dealing the layers…',
+    dealState: true,
+    gameText: 'palace',
+  },
+  {
+    name: 'pinochle',
+    Screen: PinochleTableScreen as ComponentType<never>,
+    view: PINOCHLE_VIEW,
+    eyebrow: 'Pinochle',
+    playfield: 'Pinochle table',
+    feltMark: 'P',
+    errorHeadline: 'The table lost the thread.',
+    loadingCopy: 'Dealing the first hand…',
+    dealState: true,
+    gameText: 'pinochle',
+  },
+  {
+    name: 'tripeaks',
+    Screen: TripeaksTableScreen as ComponentType<never>,
+    view: TRIPEAKS_VIEW,
+    eyebrow: 'TriPeaks',
+    playfield: 'TriPeaks table',
+    feltMark: 'T',
+    errorHeadline: 'The peaks lost the thread.',
+    loadingCopy: 'Laying out the three peaks…',
+    dealState: true,
+    handRail: false,
+    dealFx: TRIPEAKS_DEAL_FX,
+    gameText: 'tripeaks',
   },
 ];
 

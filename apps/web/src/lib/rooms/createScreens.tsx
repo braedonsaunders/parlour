@@ -21,6 +21,10 @@ import { useScopaSetupStore } from '@/stores/scopaSetup';
 import { useSpadesSetupStore } from '@/stores/spadesSetup';
 import { useSpiteSetupStore } from '@/stores/spiteSetup';
 import { useWildSetupStore, wildRulesFor } from '@/stores/wildSetup';
+import { durakRulesFor, useDurakSetupStore } from '@/stores/durakSetup';
+import { palaceRulesFor, usePalaceSetupStore } from '@/stores/palaceSetup';
+import { pinochleConfig } from '@parlour/game-pinochle';
+import { usePinochleSetupStore } from '@/stores/pinochleSetup';
 import type { PersistApi } from '@/stores/usePersistHydrated';
 import { type MultiplayerGameId } from './gameIds';
 
@@ -313,6 +317,61 @@ export const CREATE_SCREENS: Readonly<Record<MultiplayerGameId, CreateScreen>> =
       <>
         This {capacity}-seat table starts when every chair is filled. Share the code with friends,
         or fill empty chairs with bots.
+      </>
+    ),
+  },
+  durak: {
+    backHref: '/durak',
+    backLabel: 'Back to Durak',
+    loading: 'Turning up the trump…',
+    botGlyph: 'D',
+    humanGlyph: '◆',
+    hydrate: useDurakSetupStore,
+    room: () => {
+      const { mode, seats, overrides } = useDurakSetupStore.getState();
+      return { seats, config: durakRulesFor(mode, overrides) };
+    },
+    blurb: (capacity) => (
+      <>
+        This {capacity}-seat table deals as soon as every chair fills. Share the code with{' '}
+        {capacity - 1} friend{capacity === 2 ? '' : 's'} — the pack seats up to six.
+      </>
+    ),
+  },
+  palace: {
+    backHref: '/palace',
+    backLabel: 'Back to Palace',
+    loading: 'Dealing the layers…',
+    botGlyph: '2',
+    humanGlyph: '◆',
+    hydrate: usePalaceSetupStore,
+    room: () => {
+      const { mode, seats, overrides } = usePalaceSetupStore.getState();
+      return { seats, config: palaceRulesFor(mode, overrides) };
+    },
+    blurb: (capacity) => (
+      <>
+        This {capacity}-seat table deals as soon as every chair fills. Share the code with{' '}
+        {capacity - 1} friend{capacity === 2 ? '' : 's'} — clear hand, face-up and face-down to win
+        the round.
+      </>
+    ),
+  },
+  pinochle: {
+    backHref: '/pinochle',
+    backLabel: 'Back to Pinochle',
+    loading: 'Dealing a pinochle table…',
+    botGlyph: 'W',
+    humanGlyph: '◆',
+    hydrate: null,
+    room: () => ({
+      seats: 4,
+      config: applyPreset(pinochleConfig, usePinochleSetupStore.getState().mode),
+    }),
+    blurb: () => (
+      <>
+        You sit across from your partner. Share the code with three friends — bid, name trump, and
+        meld before the tricks fall.
       </>
     ),
   },
