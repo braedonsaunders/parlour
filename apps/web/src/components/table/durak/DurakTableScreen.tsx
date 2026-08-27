@@ -140,6 +140,7 @@ export function DurakTableScreen(props: DurakTableScreenProps) {
             />
           ))}
           <Table view={view} deal={deal} busy={localBusy} />
+          <TablePairs view={view} />
           <LocalHand
             view={view}
             busy={localBusy}
@@ -332,19 +333,25 @@ function Table({
           <span className={styles.trumpChip}>{DURAK_SUIT_GLYPHS[view.trumpSuit]} trump</span>
         </div>
       )}
-      <div className={styles.tableArea} data-zone="table" aria-label="The table">
-        {view.table.map((pair, index) => (
-          <div key={`${pair.attack}:${index}`} className={styles.pairSlot}>
-            <PlayingCard card={pair.attack} face={cardFace(pair.attack)} />
-            {pair.defend && (
-              <div className={styles.pairDefend}>
-                <PlayingCard card={pair.defend} face={cardFace(pair.defend)} />
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
     </TablePiles>
+  );
+}
+
+function TablePairs({ view }: { view: DurakTableView }) {
+  if (view.table.length === 0) return null;
+  return (
+    <div className={styles.tableArea} data-zone="table" aria-label="The table">
+      {view.table.map((pair, index) => (
+        <div key={`${pair.attack}:${index}`} className={styles.pairSlot}>
+          <PlayingCard compact card={pair.attack} face={cardFace(pair.attack)} />
+          {pair.defend && (
+            <div className={styles.pairDefend}>
+              <PlayingCard compact card={pair.defend} face={cardFace(pair.defend)} />
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
   );
 }
 

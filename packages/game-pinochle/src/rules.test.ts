@@ -119,6 +119,15 @@ describe('naming trump', () => {
     expect(session.state.stage).toBe('melding');
     expect(session.state.trump).toBe('H');
   });
+
+  it('keeps the first unconfirmed seat as the phase actor so solo bots can confirm', () => {
+    let session = nameTrump(winAuction(openSession({ seed: 5 }), 25), 'H');
+    expect(session.phase.actor).toBe(0);
+    expect(session.phase.actors).toEqual([0, 1, 2, 3]);
+    session = mustStep(session, 0, 'confirmMeld');
+    expect(session.phase.actor).toBe(1);
+    expect(session.phase.actors).toEqual([1, 2, 3]);
+  });
 });
 
 describe('meld declaration', () => {

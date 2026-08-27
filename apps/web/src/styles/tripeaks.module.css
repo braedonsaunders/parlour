@@ -1,6 +1,6 @@
 .screen {
   --tp-select: #7ee0b0;
-  --tp-card: clamp(3.6rem, 6vw, 5rem);
+  --tp-card: clamp(4.5rem, 8vw, 6.2rem);
   --tp-col: calc(var(--tp-card) * 0.62);
   --tp-row: calc(var(--tp-card) * 0.72);
 }
@@ -30,13 +30,20 @@
 .board {
   position: absolute;
   z-index: 5;
-  inset: clamp(5.35rem, 11vh, 6.5rem) max(1rem, env(safe-area-inset-right))
-    max(4.7rem, calc(env(safe-area-inset-bottom) + 4rem)) max(1rem, env(safe-area-inset-left));
+  top: clamp(5.35rem, 11vh, 6.5rem);
+  bottom: max(4.7rem, calc(env(safe-area-inset-bottom) + 4rem));
+  left: 50%;
+  width: min(68rem, calc(100% - 2 * max(1rem, env(safe-area-inset-left))));
+  translate: -50% 0;
   display: grid;
   grid-template-rows: auto 1fr;
+  justify-items: center;
+  align-content: start;
   gap: clamp(0.7rem, 2vh, 1.2rem);
-  max-width: 68rem;
-  margin-inline: auto;
+  container-type: size;
+  /* Eight column-steps + one card ≈ 5.96 card-widths; three overlapped rows
+     plus the stock/hole row ≈ 5.1 card-heights. */
+  --tp-card: min(6.6rem, calc(100cqw / 6.1), calc((100cqh - 1.6rem) / 5.1));
 }
 
 .topRow {
@@ -149,7 +156,7 @@ button.pileButton {
   position: relative;
   min-height: calc(3 * var(--tp-row) + var(--tp-card) * 1.4);
   margin-inline: auto;
-  width: calc(9 * var(--tp-col) + var(--tp-card));
+  width: calc(8 * var(--tp-col) + var(--tp-card));
   max-width: 100%;
 }
 
@@ -261,11 +268,13 @@ button.pileButton {
 
 @media (orientation: landscape) and (max-height: 560px) {
   .screen {
-    --tp-card: clamp(2.6rem, 5.4vw, 3.2rem);
+    --tp-card: clamp(3.2rem, 6.4vw, 4.2rem);
   }
 
   .board {
-    inset: 3.55rem 0.75rem 3.6rem;
+    top: 3.55rem;
+    bottom: 3.6rem;
+    width: min(68rem, calc(100% - 1.5rem));
     gap: 0.32rem;
   }
 
@@ -311,18 +320,15 @@ button.pileButton {
 
 @media (orientation: portrait) and (max-width: 700px) {
   .screen {
-    /* Nine base-card half-widths always fit at 2.9rem: 3.2rem side padding,
-       width-derived so no peak clips at small phones. */
-    --tp-card: min(2.9rem, calc((100vw - 3.2rem) / 6));
+    /* Eight column steps + one card: ~5.96 card-widths, padded so nothing clips. */
+    --tp-card: min(3.6rem, calc((100vw - 2rem) / 6));
   }
 
   .board {
-    inset: 5.15rem 0 4.8rem;
+    top: 5.15rem;
+    bottom: 4.8rem;
+    width: calc(100% - 2 * max(0.65rem, env(safe-area-inset-left)));
     gap: 0.65rem;
-    max-width: none;
-    margin: 0;
-    padding-left: max(0.65rem, env(safe-area-inset-left));
-    padding-right: max(0.65rem, env(safe-area-inset-right));
   }
 
   .topRow {

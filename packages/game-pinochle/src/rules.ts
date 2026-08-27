@@ -525,14 +525,16 @@ function phaseFor(state: PinochleState): PhaseState {
         round: state.handNo,
         label: 'auction winner names trump',
       };
-    case 'melding':
+    case 'melding': {
+      const pending = pendingMeldSeats(state);
       return {
         phase: 'melding',
-        actor: null,
-        actors: pendingMeldSeats(state),
+        actor: pending[0] ?? null,
+        actors: pending,
         round: state.handNo,
         label: 'declaring meld',
       };
+    }
     case 'playing':
       return { phase: 'playing', actor: state.turn, round: state.handNo };
     case 'redeal':
