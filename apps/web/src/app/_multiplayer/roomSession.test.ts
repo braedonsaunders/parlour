@@ -946,8 +946,7 @@ describe('multiplayer route composition', () => {
      * anything that is not an accepted veil request to `tierFor()`, so that
      * argument would be quietly ignored and this comment would be a lie.
      */
-    (window as unknown as { __PARLOUR_E2E_SECURITY__?: string }).__PARLOUR_E2E_SECURITY__ =
-      'open';
+    (window as unknown as { __PARLOUR_E2E_SECURITY__?: string }).__PARLOUR_E2E_SECURITY__ = 'open';
     const room = await host.create({
       gameId: 'wildpile',
       seats: 2,

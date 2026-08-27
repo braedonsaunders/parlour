@@ -92,10 +92,11 @@ The browser version is the full game. If you want it closer:
 ## Privacy & trust, honestly stated
 
 There is no backend, no database, and no account — your profile, stats, and head-to-head
-rivalries against friends live in your browser. In ordinary friend rooms, hidden hands are
-hidden the same way they are around a kitchen table: honest UI. For tables that want more,
-parlour carries **veiled-deck play**, where even the wire never sees your cards until you
-reveal them. Multiplayer rides end-to-end-encrypted peer-to-peer channels.
+rivalries against friends live in your browser. Every friend room deals a **veiled deck**:
+your hand is dealt as opaque handles that even the wire never sees, and it becomes cards
+only for you. Nobody has to switch it on and nothing says so at the table — a shuffle that
+cannot complete simply deals openly and the game carries on. Multiplayer rides
+end-to-end-encrypted peer-to-peer channels.
 
 One exception, named plainly: the hosted site loads **Vercel Analytics**, which records page
 views and coarse request metadata (no cookies, no profile identifiers, nothing you type or
@@ -152,7 +153,7 @@ Spectating is still not built.
 
 - **Moves are pure reducers** that emit an ordered **fx timeline**. The UI animates _only_ from fx events — never by diffing state. That's why deals cascade and cards arc instead of teleporting.
 - **Real-time and turn-based share one runtime.** A slap window, an out-of-turn jump-in, and an ordinary trick are all the same kind of move to the engine.
-- **Veiled decks are an engine primitive.** The protocol deals opaque handles and records reveals in the log, backed by an SRA commutative cipher, threshold recovery for a dropped seat and a match-end audit. Friend rooms still play the open collaborative deal while the room layer is proven against it.
+- **Veiled decks are an engine primitive, and every room uses one.** The protocol deals opaque handles and records reveals in the log, backed by an SRA commutative cipher, threshold recovery for a dropped seat and a match-end audit. All fourteen multiplayer packs are covered, and a ceremony that fails falls back to an open deal rather than stranding the table.
 - **Games are packages, not engine branches.** Every game on the shelf was written against the public engine API.
 
 | A new game inherits for free |                                                           |

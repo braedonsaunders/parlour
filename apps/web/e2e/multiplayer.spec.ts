@@ -751,42 +751,36 @@ test.describe('veiled-deck rooms', () => {
     // The host plays a non-wild card; the guest sees the card land on the
     // centre pile but must not see the host's remaining hand cards.
     const hostHandCards = host.page.locator('[role="list"][data-zone] [role="listitem"]');
-    const cardCount = await hostHandCards.count();
-    let played = false;
-    for (let i = 0; i < cardCount && !played; i++) {
-      const card = hostHandCards.nth(i);
-      if (await isWildCard(card)) continue;
-      const isPlayable = await card
-        .evaluate((el) => {
-          const style = window.getComputedStyle(el);
-          return style.opacity !== '0.4' && style.filter !== 'grayscale(1)';
-        })
-        .catch(() => false);
-      if (!isPlayable) continue;
 
-      // Read the host's hand card count before playing.
-      const hostHandBefore = await host.page
-        .locator('[role="list"][data-zone] [role="listitem"]')
-        .count();
-      await card.click({ force: true });
-      played = true;
+    /*
+     * Ask the rail which cards are legal instead of inferring it from opacity.
+     * The rail publishes `data-playable`, and reading the computed style was
+     * guessing at the same fact through its presentation: a card dimmed for any
+     * other reason read as legal, the click was refused, and the hand did not
+     * shrink — which surfaced as "expected 6, received 7" and looked like a
+     * Veil failure rather than a mis-aimed click.
+     */
+    const playable = host.page.locator('[data-hand-card][data-playable="true"]').filter({
+      hasNot: host.page.locator('[aria-label^="Play wild"]'),
+    });
+    if (await playable.count()) {
+      const hostHandBefore = await hostHandCards.count();
+      // Forced, because overlap is the design: a fanned hand covers each card's
+      // centre with the one dealt after it, and Playwright clicks centres. What
+      // `force` skips is hit-testing, not the outcome — the assertion below is
+      // still that the card actually left the hand.
+      await playable.last().click({ force: true });
 
-      // If this card opens a colour picker (only wilds do), dismiss it by
-      // picking the first available colour. The picker has role="dialog".
+      // Only wilds open this, and they are filtered out above — but a pack may
+      // add another chooser later, and a modal left open would block the rest.
       const picker = host.page.locator('[role="dialog"][aria-label="Choose a color"]');
       if (await picker.isVisible().catch(() => false)) {
         await picker.getByRole('button').first().click();
-        await host.page.waitForTimeout(500);
       }
 
-      await host.page.waitForTimeout(1_000);
-      await guest.page.waitForTimeout(1_000);
-
-      // The host's hand should have one fewer card after playing.
-      const hostHandAfter = await host.page
-        .locator('[role="list"][data-zone] [role="listitem"]')
-        .count();
-      expect(hostHandAfter).toBe(hostHandBefore - 1);
+      // The card leaving the hand is the assertion; a fixed sleep was only ever
+      // standing in for it, and four veiled tables sharing a CPU outran it.
+      await expect(hostHandCards).toHaveCount(hostHandBefore - 1, { timeout: 15_000 });
     }
 
     // The guest must NOT see any new card faces in their own DOM.
