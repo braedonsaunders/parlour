@@ -1,4 +1,5 @@
 export { golfCatalog } from './catalog';
+export { solveGolf, isWinnableDeal, type SolveOptions, type SolveResult } from './solver';
 export {
   DECK,
   GOLF_SEATS,
@@ -27,6 +28,7 @@ export {
   legalMovesFor,
   type GolfHint,
 } from './game';
+export { createHintPlanner, sameLegalMove, solverHintFor, type HintPlanner } from './hint-plan';
 export { golfHowToPlay } from './howto';
 export type {
   GolfPlayerView,

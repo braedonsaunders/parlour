@@ -12,7 +12,8 @@ import {
 import {
   golfGame,
   golfPlayerView,
-  hintFor,
+  createHintPlanner,
+  type HintPlanner,
   legalMovesFor,
   type GolfHint,
   type GolfPlayerView,
@@ -70,14 +71,19 @@ export interface GolfTransportOptions {
 export class GolfTransport {
   private readonly listeners = new Set<() => void>();
   private session: LiveSession;
+  private readonly planner: HintPlanner;
 
   constructor(private readonly options: GolfTransportOptions) {
     this.session = this.freshSession();
+    this.planner = createHintPlanner();
   }
 
   getSnapshot(): GolfSnapshot {
     const state = golfPlayerView(this.session.state);
     const undo = undoPolicy(this.session);
+    const session = this.session;
+    const planner = this.planner;
+    let hinted: GolfHint | null | undefined;
     return {
       mode: this.options.mode,
       dailyKey: this.options.dailyKey,
@@ -91,7 +97,18 @@ export class GolfTransport {
       eventCount: this.session.log.length,
       canUndo: undo.available,
       undoDepth: undo.depth,
-      hint: this.session.status === 'playing' ? hintFor(state) : null,
+      /**
+       * Golf is perfect information, so the solver can prove a line out. The
+       * greedy hinter took the first column that fits, which is often the one
+       * that buries a card the hole needs later. Deferred until shown, so a
+       * hidden hint costs nothing.
+       */
+      get hint(): GolfHint | null {
+        if (hinted === undefined) {
+          hinted = session.status === 'playing' ? planner.hint(session.state as GolfState) : null;
+        }
+        return hinted;
+      },
     };
   }
 
@@ -103,6 +120,7 @@ export class GolfTransport {
     const outcome = sessionApply(golfGame, this.session, 0, move, payload);
     if (outcome.rejected) return this.rejection(outcome.rejected);
     this.session = outcome.session;
+    this.planner.follow({ id: move, payload });
     return this.publish({
       events: outcome.events,
       fx: outcome.fx,
@@ -116,6 +134,8 @@ export class GolfTransport {
       return this.rejection({ code: 'nothing-to-undo', message: 'No move to undo yet.' });
     }
     this.session = undoSession(golfGame, this.session);
+    if (this.session.log.length === 0) this.planner.rewind();
+    else this.planner.invalidate();
     return this.publish({ events: [], fx: [], rejected: null, snapshot: this.getSnapshot() });
   }
 

@@ -10,7 +10,8 @@ import {
   type RuleError,
 } from '@parlour/engine';
 import {
-  hintFor,
+  createHintPlanner,
+  type HintPlanner,
   legalMovesFor,
   pyramidGame,
   pyramidPlayerView,
@@ -70,14 +71,19 @@ export interface PyramidTransportOptions {
 export class PyramidTransport {
   private readonly listeners = new Set<() => void>();
   private session: LiveSession;
+  private readonly planner: HintPlanner;
 
   constructor(private readonly options: PyramidTransportOptions) {
     this.session = this.freshSession();
+    this.planner = createHintPlanner();
   }
 
   getSnapshot(): PyramidSnapshot {
     const state = pyramidPlayerView(this.session.state);
     const undo = undoPolicy(this.session);
+    const session = this.session;
+    const planner = this.planner;
+    let hinted: PyramidHint | null | undefined;
     return {
       mode: this.options.mode,
       dailyKey: this.options.dailyKey,
@@ -91,7 +97,18 @@ export class PyramidTransport {
       eventCount: this.session.log.length,
       canUndo: undo.available,
       undoDepth: undo.depth,
-      hint: this.session.status === 'playing' ? hintFor(state) : null,
+      /**
+       * The losing pair looks exactly like the winning one, so a greedy hint
+       * cannot tell them apart. Pyramid is perfect information; the solver can.
+       * Deferred until shown, so a hidden hint costs nothing.
+       */
+      get hint(): PyramidHint | null {
+        if (hinted === undefined) {
+          hinted =
+            session.status === 'playing' ? planner.hint(session.state as PyramidState) : null;
+        }
+        return hinted;
+      },
     };
   }
 
@@ -103,6 +120,7 @@ export class PyramidTransport {
     const outcome = sessionApply(pyramidGame, this.session, 0, move, payload);
     if (outcome.rejected) return this.rejection(outcome.rejected);
     this.session = outcome.session;
+    this.planner.follow({ id: move, payload });
     return this.publish({
       events: outcome.events,
       fx: outcome.fx,
@@ -116,6 +134,8 @@ export class PyramidTransport {
       return this.rejection({ code: 'nothing-to-undo', message: 'No move to undo yet.' });
     }
     this.session = undoSession(pyramidGame, this.session);
+    if (this.session.log.length === 0) this.planner.rewind();
+    else this.planner.invalidate();
     return this.publish({ events: [], fx: [], rejected: null, snapshot: this.getSnapshot() });
   }
 

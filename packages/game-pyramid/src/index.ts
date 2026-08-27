@@ -1,4 +1,5 @@
 export { pyramidCatalog } from './catalog';
+export { solvePyramid, isWinnableDeal, type SolveOptions, type SolveResult } from './solver';
 export {
   DECK,
   PYRAMID_ROWS,
@@ -32,6 +33,7 @@ export {
   pyramidPlayerView,
   type PyramidHint,
 } from './game';
+export { createHintPlanner, sameLegalMove, solverHintFor, type HintPlanner } from './hint-plan';
 export { pyramidHowToPlay } from './howto';
 export type {
   HiddenPyramidCard,
