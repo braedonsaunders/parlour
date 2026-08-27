@@ -207,10 +207,14 @@ describe('SpiderTableScreen', () => {
     expect(SPIDER_STYLES).toMatch(/\.emptyColumn\s*\{[^}]*pointer-events:\s*none;/s);
   });
 
-  it('keeps the playable board and permanent win status in portrait-ready DOM', () => {
+  it('keeps the board mounted and asks for a rotation rather than hiding silently', () => {
+    // Spider is the one game that declines portrait: ten columns on a phone
+    // resolve to a 31px card. The notice is always in the DOM and the
+    // stylesheet decides when it is seen, so the board keeps its state — and
+    // its win banner — across a rotation instead of remounting.
     const { view } = table();
     render({ ...view, stage: 'won', canFinish: false }, { elapsedMs: 92_000 });
-    expect(container.querySelector('[data-testid="spider-rotate-notice"]')).toBeNull();
+    expect(container.querySelector('[data-testid="spider-rotate-notice"]')).not.toBeNull();
     expect(container.querySelector('[data-testid="spider-board"]')).not.toBeNull();
     expect(container.querySelector('[data-testid="spider-win"]')!.textContent).toContain(
       'Table cleared',

@@ -108,6 +108,9 @@ export const es: Messages = {
   // --- table ----------------------------------------------------------------
   'table.menu': 'Menú de la mesa',
   'table.dealing': 'Repartiendo…',
+  'table.rotateTitle': 'Gira el teléfono',
+  'table.rotateBody':
+    'Las diez columnas de Spider necesitan una mesa apaisada. Los demás juegos funcionan en ambos sentidos.',
 
   // --- table menu -----------------------------------------------------------
   'tableMenu.backToTable': 'Volver a la mesa',

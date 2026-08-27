@@ -104,6 +104,9 @@ export const en = {
   // --- table ----------------------------------------------------------------
   'table.menu': 'Table menu',
   'table.dealing': 'Dealing…',
+  'table.rotateTitle': 'Turn your phone sideways',
+  'table.rotateBody':
+    'Ten spider columns need a landscape table. Every other game plays either way.',
 
   // --- table menu -----------------------------------------------------------
   'tableMenu.backToTable': 'Back to the table',

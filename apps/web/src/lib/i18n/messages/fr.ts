@@ -95,6 +95,9 @@ export const fr: Messages = {
   // --- table ----------------------------------------------------------------
   'table.menu': 'Menu de la table',
   'table.dealing': 'La donne…',
+  'table.rotateTitle': 'Tournez votre téléphone',
+  'table.rotateBody':
+    'Les dix colonnes du Spider exigent une table en paysage. Tous les autres jeux se jouent dans les deux sens.',
 
   // --- table menu -----------------------------------------------------------
   'tableMenu.backToTable': 'Retour à la table',

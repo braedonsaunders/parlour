@@ -12,6 +12,7 @@ import {
 import type { FxEvent } from '@parlour/engine';
 import { FOUNDATION_SLOTS, spiderCatalog } from '@parlour/game-spider';
 import { PlayingCard } from '@/components/table/PlayingCard';
+import { useT } from '@/lib/i18n';
 import {
   TableActionRail,
   TableErrorScreen,
@@ -164,6 +165,7 @@ function ReadySpiderTable({
   setShowHint: (visible: boolean) => void;
 }) {
   const rootRef = useRef<HTMLElement>(null);
+  const t = useT();
   const menu = useTableMenu(onQuit ?? (() => undefined));
   const targets = useMemo(() => targetsForSelection(view, selection), [selection, view]);
   const hintText = showHint ? describeHint(view.hint, view) : null;
@@ -404,6 +406,17 @@ function ReadySpiderTable({
           </span>
         )}
       </TableActionRail>
+
+      {/* Spider is the one board that cannot be honest in portrait. Ten columns
+          on a phone leaves a 31px card — small enough that reading a run is
+          guesswork — and the alternatives are hiding columns or panning, which
+          is what this whole batch removed. So Spider asks for the rotation it
+          genuinely needs, and stays out of the way of the games that do not. */}
+      <div className={styles.rotateNotice} data-testid="spider-rotate-notice" role="status">
+        <span aria-hidden="true">▭</span>
+        <strong>{t('table.rotateTitle')}</strong>
+        <p>{t('table.rotateBody')}</p>
+      </div>
     </TableScreenFrame>
   );
 }

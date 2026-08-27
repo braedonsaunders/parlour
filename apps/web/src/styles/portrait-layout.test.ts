@@ -16,15 +16,29 @@ const ROOT = process.cwd();
 const BOARDS = {
   klondike: { piles: 7, gapRem: 0.4, padRem: 1.3 },
   freecell: { piles: 8, gapRem: 0.35, padRem: 1.3 },
-  spider: { piles: 10, gapRem: 0.22, padRem: 1.3 },
   golf: { piles: 7, gapRem: 0.4, padRem: 1.3 },
 } as const;
+
+/**
+ * Spider is the deliberate exception and the only one.
+ *
+ * Ten columns on a 390px phone resolve to a 31px card, and 28px at 360px —
+ * small enough that reading a run is guesswork. The two ways to buy width back
+ * are hiding columns and panning, which are exactly what the rest of this file
+ * exists to forbid. So Spider asks to be rotated rather than shipping a board
+ * nobody can play, and it is listed here so that adding a second exception has
+ * to be a decision somebody writes down.
+ */
+const ROTATE_ONLY = ['spider'] as const;
 
 const GAMES = Object.keys(BOARDS) as (keyof typeof BOARDS)[];
 
 const STYLES = Object.fromEntries(
-  GAMES.map((game) => [game, readFileSync(join(ROOT, `src/styles/${game}.module.css`), 'utf8')]),
-) as Record<keyof typeof BOARDS, string>;
+  [...GAMES, ...ROTATE_ONLY].map((game) => [
+    game,
+    readFileSync(join(ROOT, `src/styles/${game}.module.css`), 'utf8'),
+  ]),
+) as Record<(typeof GAMES)[number] | (typeof ROTATE_ONLY)[number], string>;
 
 const REM = 16;
 /** The two phones the owner's boards have to survive. */
@@ -99,6 +113,21 @@ describe('portrait table layouts', () => {
    * FreeCell 98px and Spider 128px of a 369px board — which no card size can
    * absorb — so every game that has one gives it its own line.
    */
+  /*
+   * The exception has to be an honest one: Spider may skip portrait only if it
+   * SAYS so. A board that quietly went blank would read as broken, and the
+   * notice is what makes the trade-off visible to the player instead of just
+   * to us.
+   */
+  it.each(ROTATE_ONLY)('%s asks to be rotated instead of shipping an unreadable board', (game) => {
+    const block = portraitBlock(STYLES[game]);
+    expect(block, 'the board stands down in portrait').toMatch(/visibility:\s*hidden/);
+    expect(block, 'and says why, full-bleed').toMatch(/\.rotateNotice\s*\{[^}]*inset:\s*0;/s);
+    // Still no panning: rotating is the alternative to panning, not a licence.
+    expect(block).not.toMatch(/overflow-x:\s*auto/);
+    expect(block).not.toContain('scroll-snap-type');
+  });
+
   it.each(GAMES.filter((game) => STYLES[game].includes('.runPicker')))(
     'the %s run picker takes its own line rather than pile width',
     (game) => {

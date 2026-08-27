@@ -104,6 +104,8 @@ export const zh: Messages = {
   // --- table ----------------------------------------------------------------
   'table.menu': '牌桌菜单',
   'table.dealing': '发牌中…',
+  'table.rotateTitle': '请横放手机',
+  'table.rotateBody': '蜘蛛纸牌的十列需要横向牌桌。其他游戏竖屏横屏都能玩。',
 
   // --- table menu -----------------------------------------------------------
   'tableMenu.backToTable': '返回牌桌',

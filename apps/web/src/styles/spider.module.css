@@ -6,6 +6,10 @@
   --sp-up-step: clamp(1.35rem, 3.2vh, 2.05rem);
 }
 
+.rotateNotice {
+  display: none;
+}
+
 .playfield {
   background:
     radial-gradient(ellipse at 50% 45%, rgba(107, 76, 138, 0.22), transparent 56%),
@@ -436,84 +440,70 @@ button.pileButton {
   }
 }
 
+/* Spider is the only board that portrait cannot hold honestly. Ten columns on
+   a 390px phone leaves a 31px card and a 28px one at 360px — small enough that
+   reading a run becomes guesswork — and the two ways out, hiding columns or
+   panning, are the very things this batch removed everywhere else. So Spider
+   asks for the rotation it actually needs. Every other game plays either way. */
 @media (orientation: portrait) and (max-width: 700px) {
-  .screen {
-    /* Width-derived card: ten columns always fit. 3.2rem side padding,
-       nine gutters at 0.22rem. At 390×844 the card lands at ~2.29rem
-       (36.6px); at 360×740, ~2.03rem (32.5px) — small, but every pile
-       is visible at once, and the tap target is still above the 44px
-       interaction floor only for a wider screen. */
-    --sp-card: min(3.05rem, calc((100vw - 3.2rem - 9 * 0.22rem) / 10));
-    --sp-down-step: calc(var(--sp-card) * 0.19);
-    --sp-up-step: calc(var(--sp-card) * 0.31);
+  .board,
+  .actions,
+  .hintBanner,
+  .winPanel {
+    visibility: hidden;
+    pointer-events: none;
   }
 
-  /* The board fits: no pan, no scroll. The card is a size the screen can
-     hold, and every pile stays in the same coordinate space for selection,
-     focus and FX anchors. */
-  .board {
-    inset: 5.15rem 0 4.8rem;
-    gap: 0.55rem;
-    max-width: none;
-    margin: 0;
-    padding-left: max(0.65rem, env(safe-area-inset-left));
-    padding-right: max(0.65rem, env(safe-area-inset-right));
+  /* Under the HUD (z-index 20), not over it: a player who lands here still has
+     to be able to open the table menu and quit without rotating first. Opaque,
+     because at 96% the title pill ghosted through and read as a render bug. */
+  .rotateNotice {
+    position: absolute;
+    z-index: 15;
+    inset: 0;
+    display: grid;
+    place-content: center;
+    justify-items: center;
+    gap: 0.7rem;
+    padding: 2rem;
+    background: radial-gradient(circle at 50% 42%, rgb(107, 76, 138), rgb(20, 12, 32));
+    color: #fff1d5;
+    text-align: center;
   }
 
-  /* The run picker is a control, not a pile, and a phone's width belongs to
-     the piles. Wrapping it onto its own line above them is the same decision
-     in all three games that have one: FreeCell cannot fit eight piles and a
-     picker side by side at any card size worth playing, and a rule that only
-     holds where there happens to be slack is not a rule. */
-  .topRow {
-    flex-wrap: wrap;
-    justify-content: flex-start;
-    gap: 0.55rem;
-    min-height: calc(var(--sp-card) * 1.4 + 0.7rem);
+  .rotateNotice span {
+    font-size: 4rem;
+    animation: spiderRotate 2.4s ease-in-out infinite;
   }
 
-  .stockRail,
-  .foundations,
-  .tableau {
-    gap: 0.35rem;
+  .rotateNotice strong {
+    font:
+      800 1.7rem/1.1 var(--font-display),
+      sans-serif;
   }
 
-  .runPicker {
-    order: -1;
-    flex: 1 0 100%;
-    max-width: none;
-    overflow-x: visible;
+  .rotateNotice p {
+    max-width: 18rem;
+    color: rgba(255, 241, 213, 0.75);
   }
+}
 
-  .titlePill {
-    min-width: 0;
-    max-width: calc(100vw - 6.5rem);
+@keyframes spiderRotate {
+  0%,
+  100% {
+    rotate: -12deg;
   }
-
-  .metrics {
-    font-size: 0.58rem;
+  50% {
+    rotate: 78deg;
   }
+}
 
-  .actions {
-    right: auto;
-    left: 0.65rem;
-    bottom: max(0.45rem, env(safe-area-inset-bottom));
-    max-width: calc(100vw - 1.3rem);
-  }
+:global(.reduce-motion) .rotateNotice span {
+  animation: none;
+}
 
-  .hintBanner {
-    right: 0.7rem;
-    bottom: max(3.45rem, calc(env(safe-area-inset-bottom) + 3.1rem));
-    left: auto;
-    max-width: calc(100vw - 1.4rem);
-    translate: 0 0;
-  }
-
-  /* At a phone's card width "diamonds · 0" is wider than the pile it labels,
-     so the words ran into each other across the foundations row. The glyph on
-     the pile already says which suit it is; this only has to stay legible. */
-  .pileLabel {
-    font-size: 0.46rem;
-    letter-spacing: 0.02em;
+@media (prefers-reduced-motion: reduce) {
+  .rotateNotice span {
+    animation: none;
   }
 }

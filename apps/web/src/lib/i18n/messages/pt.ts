@@ -107,6 +107,9 @@ export const pt: Messages = {
   // --- table ----------------------------------------------------------------
   'table.menu': 'Menu da mesa',
   'table.dealing': 'Distribuindo…',
+  'table.rotateTitle': 'Vire o telemóvel',
+  'table.rotateBody':
+    'As dez colunas do Spider precisam de uma mesa na horizontal. Todos os outros jogos funcionam nos dois sentidos.',
 
   // --- table menu -----------------------------------------------------------
   'tableMenu.backToTable': 'Voltar à mesa',
