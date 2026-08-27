@@ -48,7 +48,8 @@ import {
 import { validateRoomCode } from '@/lib/rooms/code';
 import { hasValidSeatCount } from '@/lib/rooms/seatRange';
 import type { MultiplayerGameId } from '@/lib/rooms/gameIds';
-import { delayUntilFxSettles } from '@/lib/table/fx-motion';
+import { delayUntilFxSettles, fxTimelineDurationMs } from '@/lib/table/fx-motion';
+import { createFxQueue } from '@/lib/table/fx-queue';
 import {
   roomGame,
   seatRefusal,
@@ -239,6 +240,15 @@ function injectedSignaling(): RoomSignaling | null {
 
 export class MultiplayerRoomSession {
   private readonly listeners = new Set<Listener>();
+  /**
+   * Bursts play one after another rather than on top of one another, so a
+   * follow-up packet cannot tear a card out of the air mid-flight. See
+   * `lib/table/fx-queue`.
+   */
+  private readonly fxQueue = createFxQueue({
+    publish: (fx) => this.update({ fx: this.presentedFx(fx), fxKey: this.snapshot.fxKey + 1 }),
+    durationOf: fxTimelineDurationMs,
+  });
   private authority: SessionAuthority | null = null;
   private transport: P2PTransport | null = null;
   private veil: { session: VeilSession; room: VeilRoom } | null = null;
@@ -1680,6 +1690,7 @@ export class MultiplayerRoomSession {
   }
 
   close(): void {
+    this.fxQueue.clear();
     if (this.snapshot.isHost && this.snapshot.stage === 'lobby') {
       this.transport?.announceClosed();
     }
@@ -1782,11 +1793,10 @@ export class MultiplayerRoomSession {
   private accept(packet: AppliedPacket): void {
     this.update({
       session: this.presented(this.authority!.getSession()),
-      fx: this.presentedFx(packet.fx),
-      fxKey: this.snapshot.fxKey + 1,
       error: null,
       stage: 'table',
     });
+    this.fxQueue.push(packet.fx);
     // A draw may have handed this seat a handle it cannot read yet.
     if (this.veil) {
       void this.openMyHandles();
