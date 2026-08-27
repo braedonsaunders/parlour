@@ -244,20 +244,20 @@ export class HermeticSignalingBroker {
   }
 
   /**
-   * Drop all handlers for a seat whose context was closed.
+   * Drop this seat's delivery handlers, and ONLY its handlers.
    *
-   * This prevents a race where a joiner with the same public key as a
-   * departed seat gets the old page's stale forwarder instead of the new
-   * one. Call before closing the context in test teardown.
+   * The room announcement is deliberately left alone. In the real relays an
+   * announcement lives in the directory until it expires, independent of the
+   * peer that published it — a host death must not erase the room, because
+   * the surviving peers (or a rejoining seat) still need to resolve the code.
+   * A prior version also stripped the announcement, which made host
+   * re-election and seat rejoin resolve to nobody: the rejoining page had
+   * nothing to find. The delivery handlers are the only thing that can go
+   * stale when a context closes, so they are the only thing dropped here.
    */
   dropKey(publicKey: string): void {
     for (const codeHandlers of this.handlers.values()) {
       codeHandlers.delete(publicKey);
     }
-    this.rooms.forEach((list) => {
-      for (let i = list.length - 1; i >= 0; i--) {
-        if (list[i]!.hostPubkey === publicKey) list.splice(i, 1);
-      }
-    });
   }
 }

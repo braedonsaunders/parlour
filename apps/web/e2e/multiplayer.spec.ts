@@ -85,6 +85,28 @@ async function openSeat(
   return { context, page, key };
 }
 
+/**
+ * Reopens a seat that dropped, carrying the SAME profile id.
+ *
+ * Seat reclaim is keyed on the profile id in localStorage
+ * (`parlour.multiplayer.profile-id`). A fresh context mints a new one, so a
+ * plain `openSeat` would arrive as a brand-new peer and the host's grace-
+ * period reclaim would never match. This helper injects the departed seat's
+ * id back into the new context before its first navigation.
+ */
+async function openReturningSeat(
+  browser: Browser,
+  broker: HermeticSignalingBroker,
+  label: string,
+  profileId: string,
+): Promise<Seat> {
+  const seat = await openSeat(browser, broker, label);
+  await seat.page.addInitScript((id: string) => {
+    window.localStorage.setItem('parlour.multiplayer.profile-id', id);
+  }, profileId);
+  return seat;
+}
+
 /** Creates a room from the Wild create page and reads the four-character code. */
 async function createRoom(page: Page): Promise<string> {
   await page.goto(`/${GAME}/create`);
@@ -162,6 +184,24 @@ async function closeSeat(seat: Seat, broker: HermeticSignalingBroker): Promise<v
 /** True when the seat named by `data-seat` is showing the "bot" marker. */
 function seatIsBot(page: Page, seat: number) {
   return page.locator(`[data-seat="${seat}"] small`).filter({ hasText: 'bot' });
+}
+
+/**
+ * True when a hand card is one of Wild's colour-choosing cards.
+ *
+ * Wild cards render `<button aria-label="Play wild …">` — the word "wild"
+ * appears only on the four cards that open the colour picker (plain wild,
+ * draw four, swap, shuffle). A normal number or action card never carries it,
+ * so the aria-label is the reliable signal. There is no `data-kind` attribute
+ * to read; the deck's `meta.kind` does not reach the DOM.
+ */
+function isWildCard(card: import('@playwright/test').Locator): Promise<boolean> {
+  return card
+    .evaluate((el) => {
+      const label = el.getAttribute('aria-label') ?? '';
+      return /\bwild\b/i.test(label);
+    })
+    .catch(() => false);
 }
 
 /**
@@ -310,17 +350,7 @@ test.describe('multi-context friend room (hermetic)', () => {
     let clicked = false;
     for (let i = 0; i < cardCount && !clicked; i++) {
       const card = hostHandCards.nth(i);
-      // Wild cards in the Parlour deck have meta.kind === 'wild'. Read the
-      // data attribute from the card's rendered DOM. If absent, the card is
-      // a normal number/action card.
-      const isWild = await card
-        .evaluate((el) => {
-          // Wild cards render with a kind marker; normal cards have none.
-          const kind = el.getAttribute('data-kind');
-          return kind === 'wild';
-        })
-        .catch(() => false);
-      if (isWild) continue;
+      if (await isWildCard(card)) continue;
       const isPlayable = await card
         .evaluate((el) => {
           const style = window.getComputedStyle(el);
@@ -698,12 +728,7 @@ test.describe('veiled-deck rooms', () => {
     let played = false;
     for (let i = 0; i < cardCount && !played; i++) {
       const card = hostHandCards.nth(i);
-      const isWild = await card
-        .evaluate((el) => {
-          return el.getAttribute('data-kind') === 'wild';
-        })
-        .catch(() => false);
-      if (isWild) continue;
+      if (await isWildCard(card)) continue;
       const isPlayable = await card
         .evaluate((el) => {
           const style = window.getComputedStyle(el);
@@ -763,13 +788,20 @@ test.describe('veiled-deck rooms', () => {
     await expectAtTable(guest1.page, CONNECT_TIMEOUT_MS);
     await expectAtTable(guest2.page, CONNECT_TIMEOUT_MS);
 
+    // Capture the profile id BEFORE the drop — seat reclaim matches on it.
+    const profileId = await guest2.page.evaluate(() =>
+      window.localStorage.getItem('parlour.multiplayer.profile-id'),
+    );
+    expect(profileId, 'guest2 has a persisted profile id').toBeTruthy();
+
     // Close guest2 — simulates a phone losing signal.
     await closeSeat(guest2, broker);
 
     // Wait briefly — not past the grace — then reconnect.
     await host.page.waitForTimeout(2_000);
 
-    const guest2b = await openSeat(browser, broker, 'v-g2-return');
+    // Same profile id, new context: the host's grace-period reclaim fires.
+    const guest2b = await openReturningSeat(browser, broker, 'v-g2-return', profileId!);
     await joinRoomByCode(guest2b.page, code);
 
     // The table should resume: guest2 reclaims seat 2.
