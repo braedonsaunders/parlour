@@ -1897,7 +1897,26 @@ export class MultiplayerRoomSession {
   }
 
   private update(patch: Partial<MultiplayerRoomSnapshot>): void {
+    const wasLobby = this.snapshot.stage === 'lobby';
     this.snapshot = { ...this.snapshot, ...patch };
+    /*
+     * Leaving the lobby is what tells the transport that a vanished peer is a
+     * seat to cover rather than a chair to free — and it has to happen on every
+     * peer, not just the one that dealt.
+     *
+     * `start()` released the hold, and only the host runs `start()`. Guests
+     * reach the table by adopting the host's opening position, so their
+     * transport stayed in lobby mode for the whole match. When the host then
+     * died, their heartbeat took the lobby branch — announce `room.closed` and
+     * close — so a host dropping mid-hand dissolved the table on exactly the
+     * peers that were supposed to elect a replacement and carry on. It also
+     * meant their `expireAndElect` released the dead seat instead of handing it
+     * to a bot.
+     *
+     * Driven from here because there are four ways onto a table and this is the
+     * one thing all of them agree on.
+     */
+    if (wasLobby && this.snapshot.stage === 'table') this.transport?.holdLobby(false);
     // A listed row states how many chairs are taken, so it goes stale the
     // moment one changes. Driving it from here catches every seating path —
     // a guest arriving, a bot filling in, a peer dropping — rather than
