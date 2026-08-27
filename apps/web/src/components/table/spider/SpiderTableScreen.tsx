@@ -36,6 +36,7 @@ import {
   selectionForCard,
   sourceOfMove,
   targetOfMove,
+  preferredTargets,
   targetsForSelection,
   type SpiderSelection,
   type SpiderTableView,
@@ -168,6 +169,9 @@ function ReadySpiderTable({
   const t = useT();
   const menu = useTableMenu(onQuit ?? (() => undefined));
   const targets = useMemo(() => targetsForSelection(view, selection), [selection, view]);
+  // Legal and worth doing are different questions in Spider, because an empty
+  // column accepts anything. Both are still playable; only one is pointed at.
+  const builds = useMemo(() => preferredTargets(view, selection), [selection, view]);
   const hintText = showHint ? describeHint(view.hint, view) : null;
   const hintSource = showHint && view.hint ? sourceOfMove(view.hint.move) : null;
   const hintTarget = showHint && view.hint ? targetOfMove(view.hint.move) : null;
@@ -325,6 +329,7 @@ function ReadySpiderTable({
                 ready={ready}
                 selection={selection}
                 legalTarget={targets.includes(`tableau:${columnIndex}`)}
+                buildTarget={builds.includes(`tableau:${columnIndex}`)}
                 hinted={
                   hintSource === `tableau:${columnIndex}` || hintTarget === `tableau:${columnIndex}`
                 }
@@ -429,6 +434,7 @@ function TableauColumn({
   ready,
   selection,
   legalTarget,
+  buildTarget,
   hinted,
   onCard,
   onTarget,
@@ -440,6 +446,7 @@ function TableauColumn({
   ready: boolean;
   selection: SpiderSelection | null;
   legalTarget: boolean;
+  buildTarget: boolean;
   hinted: boolean;
   onCard: (card: string) => void;
   onTarget: () => void;
@@ -452,6 +459,7 @@ function TableauColumn({
       className={styles.tableauColumn}
       data-zone={zone}
       data-legal-target={legalTarget || undefined}
+      data-build-target={buildTarget || undefined}
       data-hint={hinted || undefined}
       style={{ ['--down-count' as string]: visibleDown }}
     >

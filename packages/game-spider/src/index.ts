@@ -28,12 +28,14 @@ export {
   GAME_ID,
   SpiderFx,
   createSpiderDef,
+  describeHintMove,
   hintFor,
   legalMovesFor,
   spiderGame,
   spiderPlayerView,
   type SpiderHint,
 } from './game';
+export { createHintPlanner, sameLegalMove, solverHintFor, type HintPlanner } from './hint-plan';
 export { spiderHowToPlay } from './howto';
 export {
   solveSpider,

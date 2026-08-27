@@ -947,7 +947,9 @@ const callLastCard: Move<WildpileState> = {
   validate(state, seat) {
     if (state.calledLastCard[seat]) return error('already-called', 'protection is already armed');
     const cards = hand(state, seat);
-    if (state.veiled) return cards.length > 1 ? true : error('not-last-card', 'nothing to protect');
+    if (!cards.every(isRealCard)) {
+      return cards.length > 1 ? true : error('not-last-card', 'nothing to protect');
+    }
     const canReachOne = cards.some(
       (card) =>
         canPlay(state, card) && cards.length - wildpileDiscardAllCards(cards, card).length === 1,
@@ -1131,10 +1133,16 @@ function lastCardMoves(state: WildpileState, seat: SeatId): LegalMove[] {
   if (state.calledLastCard[seat]) return [];
   const cards = hand(state, seat);
   const offer: LegalMove[] = [{ id: 'callLastCard', hint: 'protect your last card' }];
-  // The host decides what is legal and, under Veil, cannot read this hand. It
-  // offers the move to any seat still holding cards; the owner's own client
-  // resolves its hand and shows the button only when it is really reachable.
-  if (state.veiled) return cards.length > 1 ? offer : [];
+  /*
+   * Whether the HAND is readable, not whether the ROOM is veiled.
+   *
+   * `state.veiled` stays true on the owner's own view even after its cards have
+   * been resolved, so keying on it made the client take the host's branch too —
+   * and the button was offered on almost every turn, including ones that could
+   * not reach a last card. The seat that can read its hand answers the real
+   * question; only a view holding handles has to be taken at its word.
+   */
+  if (!cards.every(isRealCard)) return cards.length > 1 ? offer : [];
   const canReachOne = cards.some(
     (card) =>
       canPlay(state, card) && cards.length - wildpileDiscardAllCards(cards, card).length === 1,

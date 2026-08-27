@@ -92,6 +92,48 @@ export function targetsForSelection(
     .filter((zone): zone is SpiderZone => zone !== null);
 }
 
+/**
+ * The targets worth aiming at, among those that are merely legal.
+ *
+ * Any single card fits an empty column, so the moment one opens up every card
+ * on the table lights up a target and the highlight stops meaning anything —
+ * "you may put this anywhere" is not help. A build is different: it lands on a
+ * card one rank higher, and a build in the same suit is the only move that
+ * actually assembles a run.
+ *
+ * Legality is unchanged; parking on an empty column is still a real and often
+ * correct move. This only says which target the table should point at.
+ */
+export function preferredTargets(
+  view: SpiderTableView,
+  selection: SpiderSelection | null,
+): SpiderZone[] {
+  if (!selection) return [];
+  const card = selection.card;
+  const rank = rankOf(card);
+  if (rank === null) return [];
+  return targetsForSelection(view, selection).filter((zone) => {
+    const column = columnOf(zone);
+    if (column === null) return false;
+    const top = view.tableau[column]?.up.at(-1);
+    // An empty column is a park, never a build — that is the whole distinction.
+    if (!top) return false;
+    return rankOf(top) === rank + 1;
+  });
+}
+
+function columnOf(zone: SpiderZone): number | null {
+  const match = /^tableau:(\d+)$/.exec(zone);
+  return match ? Number(match[1]) : null;
+}
+
+/** Cards are `<suit>-<rank>-<copy>`; the rank is what a build is measured on. */
+function rankOf(card: string): number | null {
+  const parts = card.split('-');
+  const rank = Number(parts[1]);
+  return Number.isFinite(rank) ? rank : null;
+}
+
 export function sourceOfMove(move: LegalMove): SpiderZone | null {
   const payload = recordPayload(move);
   switch (move.id) {

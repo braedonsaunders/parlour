@@ -11,11 +11,12 @@ import {
 } from '@parlour/engine';
 import {
   canAutoFinish,
+  createHintPlanner,
   freecellGame,
   freecellPlayerView,
-  hintFor,
   legalMovesFor,
   type FreecellHint,
+  type HintPlanner,
   type FreecellPlayerView,
   type FreecellRules,
   type FreecellState,
@@ -72,14 +73,26 @@ export interface FreecellTransportOptions {
 export class FreecellTransport {
   private readonly listeners = new Set<() => void>();
   private session: LiveSession;
+  private readonly planner: HintPlanner;
 
   constructor(private readonly options: FreecellTransportOptions) {
     this.session = this.freshSession();
+    this.planner = createHintPlanner();
   }
 
+  /**
+   * The solver-backed hint existed in the pack and nothing ever asked for it —
+   * this screen still called the greedy hinter, which ranks each move on local
+   * merit and will happily suggest a shuffle back and forth. The planner walks
+   * a proven line instead, and the getter defers the search until the hint is
+   * actually shown, so a hidden one costs nothing.
+   */
   getSnapshot(): FreecellSnapshot {
     const state = freecellPlayerView(this.session.state);
     const undo = undoPolicy(this.session);
+    const session = this.session;
+    const planner = this.planner;
+    let hinted: FreecellHint | null | undefined;
     return {
       mode: this.options.mode,
       dailyKey: this.options.dailyKey,
@@ -94,7 +107,13 @@ export class FreecellTransport {
       canUndo: undo.available,
       undoDepth: undo.depth,
       canFinish: this.session.status === 'playing' && canAutoFinish(state),
-      hint: this.session.status === 'playing' ? hintFor(state) : null,
+      get hint(): FreecellHint | null {
+        if (hinted === undefined) {
+          hinted =
+            session.status === 'playing' ? planner.hint(session.state as FreecellState) : null;
+        }
+        return hinted;
+      },
     };
   }
 
@@ -106,6 +125,7 @@ export class FreecellTransport {
     const outcome = sessionApply(freecellGame, this.session, 0, move, payload);
     if (outcome.rejected) return this.rejection(outcome.rejected);
     this.session = outcome.session;
+    this.planner.follow({ id: move, payload });
     return this.publish({
       events: outcome.events,
       fx: outcome.fx,
@@ -119,11 +139,14 @@ export class FreecellTransport {
       return this.rejection({ code: 'nothing-to-undo', message: 'No move to undo yet.' });
     }
     this.session = undoSession(freecellGame, this.session);
+    if (this.session.log.length === 0) this.planner.rewind();
+    else this.planner.invalidate();
     return this.publish({ events: [], fx: [], rejected: null, snapshot: this.getSnapshot() });
   }
 
   restart(): FreecellDispatch {
     this.session = this.freshSession();
+    this.planner.rewind();
     return this.publish({
       events: [],
       fx: this.session.setupFx ?? [],

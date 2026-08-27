@@ -10,7 +10,8 @@ import {
   type RuleError,
 } from '@parlour/engine';
 import {
-  hintFor,
+  createHintPlanner,
+  type HintPlanner,
   legalMovesFor,
   spiderGame,
   spiderPlayerView,
@@ -71,14 +72,31 @@ export interface SpiderTransportOptions {
 export class SpiderTransport {
   private readonly listeners = new Set<() => void>();
   private session: LiveSession;
+  private readonly planner: HintPlanner;
 
   constructor(private readonly options: SpiderTransportOptions) {
     this.session = this.freshSession();
+    this.planner = createHintPlanner();
   }
 
+  /**
+   * The hint is the one expensive thing on this screen, and it is worth it.
+   *
+   * The greedy hinter ranks each move on local merit alone, so it would suggest
+   * shifting a card across and then, next turn, shifting it back — two moves
+   * that each score well and cancel out. The solver returns a proven line
+   * instead, and the planner walks it for free; only a player leaving that line
+   * pays for a fresh search.
+   *
+   * Deferred and memoised per snapshot, the way Klondike does it: the table
+   * reads `hint` only while a hint is on screen, so a hidden one costs nothing.
+   */
   getSnapshot(): SpiderSnapshot {
     const state = spiderPlayerView(this.session.state);
     const undo = undoPolicy(this.session);
+    const session = this.session;
+    const planner = this.planner;
+    let hinted: SpiderHint | null | undefined;
     return {
       mode: this.options.mode,
       dailyKey: this.options.dailyKey,
@@ -93,7 +111,12 @@ export class SpiderTransport {
       canUndo: undo.available,
       undoDepth: undo.depth,
       canFinish: false,
-      hint: this.session.status === 'playing' ? hintFor(state) : null,
+      get hint(): SpiderHint | null {
+        if (hinted === undefined) {
+          hinted = session.status === 'playing' ? planner.hint(session.state as SpiderState) : null;
+        }
+        return hinted;
+      },
     };
   }
 
@@ -105,6 +128,7 @@ export class SpiderTransport {
     const outcome = sessionApply(spiderGame, this.session, 0, move, payload);
     if (outcome.rejected) return this.rejection(outcome.rejected);
     this.session = outcome.session;
+    this.planner.follow({ id: move, payload });
     return this.publish({
       events: outcome.events,
       fx: outcome.fx,
@@ -118,11 +142,14 @@ export class SpiderTransport {
       return this.rejection({ code: 'nothing-to-undo', message: 'No move to undo yet.' });
     }
     this.session = undoSession(spiderGame, this.session);
+    if (this.session.log.length === 0) this.planner.rewind();
+    else this.planner.invalidate();
     return this.publish({ events: [], fx: [], rejected: null, snapshot: this.getSnapshot() });
   }
 
   restart(): SpiderDispatch {
     this.session = this.freshSession();
+    this.planner.rewind();
     return this.publish({
       events: [],
       fx: this.session.setupFx ?? [],

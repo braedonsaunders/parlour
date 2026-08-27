@@ -159,6 +159,34 @@ describe('calling last card on a veiled table', () => {
     expect((armed.session.state as WildpileState).calledLastCard[actor]).toBe(true);
   });
 
+  /*
+   * The regression this guards: keying on `state.veiled` rather than on whether
+   * the hand is readable meant the owner's own client took the host's branch,
+   * and the button appeared on nearly every turn — including turns that could
+   * not reach a last card. A seat that can read its hand answers the real
+   * question.
+   */
+  it('asks the real question of a hand it can actually read', () => {
+    const { session } = veiled();
+    const state = session.state as WildpileState;
+    const actor = state.turn;
+    const opened = {
+      ...state,
+      hands: state.hands.map((cards, seat) =>
+        seat === actor ? ['red-5-1', 'blue-9-0', 'green-3-0'] : cards,
+      ),
+    } as WildpileState;
+
+    // Still a veiled room, but this seat's cards are faces now. Nothing here
+    // can reach one card in a single play, so nothing should be offered.
+    expect(opened.veiled).toBe(true);
+    expect(
+      wildpileGame.flow
+        .legalMoves(opened, session.phase)
+        .some((move) => move.id === 'callLastCard'),
+    ).toBe(false);
+  });
+
   it('still refuses a second call, so the declaration stays a single act', () => {
     const { session } = veiled();
     const actor = (session.state as WildpileState).turn;

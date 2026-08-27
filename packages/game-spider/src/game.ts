@@ -368,6 +368,28 @@ function tableauMoveMeta(state: SpiderPlayerView, move: LegalMove) {
   };
 }
 
+/**
+ * Words any legal move, including one the local ranker never chose.
+ *
+ * The solver-backed planner hands us a move off a proven line, and that move
+ * has no `HintKind` because nothing ranked it. Deriving the kind from the move
+ * itself lets a proven hint speak in the same voice as a greedy one.
+ */
+export function describeHintMove(state: SpiderPlayerView, move: LegalMove): string {
+  const kind = kindOfMove(state, move);
+  return hintReason(state, move, kind);
+}
+
+function kindOfMove(state: SpiderPlayerView, move: LegalMove): HintKind {
+  if (move.id === 'stock.deal') return 'deal';
+  const meta = tableauMoveMeta(state, move);
+  if (!meta) return 'shift';
+  if (meta.completes) return 'complete';
+  if (meta.uncovers) return 'uncover';
+  if (meta.sameSuit) return 'same-suit';
+  return 'shift';
+}
+
 function hintReason(state: SpiderPlayerView, move: LegalMove, kind: HintKind): string {
   const meta = tableauMoveMeta(state, move);
   const named = meta ? nameOfCard(meta.card) : 'that card';

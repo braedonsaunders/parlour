@@ -128,9 +128,20 @@ button.pileButton {
   width: 100%;
 }
 
+/* Every legal target is still shown, because parking on an empty column is a
+   real move and often the right one. But an empty column accepts ANY card, so
+   the moment one opens the whole table lit up and the highlight stopped saying
+   anything. A quieter ring means "you may"; the full one below means "this
+   builds a run". */
 .pileButton[data-legal-target],
 .tableauColumn[data-legal-target] .columnTarget {
   border-radius: 0.85rem;
+  box-shadow:
+    0 0 0 2px rgba(212, 180, 240, 0.42),
+    0 0 10px rgba(212, 180, 240, 0.26);
+}
+
+.tableauColumn[data-build-target] .columnTarget {
   box-shadow:
     0 0 0 3px var(--sp-select),
     0 0 24px rgba(212, 180, 240, 0.74);
