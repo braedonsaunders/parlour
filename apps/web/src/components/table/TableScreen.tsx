@@ -60,6 +60,11 @@ export type TableView = {
     drawDiscard: boolean;
     discardCards: readonly string[];
     knock: boolean;
+    /**
+     * This seat may declare a blitz — a veiled table cannot see a 31, so the
+     * player has to say so and open their hand. Absent everywhere else.
+     */
+    claim?: boolean;
   };
 };
 
@@ -72,6 +77,8 @@ export type TableScreenProps = {
   onDraw?: (source: 'stock' | 'discard') => void;
   onDiscard?: (card: string) => void;
   onKnock?: () => void;
+  /** Declares a blitz on a veiled table, opening this hand to prove the 31. */
+  onClaim?: () => void;
   /** Fired only after the player confirms quitting from the table menu. */
   onQuit?: () => void;
 };
@@ -141,6 +148,11 @@ export function TableScreen(props: TableScreenProps) {
         </TablePlayfield>
 
         <TableActionRail>
+          {view.legal.claim && (
+            <button type="button" className="btn-fat" onClick={props.onClaim}>
+              Blitz!
+            </button>
+          )}
           <button
             type="button"
             className="btn-fat"

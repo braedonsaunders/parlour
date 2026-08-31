@@ -1,4 +1,11 @@
-import { isActingSeat, type GameSession, type LegalMove, type Rng } from '@parlour/engine';
+import {
+  isActingSeat,
+  isVeilHandle,
+  type GameSession,
+  type LegalMove,
+  type Rng,
+} from '@parlour/engine';
+import { isBlitz } from '@parlour/game-blitz';
 import { wildpileDiscardAllCards } from '@parlour/game-wildpile';
 import { isStaleMoveFault } from '@/lib/table/useRoomTable';
 import {
@@ -20,6 +27,8 @@ import {
 export interface Cockpit {
   /** moves this game's room screen has a control for */
   expressible: ReadonlySet<string>;
+  /** mirrors any extra gating the screen puts in front of a control */
+  offers?(session: GameSession<unknown, never>, localSeat: number, move: LegalMove): boolean;
   /** mirrors the screen's dispatch — e.g. Wild's colour dump carries reveals */
   dispatch(
     peer: MultiplayerRoomSession,
@@ -56,11 +65,25 @@ const wildCockpit: Cockpit = {
 };
 
 const blitzCockpit: Cockpit = {
-  // TableScreen's blitz surface: draw either way, discard, knock. There is no
-  // control for `blitz.claim` or `showdown.open`; if a veiled round cannot end
-  // without them, the harness will report the stall that a real table shows.
-  expressible: new Set(['draw.stock', 'draw.discard', 'discard', 'knock']),
-  dispatch(peer, _session, _localSeat, move) {
+  // TableScreen's blitz surface: draw either way, discard, knock, and the
+  // veiled-table "Blitz!" claim. `showdown.open` is deliberately absent — the
+  // room answers that one itself, and if that automation ever breaks, the
+  // harness reports the stall a real table would show.
+  expressible: new Set(['draw.stock', 'draw.discard', 'discard', 'knock', 'blitz.claim']),
+  offers(session, localSeat, move) {
+    if (move.id !== 'blitz.claim') return true;
+    // The screen only shows "Blitz!" over a readable, genuine 31.
+    const hands = (session.state as { hands?: readonly string[][] }).hands;
+    const mine = hands?.[localSeat] ?? [];
+    return mine.length === 3 && mine.every((card) => !isVeilHandle(card)) && isBlitz(mine);
+  },
+  dispatch(peer, session, localSeat, move) {
+    if (move.id === 'blitz.claim') {
+      // The claim proves itself by opening the whole hand — same as the screen.
+      const hands = (session.state as { hands?: readonly string[][] }).hands;
+      peer.send('blitz.claim', undefined, hands?.[localSeat] ?? []);
+      return;
+    }
     peer.send(move.id, move.payload);
   },
 };
@@ -112,7 +135,9 @@ export function stepActor(
   } catch {
     return false;
   }
-  const offered = legal.filter((move) => cockpit.expressible.has(move.id));
+  const offered = legal.filter(
+    (move) => cockpit.expressible.has(move.id) && (cockpit.offers?.(session, seat, move) ?? true),
+  );
   if (offered.length === 0) return false;
 
   let move: LegalMove | null = null;

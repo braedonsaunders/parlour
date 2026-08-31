@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect } from 'react';
-import { Fx, isActingSeat, type FxEvent, type MatchResult } from '@parlour/engine';
-import type { BlitzConfig, BlitzState } from '@parlour/game-blitz';
+import { Fx, isActingSeat, isVeilHandle, type FxEvent, type MatchResult } from '@parlour/engine';
+import { isBlitz, type BlitzConfig, type BlitzState } from '@parlour/game-blitz';
 import { RoundEndOverlay } from '@/components/celebration/RoundEndOverlay';
 import { TableScreen, type TableView } from '@/components/table/TableScreen';
 import {
@@ -160,8 +160,18 @@ function roomTableView(
       drawDiscard: moveIds.has('draw.discard'),
       discardCards,
       knock: moveIds.has('knock'),
+      // Only offered when this hand really is 31: a false claim is refused
+      // without entering the log, so the button would be a tap that does
+      // nothing. The engine's own count-based legality still gates the move.
+      claim: moveIds.has('blitz.claim') && claimableHand(session.state, localSeat),
     },
   };
+}
+
+/** This seat's presented hand is fully readable and actually holds 31. */
+function claimableHand(state: BlitzState, seat: number): boolean {
+  const hand = state.hands[seat] ?? [];
+  return hand.length === 3 && hand.every((card) => !isVeilHandle(card)) && isBlitz(hand);
 }
 
 function matchResult(snapshot: SoloSnapshot): MatchResult {
@@ -302,6 +312,9 @@ export const blitzTablePack = defineTablePack<
         onDraw={(source) => dispatch(`draw.${source}`)}
         onDiscard={(card) => dispatch('discard', { card })}
         onKnock={() => dispatch('knock')}
+        // A claim proves itself: the move carries the whole hand's openings,
+        // and the table checks the 31 — a bluff is refused without a trace.
+        onClaim={() => dispatch('blitz.claim', undefined, session.state.hands[localSeat] ?? [])}
         onQuit={quit}
       />
     );
