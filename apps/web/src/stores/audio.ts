@@ -142,6 +142,26 @@ export function useMusicMood(mood: MusicMoodId | null): void {
   useEffect(() => () => getMusicController().setMood(null), []);
 }
 
+/**
+ * Declarative soundtrack pack for game screens: the table plays its own pack
+ * while mounted, and leaving restores whatever the player had picked before.
+ */
+export function useMusicGamePack(packId: string | null): void {
+  const controller = useMusicController();
+
+  useEffect(() => {
+    if (!packId) return;
+    const previous = controller.getState().packId;
+    controller.setPack(packId);
+    return () => {
+      const live = getMusicController();
+      // Only step back if nothing else (the settings menu, another table)
+      // changed the pack while this screen held it.
+      if (live.getState().packId === packId) live.setPack(previous);
+    };
+  }, [controller, packId]);
+}
+
 export function resetMusicBindingsForTests(): void {
   bound = false;
   musicBound = false;

@@ -474,4 +474,5 @@ export const es: Messages = {
   'scene.campfire': 'Hoguera',
   'scene.casino': 'Casino',
   'scene.snug': 'Rincón',
+  'scene.beach': 'Playa',
 };

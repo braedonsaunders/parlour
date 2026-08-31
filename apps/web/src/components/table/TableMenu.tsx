@@ -16,12 +16,14 @@ const SCENE_ICONS: Record<SceneId, string> = {
   campfire: '🔥',
   casino: '🎲',
   snug: '🛋️',
+  beach: '🌴',
 };
 
 const SCENE_KEYS: Record<SceneId, MessageKey> = {
   campfire: 'scene.campfire',
   casino: 'scene.casino',
   snug: 'scene.snug',
+  beach: 'scene.beach',
 };
 
 const DROP_EFFECT_KEYS: Record<DropEffectLevel, MessageKey> = {

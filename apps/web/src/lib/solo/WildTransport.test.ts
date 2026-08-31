@@ -1,4 +1,5 @@
-import { Fx } from '@parlour/engine';
+import { applyPreset, Fx } from '@parlour/engine';
+import { wildpileConfig } from '@parlour/game-wildpile';
 import { describe, expect, it } from 'vitest';
 import { WildTransport } from './WildTransport';
 import { wildTableView } from '@/lib/wild/view';
@@ -167,11 +168,13 @@ describe('wildTableView', () => {
   });
 
   it('leaves the challenge off the table when the rule is off', () => {
+    // Challenges default on now, so "off" has to be an explicit override.
     const transport = new WildTransport({
       mode: 'party',
       seats: 4,
       seed: 12,
       player: { name: 'You', avatarId: 'ember' },
+      rules: { ...applyPreset(wildpileConfig, 'party'), challengeDrawFour: false },
     });
     let guard = 0;
     while (transport.getSnapshot().session.status === 'playing' && guard++ < 2000) {

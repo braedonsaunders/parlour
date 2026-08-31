@@ -228,7 +228,7 @@ export const wildpileConfig = defineConfig<WildpileRules>(
       key: 'challengeDrawFour',
       kind: 'toggle',
       label: 'Challenge Draw Fours',
-      default: false,
+      default: true,
       advanced: true,
       group: 'House rules',
       help: 'A Draw Four is only honest with nothing in the live colour. Call the bluff: win and they take the cards, lose and you take two more.',

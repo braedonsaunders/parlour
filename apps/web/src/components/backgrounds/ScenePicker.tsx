@@ -9,6 +9,7 @@ const SCENE_ICONS: Record<(typeof SCENE_IDS)[number], string> = {
   campfire: '🔥',
   casino: '🎲',
   snug: '🛋️',
+  beach: '🌴',
 };
 
 export function ScenePicker() {

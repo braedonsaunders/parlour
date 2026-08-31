@@ -467,6 +467,7 @@ export const en = {
   'scene.campfire': 'Campfire',
   'scene.casino': 'Casino',
   'scene.snug': 'Snug',
+  'scene.beach': 'Beach',
 } as const;
 
 /**

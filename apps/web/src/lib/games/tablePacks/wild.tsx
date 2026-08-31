@@ -113,13 +113,18 @@ function useRoomClocks(ctx: WildRoomContext | null): void {
  * time this device renders the table and held steady from there. That is the
  * same anchor the hand-written page used; a peer joining late sees a shorter
  * clock, which is a known limitation of a room whose authority is a peer.
+ *
+ * Anchored per deal, not per room: a rematch keeps the room object but deals a
+ * fresh seed, and the new match deserves a full clock rather than inheriting
+ * however many seconds the last one left behind.
  */
-const roomStartAt = new WeakMap<object, number>();
+const roomStartAt = new WeakMap<object, { seed: number; started: number }>();
 function roomMatchEndsAt(ctx: WildRoomContext): number {
-  let started = roomStartAt.get(ctx.room);
+  const anchor = roomStartAt.get(ctx.room);
+  let started = anchor?.seed === ctx.session.seed ? anchor.started : undefined;
   if (started === undefined) {
     started = Date.now();
-    roomStartAt.set(ctx.room, started);
+    roomStartAt.set(ctx.room, { seed: ctx.session.seed, started });
   }
   return started + (ctx.session.config.matchTimeMinutes ?? 5) * 60_000;
 }

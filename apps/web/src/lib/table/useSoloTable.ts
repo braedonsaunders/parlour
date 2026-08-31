@@ -131,7 +131,10 @@ export function useSoloTable<TSnapshot, TDispatch extends SoloTableDispatch<TSna
         // next render already shows the truth. Solo tables get the same
         // treatment as room tables: a stale tap does nothing, rather than
         // replacing the game with an error screen.
-        if (!isStaleMoveFault(outcome.rejected.message)) setError(outcome.rejected.message);
+        if (!isStaleMoveFault(outcome.rejected.message)) {
+          console.error('[table] move rejected', outcome.rejected.message);
+          setError(outcome.rejected.message);
+        }
         return;
       }
       setError(null);
@@ -162,6 +165,7 @@ export function useSoloTable<TSnapshot, TDispatch extends SoloTableDispatch<TSna
       try {
         accept(transport.playBotTurn());
       } catch (caught) {
+        console.error('[table] bot turn failed', caught);
         setError(caught instanceof Error ? caught.message : botErrorMessage);
       }
     }, delay);

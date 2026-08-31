@@ -67,6 +67,13 @@ const SNUG_PLAYLIST: readonly MusicTrack[] = [
   track('snug-3', 'The Quiet Round', '/audio/music/music-snug-3.m4a'),
 ];
 
+/** Tropical house for the sunset beach — also borrowed wholesale by Wild's pack. */
+export const BEACH_PLAYLIST: readonly MusicTrack[] = [
+  track('beach-1', 'Palm Court Shuffle', '/audio/music/music-beach-1.m4a'),
+  track('beach-2', 'Cabana Stack', '/audio/music/music-beach-2.m4a', 0.95),
+  track('beach-3', 'Reverse Into Sunset', '/audio/music/music-beach-3.m4a'),
+];
+
 /** Title-screen theme, played on menu routes instead of a scene playlist. */
 export const MENU_PLAYLIST: readonly MusicTrack[] = [
   track('title-1', 'Pull Up a Chair', '/audio/music/music-title.m4a'),
@@ -77,6 +84,7 @@ export const TENSE_PLAYLISTS: Readonly<Record<SceneId, readonly MusicTrack[]>> =
   campfire: [track('tense-campfire', 'Ember Rush', '/audio/music/music-tense-campfire.m4a')],
   casino: [track('tense-casino', 'House Edge', '/audio/music/music-tense-casino.m4a')],
   snug: [track('tense-snug', 'Last Orders', '/audio/music/music-tense-snug.m4a')],
+  beach: [track('tense-beach', 'Last Card Tide', '/audio/music/music-tense-beach.m4a')],
 };
 
 /** Flat view of every shipped track — handy for validation and tooling. */
@@ -84,6 +92,7 @@ export const MUSIC_TRACKS: readonly MusicTrack[] = [
   ...CAMPFIRE_PLAYLIST,
   ...CASINO_PLAYLIST,
   ...SNUG_PLAYLIST,
+  ...BEACH_PLAYLIST,
   ...MENU_PLAYLIST,
   ...Object.values(TENSE_PLAYLISTS).flat(),
 ];
@@ -97,12 +106,14 @@ export const PARLOUR_PACK: MusicPack = {
     campfire: CAMPFIRE_PLAYLIST,
     casino: CASINO_PLAYLIST,
     snug: SNUG_PLAYLIST,
+    beach: BEACH_PLAYLIST,
   },
   menu: MENU_PLAYLIST,
   sceneMoods: {
     campfire: { tense: TENSE_PLAYLISTS.campfire },
     casino: { tense: TENSE_PLAYLISTS.casino },
     snug: { tense: TENSE_PLAYLISTS.snug },
+    beach: { tense: TENSE_PLAYLISTS.beach },
   },
 };
 

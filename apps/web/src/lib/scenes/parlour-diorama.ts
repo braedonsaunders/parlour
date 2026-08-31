@@ -104,6 +104,14 @@ interface SceneExtras {
   vinyl?: { x: number; y: number; r: number };
   mug?: ScaledAnchor;
   cat?: ScaledAnchor;
+  // beach
+  sun?: { x: number; y: number; r: number };
+  sea?: { top: number; bot: number };
+  /** Festoon bulbs strung between the palms, pulsing to the party. */
+  bulbs?: Anchor[];
+  torchesB?: ScaledAnchor[];
+  /** The beach bar's light wash, where the colour sweeps come from. */
+  bar?: ScaledAnchor;
 }
 
 export function mountParlourDiorama(
@@ -876,8 +884,13 @@ export function mountParlourDiorama(
   let reduced = options.getReducedMotion() || calmQuery.matches;
 
   /** The four baked parallax plates per scene, filled on first render. */
-  const plates: Record<SceneId, Plate[] | null> = { campfire: null, casino: null, snug: null };
-  const EX: Record<SceneId, SceneExtras> = { campfire: {}, casino: {}, snug: {} };
+  const plates: Record<SceneId, Plate[] | null> = {
+    campfire: null,
+    casino: null,
+    snug: null,
+    beach: null,
+  };
+  const EX: Record<SceneId, SceneExtras> = { campfire: {}, casino: {}, snug: {}, beach: {} };
 
   /**
    * The animated fields, seeded once from fixed seeds so the scatter is the
@@ -897,6 +910,7 @@ export function mountParlourDiorama(
   const embersSN: { x: number; delay: number; life: number; sway: number; r: number }[] = [];
   const rain: { x: number; y: number; len: number; s: number; a: number }[] = [];
   const motes: { x: number; r: number; s: number; p: number }[] = [];
+  const glints: { x: number; y: number; w: number; s: number; p: number }[] = [];
 
   function seedFields() {
     const rt = mulberry(0x7a11);
@@ -961,6 +975,18 @@ export function mountParlourDiorama(
     motes.length = 0;
     for (let i = 0; i < 12; i += 1) {
       motes.push({ x: 0.06 + rm() * 0.88, r: 1 + rm() * 1.8, s: 14 + rm() * 14, p: rm() });
+    }
+    // Sea sparkles: x/y in 0–1 space across the sun's glitter path.
+    const rg = mulberry(0xbea);
+    glints.length = 0;
+    for (let i = 0; i < 22; i += 1) {
+      glints.push({
+        x: (rg() - 0.5) * 0.16,
+        y: rg(),
+        w: 8 + rg() * 22,
+        s: 1.2 + rg() * 2.6,
+        p: rg() * 6.28,
+      });
     }
   }
 
@@ -3934,6 +3960,729 @@ export function mountParlourDiorama(
   }
 
   /* ================================================================== */
+  /* BEACH                                                               */
+  /* ================================================================== */
+
+  /**
+   * Sunset tropical beach: the party scene the Wild soundtrack was written
+   * for. Sky and sea burn warm behind the table while the beach bar, festoon
+   * lights and tiki torches carry the party; all of the loud colour is baked,
+   * and the live pass only breathes — glitter, foam, bulb pulses, torch
+   * flames — so it stays as cheap as the other three scenes.
+   */
+  function bakeBeach() {
+    const far = plate();
+    const mid = plate();
+    const near = plate();
+    const fore = plate();
+    const ex: SceneExtras = {};
+    EX.beach = ex;
+
+    const HOR = H * 0.46;
+    const SEA_B = H * 0.62;
+    ex.sea = { top: HOR, bot: SEA_B };
+
+    /* ---- far: sunset sky, clouds, the sun, a distant island -------- */
+    const g = far.g;
+    const sky = g.createLinearGradient(0, -PAD, 0, HOR);
+    sky.addColorStop(0, '#140b33');
+    sky.addColorStop(0.3, '#3a1a5c');
+    sky.addColorStop(0.52, '#8a2f63');
+    sky.addColorStop(0.72, '#d4544e');
+    sky.addColorStop(0.88, '#f08a3c');
+    sky.addColorStop(1, '#ffc46a');
+    g.fillStyle = sky;
+    g.fillRect(-PAD, -PAD, W + PAD * 2, H + PAD * 2);
+
+    /* early stars, only in the violet band */
+    const rnd = mulberry(0x5ea);
+    for (let i = 0; i < 70; i += 1) {
+      const x = rnd() * (W + PAD * 2) - PAD;
+      const y = rnd() * H * 0.2 - PAD * 0.5;
+      g.fillStyle = `rgba(255,244,226,${0.1 + rnd() * 0.3})`;
+      g.beginPath();
+      g.arc(x, y, 0.4 + rnd() * 0.9, 0, Math.PI * 2);
+      g.fill();
+    }
+
+    const sunX = W * 0.62;
+    const sunY = H * 0.395;
+    const sunR = clamp(H * 0.075, 34, 64);
+    ex.sun = { x: sunX, y: sunY, r: sunR };
+    glow(g, sunX, sunY, sunR * 5.2, '#ff9e4f', 0.24);
+    glow(g, sunX, sunY, sunR * 2.4, '#ffcf7e', 0.4);
+    const sunGrad = g.createRadialGradient(sunX, sunY - sunR * 0.2, sunR * 0.1, sunX, sunY, sunR);
+    sunGrad.addColorStop(0, '#fffbe8');
+    sunGrad.addColorStop(0.55, '#ffe4a4');
+    sunGrad.addColorStop(1, '#ff9e4f');
+    g.fillStyle = sunGrad;
+    g.beginPath();
+    g.arc(sunX, sunY, sunR, 0, Math.PI * 2);
+    g.fill();
+    /* haze band where the sun meets the water */
+    g.save();
+    g.globalCompositeOperation = 'screen';
+    const haze = g.createLinearGradient(0, HOR - 26, 0, HOR);
+    haze.addColorStop(0, 'rgba(255,196,106,0)');
+    haze.addColorStop(1, 'rgba(255,196,106,0.4)');
+    g.fillStyle = haze;
+    g.fillRect(-PAD, HOR - 26, W + PAD * 2, 26);
+    g.restore();
+
+    /* sun-lit cloud streaks: long, soft, and warm-bellied, never blobs */
+    const cloud = (cx: number, cy: number, s: number, seed: number) => {
+      const rc = mulberry(seed);
+      g.save();
+      g.translate(cx, cy);
+      for (let i = 0; i < 5; i += 1) {
+        const ox = (rc() - 0.5) * 150 * s;
+        const oy = (rc() - 0.5) * 20 * s + i * 3 * s;
+        const rx = (52 + rc() * 66) * s;
+        const streak = g.createLinearGradient(ox - rx, 0, ox + rx, 0);
+        streak.addColorStop(0, 'rgba(90,35,80,0)');
+        streak.addColorStop(0.5, `rgba(90,35,80,${0.22 + rc() * 0.12})`);
+        streak.addColorStop(1, 'rgba(90,35,80,0)');
+        g.fillStyle = streak;
+        g.beginPath();
+        g.ellipse(ox, oy, rx, rx * 0.085, 0, 0, Math.PI * 2);
+        g.fill();
+        const under = g.createLinearGradient(ox - rx * 0.8, 0, ox + rx * 0.8, 0);
+        under.addColorStop(0, 'rgba(255,158,106,0)');
+        under.addColorStop(0.5, `rgba(255,158,106,${0.22 + rc() * 0.1})`);
+        under.addColorStop(1, 'rgba(255,158,106,0)');
+        g.fillStyle = under;
+        g.beginPath();
+        g.ellipse(ox, oy + rx * 0.07, rx * 0.8, rx * 0.045, 0, 0, Math.PI * 2);
+        g.fill();
+      }
+      g.restore();
+    };
+    cloud(W * 0.2, H * 0.15, 1.1, 0xc1);
+    cloud(W * 0.74, H * 0.1, 0.9, 0xc2);
+    cloud(W * 0.44, H * 0.26, 1.35, 0xc3);
+    cloud(W * 0.9, H * 0.3, 0.8, 0xc4);
+
+    /* far island, off to the left of the sun path */
+    g.fillStyle = '#2c1440';
+    g.beginPath();
+    g.moveTo(W * 0.02, HOR + 1);
+    g.quadraticCurveTo(W * 0.09, HOR - H * 0.045, W * 0.2, HOR + 1);
+    g.closePath();
+    g.fill();
+
+    /* homeward birds */
+    g.strokeStyle = 'rgba(30,14,42,0.8)';
+    g.lineWidth = 1.6;
+    (
+      [
+        [0.3, 0.17, 7],
+        [0.34, 0.2, 5],
+        [0.27, 0.22, 4],
+      ] as const
+    ).forEach(([bx, by, s]) => {
+      g.beginPath();
+      g.moveTo(W * bx - s, H * by);
+      g.quadraticCurveTo(W * bx, H * by - s * 0.9, W * bx + s, H * by);
+      g.stroke();
+    });
+
+    /* ---- mid: the sea --------------------------------------------- */
+    const m = mid.g;
+    const seaGrad = m.createLinearGradient(0, HOR, 0, SEA_B);
+    seaGrad.addColorStop(0, '#c25a43');
+    seaGrad.addColorStop(0.22, '#8a3a58');
+    seaGrad.addColorStop(0.55, '#2e4d70');
+    seaGrad.addColorStop(1, '#173a52');
+    m.fillStyle = seaGrad;
+    m.fillRect(-PAD, HOR, W + PAD * 2, SEA_B - HOR);
+
+    /* baked base of the sun's glitter path; the live pass sparkles over it */
+    m.save();
+    m.globalCompositeOperation = 'screen';
+    const path = m.createLinearGradient(0, HOR, 0, SEA_B);
+    path.addColorStop(0, 'rgba(255,214,142,0.42)');
+    path.addColorStop(0.75, 'rgba(255,158,79,0.1)');
+    path.addColorStop(1, 'rgba(255,158,79,0)');
+    m.fillStyle = path;
+    m.beginPath();
+    m.moveTo(sunX - sunR * 0.5, HOR);
+    m.lineTo(sunX + sunR * 0.5, HOR);
+    m.lineTo(sunX + sunR * 1.7, SEA_B);
+    m.lineTo(sunX - sunR * 1.7, SEA_B);
+    m.closePath();
+    m.fill();
+    m.restore();
+
+    /* still wave bands */
+    m.strokeStyle = 'rgba(20,36,54,0.5)';
+    m.lineWidth = 1.2;
+    for (let i = 0; i < 7; i += 1) {
+      const yy = HOR + 6 + i * ((SEA_B - HOR) * 0.135);
+      m.beginPath();
+      for (let x = -PAD; x < W + PAD; x += 14) {
+        const y = yy + Math.sin(x * 0.02 + i * 2.3) * (1.2 + i * 0.3);
+        if (x === -PAD) m.moveTo(x, y);
+        else m.lineTo(x, y);
+      }
+      m.stroke();
+    }
+
+    /* a sailboat heading home, silhouetted on the bright side */
+    m.save();
+    m.translate(W * 0.24, HOR + H * 0.018);
+    m.fillStyle = '#241234';
+    m.beginPath();
+    m.moveTo(-14, 0);
+    m.quadraticCurveTo(0, 7, 15, 0);
+    m.closePath();
+    m.fill();
+    m.beginPath();
+    m.moveTo(1, -2);
+    m.lineTo(1, -26);
+    m.lineTo(12, -4);
+    m.closePath();
+    m.fill();
+    m.beginPath();
+    m.moveTo(-2, -2);
+    m.lineTo(-2, -22);
+    m.lineTo(-11, -4);
+    m.closePath();
+    m.fill();
+    m.restore();
+
+    /* ---- near: sand, palms, string lights, bar, torches ------------ */
+    const n = near.g;
+    const shoreAt = (x: number) =>
+      H * 0.615 + Math.sin(x * 0.012) * 6 + (fbm(x * 0.01, 9, 3) - 0.5) * 10;
+    n.beginPath();
+    n.moveTo(-PAD, H + PAD);
+    n.lineTo(-PAD, shoreAt(-PAD));
+    for (let x = -PAD; x <= W + PAD; x += 16) n.lineTo(x, shoreAt(x));
+    n.lineTo(W + PAD, H + PAD);
+    n.closePath();
+    const sand = n.createLinearGradient(0, H * 0.6, 0, H + PAD);
+    sand.addColorStop(0, '#b87c52');
+    sand.addColorStop(0.35, '#96603f');
+    sand.addColorStop(1, '#4c2c22');
+    n.fillStyle = sand;
+    n.fill();
+
+    clipDraw(
+      n,
+      () => {
+        n.moveTo(-PAD, H + PAD);
+        n.lineTo(-PAD, shoreAt(-PAD));
+        for (let x = -PAD; x <= W + PAD; x += 16) n.lineTo(x, shoreAt(x));
+        n.lineTo(W + PAD, H + PAD);
+        n.closePath();
+      },
+      () => {
+        /* wet band mirroring the sky, then sand speckle and edge shade */
+        const wet = n.createLinearGradient(0, H * 0.6, 0, H * 0.67);
+        wet.addColorStop(0, 'rgba(255,170,102,0.5)');
+        wet.addColorStop(1, 'rgba(255,170,102,0)');
+        n.fillStyle = wet;
+        n.fillRect(-PAD, H * 0.59, W + PAD * 2, H * 0.09);
+        const rs = mulberry(0x5a2);
+        for (let i = 0; i < 260; i += 1) {
+          const x = rs() * (W + PAD * 2) - PAD;
+          const y = H * (0.63 + rs() * 0.37);
+          n.fillStyle = rs() > 0.5 ? 'rgba(64,36,26,0.35)' : 'rgba(255,208,150,0.18)';
+          n.fillRect(x, y, 1.6, 1.2);
+        }
+        const edgeShade = n.createLinearGradient(0, 0, W, 0);
+        edgeShade.addColorStop(0, 'rgba(16,6,20,0.5)');
+        edgeShade.addColorStop(0.3, 'rgba(16,6,20,0)');
+        edgeShade.addColorStop(0.7, 'rgba(16,6,20,0)');
+        edgeShade.addColorStop(1, 'rgba(16,6,20,0.5)');
+        n.fillStyle = edgeShade;
+        n.fillRect(-PAD, H * 0.55, W + PAD * 2, H * 0.55 + PAD);
+      },
+    );
+    /* shoreline highlight where the last wave reaches */
+    n.strokeStyle = 'rgba(255,236,210,0.4)';
+    n.lineWidth = 2;
+    n.beginPath();
+    for (let x = -PAD; x <= W + PAD; x += 16) {
+      const y = shoreAt(x) + 1.5;
+      if (x === -PAD) n.moveTo(x, y);
+      else n.lineTo(x, y);
+    }
+    n.stroke();
+
+    /* shells and a starfish */
+    const rsh = mulberry(0x77e);
+    for (let i = 0; i < 6; i += 1) {
+      const x = W * (0.18 + rsh() * 0.6);
+      const y = H * (0.7 + rsh() * 0.16);
+      const r = 2.5 + rsh() * 3.5;
+      ellipse(n, x, y + r * 0.3, r, r * 0.3, 'rgba(20,8,16,0.4)');
+      ellipse(n, x, y, r, r * 0.7, i % 2 ? '#e8c9a8' : '#d98a76');
+    }
+
+    /* the two palms that hold the party lights */
+    const palm = (
+      baseX: number,
+      baseY: number,
+      h: number,
+      lean: number,
+      seed: number,
+    ): Anchor => {
+      const rp = mulberry(seed);
+      const topX = baseX + lean * h * 0.34;
+      const topY = baseY - h;
+      n.save();
+      /* trunk: one smooth bow, with a faint warm rim on the sun side */
+      n.strokeStyle = '#241226';
+      n.lineCap = 'round';
+      for (let i = 0; i < 3; i += 1) {
+        n.lineWidth = 6.5 - i * 1.9;
+        n.beginPath();
+        n.moveTo(baseX, baseY);
+        n.quadraticCurveTo(
+          baseX + lean * h * 0.08,
+          baseY - h * 0.55,
+          baseX + lean * h * 0.34,
+          topY + h * (0.3 - i * 0.15),
+        );
+        n.stroke();
+      }
+      n.strokeStyle = 'rgba(240,138,60,0.24)';
+      n.lineWidth = 1.4;
+      n.beginPath();
+      n.moveTo(baseX + lean * 2.4, baseY - 2);
+      n.quadraticCurveTo(
+        baseX + lean * h * 0.08 + lean * 2.4,
+        baseY - h * 0.55,
+        topX + lean * 1.4,
+        topY + h * 0.05,
+      );
+      n.stroke();
+      /* ring notches up the bow */
+      n.strokeStyle = 'rgba(12,5,16,0.55)';
+      n.lineWidth = 1.2;
+      for (let i = 1; i < 9; i += 1) {
+        const u = i / 9 + (rp() - 0.5) * 0.02;
+        const x = baseX + lean * h * 0.34 * u * u;
+        const y = baseY - h * u;
+        const w = 3.4 - u * 1.4;
+        n.beginPath();
+        n.moveTo(x - w, y);
+        n.quadraticCurveTo(x, y + 2.2, x + w, y);
+        n.stroke();
+      }
+      /* fronds: dark arcs with a droop, rim-lit toward the sun */
+      for (let i = 0; i < 8; i += 1) {
+        const ang = -Math.PI * 0.92 + (i / 7) * Math.PI * 0.86;
+        const len = h * (0.3 + rp() * 0.14);
+        const ex1 = topX + Math.cos(ang) * len;
+        const ey1 = topY + Math.sin(ang) * len * 0.62 + len * 0.34;
+        n.strokeStyle = '#1d1022';
+        n.lineWidth = 4.6;
+        n.lineCap = 'round';
+        n.beginPath();
+        n.moveTo(topX, topY);
+        n.quadraticCurveTo(
+          topX + Math.cos(ang) * len * 0.6,
+          topY + Math.sin(ang) * len * 0.5,
+          ex1,
+          ey1,
+        );
+        n.stroke();
+        n.strokeStyle = 'rgba(240,138,60,0.28)';
+        n.lineWidth = 1.4;
+        n.stroke();
+        /* leaflets hanging off the rib */
+        n.strokeStyle = '#1d1022';
+        n.lineWidth = 1.6;
+        for (let k = 2; k < 7; k += 1) {
+          const u = k / 7;
+          const lx = topX + (ex1 - topX) * u;
+          const ly = topY + (ey1 - topY) * u - Math.sin(u * Math.PI) * len * 0.16;
+          n.beginPath();
+          n.moveTo(lx, ly);
+          n.lineTo(lx + Math.cos(ang) * 7, ly + 9 + u * 5);
+          n.stroke();
+        }
+      }
+      /* coconuts */
+      ellipse(n, topX - 5, topY + 7, 3.4, 3.1, '#150b1a');
+      ellipse(n, topX + 4, topY + 9, 3, 2.8, '#150b1a');
+      n.restore();
+      return { x: topX, y: topY + 6 };
+    };
+    const palmL = palm(W * 0.09, H * 0.78, H * 0.5, 0.9, 0xb1);
+    const palmR = palm(W * 0.93, H * 0.8, H * 0.56, -0.85, 0xa7);
+
+    /* festoon lights sagging between the palm crowns */
+    const sagX = (palmL.x + palmR.x) / 2;
+    const sagY = Math.max(palmL.y, palmR.y) + H * 0.13;
+    n.strokeStyle = 'rgba(20,10,22,0.85)';
+    n.lineWidth = 1.6;
+    n.beginPath();
+    n.moveTo(palmL.x, palmL.y);
+    n.quadraticCurveTo(sagX, sagY, palmR.x, palmR.y);
+    n.stroke();
+    const bulbs: Anchor[] = [];
+    for (let i = 1; i < 14; i += 1) {
+      const u = i / 14;
+      const x =
+        (1 - u) * (1 - u) * palmL.x + 2 * (1 - u) * u * sagX + u * u * palmR.x;
+      const y =
+        (1 - u) * (1 - u) * palmL.y + 2 * (1 - u) * u * sagY + u * u * palmR.y;
+      bulbs.push({ x, y: y + 5 });
+      n.strokeStyle = 'rgba(20,10,22,0.85)';
+      n.beginPath();
+      n.moveTo(x, y);
+      n.lineTo(x, y + 4);
+      n.stroke();
+      ellipse(n, x, y + 6, 2.6, 3, '#3a2436');
+    }
+    ex.bulbs = bulbs;
+
+    /* the beach bar: bamboo counter, thatch roof, glowing shelf */
+    const bx = W * 0.795;
+    const by = H * 0.685;
+    const bs = clamp(H / 720, 0.75, 1.2);
+    ex.bar = { x: bx, y: by - 74 * bs, s: bs };
+    n.save();
+    n.translate(bx, by);
+    n.scale(bs, bs);
+    ellipse(n, 0, 6, 92, 12, 'rgba(20,8,16,0.42)');
+    /* counter */
+    n.fillStyle = '#4a2a20';
+    n.fillRect(-66, -44, 132, 48);
+    n.strokeStyle = 'rgba(240,170,110,0.35)';
+    n.lineWidth = 1.4;
+    for (let i = 0; i < 7; i += 1) {
+      n.beginPath();
+      n.moveTo(-62 + i * 20, -44);
+      n.lineTo(-62 + i * 20, 2);
+      n.stroke();
+    }
+    n.fillStyle = '#6b4030';
+    n.fillRect(-72, -50, 144, 8);
+    /* interior glow + bottles on the shelf */
+    const barGlow = n.createLinearGradient(0, -86, 0, -50);
+    barGlow.addColorStop(0, 'rgba(255,178,90,0.12)');
+    barGlow.addColorStop(1, 'rgba(255,178,90,0.4)');
+    n.fillStyle = barGlow;
+    n.fillRect(-58, -86, 116, 36);
+    (
+      [
+        [-40, '#7fe0c3'],
+        [-22, '#f792c8'],
+        [-4, '#ffd98e'],
+        [14, '#8fb8ff'],
+        [32, '#f0966f'],
+      ] as const
+    ).forEach(([ox, color]) => {
+      n.fillStyle = color;
+      n.globalAlpha = 0.85;
+      n.fillRect(ox, -74, 7, 22);
+      n.fillRect(ox + 2.4, -80, 2.2, 6);
+      n.globalAlpha = 1;
+    });
+    /* thatch roof */
+    n.fillStyle = '#2c1626';
+    n.beginPath();
+    n.moveTo(-92, -86);
+    n.lineTo(0, -118);
+    n.lineTo(92, -86);
+    n.closePath();
+    n.fill();
+    n.strokeStyle = '#8a5a33';
+    n.lineWidth = 2;
+    for (let i = 0; i < 12; i += 1) {
+      n.beginPath();
+      n.moveTo(-88 + i * 16, -86 + Math.abs(i - 6) * -0.5);
+      n.lineTo(-80 + i * 16, -98 - Math.abs(6 - i));
+      n.stroke();
+    }
+    /* poles */
+    n.fillStyle = '#3a2018';
+    n.fillRect(-64, -86, 5, 42);
+    n.fillRect(59, -86, 5, 42);
+    n.restore();
+
+    /* tiki torches planted in the sand */
+    const torchesB: ScaledAnchor[] = [];
+    (
+      [
+        [W * 0.285, H * 0.745],
+        [W * 0.6, H * 0.72],
+      ] as const
+    ).forEach(([tx, ty]) => {
+      const ts = clamp(H / 760, 0.7, 1.15);
+      ellipse(n, tx, ty + 2, 10 * ts, 3 * ts, 'rgba(20,8,16,0.45)');
+      n.fillStyle = '#33201a';
+      n.fillRect(tx - 2.4 * ts, ty - 64 * ts, 4.8 * ts, 64 * ts);
+      n.strokeStyle = 'rgba(240,170,110,0.3)';
+      n.lineWidth = 1.2;
+      n.beginPath();
+      n.moveTo(tx - 2.4 * ts, ty - 34 * ts);
+      n.lineTo(tx + 2.4 * ts, ty - 34 * ts);
+      n.stroke();
+      /* woven bowl */
+      n.fillStyle = '#4a2a20';
+      n.beginPath();
+      n.moveTo(tx - 7 * ts, ty - 64 * ts);
+      n.lineTo(tx + 7 * ts, ty - 64 * ts);
+      n.lineTo(tx + 4 * ts, ty - 78 * ts);
+      n.lineTo(tx - 4 * ts, ty - 78 * ts);
+      n.closePath();
+      n.fill();
+      torchesB.push({ x: tx, y: ty - 80 * ts, s: ts });
+    });
+    ex.torchesB = torchesB;
+
+    /* ---- fore: framing fronds, a surfboard, a drink at your elbow --- */
+    const f = fore.g;
+    /* oversized frond silhouettes dipping into the top corners */
+    const frond = (ox: number, oy: number, ang: number, len: number) => {
+      f.strokeStyle = 'rgba(14,7,18,0.92)';
+      f.lineCap = 'round';
+      f.lineWidth = 9;
+      f.beginPath();
+      f.moveTo(ox, oy);
+      f.quadraticCurveTo(
+        ox + Math.cos(ang) * len * 0.5,
+        oy + Math.sin(ang) * len * 0.5 - len * 0.1,
+        ox + Math.cos(ang) * len,
+        oy + Math.sin(ang) * len + len * 0.24,
+      );
+      f.stroke();
+      f.lineWidth = 3;
+      for (let k = 1; k < 10; k += 1) {
+        const u = k / 10;
+        const lx = ox + Math.cos(ang) * len * u;
+        const ly = oy + Math.sin(ang) * len * u + len * 0.22 * u * u;
+        f.beginPath();
+        f.moveTo(lx, ly);
+        f.lineTo(lx + Math.cos(ang + 1.2) * 26 * (1 - u * 0.4), ly + 30 * (1 - u * 0.3));
+        f.stroke();
+      }
+    };
+    frond(-PAD * 0.5, H * 0.02, 0.5, W * 0.2);
+    frond(W + PAD * 0.5, H * 0.05, Math.PI - 0.4, W * 0.24);
+
+    /* surfboard leaning into frame on the left */
+    f.save();
+    f.translate(W * 0.055, H * 0.87);
+    f.rotate(-0.16);
+    ellipse(f, 6, 34, 30, 7, 'rgba(20,8,16,0.4)');
+    const board = f.createLinearGradient(-12, 0, 14, 0);
+    board.addColorStop(0, '#d4544e');
+    board.addColorStop(0.5, '#f0966f');
+    board.addColorStop(1, '#d4544e');
+    f.fillStyle = board;
+    f.beginPath();
+    f.ellipse(0, 0, 15, 62, 0, 0, Math.PI * 2);
+    f.fill();
+    f.fillStyle = '#fff3d6';
+    f.fillRect(-2.2, -56, 4.4, 112);
+    f.strokeStyle = 'rgba(60,20,24,0.5)';
+    f.lineWidth = 2;
+    f.beginPath();
+    f.ellipse(0, 0, 15, 62, 0, 0, Math.PI * 2);
+    f.stroke();
+    f.restore();
+
+    /* a cocktail on a driftwood stump, bottom right */
+    f.save();
+    f.translate(W * 0.9, H * 0.9);
+    ellipse(f, 0, 14, 26, 7, 'rgba(20,8,16,0.45)');
+    f.fillStyle = '#4a2a20';
+    f.fillRect(-20, -6, 40, 20);
+    ellipse(f, 0, -6, 20, 6, '#6b4030');
+    f.fillStyle = 'rgba(255,220,160,0.9)';
+    f.beginPath();
+    f.moveTo(-9, -30);
+    f.lineTo(9, -30);
+    f.lineTo(2.4, -12);
+    f.lineTo(-2.4, -12);
+    f.closePath();
+    f.fill();
+    f.fillStyle = '#f792c8';
+    f.beginPath();
+    f.moveTo(-7.4, -28);
+    f.lineTo(7.4, -28);
+    f.lineTo(2, -14);
+    f.lineTo(-2, -14);
+    f.closePath();
+    f.fill();
+    f.strokeStyle = '#7fe0c3';
+    f.lineWidth = 2;
+    f.beginPath();
+    f.moveTo(4, -30);
+    f.lineTo(8, -42);
+    f.stroke();
+    ellipse(f, 9, -44, 4, 4, '#d4544e');
+    f.restore();
+
+    plates.beach = [far, mid, near, fore];
+  }
+
+  function liveBeach(t: number) {
+    blitPlates(plates.beach ?? []);
+    const ex = readyExtras(EX.beach, ['sun', 'sea', 'bulbs', 'torchesB', 'bar'] as const);
+    if (!ex) return;
+
+    /* the sun breathes; the first stars blink on */
+    withDepth(DEPTHS[0], () => {
+      ctx.save();
+      ctx.globalCompositeOperation = 'screen';
+      const breathe = 0.5 + 0.5 * Math.sin(t * 0.7);
+      glow(ctx, ex.sun.x, ex.sun.y, ex.sun.r * 3.4, '#ffcf7e', 0.1 + 0.05 * breathe);
+      ctx.restore();
+      twinkles.forEach((s, i) => {
+        if (i > 9 || s.y > 0.18) return;
+        const tw = 0.3 + 0.7 * (0.5 + 0.5 * Math.sin(t * s.s + s.p));
+        ctx.fillStyle = `rgba(255,244,226,${s.a * 0.5 * tw})`;
+        ctx.beginPath();
+        ctx.arc(s.x * W, s.y * H, s.r, 0, Math.PI * 2);
+        ctx.fill();
+      });
+    });
+
+    /* the sea: glitter path, drifting swell, foam reaching the sand */
+    withDepth(DEPTHS[1], () => {
+      const { top, bot } = ex.sea;
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(-PAD, top, W + PAD * 2, bot - top + 14);
+      ctx.clip();
+      ctx.globalCompositeOperation = 'screen';
+      glints.forEach((sp) => {
+        const y = top + sp.y * (bot - top);
+        const spread = 0.5 + sp.y * 1.2;
+        const x = ex.sun.x + sp.x * W * spread + Math.sin(t * 0.4 + sp.p) * 6 * spread;
+        const a = Math.max(0, Math.sin(t * sp.s + sp.p)) * 0.34 * (1 - sp.y * 0.45);
+        ctx.fillStyle = `rgba(255,220,150,${a})`;
+        ctx.fillRect(x - sp.w / 2, y, sp.w * (0.6 + sp.y * 0.7), 2);
+      });
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.strokeStyle = `rgba(255,190,150,${0.1 + 0.05 * Math.sin(t * 1.4)})`;
+      ctx.lineWidth = 1.1;
+      for (let i = 0; i < 3; i += 1) {
+        const yy = top + 14 + i * 14 + Math.sin(t * 0.6 + i) * 2;
+        ctx.beginPath();
+        for (let x = -20; x < W + 20; x += 16) {
+          const y = yy + Math.sin(x * 0.02 + t * 1.1 + i * 1.7) * 2;
+          if (x === -20) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+      }
+      /* the last wave: a foam line breathing up the wet sand with the tide */
+      const tide = Math.sin(t * 0.55);
+      ctx.strokeStyle = `rgba(255,244,230,${0.3 + 0.18 * tide})`;
+      ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      for (let x = -20; x < W + 20; x += 14) {
+        const y = bot + 2 + tide * 4 + Math.sin(x * 0.012) * 5 + Math.sin(x * 0.05 + t) * 1.4;
+        if (x === -20) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+      ctx.restore();
+    });
+
+    /* party lights: festoon bulbs cycling colour, bar wash swaying */
+    withDepth(DEPTHS[2], () => {
+      ctx.save();
+      ctx.globalCompositeOperation = 'screen';
+      const colors = ['#ffd98e', '#7fe0c3', '#f792c8', '#8fb8ff'];
+      ex.bulbs.forEach((b, i) => {
+        const pulse = 0.55 + 0.45 * Math.sin(t * 1.9 + i * 0.9);
+        glow(ctx, b.x, b.y, 8, colors[i % colors.length] ?? '#ffd98e', 0.5 * pulse);
+      });
+      const bar = ex.bar;
+      glow(ctx, bar.x, bar.y, 80 * bar.s, '#ffb25a', 0.14 + 0.04 * Math.sin(t * 2.2));
+      /* two slow colour sweeps out of the bar — the party without the strobe */
+      for (let i = 0; i < 2; i += 1) {
+        const swing = Math.sin(t * (0.4 + i * 0.17) + i * 2.6) * 0.5;
+        ctx.save();
+        ctx.translate(bar.x, bar.y);
+        ctx.rotate(-Math.PI / 2 + swing);
+        const beam = ctx.createLinearGradient(0, 0, 0, -H * 0.34);
+        const color = i === 0 ? '247,146,200' : '127,224,195';
+        beam.addColorStop(0, `rgba(${color},0.13)`);
+        beam.addColorStop(1, `rgba(${color},0)`);
+        ctx.fillStyle = beam;
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(-H * 0.055, -H * 0.34);
+        ctx.lineTo(H * 0.055, -H * 0.34);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+      }
+      ctx.restore();
+    });
+
+    /* torch flames and the warm shore wash */
+    withDepth(DEPTHS[3], () => {
+      ex.torchesB.forEach((torch, i) => {
+        ctx.save();
+        ctx.globalCompositeOperation = 'screen';
+        glow(
+          ctx,
+          torch.x,
+          torch.y - 8 * torch.s,
+          52 * torch.s,
+          '#ffb24a',
+          0.2 + 0.06 * Math.sin(t * 3.1 + i * 2),
+        );
+        ctx.restore();
+        tongue(
+          ctx,
+          t,
+          torch.x,
+          torch.y + 4 * torch.s,
+          11 * torch.s,
+          40 * torch.s,
+          hex('#e26a28', 0.85),
+          1.1 + i * 2.3,
+          -2 * torch.s,
+        );
+        tongue(
+          ctx,
+          t,
+          torch.x,
+          torch.y + 2 * torch.s,
+          6.5 * torch.s,
+          26 * torch.s,
+          hex('#ffd98e', 0.9),
+          2.6 + i * 1.7,
+          0,
+          'lighter',
+        );
+      });
+      /* a few sparks off each torch */
+      ctx.save();
+      ctx.globalCompositeOperation = 'screen';
+      embersSN.forEach((e, i) => {
+        const torch = ex.torchesB[i % ex.torchesB.length];
+        if (!torch) return;
+        const u = ((t + e.delay) % e.life) / e.life;
+        const a = u < 0.15 ? u / 0.15 : 1 - (u - 0.15) / 0.85;
+        ctx.globalAlpha = Math.max(0, a) * 0.8;
+        glow(
+          ctx,
+          torch.x + e.x * 30 * torch.s + Math.sin(u * 6 + e.delay) * e.sway * 0.4,
+          torch.y - u * 60 * torch.s,
+          e.r * 2.4 * torch.s,
+          '#ffb24a',
+          0.9,
+        );
+      });
+      ctx.globalAlpha = 1;
+      ctx.restore();
+    });
+  }
+
+  /* ================================================================== */
   /* frame loop + chrome                                                 */
   /* ================================================================== */
 
@@ -3951,9 +4700,12 @@ export function mountParlourDiorama(
     c.height = Math.max(1, Math.round(H * dpr));
     const g = context2d(c);
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
-    const radial = g.createRadialGradient(W * 0.5, H * 0.55, H * 0.14, W * 0.5, H * 0.53, H * 0.82);
+    // A touch deeper and tighter than it used to be: the animated props all
+    // live in the periphery, and settling them into shadow keeps the scene
+    // from competing with the cards while the saturated centre stays lively.
+    const radial = g.createRadialGradient(W * 0.5, H * 0.55, H * 0.14, W * 0.5, H * 0.53, H * 0.74);
     radial.addColorStop(0, 'rgba(4,9,14,0)');
-    radial.addColorStop(1, 'rgba(4,9,14,0.5)');
+    radial.addColorStop(1, 'rgba(4,9,14,0.58)');
     g.fillStyle = radial;
     g.fillRect(0, 0, W, H);
     const grade = g.createLinearGradient(0, 0, 0, H);
@@ -3979,6 +4731,7 @@ export function mountParlourDiorama(
     if (plates[id]) return;
     if (id === 'campfire') bakeCampfire();
     else if (id === 'casino') bakeCasino();
+    else if (id === 'beach') bakeBeach();
     else bakeSnug();
   }
 
@@ -3989,6 +4742,7 @@ export function mountParlourDiorama(
     ctx.imageSmoothingQuality = 'medium';
     if (scene === 'casino') liveCasino(t);
     else if (scene === 'snug') liveSnug(t);
+    else if (scene === 'beach') liveBeach(t);
     else liveCampfire(t);
     vignette();
   }
@@ -4017,6 +4771,11 @@ export function mountParlourDiorama(
   const SLIPPING_MS = 22;
   const CALM_MS = 14;
   const CALM_HOLD_MS = 10_000;
+  /* Ambient time runs ~15% slower than the wall clock. The scene is set
+     dressing behind a card table; at full speed its flicker and drift pulled
+     the eye off the game, and slowing every oscillator at the source calms all
+     three scenes at once without touching any of them individually. */
+  const AMBIENT_TIME_SCALE = 0.00085;
 
   let frameBudgetMs = coarseQuery.matches ? HALF_RATE_MS : 0;
   let intervalEma = 16.7;
@@ -4057,7 +4816,7 @@ export function mountParlourDiorama(
     lastDrawn = now;
     px += (mx - px) * 0.055;
     py += (my - py) * 0.055;
-    renderScene(now * 0.001);
+    renderScene(now * AMBIENT_TIME_SCALE);
   }
 
   function resize() {
@@ -4091,6 +4850,7 @@ export function mountParlourDiorama(
     plates.campfire = null;
     plates.casino = null;
     plates.snug = null;
+    plates.beach = null;
     vignettePlate = null;
     flatPlate = null;
     flatFor = null;
@@ -4098,7 +4858,7 @@ export function mountParlourDiorama(
     scene = options.getScene();
     // Setting width/height clears the bitmap. Paint now — waiting for the next
     // rAF (or skipping it on the half-rate budget) leaves a dark empty frame.
-    renderScene(reduced || lastDrawn < 0 ? 2.4 : lastDrawn * 0.001);
+    renderScene(reduced || lastDrawn < 0 ? 2.4 : lastDrawn * AMBIENT_TIME_SCALE);
     if (!reduced && !frameId) frameId = requestAnimationFrame(frame);
   }
 

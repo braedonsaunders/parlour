@@ -10,6 +10,7 @@ import {
   menuForPack,
   moodForPack,
   playlistForPack,
+  tracksForScene,
   type MusicMoodId,
   type MusicTrack,
 } from '@/lib/audio/music';
@@ -347,6 +348,15 @@ export class MusicController {
     const pool = this.inMenu ? menuForPack(pack) : playlistForPack(pack, this.scene);
     const list = pool.filter((track) => !this.voices.get(track.id)?.failed);
     if (list.length > 0) return list;
+    // A game pack whose songs have not shipped yet should sound like the
+    // parlour, not like silence: fall through to the base scene playlist
+    // before giving up and droning the ambience bed.
+    if (!this.inMenu && pack && pack.id !== BASE_PACK_ID) {
+      const base = tracksForScene(this.scene).filter(
+        (track) => !this.voices.get(track.id)?.failed,
+      );
+      if (base.length > 0) return base;
+    }
     const fallbackFailed = this.voices.get(FALLBACK_TRACK.id)?.failed;
     return fallbackFailed ? [] : [FALLBACK_TRACK];
   }

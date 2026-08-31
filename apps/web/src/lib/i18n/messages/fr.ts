@@ -465,4 +465,5 @@ export const fr: Messages = {
   'scene.campfire': 'Feu de camp',
   'scene.casino': 'Casino',
   'scene.snug': 'Salon cosy',
+  'scene.beach': 'Plage',
 };

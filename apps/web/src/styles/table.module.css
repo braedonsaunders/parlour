@@ -385,7 +385,7 @@
   --fan-n: 3;
   --fan-un: 0.334;
   --fan-step: 0px;
-  --hand-card-width: clamp(5.6rem, 8vw, 7.2rem);
+  --hand-card-width: clamp(6.3rem, 9vw, 8.1rem);
   --hand-rail-span: calc(9rem + var(--fan-n) * 3.4rem);
   --hand-rail-max: 92vw;
   position: absolute;
@@ -524,8 +524,10 @@
   transition: transform 200ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
+/* Legality reads as depth first: a playable card steps forward out of the fan,
+   and the dim on the rest is only a supporting cue, not the whole story. */
 .handCard[data-playable='true'] {
-  --playable-y: -0.62rem;
+  --playable-y: -1.05rem;
 }
 
 .handCard[data-playable='true'] .card {
@@ -544,7 +546,7 @@
 
 /* The card you just drew: lifted clear of the fan so the decision is obvious. */
 .handCard[data-just-drawn] {
-  --playable-y: -1.15rem;
+  --playable-y: -1.55rem;
   z-index: 6;
 }
 
@@ -592,7 +594,7 @@
   --card-rotation: 0deg;
   position: relative;
   display: inline-block;
-  width: clamp(5.6rem, 8vw, 7.2rem);
+  width: clamp(6.3rem, 9vw, 8.1rem);
   aspect-ratio: 5 / 7;
   overflow: hidden;
   border: 0.28rem solid #fffaf0;
@@ -1076,7 +1078,7 @@ button.card {
      the phone. Nothing here may introduce a scroll or a clip: the hand must be
      readable in one look, and a lifted playable card needs somewhere to go. */
   .localHand {
-    --hand-card-width: clamp(4.3rem, 15.5vw, 5.1rem);
+    --hand-card-width: clamp(4.8rem, 17.5vw, 5.7rem);
     /* The fan's outermost cards rotate past the rail, so its ceiling stops
        short of the screen to leave the arc its gutters. At full width the
        corner cards sit on the bezel. */
@@ -1143,7 +1145,7 @@ button.card {
      stays as easy to hit here as anywhere. Spades proved this privately; it
      belongs to every game. */
   .localHand {
-    --hand-card-width: 5.75rem;
+    --hand-card-width: 6.4rem;
     bottom: -2.4rem;
     transform: translateX(-50%);
   }

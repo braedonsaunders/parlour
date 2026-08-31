@@ -87,10 +87,13 @@ export function useRoomTable<S, C extends RuleValues>(
          * difference between a button that did nothing and a table that died.
          */
         if (isStaleMoveFault(caught)) return;
+        // The screen only gets the flattened message; keep the real error —
+        // stack and all — where a bug report can find it.
+        console.error(`[table] ${gameId} move "${move}" failed to send`, caught);
         setLocalError(caught instanceof Error ? caught.message : SEND_FAILED);
       }
     },
-    [room],
+    [gameId, room],
   );
 
   const leave = useCallback(

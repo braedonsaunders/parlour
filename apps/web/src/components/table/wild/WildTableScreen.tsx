@@ -12,7 +12,8 @@ import { AnimatePresence, motion } from 'motion/react';
 import { getAvatar } from '@/lib/avatars';
 import { WILDPILE_SFX_PACK } from '@/lib/audio/sfx';
 import { useMatchTension } from '@/lib/audio/tension';
-import { useMusicMood } from '@/stores/audio';
+import { WILD_MUSIC_PACK } from '@/lib/audio/wild-music';
+import { useMusicGamePack, useMusicMood } from '@/stores/audio';
 import { ArrivalProvider, useAdmittedHand } from '@/lib/table/arrival-presentation';
 import {
   DealProvider,
@@ -130,6 +131,9 @@ function WildTableScreenView(props: WildTableScreenProps) {
     props.matchEndsAt === undefined
       ? fallbackTense
       : Boolean(view?.activeSeat !== null && finalMinute);
+  // Wild brings its own soundtrack: tropical house while seated, released on
+  // the way out. The tense cue below rides the same pack's mood tracks.
+  useMusicGamePack(WILD_MUSIC_PACK.id);
   useMusicMood(tense ? 'tense' : null);
 
   const calls = useMemo(

@@ -447,4 +447,5 @@ export const zh: Messages = {
   'scene.campfire': '篝火',
   'scene.casino': '赌场',
   'scene.snug': '小暖屋',
+  'scene.beach': '海滩',
 };

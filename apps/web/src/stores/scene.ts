@@ -3,7 +3,7 @@ import { persist } from 'zustand/middleware';
 
 export const SCENE_STORAGE_KEY = 'parlour.scene.v1';
 
-export const SCENE_IDS = ['campfire', 'casino', 'snug'] as const;
+export const SCENE_IDS = ['campfire', 'casino', 'snug', 'beach'] as const;
 
 export type SceneId = (typeof SCENE_IDS)[number];
 
@@ -11,6 +11,7 @@ export const SCENE_LABELS: Record<SceneId, string> = {
   campfire: 'Campfire',
   casino: 'Casino',
   snug: 'Snug',
+  beach: 'Beach',
 };
 
 export const DEFAULT_SCENE: SceneId = 'campfire';

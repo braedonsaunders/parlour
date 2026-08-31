@@ -22,4 +22,8 @@
      HTML tiles sitting above this bitmap (Windows DComp flashes those black). */
   transform: translateZ(0);
   backface-visibility: hidden;
+  /* One constant vibrancy pass over the painted scene. Constant matters: the
+     layer never gains or loses its filter, so Windows DComp has nothing to
+     flash, and the diorama's dusk palette stops reading as murk behind cards. */
+  filter: saturate(1.16) contrast(1.04);
 }

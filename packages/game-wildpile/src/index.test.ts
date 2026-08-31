@@ -367,6 +367,8 @@ describe('wildpile moves and flow', () => {
     expect(colored.session.state).toMatchObject({ activeColor: 'blue', turn: 1 });
 
     const pending = fixture({
+      // Stacking mechanics only — the challenge window is its own suite below.
+      rules: { ...defaults, challengeDrawFour: false },
       turn: 1,
       activeColor: 'blue',
       pendingDraw: 4,
@@ -754,7 +756,11 @@ describe('wildpile moves and flow', () => {
     });
 
     it('stays out of the way when the table has the rule off, or the room is veiled', () => {
-      const off = playDrawFour([card('5')], { ...defaults, stackDrawFour: false });
+      const off = playDrawFour([card('5')], {
+        ...defaults,
+        stackDrawFour: false,
+        challengeDrawFour: false,
+      });
       // No window, so the flow takes the pickup for seat 1 automatically.
       expect(off.session.state.challenge).toBeNull();
       expect(off.session.state.hands[1]).toHaveLength(6);

@@ -18,7 +18,7 @@ import {
   unregisterMusicPack,
 } from './music';
 
-const SCENE_IDS = ['campfire', 'casino', 'snug'] as const;
+const SCENE_IDS = ['campfire', 'casino', 'snug', 'beach'] as const;
 
 describe('music library', () => {
   it('ships exactly three songs per scene with unique ids and safe paths', () => {
@@ -47,8 +47,9 @@ describe('music library', () => {
   });
 
   it('resolves lookups across songs, packs, menu theme, and fallback', () => {
-    expect(MUSIC_TRACKS.length).toBe(13);
+    expect(MUSIC_TRACKS.length).toBe(17);
     expect(getMusicTrack('campfire-1')?.title).toBe('Ember Watch');
+    expect(getMusicTrack('beach-1')?.title).toBe('Palm Court Shuffle');
     expect(getMusicTrack('title-1')?.src).toContain('music-title.m4a');
     expect(getMusicTrack('tense-campfire')?.src).toContain('music-tense-campfire.m4a');
     expect(getMusicTrack('tense-casino')?.src).toContain('music-tense-casino.m4a');
