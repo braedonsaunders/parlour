@@ -69,7 +69,8 @@ export class EngineAuthority<S, C extends RuleValues> implements AuthorityAdapte
       reveals: action.reveals,
       recycle: action.recycle,
     });
-    if (outcome.rejected) throw new Error(outcome.rejected.message);
+    if (outcome.rejected)
+      throw new MoveRefusedError(outcome.rejected.code, outcome.rejected.message);
     const events = outcome.events.map((event) => ({ ...event, ts: timestamp }));
     const nextSession = { ...outcome.session, log: [...session.log, ...events] };
     this.authorityState = { session: nextSession, settings };
@@ -101,7 +102,8 @@ export class EngineAuthority<S, C extends RuleValues> implements AuthorityAdapte
         ? { reveals: reveals.map(([handle, card]) => [handle, card] as [CardId, CardId]) }
         : {}),
     });
-    if (outcome.rejected) throw new Error(outcome.rejected.message);
+    if (outcome.rejected)
+      throw new MoveRefusedError(outcome.rejected.code, outcome.rejected.message);
     const events = outcome.events.map((event) => ({ ...event, ts: timestamp }));
     const nextSession = { ...outcome.session, log: [...session.log, ...events] };
     this.authorityState = { session: nextSession, settings };
@@ -259,5 +261,25 @@ export class DuplicateActionError extends Error {
   constructor(actionId: string) {
     super(`duplicate action: ${actionId}`);
     this.name = 'DuplicateActionError';
+  }
+}
+
+/**
+ * The engine looked at a move and said no.
+ *
+ * Distinct from every other throw in this file because it is the one failure
+ * that means the table is HEALTHY: a tap raced a state change and lost, which
+ * on a fast table happens every few seconds. The transport must be able to
+ * tell this apart from "the authority broke" without matching on message text
+ * — an error banner for a mistimed tap is how a live game gets replaced by
+ * "the table lost the thread".
+ */
+export class MoveRefusedError extends Error {
+  constructor(
+    readonly code: string,
+    message: string,
+  ) {
+    super(message);
+    this.name = 'MoveRefusedError';
   }
 }

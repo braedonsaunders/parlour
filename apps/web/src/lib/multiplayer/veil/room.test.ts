@@ -219,14 +219,25 @@ describe('opening a card over a mesh', () => {
     }
   });
 
-  it('refuses to open the same position twice at once', async () => {
+  it('coalesces concurrent asks for one position, and refuses a different audience', async () => {
     const mesh = new Mesh(3);
     await mesh.openRound();
     await mesh.runCeremony();
+    // Fast tables ask twice as a matter of course — every applied packet
+    // re-lists the handles this seat cannot read while the first chain is
+    // still in flight — so a duplicate ask shares the chain instead of erroring.
     const first = mesh.rooms[1]!.open(0, 2, 'private');
-    await expect(mesh.rooms[1]!.open(0, 2, 'private')).rejects.toThrow(/already being opened/);
+    const second = mesh.rooms[1]!.open(0, 2, 'private');
+    // A 'public' ask files an audit opening a 'private' one must not, so the
+    // mismatch is the one shape that still refuses.
+    await expect(mesh.rooms[1]!.open(0, 2, 'public')).rejects.toThrow(/different audience/);
     for (let round = 0; round < 20; round++) await mesh.settle();
-    await first;
+    const [a, b] = await Promise.all([first, second]);
+    expect(a).toBe(b);
+    // One chain ran, not two: every seat peeled this position exactly once.
+    for (const room of mesh.rooms) {
+      expect(room.peelReceipts().filter((r) => r.position === 2)).toHaveLength(1);
+    }
   });
 
   it('refuses to open before the ceremony has closed', async () => {

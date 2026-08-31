@@ -313,6 +313,8 @@ export class MultiplayerRoomSession {
   private readonly localDealFaults = new Map<SeatId, string>();
   /** bot turns already scheduled, keyed by log position, so none fires twice */
   private readonly scheduledBotTurns = new Set<string>();
+  /** self-openings already sent, keyed by seat and log position, so none fires twice */
+  private readonly sentSelfOpens = new Set<string>();
   /** seats being held open for a player who dropped, keyed by seat */
   private readonly pendingReturns = new Map<number, ReturnType<typeof setTimeout>>();
   private snapshot: MultiplayerRoomSnapshot = {
@@ -976,7 +978,10 @@ export class MultiplayerRoomSession {
     if (this.snapshot.security.paused) throw new Error(this.snapshot.security.paused);
     const recyclable = this.recyclableCards(move);
     if (recyclable) {
-      if (this.recycleActionPending) throw new Error('The stock is already being re-veiled');
+      // A second tap while the re-veil ceremony runs is the same draw asked
+      // twice — the first tap already carries it. A repeat of work underway
+      // is absorbed, not an error a player should ever see.
+      if (this.recycleActionPending) return;
       this.recycleActionPending = true;
       void this.sendAfterRecycle(move, payload, reveals, recyclable).finally(() => {
         this.recycleActionPending = false;
@@ -1323,6 +1328,11 @@ export class MultiplayerRoomSession {
             if (departed !== null && this.shouldWalkover(departed)) this.awardWalkover(departed);
             return;
           }
+          // A rejoining seat asks for its cards before its catch-up has
+          // replayed the ceremony — not-ready, not broken. onVeilResume asks
+          // again the moment the layers are back; a banner here would flash
+          // an error at a player whose table is about to be fine.
+          if (error instanceof Error && /has not closed yet/.test(error.message)) return;
           this.update({
             error: error instanceof Error ? error.message : 'A card could not be opened',
           });
@@ -1407,6 +1417,11 @@ export class MultiplayerRoomSession {
       });
       this.driveBotSeats();
     }
+    // An opening that failed while they were away died as a seat-left fault,
+    // and no packet may be coming to retry it — a table parked on a showdown
+    // is waiting for exactly the face that failed. Ask again now they are
+    // here; refreshView then re-answers anything this seat owes the table.
+    void this.openMyHandles().then(() => this.refreshView());
   }
 
   /**
@@ -1619,6 +1634,70 @@ export class MultiplayerRoomSession {
     if (!this.authority) return;
     this.update({ session: this.presented(this.authority.getSession()) });
     this.maybeAutoDeclineJump();
+    this.maybeOpenOwnReveals();
+  }
+
+  /**
+   * Answers the openings this seat itself owes the table.
+   *
+   * The host's `maybeOpenVeiledCards` turns the TABLE's cards face up — a
+   * board, a street. This is the other half: cards one seat holds that the
+   * round cannot finish without seeing, like every hand still face down when
+   * Blitz's knock window closes. Only their owner can open those, so each
+   * client polls `selfOpenPending` for its own seat and sends the move the
+   * pack names, with the openings riding along as reveals.
+   *
+   * An obligation, not a choice — the pack only reports cards the round is
+   * waiting on — so the room answers the moment the duty appears, exactly as
+   * it auto-declines a jump-in no seat can take: a prompt nobody can act on
+   * must never be the thing a table waits for.
+   *
+   * The host also answers for bot-held seats, whose rebuilt faces it can read.
+   */
+  private maybeOpenOwnReveals(): void {
+    if (!this.authority || !this.veil || !this.transport || this.snapshot.security.paused) return;
+    const settings = this.snapshot.settings;
+    if (!settings) return;
+    const session = this.authority.getSession();
+    if (session.status !== 'playing') return;
+    const known = this.veil.session.knownFaces();
+    const pack = packFor(settings);
+
+    const owed: { seat: number; asBot: boolean }[] = [];
+    if (this.snapshot.localSeat !== null) {
+      owed.push({ seat: this.snapshot.localSeat, asBot: false });
+    }
+    if (this.snapshot.isHost) {
+      for (const seat of this.snapshot.seats) {
+        if (seat.bot) owed.push({ seat: seat.seat, asBot: true });
+      }
+    }
+
+    for (const { seat, asBot } of owed) {
+      const pending = pack.selfOpenPending(session.state, seat);
+      if (!pending) continue;
+      // The faces must have peeled first; refreshView re-runs this as each
+      // opening lands, so a hand still in flight is answered moments later.
+      if (!pending.handles.every((handle) => known.has(handle))) continue;
+      const key = `${seat}:${pending.move}:${session.log.length}`;
+      if (this.sentSelfOpens.has(key)) continue;
+      this.sentSelfOpens.add(key);
+      try {
+        if (asBot) {
+          this.transport.sendAsBot({
+            id: `bot:${seat}:${this.sequence++}`,
+            seat,
+            move: pending.move,
+            ...this.openingsFor(undefined, pending.handles),
+          });
+        } else {
+          this.send(pending.move, undefined, pending.handles);
+        }
+      } catch {
+        // Refused means the position moved — a claim landed, the round scored.
+        // The next applied packet re-evaluates whatever duty remains.
+      }
+    }
   }
 
   /**
@@ -1812,6 +1891,7 @@ export class MultiplayerRoomSession {
     this.maybeDealVeiledHand();
     this.maybeOpenVeiledCards();
     this.maybeAutoDeclineJump();
+    this.maybeOpenOwnReveals();
   }
 
   private acceptPresence(presence: PresenceEvent): void {
@@ -1935,11 +2015,22 @@ export class MultiplayerRoomSession {
     await Promise.all(botSeats.map((seat) => this.openSeatHandles(seat)));
   }
 
-  private fail(_error: unknown, fallback: string): void {
+  private fail(error: unknown, fallback: string): void {
+    // The snapshot only carries the friendly fallback; the cause goes to the
+    // console so a playtest report is more than the copy on the error screen.
+    console.error(`[room] ${fallback}`, error);
     this.update({ error: fallback });
   }
 
   private update(patch: Partial<MultiplayerRoomSnapshot>): void {
+    if (patch.error && patch.error !== this.snapshot.error) {
+      console.error(`[room] table error: ${patch.error}`, {
+        code: this.snapshot.room?.code ?? null,
+        stage: this.snapshot.stage,
+        isHost: this.snapshot.isHost,
+        connection: this.snapshot.connection,
+      });
+    }
     const wasLobby = this.snapshot.stage === 'lobby';
     this.snapshot = { ...this.snapshot, ...patch };
     /*

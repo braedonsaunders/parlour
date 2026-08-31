@@ -14,7 +14,7 @@
  * honest lives in the web transport, not in the engine.
  */
 
-import type { CardId, DeckDef, RuleError, Rng, RuleValues } from './types';
+import type { CardId, DeckDef, RuleError, Rng, RuleValues, SeatId } from './types';
 import { shuffledIds } from './zones';
 
 /** Reserved prefix. No real deck may mint card ids that start with it. */
@@ -379,6 +379,22 @@ export interface VeilSupport {
    * understand any particular game's idea of a street or a showdown.
    */
   publicOpens?: (state: unknown) => VeilPublicOpen | null;
+
+  /**
+   * The cards THIS seat is obliged to show, and the move that shows them.
+   *
+   * {@link publicOpens} is the table's half: the host runs the peel chain over
+   * cards nobody owns — a board, a street. This is the seat's half: cards one
+   * player holds that the round cannot finish without seeing, like every hand
+   * still face down when Blitz's knock window closes. Only their owner can
+   * open them, so the room polls this per seat and each client sends the move
+   * with its own openings.
+   *
+   * An obligation, not a choice — the game should return non-null only when
+   * the round is waiting on these cards and nothing else. Anything a player
+   * might *decline* to show belongs in the UI, not here.
+   */
+  selfOpens?: (state: unknown, seat: SeatId) => VeilSelfOpen | null;
 }
 
 /** A set of handles the table has to be able to read, and what to do with them. */
@@ -386,6 +402,14 @@ export interface VeilPublicOpen {
   /** Handles to run the peel chain over, in public. */
   handles: readonly CardId[];
   /** The move to inject once they are open, carrying the openings as reveals. */
+  move: string;
+}
+
+/** A seat's own cards the round is waiting on, and the move that shows them. */
+export interface VeilSelfOpen {
+  /** Handles this seat holds and owes the table. */
+  handles: readonly CardId[];
+  /** The move this seat sends, carrying the openings as reveals. */
   move: string;
 }
 
@@ -469,6 +493,8 @@ export interface VeilPack {
   redealMove?: string;
   /** See {@link VeilSupport.publicOpens}. */
   publicOpens?: (state: unknown) => VeilPublicOpen | null;
+  /** See {@link VeilSupport.selfOpens}. */
+  selfOpens?: (state: unknown, seat: SeatId) => VeilSelfOpen | null;
 }
 
 function resolveDeck(pack: VeilPack, config: RuleValues): DeckDef {
@@ -482,6 +508,7 @@ export function veilSupport(pack: VeilPack): VeilSupport {
     deck: (config) => resolveDeck(pack, config),
     redealMove: pack.redealMove,
     publicOpens: pack.publicOpens,
+    selfOpens: pack.selfOpens,
     publicSetupFrom(seats, config) {
       if (mode === 'none') return resolveDeck(pack, config).cardIds.length;
       const size =

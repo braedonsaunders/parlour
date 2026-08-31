@@ -22,7 +22,7 @@ import {
 import { canPublishListings, type RoomListingPublisher } from './RoomDirectory';
 import { validateEmote } from './emotes';
 import { DEFAULT_ICE_SERVERS } from './iceServers';
-import { DuplicateActionError } from './EngineAuthority';
+import { DuplicateActionError, MoveRefusedError } from './EngineAuthority';
 import {
   dispatchWireData,
   type DealMessage,
@@ -795,6 +795,11 @@ export class P2PTransport implements Transport {
       this.emitEvent(packet);
     } catch (error) {
       if (error instanceof DuplicateActionError) return;
+      // A refused move is a tap that raced the position and lost — the seat's
+      // own screen already swallows the local version of this, and a guest's
+      // late tap must not paint an error across the HOST's table. The board
+      // every peer renders is still the authoritative one; nothing is lost.
+      if (error instanceof MoveRefusedError) return;
       this.emitPresence({
         kind: 'error',
         message: error instanceof Error ? error.message : 'Action rejected',
@@ -814,6 +819,9 @@ export class P2PTransport implements Transport {
       this.emitEvent(packet);
     } catch (error) {
       if (error instanceof DuplicateActionError) return;
+      // An injected clock that lost its race — the move that beat it already
+      // replaced the phase the timeout described. That is the clock working.
+      if (error instanceof MoveRefusedError) return;
       this.emitPresence({
         kind: 'error',
         message: error instanceof Error ? error.message : 'System event rejected',

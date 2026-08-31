@@ -443,8 +443,22 @@ export function createBlitzDef(options: BlitzDefOptions = {}): GameDef<BlitzStat
     howToPlay: blitzHowToPlay,
     configSchema: blitzConfigSchema,
     // Veil, inherited: three cards a seat, then one card the room turns face up
-    // in public to start the discard.
-    veil: veilSupport({ deck: DECK, handSize: HAND_SIZE, publicSetup: 'one' }),
+    // in public to start the discard. When the knock window closes, every hand
+    // still face down owes the table its cards — that is the showdown reveal,
+    // and each seat's client answers it through `selfOpens`.
+    veil: veilSupport({
+      deck: DECK,
+      handSize: HAND_SIZE,
+      publicSetup: 'one',
+      selfOpens: (state, seat) => {
+        const round = state as BlitzState;
+        if (!round.veiled || round.outcome) return null;
+        if (round.knocker === null || round.postKnockTurns !== 0) return null;
+        if (isSittingOut(round, seat)) return null;
+        const handles = (round.hands[seat] ?? []).filter(isVeilHandle);
+        return handles.length > 0 ? { move: 'showdown.open', handles } : null;
+      },
+    }),
 
     setup(ctx) {
       const { config, seats, fx } = ctx;

@@ -73,9 +73,21 @@ type Pending = {
   resolve: (card: CardId) => void;
   reject: (error: Error) => void;
   timer: ReturnType<typeof setTimeout>;
+  /** re-sends the current remote hop until it is answered */
+  retry: ReturnType<typeof setInterval>;
+  /** the promise every caller of open() for this position shares */
+  promise: Promise<CardId>;
+  /**
+   * The last hop handed to a REMOTE peer, kept so a chain stalled on a seat
+   * that dropped mid-peel can be re-sent when that seat comes back. Answers
+   * are deduped by seat, so a resend that crosses a late reply is harmless.
+   */
+  hop: { sequence: number; value: string } | null;
 };
 
 const OPEN_TIMEOUT_MS = 20_000;
+/** How often a chain re-asks its unanswered hop. */
+const OPEN_RETRY_MS = 1_500;
 const RECOVER_TIMEOUT_MS = 15_000;
 
 type PendingRecovery = {
@@ -94,6 +106,8 @@ export class VeilRoom {
   private readonly keys = new Map<number, string>();
   /** seats the room has been told are gone; their layers may be recovered */
   private readonly lost = new Set<number>();
+  /** peels that arrived before this seat's layers were restored, answered after catch-up */
+  private readonly deferredPeels: { peerId: string; message: VeilMessage }[] = [];
 
   constructor(
     private readonly session: VeilSession,
@@ -247,6 +261,25 @@ export class VeilRoom {
 
   markSeatPresent(seat: number): void {
     this.lost.delete(seat);
+    // Any peel that went out while the seat was away evaporated with its old
+    // connection; without a resend the opening hangs its full timeout and the
+    // table wedges on a card nobody is actually withholding.
+    this.resendPending();
+  }
+
+  /**
+   * Re-drives every opening stalled on a remote hop.
+   *
+   * Only remote hops are re-sent: replaying this seat's own or a recovered
+   * share would append a duplicate to the collected set, and the terminal
+   * check requires one share per distinct participant. A remote duplicate is
+   * safe — the answer path drops shares from a seat it already heard.
+   */
+  private resendPending(): void {
+    for (const waiting of this.pending.values()) {
+      if (!waiting.hop) continue;
+      this.forward(waiting.epoch, waiting.position, waiting.hop.value, waiting.hop.sequence);
+    }
   }
 
   /** Seats whose layer this client rebuilt — no longer private for the round. */
@@ -301,27 +334,78 @@ export class VeilRoom {
     clearTimeout(waiting.timer);
     this.recovering.delete(key);
     waiting.resolve(true);
+    // Chains parked on the seat we just rebuilt can finish locally now.
+    this.resendPending();
+  }
+
+  /** Replays peels that were parked while this seat's layers were rebuilding. */
+  private async answerDeferredPeels(): Promise<void> {
+    const parked = this.deferredPeels.splice(0);
+    for (const { peerId, message } of parked) {
+      await this.receive(peerId, message);
+    }
   }
 
   /**
    * Starts an opening for a deck position. Resolves with the card once the
    * chain comes back; rejects if a hop lies or never answers.
+   *
+   * Concurrent requests for the same position and audience share one chain and
+   * one promise. Fast tables ask twice as a matter of course — every applied
+   * packet re-lists the handles this seat cannot read yet, and the first chain
+   * is still in flight when the second packet lands — so a duplicate ask is
+   * ordinary traffic, not an error. Only a request for a *different* audience
+   * is refused: 'public' files an audit opening that 'private' must not.
    */
   open(epoch: number, position: number, visibility: FaceVisibility): Promise<CardId> {
     const locked = this.session.lockedAt(epoch, position);
     if (!locked) return Promise.reject(new Error('the ceremony has not closed yet'));
     const key = `${epoch}:${position}`;
-    if (this.pending.has(key)) {
-      return Promise.reject(new Error('this position is already being opened'));
+    const existing = this.pending.get(key);
+    if (existing) {
+      return existing.visibility === visibility
+        ? existing.promise
+        : Promise.reject(
+            new Error('this position is already being opened for a different audience'),
+          );
     }
-    return new Promise<CardId>((resolve, reject) => {
+    const promise = new Promise<CardId>((resolve, reject) => {
       const timer = setTimeout(() => {
+        const waiting = this.pending.get(key);
+        if (waiting) clearInterval(waiting.retry);
         this.pending.delete(key);
         reject(new Error('the room did not finish opening this card'));
       }, OPEN_TIMEOUT_MS);
-      this.pending.set(key, { epoch, position, visibility, shares: [], resolve, reject, timer });
+      // A wire can lose a peel or a share — a peer swapping connections
+      // mid-rejoin is enough — and a chain with one message missing used to
+      // hang its whole timeout. Re-ask periodically instead: peels are
+      // answered statelessly and answers are deduped by seat, so asking again
+      // is free, and the chain heals the moment the route works.
+      const retry = setInterval(() => {
+        const waiting = this.pending.get(key);
+        if (!waiting?.hop) return;
+        this.forward(waiting.epoch, waiting.position, waiting.hop.value, waiting.hop.sequence);
+      }, OPEN_RETRY_MS);
+      // The executor runs synchronously, so the entry is registered (with a
+      // placeholder promise) before forward() can settle or fail it.
+      const entry: Pending = {
+        epoch,
+        position,
+        visibility,
+        shares: [],
+        resolve,
+        reject,
+        timer,
+        retry,
+        promise: null as unknown as Promise<CardId>,
+        hop: null,
+      };
+      this.pending.set(key, entry);
       this.forward(epoch, position, locked, 0);
     });
+    const entry = this.pending.get(key);
+    if (entry) entry.promise = promise;
+    return promise;
   }
 
   /** Seats that peel, in order, with the recipient last. */
@@ -337,6 +421,8 @@ export class VeilRoom {
     const order = this.chain(epoch);
     const seat = order[sequence];
     if (seat === undefined) return;
+    const waiting = this.pending.get(`${epoch}:${position}`);
+    if (waiting) waiting.hop = null;
     if (seat === this.session.seat) {
       void this.applyOwnShare(epoch, position, locked, sequence);
       return;
@@ -347,6 +433,7 @@ export class VeilRoom {
       void this.applyRecoveredShare(seat, epoch, position, locked, sequence);
       return;
     }
+    if (waiting) waiting.hop = { sequence, value: locked };
     const peer = this.lost.has(seat) ? null : this.link.peerIdForSeat(seat);
     if (!peer) {
       this.fail(
@@ -406,6 +493,7 @@ export class VeilRoom {
     waiting.shares.push(share);
     if (waiting.shares.length < this.session.participantsFor(epoch).length) return;
     clearTimeout(waiting.timer);
+    clearInterval(waiting.retry);
     this.pending.delete(key);
     const result = this.session.open(epoch, position, waiting.shares, waiting.visibility);
     if ('code' in result) {
@@ -420,6 +508,7 @@ export class VeilRoom {
     const waiting = this.pending.get(key);
     if (!waiting) return;
     clearTimeout(waiting.timer);
+    clearInterval(waiting.retry);
     this.pending.delete(key);
     waiting.reject(new Error(message));
   }
@@ -481,13 +570,21 @@ export class VeilRoom {
       case 'veil.catchup': {
         const restored = await this.adoptCatchUp(message.catchUp);
         this.onResume?.(restored);
+        if (restored) await this.answerDeferredPeels();
         return;
       }
       case 'veil.peel': {
         // Someone asked this seat to remove its layer. It never sees a
         // plaintext: it hands the still-locked value to the next hop.
         const share = this.session.share(message.epoch, message.position, message.locked);
-        if (!share) return;
+        if (!share) {
+          // A peel can outrun this seat's own catch-up after a rejoin — the
+          // layer it needs is still being rebuilt from the transcript. Park
+          // the request and answer it the moment the layers are back; dropped
+          // silently, the asker's chain hangs its full timeout instead.
+          if (this.deferredPeels.length < 64) this.deferredPeels.push({ peerId, message });
+          return;
+        }
         const order = this.chainFor(message.forSeat, message.epoch);
         const sequence = order.indexOf(this.session.seat);
         await this.recordReceipt(
@@ -578,6 +675,7 @@ export class VeilRoom {
   cancelAll(reason = 'the room closed'): void {
     for (const [key, waiting] of this.pending) {
       clearTimeout(waiting.timer);
+      clearInterval(waiting.retry);
       this.pending.delete(key);
       waiting.reject(new Error(reason));
     }

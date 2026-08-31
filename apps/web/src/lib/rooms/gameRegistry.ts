@@ -202,6 +202,15 @@ export interface RoomGamePack {
    */
   publicOpenPending(state: unknown): { handles: readonly string[]; move: string } | null;
   /**
+   * Cards THIS seat owes the table, and the move that shows them — a blitz
+   * showdown hand. Only their owner can open them, so every client polls this
+   * for its own seat, where `publicOpenPending` is polled by the host alone.
+   */
+  selfOpenPending(
+    state: unknown,
+    seat: number,
+  ): { handles: readonly string[]; move: string } | null;
+  /**
    * The move that deals this game another hand inside the same session, or
    * null when a room is only ever one deal.
    */
@@ -336,6 +345,10 @@ function definePack<S, C extends RuleValues>(spec: PackSpec<S, C>): RoomGamePack
     },
     publicOpenPending(state) {
       const opens = spec.createDef().veil?.publicOpens?.(state);
+      return opens && opens.handles.length > 0 ? opens : null;
+    },
+    selfOpenPending(state, seat) {
+      const opens = spec.createDef().veil?.selfOpens?.(state, seat);
       return opens && opens.handles.length > 0 ? opens : null;
     },
   };
