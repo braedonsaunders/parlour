@@ -94,6 +94,9 @@ function CardContents({ face, faceDown }: { face: WildpileFace | null; faceDown:
       <span className={wildStyles.corner} aria-hidden="true">
         {short}
       </span>
+      <span className={wildStyles.cornerB} aria-hidden="true">
+        {short}
+      </span>
       <span className={wildStyles.pip} aria-hidden="true">
         {face.meta.kind === 'wild' ? (
           <small>WILD</small>

@@ -29,12 +29,24 @@
 
 .corner {
   position: absolute;
-  top: 0.28rem;
-  left: 0.38rem;
+  top: 0.22rem;
+  left: 0.34rem;
   font-family: var(--font-display), sans-serif;
   font-weight: 800;
-  font-size: clamp(0.95rem, 1.6vw, 1.3rem);
+  font-size: clamp(1.2rem, 2.1vw, 1.7rem);
   line-height: 1;
+  transform: skewX(-6deg);
+  text-shadow: 0.08em 0.08em 0 rgba(20, 12, 4, 0.5);
+}
+
+/* Mirrored index in the opposite corner, the way a real deck reads. */
+.cornerB {
+  composes: corner;
+  top: auto;
+  left: auto;
+  right: 0.34rem;
+  bottom: 0.22rem;
+  transform: rotate(180deg) skewX(-6deg);
 }
 
 .pip {
@@ -44,7 +56,9 @@
   place-items: center;
   font-family: var(--font-display), sans-serif;
   font-weight: 800;
-  font-size: clamp(2.4rem, 4.5vw, 4rem);
+  font-size: clamp(2.6rem, 4.9vw, 4.3rem);
+  transform: skewX(-6deg);
+  text-shadow: 0.055em 0.055em 0 rgba(20, 12, 4, 0.45);
 }
 
 .pip small {
@@ -99,8 +113,8 @@
   height: 58%;
   transform: translate(-50%, -50%) rotate(-24deg);
   border-radius: 50%;
-  background: rgba(255, 252, 244, 0.22);
-  border: 2px solid rgba(255, 252, 244, 0.5);
+  background: rgba(255, 252, 244, 0.26);
+  border: 3px solid rgba(255, 252, 244, 0.78);
 }
 
 .back {

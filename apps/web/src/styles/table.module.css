@@ -1290,7 +1290,9 @@ button.card {
      belongs to every game. */
   .localHand {
     --hand-card-width: 7.2rem;
-    bottom: -2.4rem;
+    /* A short screen has no spare middle: sink the fan into the bottom edge
+       and let the cards crop — the top halves stay readable and tappable. */
+    bottom: -6rem;
     transform: translateX(-50%);
   }
   .ownerStatusRail {
