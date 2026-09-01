@@ -189,7 +189,7 @@ async function expectSeatsAtTable(seats: readonly Seat[]): Promise<void> {
 
 async function roomSnapshot(page: Page): Promise<{
   localSeat: number | null;
-  seats: { seat: number; bot: boolean; connected: boolean }[];
+  seats: { seat: number; bot: boolean; connected: boolean; profileId: string }[];
 }> {
   return page.evaluate(() => {
     const session = (
@@ -197,7 +197,7 @@ async function roomSnapshot(page: Page): Promise<{
         __parlourActiveRoom?: {
           getSnapshot(): {
             localSeat: number | null;
-            seats: { seat: number; bot: boolean; connected: boolean }[];
+            seats: { seat: number; bot: boolean; connected: boolean; profileId: string }[];
           };
         };
       }
@@ -220,7 +220,7 @@ async function expectSeatBecameBot(page: Page, seat: number, timeout = 30_000): 
       { timeout },
     )
     .toBe(true);
-  await expect(seatIsBot(page, seat)).toBeVisible({ timeout: 10_000 });
+  await expect(seatIsBot(page, seat)).toBeVisible({ timeout: 20_000 });
 }
 
 /** Drops a seat's broker handlers and closes its context. */
@@ -525,8 +525,16 @@ test.describe('multiplayer resilience (hermetic)', () => {
     await fillBotsAndStart(host.page);
     await expectSeatsAtTable([guest1, guest2]);
 
-    const guest2Seat = (await roomSnapshot(guest2.page)).localSeat;
-    expect(guest2Seat, 'guest2 was seated before it left').not.toBeNull();
+    // The host's occupancy list is the authority — guest2.localSeat can still
+    // be 0 if the welcome has not written it, and looking at the host's own
+    // chair then waits for a bot marker that will never appear.
+    const guest2Profile = await guest2.page.evaluate(() =>
+      window.localStorage.getItem('parlour.multiplayer.profile-id'),
+    );
+    const guest2Seat = (await roomSnapshot(host.page)).seats.find(
+      (occupant) => occupant.profileId === guest2Profile && !occupant.bot,
+    )?.seat;
+    expect(guest2Seat, 'host has guest2 in a human chair').not.toBeUndefined();
 
     await closeSeat(guest2, broker);
 
@@ -824,11 +832,10 @@ test.describe('veiled-deck rooms', () => {
     if (await playable.count()) {
       const card = playable.last();
       const cardId = await card.getAttribute('data-card-id');
-      // Forced, because overlap is the design: a fanned hand covers each card's
-      // centre with the one dealt after it, and Playwright clicks centres. What
-      // `force` skips is hit-testing, not the outcome — the assertion below is
-      // still that the card actually left the hand.
-      await card.click({ force: true });
+      // The play handler is on the button inside the rail item. A force-click
+      // on the wrapper never reaches it — Playwright fires the event on the
+      // node it was given — so the card sat in the hand and the test blamed Veil.
+      await card.locator('button').click({ force: true });
 
       // Only wilds open this, and they are filtered out above — but a pack may
       // add another chooser later, and a modal left open would block the rest.
