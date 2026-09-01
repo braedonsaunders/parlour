@@ -7,7 +7,7 @@
 No account. No download. No server. Send a room code and you're dealing in seconds —
 on your phone, your laptop, or a native desktop app.
 
-[![Play now](https://img.shields.io/badge/▶_Play_now-free_in_browser-e29349?style=for-the-badge)](https://parlour-liart.vercel.app)
+[![Play now](https://img.shields.io/badge/▶_Play_now-free_in_browser-e29349?style=for-the-badge)](https://parlour.cards)
 [![Desktop](https://img.shields.io/badge/↓_Desktop-macOS_·_Windows_·_Linux-2f86a1?style=for-the-badge)](https://github.com/braedonsaunders/parlour/releases/latest)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Multiplayer](https://img.shields.io/badge/friends-peer--to--peer-54a06e)](#play-with-friends-in-about-thirty-seconds)
@@ -117,7 +117,7 @@ against every friend you've played** — locally, on your device.
 
 <div align="center">
 
-**[Pull up a chair →](https://parlour-liart.vercel.app)**
+**[Pull up a chair →](https://parlour.cards)**
 
 </div>
 
@@ -233,6 +233,6 @@ card players find it.
 
 <div align="center">
 
-**[Pull up a chair →](https://parlour-liart.vercel.app)**
+**[Pull up a chair →](https://parlour.cards)**
 
 </div>
