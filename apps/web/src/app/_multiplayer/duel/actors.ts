@@ -122,6 +122,9 @@ export function stepActor(
   if (!cockpit) throw new Error(`no cockpit for ${gameId}`);
   const snapshot = peer.getSnapshot();
   if (snapshot.stage !== 'table' || snapshot.localSeat === null) return false;
+  // A veiled drop-hold covers the table with a countdown and disables every
+  // control, so a person cannot tap through it — neither does the actor.
+  if (snapshot.security.paused) return false;
   const session = multiplayerSession<unknown, never>(snapshot, gameId);
   if (!session || session.status !== 'playing') return false;
   const seat = snapshot.localSeat;

@@ -108,6 +108,8 @@ export class VeilRoom {
   private readonly lost = new Set<number>();
   /** peels that arrived before this seat's layers were restored, answered after catch-up */
   private readonly deferredPeels: { peerId: string; message: VeilMessage }[] = [];
+  /** entries that arrived ahead of a gap in the chain, keyed by their sequence */
+  private readonly parkedEntries = new Map<number, SignedVeilEntry>();
 
   constructor(
     private readonly session: VeilSession,
@@ -231,17 +233,37 @@ export class VeilRoom {
   /** One transcript entry, chain-checked and dispatched to the ceremony. */
   private async absorbEntry(entry: SignedVeilEntry): Promise<void> {
     const transcript = this.session.transcriptRef();
-    const chainFault = await transcript?.accept(entry);
-    if (chainFault) throw new Error(`veil transcript rejected an entry: ${chainFault.message}`);
-    if (entry.kind === 'ceremony.recycle') {
-      await this.session.acceptRecycle(entry.payload as VeilRecycleEntry);
+    if (!transcript) return;
+    const expected = transcript.all().length;
+    // The chain is one total order but the wire is many channels: an entry can
+    // arrive again (a peer replaying after a reconnect) or early (its author
+    // raced ahead of one we have not seen). Neither is a fork. A duplicate is
+    // dropped; an early entry is parked and drained the moment the gap fills.
+    // Only an entry that CONTRADICTS the chain at its own sequence — a real
+    // fork, or a bad signature — still throws.
+    if (entry.seq < expected) return;
+    if (entry.seq > expected) {
+      if (this.parkedEntries.size < 64) this.parkedEntries.set(entry.seq, entry);
       return;
     }
-    if (entry.kind !== 'ceremony.layer') return;
-    const fault = this.session.acceptLayer(
-      entry.payload as Parameters<VeilSession['acceptLayer']>[0],
-    );
-    if (fault) throw new Error(`veil ceremony rejected a layer: ${fault.message}`);
+    const chainFault = await transcript.accept(entry);
+    if (chainFault) throw new Error(`veil transcript rejected an entry: ${chainFault.message}`);
+    try {
+      if (entry.kind === 'ceremony.recycle') {
+        await this.session.acceptRecycle(entry.payload as VeilRecycleEntry);
+      } else if (entry.kind === 'ceremony.layer') {
+        const fault = this.session.acceptLayer(
+          entry.payload as Parameters<VeilSession['acceptLayer']>[0],
+        );
+        if (fault) throw new Error(`veil ceremony rejected a layer: ${fault.message}`);
+      }
+    } finally {
+      const parked = this.parkedEntries.get(entry.seq + 1);
+      if (parked) {
+        this.parkedEntries.delete(entry.seq + 1);
+        await this.absorbEntry(parked);
+      }
+    }
   }
 
   private async distributeRecovery(epoch: number): Promise<void> {

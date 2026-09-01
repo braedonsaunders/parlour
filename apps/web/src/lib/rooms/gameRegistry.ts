@@ -202,6 +202,13 @@ export interface RoomGamePack {
    */
   publicOpenPending(state: unknown): { handles: readonly string[]; move: string } | null;
   /**
+   * The public cards sitting in a spent stock right now, independent of any
+   * move — what the HOST polls so it can re-veil them ahead of the draw that
+   * will need them. `recyclableStock` answers for a specific move at send
+   * time; this answers for the state alone.
+   */
+  spentStock(state: unknown): readonly string[] | null;
+  /**
    * Cards THIS seat owes the table, and the move that shows them — a blitz
    * showdown hand. Only their owner can open them, so every client polls this
    * for its own seat, where `publicOpenPending` is polled by the host alone.
@@ -254,6 +261,8 @@ interface PackSpec<S, C extends RuleValues> {
   clampConfig?(config: C): C;
   /** See {@link RoomGamePack.recyclableStock}. */
   recyclableStock?(state: S, move: string): readonly string[] | null;
+  /** See {@link RoomGamePack.spentStock}. */
+  spentStock?(state: S): readonly string[] | null;
   /** See {@link RoomGamePack.privateHandles}. */
   privateHandles?(state: S, seat: number): readonly string[];
 }
@@ -337,6 +346,9 @@ function definePack<S, C extends RuleValues>(spec: PackSpec<S, C>): RoomGamePack
     recyclableStock(state, move) {
       return spec.recyclableStock ? spec.recyclableStock(state as S, move) : null;
     },
+    spentStock(state) {
+      return spec.spentStock ? spec.spentStock(state as S) : null;
+    },
     privateHandles(state, seat) {
       if (spec.privateHandles) return spec.privateHandles(state as S, seat);
       const hands = (state as { hands?: unknown }).hands;
@@ -365,6 +377,7 @@ export const ROOM_GAMES: Record<MultiplayerGameId, RoomGamePack> = {
     configSchema: blitzConfigSchema,
     createDef: createBlitzDef,
     recyclableStock: (state, move) => (move === 'draw.stock' ? spentDiscard(state) : null),
+    spentStock: spentDiscard,
   }),
 
   cribbage: definePack<CribbageState, CribbageConfig>({
@@ -381,6 +394,7 @@ export const ROOM_GAMES: Record<MultiplayerGameId, RoomGamePack> = {
     configSchema: wildpileConfig,
     createDef: () => wildpileGame,
     recyclableStock: (state, move) => (move === 'draw' ? spentDiscard(state) : null),
+    spentStock: spentDiscard,
   }),
 
   ratscrew: definePack<RatscrewState, RatscrewConfig>({
@@ -439,6 +453,7 @@ export const ROOM_GAMES: Record<MultiplayerGameId, RoomGamePack> = {
     // hand cannot answer — so a veiled round opens every hand still in play
     // before it settles, and the pack waits in a reveal phase until it has.
     recyclableStock: (state, move) => (move === 'draw' ? spentDiscard(state.round) : null),
+    spentStock: (state) => spentDiscard(state.round),
   }),
 
   poker: definePack<PokerState, PokerRules>({

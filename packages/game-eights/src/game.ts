@@ -17,6 +17,7 @@ import {
   type PhaseState,
   type RuleError,
   type SeatId,
+  recycleSpentPile,
 } from '@parlour/engine';
 import {
   EIGHTS_SUITS,
@@ -130,6 +131,15 @@ const draw: Move<EightsState> = {
         'the discard pile must be re-veiled before it becomes the stock',
       );
     }
+    // An exchange that no longer fits the pile — the board moved while its
+    // ceremony ran — is refused cleanly so the sender can cut a fresh one.
+    if (
+      ctx?.recycle &&
+      state.round.stock.length === 0 &&
+      recycleSpentPile(state.round.stock, state.round.discard, ctx.recycle) === null
+    ) {
+      return error('stale-recycle', 'the re-veiled exchange no longer matches the pile');
+    }
     return canDraw(state.round) || state.round.pendingDraw > 0
       ? true
       : error('nothing-to-draw', 'the stock and the pile are both spent');
@@ -147,6 +157,7 @@ const draw: Move<EightsState> = {
       stopWhen: forced ? undefined : (card) => canPlay(round, rules, card),
       // A pickup the seat did not choose is the one worth counting out loud.
       announce: forced ? 'penalty' : undefined,
+      recycle: ctx.recycle,
     });
     const cleared: EightsRound = { ...drawn, pendingDraw: 0, drawnCard: null };
     const taken =

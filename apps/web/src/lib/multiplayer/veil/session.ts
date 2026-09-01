@@ -285,6 +285,19 @@ export class VeilSession {
 
   /** Adopts a recycle declaration after its transcript signature was checked. */
   async acceptRecycle(entry: VeilRecycleEntry): Promise<void> {
+    // Re-adopting an epoch this seat already opened — its own broadcast come
+    // back through a catch-up, or a replayed entry — is a no-op, not a fork,
+    // as long as it describes the same cards.
+    const existing = this.epochs.get(entry.epoch);
+    if (existing) {
+      if (
+        existing.cards.length === entry.cards.length &&
+        existing.cards.every((card, index) => card === entry.cards[index])
+      ) {
+        return;
+      }
+      throw new Error(`deck epoch ${entry.epoch} already exists with different cards`);
+    }
     await this.beginEpoch(entry.epoch, entry.cards, entry.participants);
   }
 

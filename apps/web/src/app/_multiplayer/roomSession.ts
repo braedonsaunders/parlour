@@ -315,6 +315,30 @@ export class MultiplayerRoomSession {
   private readonly scheduledBotTurns = new Set<string>();
   /** self-openings already sent, keyed by seat and log position, so none fires twice */
   private readonly sentSelfOpens = new Set<string>();
+  /** the host's proactive re-veil in flight, so a send can await it, not race it */
+  private reveilInFlight: Promise<void> | null = null;
+  /**
+   * Every mid-round ceremony this client starts, one after another.
+   *
+   * The transcript is one sequential chain, so two ceremonies cascading at
+   * once interleave their entries differently on different peers and fork it
+   * for good. The proactive re-veil, a draw that could not wait for one, a
+   * bot seat's recycle and the primed next hand all pass through here.
+   */
+  private ceremonyChain: Promise<void> = Promise.resolve();
+
+  private queueCeremony<T>(job: () => Promise<T>): Promise<T> {
+    const run = this.ceremonyChain.then(job);
+    this.ceremonyChain = run.then(
+      () => undefined,
+      () => undefined,
+    );
+    return run;
+  }
+  /** epochs whose exchange already rode a logged move, so none is issued twice */
+  private readonly usedRecycleEpochs = new Set<number>();
+  /** how much of the log has been scanned for spent recycle exchanges */
+  private recycleScanCursor = 0;
   /** seats being held open for a player who dropped, keyed by seat */
   private readonly pendingReturns = new Map<number, ReturnType<typeof setTimeout>>();
   private snapshot: MultiplayerRoomSnapshot = {
@@ -1017,7 +1041,19 @@ export class MultiplayerRoomSession {
     cards: readonly string[],
   ): Promise<void> {
     try {
-      const recycle = await this.reveil(cards);
+      // Sent bare first, from a guest: on a spent stock the engine ALWAYS
+      // refuses this (that is the deterministic part), and the refusal is
+      // what tells the host a ceremony is owed — the one signal a seat whose
+      // turn is blocked can still produce. If the stock was refilled in the
+      // meantime the bare send simply IS the draw, and the wait below ends
+      // with nothing more to send.
+      if (!this.snapshot.isHost && !this.discoverRecycledEpoch(cards)) {
+        this.sendNow(move, payload, reveals);
+      }
+      const recycle = await this.obtainRecycle(cards, move);
+      // The pile this tap saw is gone — either the bare send above became the
+      // draw, or someone else's did. Sending again would draw twice.
+      if (recycle === null) return;
       if (this.snapshot.security.paused) throw new Error(this.snapshot.security.paused);
       this.sendNow(move, payload, reveals, recycle);
     } catch (error) {
@@ -1205,7 +1241,14 @@ export class MultiplayerRoomSession {
     return same ? primed.deck : null;
   }
 
-  private async shuffleNextHand(seats?: readonly number[]): Promise<readonly string[]> {
+  private shuffleNextHand(seats?: readonly number[]): Promise<readonly string[]> {
+    // Queued with every other mid-round ceremony: a primed next hand
+    // cascading while a stock re-veil runs would interleave their transcript
+    // entries differently on different peers, and the chain would fork.
+    return this.queueCeremony(() => this.shuffleNextHandNow(seats));
+  }
+
+  private async shuffleNextHandNow(seats?: readonly number[]): Promise<readonly string[]> {
     const veil = this.veil;
     const settings = this.snapshot.settings;
     if (!veil || !settings) throw new Error('this room is not running Veil');
@@ -1229,20 +1272,172 @@ export class MultiplayerRoomSession {
     return veil.session.redealPlan(epoch, support, opened).deckOrder;
   }
 
-  private async reveil(cards: readonly string[]): Promise<CardRecycle> {
-    const veil = this.veil;
-    if (!veil) throw new Error('this room is not running Veil');
-    const epoch = this.allocateEpoch();
-    const participants = this.ceremonySeats();
-    if (participants.length === 0) throw new Error('no connected seat can re-veil the stock');
-
-    await veil.room.startRecycle(epoch, cards, participants);
-    await waitForCeremony(veil.session, epoch, participants.length);
-    const issue = cards.map((_, position) => veil.session.handleFor(epoch, position));
-    if (issue.some((handle) => handle === null)) {
-      throw new Error('the recycled epoch did not issue every card handle');
+  /**
+   * The exchange a recycling move needs, without ever starting a second
+   * ceremony for the same pile.
+   *
+   * Ceremonies are serialized through the host, because two clients starting
+   * one each fork the transcript: both sign an entry for the same sequence,
+   * every peer accepts whichever landed first, and the loser's chain has
+   * diverged for good. The host therefore re-veils a spent stock the moment
+   * it appears ({@link maybeReveilSpentStock}) — usually before anyone draws,
+   * taking the ceremony off the draw's critical path — and every seat reads
+   * the finished epoch out of its own transcript. A guest only shuffles for
+   * itself against a host too old to prepare one.
+   */
+  private async obtainRecycle(cards: readonly string[], move: string): Promise<CardRecycle | null> {
+    // Always measured against the LIVE pile, never the one the tap saw: the
+    // table keeps playing while this waits, so the pile both grows (cards
+    // land on it — the host's ceremony may cover more than the tap's cut)
+    // and disappears (someone else's draw consumes the exchange and refills
+    // the stock, making this an ordinary draw that owes nothing).
+    const found = this.discoverRecycledEpoch(cards);
+    if (found) return found;
+    if (this.snapshot.isHost) {
+      // Whatever ceremony is running, let it land first — it is very likely
+      // the one this draw needs — then shuffle only if it was not.
+      await this.ceremonyChain;
+      const current = this.recyclableCards(move);
+      if (current === null) return null;
+      return this.discoverRecycledEpoch(current) ?? this.reveil(current);
     }
-    return { retire: [...cards], issue: issue as string[] };
+    // The host runs this ceremony; wait for its epoch instead of starting a
+    // rival one — a second cascade would interleave transcript entries
+    // differently on different peers and fork the chain for good. The
+    // ceremony is visible from here the moment its first entry lands, so
+    // patience scales with the evidence: as long as a matching epoch is
+    // cascading in the transcript, keep waiting for it; the shorter deadline
+    // is only for a host that shows no sign of shuffling at all — one too
+    // old to prepare, where saying so beats the fork self-shuffling caused.
+    const quiet = Date.now() + 8_000;
+    const cap = Date.now() + 25_000;
+    while (Date.now() < cap && !this.snapshot.security.paused) {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      const current = this.recyclableCards(move);
+      if (current === null) return null;
+      const arrived = this.discoverRecycledEpoch(current);
+      if (arrived) return arrived;
+      if (Date.now() >= quiet && !this.recycledEpochInFlight(current)) break;
+    }
+    if (this.recyclableCards(move) === null) return null;
+    // Ran dry: the host showed no ceremony in all that time — a device buried
+    // under load, or a build too old to prepare one. Give the tap up quietly,
+    // exactly like any other tap that raced the table and lost: the next one
+    // sends a fresh nudge, and a table that truly cannot move is reported by
+    // the pause machinery, not by a banner on a board that is still healthy.
+    console.warn('[veil] a re-veiled stock never arrived for a draw; the tap was dropped');
+    return null;
+  }
+
+  /**
+   * A closed, unspent recycle epoch whose cards all sit in this pile, as an
+   * exchange. Cards played after the ceremony was cut stay out of it — the
+   * engine leaves such stragglers face up for the next recycle.
+   */
+  private discoverRecycledEpoch(spent: readonly string[]): CardRecycle | null {
+    const veil = this.veil;
+    if (!veil || !this.authority) return null;
+    this.noteSpentRecycleEpochs();
+    const pile = new Set(spent);
+    for (const epoch of veil.session.liveEpochs()) {
+      if (this.usedRecycleEpochs.has(epoch)) continue;
+      const at = veil.session.epochAt(epoch);
+      // The opening deal covers the whole deck and can never fit inside a
+      // spent pile, so this naturally selects only recycle epochs.
+      if (!at || at.cards.length === 0 || at.cards.length > spent.length) continue;
+      if (!at.cards.every((card) => pile.has(card))) continue;
+      if (!veil.session.progress(epoch).ready) continue;
+      const issue = at.cards.map((_, position) => veil.session.handleFor(epoch, position));
+      if (issue.some((handle) => handle === null)) continue;
+      return { retire: [...at.cards], issue: issue as string[] };
+    }
+    return null;
+  }
+
+  /** A recycle ceremony for some of this pile is visibly still cascading. */
+  private recycledEpochInFlight(spent: readonly string[]): boolean {
+    const veil = this.veil;
+    if (!veil) return false;
+    const pile = new Set(spent);
+    return veil.session.liveEpochs().some((epoch) => {
+      if (this.usedRecycleEpochs.has(epoch)) return false;
+      const at = veil.session.epochAt(epoch);
+      if (!at || at.cards.length === 0 || at.cards.length > spent.length) return false;
+      if (!at.cards.every((card) => pile.has(card))) return false;
+      return !veil.session.progress(epoch).ready;
+    });
+  }
+
+  /**
+   * Marks epochs whose exchange has already ridden a logged move. An epoch's
+   * handles are one deck: issuing them twice would hand back cards that some
+   * seats have already read.
+   */
+  private noteSpentRecycleEpochs(): void {
+    const veil = this.veil;
+    const log = this.authority?.getSession().log;
+    if (!veil || !log) return;
+    // A rematch or a divergence snapshot replaces the log under the cursor;
+    // rescanning from the top is idempotent, so shrinkage just starts over.
+    if (this.recycleScanCursor > log.length) {
+      this.recycleScanCursor = 0;
+      this.usedRecycleEpochs.clear();
+    }
+    for (; this.recycleScanCursor < log.length; this.recycleScanCursor++) {
+      const issued = log[this.recycleScanCursor]?.recycle?.issue[0];
+      if (typeof issued !== 'string') continue;
+      const at = veil.session.positionFor(issued);
+      if (at) this.usedRecycleEpochs.add(at.epoch);
+    }
+  }
+
+  /**
+   * Host: re-veils a spent stock the moment the state shows one, while the
+   * table is still thinking — the same ahead-of-need shape as
+   * {@link primeNextHand}. By the time a draw actually needs the exchange,
+   * the epoch is usually already closed and waiting in the transcript.
+   */
+  private maybeReveilSpentStock(): void {
+    if (!this.snapshot.isHost || !this.veil || !this.authority || this.reveilInFlight) return;
+    if (this.snapshot.security.paused) return;
+    const settings = this.snapshot.settings;
+    if (!settings) return;
+    const session = this.authority.getSession();
+    if (session.status !== 'playing') return;
+    const cards = packFor(settings).spentStock(session.state);
+    if (!cards || cards.length === 0) return;
+    if (this.discoverRecycledEpoch(cards)) return;
+    this.reveilInFlight = this.reveil(cards)
+      .then(() => undefined)
+      .catch(() => {
+        // A ceremony can time out under load, and the table may be entirely
+        // blocked on this very draw — no packet is coming to re-trigger the
+        // poll. Try again shortly, for as long as a spent stock still needs it.
+        setTimeout(() => {
+          if (this.snapshot.connection !== 'closed') this.maybeReveilSpentStock();
+        }, 500);
+      })
+      .finally(() => {
+        this.reveilInFlight = null;
+      });
+  }
+
+  private reveil(cards: readonly string[]): Promise<CardRecycle> {
+    return this.queueCeremony(async () => {
+      const veil = this.veil;
+      if (!veil) throw new Error('this room is not running Veil');
+      const epoch = this.allocateEpoch();
+      const participants = this.ceremonySeats();
+      if (participants.length === 0) throw new Error('no connected seat can re-veil the stock');
+
+      await veil.room.startRecycle(epoch, cards, participants);
+      await waitForCeremony(veil.session, epoch, participants.length);
+      const issue = cards.map((_, position) => veil.session.handleFor(epoch, position));
+      if (issue.some((handle) => handle === null)) {
+        throw new Error('the recycled epoch did not issue every card handle');
+      }
+      return { retire: [...cards], issue: issue as string[] };
+    });
   }
 
   /**
@@ -1319,7 +1514,16 @@ export class MultiplayerRoomSession {
         const at = veil.session.positionFor(handle);
         if (!at) return;
         try {
-          await veil.room.open(at.epoch, at.position, 'private');
+          try {
+            await veil.room.open(at.epoch, at.position, 'private');
+          } catch (first) {
+            // A decode that comes up empty can be a genuinely dishonest share
+            // — or one chain crossed by the churn of a busy table. Run it once
+            // more before accusing anybody: a race heals, a cheat repeats.
+            if (!(first instanceof Error) || !/not-a-card/.test(first.message)) throw first;
+            console.warn(`[veil] re-running a peel that did not decode (${handle})`, first.message);
+            await veil.room.open(at.epoch, at.position, 'private');
+          }
           this.refreshView();
         } catch (error) {
           if (this.snapshot.session?.result) return;
@@ -1577,7 +1781,9 @@ export class MultiplayerRoomSession {
     if (!session || session.status !== 'playing' || !isActingSeat(session.phase, seat)) return;
     try {
       const recyclable = this.recyclableCards(move.id);
-      const recycle = recyclable ? await this.reveil(recyclable) : undefined;
+      const recycle = recyclable
+        ? ((await this.obtainRecycle(recyclable, move.id)) ?? undefined)
+        : undefined;
       session = this.authority?.getSession();
       if (
         !session ||
@@ -1817,6 +2023,10 @@ export class MultiplayerRoomSession {
     });
     this.transport.onEvent((packet) => this.accept(packet));
     this.transport.onPresence((presence) => this.acceptPresence(presence));
+    // A guest blocked on a spent stock can only say so by sending the draw
+    // bare and being refused; the refusal is this room's cue to shuffle. Any
+    // other refusal re-polls harmlessly — the method checks the actual state.
+    this.transport.onRefusal(() => this.maybeReveilSpentStock());
     this.transport.onDeal((seat, message) => {
       if (message.type === 'deal.commit') {
         this.dealRound.recordCommitment(seat, message.commit);
@@ -1892,6 +2102,7 @@ export class MultiplayerRoomSession {
     this.maybeOpenVeiledCards();
     this.maybeAutoDeclineJump();
     this.maybeOpenOwnReveals();
+    this.maybeReveilSpentStock();
   }
 
   private acceptPresence(presence: PresenceEvent): void {

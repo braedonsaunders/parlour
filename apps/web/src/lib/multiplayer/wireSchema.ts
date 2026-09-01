@@ -105,6 +105,18 @@ function isBoundedInteger(value: unknown, maximum: number): value is number {
   return isNonNegativeInteger(value) && value <= maximum;
 }
 
+/**
+ * Fx offsets are milliseconds along an animation timeline and are fractional
+ * by construction — a colour dump spaces thirteen cards across 650 ms, a
+ * ten-card pickup divides its span by the count. Requiring an integer here
+ * made every such packet "malformed": the receiving peer dropped the whole
+ * applied move, bannered the error, and limped behind until a resync. The
+ * bound is what matters; the decimals are the animation's business.
+ */
+function isBoundedFiniteNumber(value: unknown, maximum: number): value is number {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= maximum;
+}
+
 function isSeat(value: unknown): value is SeatId {
   return isNonNegativeInteger(value) && value < MAX_SEATS;
 }
@@ -294,7 +306,7 @@ function isFxEvent(value: unknown): value is FxEvent {
     hasOnlyKeys(value, ['kind'], ['payload', 'at']) &&
     isBoundedString(value.kind, MAX_LABEL_LENGTH) &&
     (!Object.hasOwn(value, 'payload') || isJsonValue(value.payload)) &&
-    (!Object.hasOwn(value, 'at') || isBoundedInteger(value.at, MAX_FX_OFFSET))
+    (!Object.hasOwn(value, 'at') || isBoundedFiniteNumber(value.at, MAX_FX_OFFSET))
   );
 }
 

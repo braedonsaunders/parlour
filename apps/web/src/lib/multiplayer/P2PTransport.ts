@@ -97,6 +97,7 @@ export class P2PTransport implements Transport {
   private readonly veilListeners = new Set<(peerId: string, message: VeilMessage) => void>();
   private readonly dealListeners = new Set<(seat: SeatId, message: DealMessage) => void>();
   private readonly rematchListeners = new Set<(seat: SeatId) => void>();
+  private readonly refusalListeners = new Set<(action: PlayerAction, code: string) => void>();
   private readonly lastReceivedEmote = new Map<string, number>();
   /** Redials spent on a peer since it last held an open channel. */
   private readonly redials = new Map<string, number>();
@@ -272,6 +273,21 @@ export class P2PTransport implements Transport {
   onVeil(callback: (peerId: string, message: VeilMessage) => void): () => void {
     this.veilListeners.add(callback);
     return () => this.veilListeners.delete(callback);
+  }
+
+  /**
+   * Host-only signal: the engine said no to a player action.
+   *
+   * Refusals are ordinarily silent — a tap that raced the position and lost.
+   * But some refusals are also a REQUEST the room should hear: a veiled draw
+   * refused for want of a re-veiled stock is a seat saying "I need the
+   * ceremony you have not run yet", and it may be the only message that seat
+   * can produce while it is blocked. The room listens and answers; nothing
+   * here reaches the screen.
+   */
+  onRefusal(callback: (action: PlayerAction, code: string) => void): () => void {
+    this.refusalListeners.add(callback);
+    return () => this.refusalListeners.delete(callback);
   }
 
   /** Broadcasts this seat's shuffle commitment or the share behind it. */
@@ -799,7 +815,10 @@ export class P2PTransport implements Transport {
       // own screen already swallows the local version of this, and a guest's
       // late tap must not paint an error across the HOST's table. The board
       // every peer renders is still the authoritative one; nothing is lost.
-      if (error instanceof MoveRefusedError) return;
+      if (error instanceof MoveRefusedError) {
+        for (const listener of this.refusalListeners) listener(action, error.code);
+        return;
+      }
       this.emitPresence({
         kind: 'error',
         message: error instanceof Error ? error.message : 'Action rejected',

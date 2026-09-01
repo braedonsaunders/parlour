@@ -1,4 +1,4 @@
-import type { RuleValues } from '@parlour/engine';
+import type { AppliedEvent, RuleValues } from '@parlour/engine';
 import { isSeatLeftFault } from '@/lib/multiplayer/veil';
 import {
   MultiplayerRoomSession,
@@ -25,6 +25,8 @@ import { DuelNet, type LatencyProfile } from './netsim';
 export type DuelFaultKind =
   /** the guest's device dies mid-match: links go silent, heartbeats time out */
   | 'guest-crash'
+  /** the HOST's device dies mid-match: the guest must inherit the table */
+  | 'host-crash'
   /** the guest quits cleanly, then a new session rejoins the same seat */
   | 'guest-quit-rejoin';
 
@@ -44,6 +46,8 @@ export interface DuelOptions {
   dataLatency?: LatencyProfile;
   /** actor think time between actions — small, because these games are fast */
   paceMs?: LatencyProfile;
+  /** override the guest's pace alone — a slow phone against a fast one */
+  guestPaceMs?: LatencyProfile;
   fault?: DuelFault;
   /** wall-clock budget for the whole duel */
   maxMs?: number;
@@ -69,6 +73,10 @@ export interface DuelReport {
   staleTaps: number;
   /** the stall diagnostic, when outcome is 'stalled' */
   diagnostic?: string;
+  /** the survivor's full applied log, for game-specific coverage analysis */
+  finalLog: readonly AppliedEvent[];
+  /** applied moves by id — what this duel actually exercised */
+  moveTally: Record<string, number>;
 }
 
 const DEFAULT_PACE: LatencyProfile = { minMs: 5, maxMs: 30 };
@@ -150,8 +158,13 @@ export async function runDuel(options: DuelOptions): Promise<DuelReport> {
         signaling: net.signaling(label(side)),
         peerConnection: net.rtcFactory(label(side)),
         seed: options.seed * 7919 + seat,
-        heartbeatIntervalMs: 40,
-        heartbeatTimeoutMs: 400,
+        // Kept near production shape (1s/3.5s), only mildly tightened: the
+        // ceremony's SRA math runs IN-THREAD here (jsdom has no Worker) and a
+        // big recycle blocks the loop for whole seconds — a hair-trigger
+        // timeout reads that as a drop and tramples the very ceremony under
+        // test with recovery it never needed.
+        heartbeatIntervalMs: 150,
+        heartbeatTimeoutMs: 2_500,
         reconnectGraceMs: options.reconnectGraceMs ?? 1_500,
       },
     );
@@ -161,6 +174,10 @@ export async function runDuel(options: DuelOptions): Promise<DuelReport> {
 
   const host = makeSession('host', 0);
   let guest = makeSession('guest', 1);
+  /** which device died mid-duel, when a fault says one does */
+  let gone: 'host' | 'guest' | null = null;
+  const survivorPlies = () =>
+    (gone === 'host' ? guest : host).getSnapshot().session?.log.length ?? 0;
 
   const finish = (
     outcome: DuelReport['outcome'],
@@ -169,16 +186,21 @@ export async function runDuel(options: DuelOptions): Promise<DuelReport> {
   ): DuelReport => {
     for (const session of sessions) session.close();
     violations.push(...report.errors.map((error) => `actor: ${error}`));
+    const finalLog = (gone === 'host' ? guest : host).getSnapshot().session?.log ?? [];
+    const moveTally: Record<string, number> = {};
+    for (const event of finalLog) moveTally[event.move] = (moveTally[event.move] ?? 0) + 1;
     return {
       gameId: options.gameId,
       seed: options.seed,
       outcome,
-      plies: host.getSnapshot().session?.log.length ?? 0,
+      plies: survivorPlies(),
       durationMs: Date.now() - started,
       violations,
       clockRescues: clock.rescues,
       staleTaps: report.staleTaps,
       ...(diagnostic ? { diagnostic } : {}),
+      finalLog,
+      moveTally,
     };
   };
 
@@ -219,15 +241,19 @@ export async function runDuel(options: DuelOptions): Promise<DuelReport> {
   // -------------------------------------------------------------------------
   // Play loop: both seats act on their own snapshots at their own pace.
   // -------------------------------------------------------------------------
-  const drawPace = () => pace.minMs + net.rng.float() * Math.max(0, pace.maxMs - pace.minMs);
   const nextActAt = new Map<MultiplayerRoomSession, number>();
   let faultFired = false;
-  let guestGone = false;
   let rejoinAt: number | null = null;
   let lastSignature = '';
   let lastProgressAt = Date.now();
 
-  const livePeers = () => (guestGone ? [host] : [host, guest]);
+  const livePeers = () => {
+    if (gone === 'host') return [guest];
+    if (gone === 'guest') return [host];
+    return [host, guest];
+  };
+  /** The peer whose story the report judges — whoever is still alive to tell it. */
+  const survivor = () => (gone === 'host' ? guest : host);
 
   while (Date.now() - started < maxMs) {
     const now = Date.now();
@@ -236,10 +262,14 @@ export async function runDuel(options: DuelOptions): Promise<DuelReport> {
     const fault = options.fault;
     if (fault && !faultFired && (host.getSnapshot().session?.log.length ?? 0) >= fault.afterPlies) {
       faultFired = true;
-      guestGone = true;
       if (fault.kind === 'guest-crash') {
+        gone = 'guest';
         net.crash(label('guest'));
+      } else if (fault.kind === 'host-crash') {
+        gone = 'host';
+        net.crash(label('host'));
       } else {
+        gone = 'guest';
         guest.close();
         rejoinAt = now + (fault.awayMs ?? 500);
       }
@@ -251,21 +281,28 @@ export async function runDuel(options: DuelOptions): Promise<DuelReport> {
       guest = makeSession('guest', 1);
       try {
         await guest.join(host.getSnapshot().room!.code);
-        guestGone = false;
+        gone = null;
       } catch (error) {
         violations.push(`rejoin: ${error instanceof Error ? error.message : String(error)}`);
       }
     }
 
-    // Wild's host-side clocks.
-    if (options.gameId === 'wildpile') clock.step(host, now);
+    // Wild's host-side clocks — stepped for every live peer, because after a
+    // host migration the surviving guest IS the host (the actor checks).
+    if (options.gameId === 'wildpile') {
+      for (const peer of livePeers()) clock.step(peer, now);
+    }
 
     // Actors.
     for (const peer of livePeers()) {
       const due = nextActAt.get(peer) ?? 0;
       if (now < due) continue;
       stepActor(peer, options.gameId, net.rng, report, options.chaos ?? 0.15);
-      nextActAt.set(peer, now + drawPace());
+      const peerPace = peer === guest && options.guestPaceMs ? options.guestPaceMs : pace;
+      nextActAt.set(
+        peer,
+        now + peerPace.minMs + net.rng.float() * Math.max(0, peerPace.maxMs - peerPace.minMs),
+      );
     }
 
     // A player-visible error is a finding the moment it appears.
@@ -281,10 +318,7 @@ export async function runDuel(options: DuelOptions): Promise<DuelReport> {
     }
 
     // Done?
-    const hostSession = host.getSnapshot().session;
-    const hostDone = hostSession?.status === 'ended';
-    const guestDone = guestGone || guest.getSnapshot().session?.status === 'ended';
-    if (hostDone && guestDone) break;
+    if (livePeers().every((peer) => peer.getSnapshot().session?.status === 'ended')) break;
 
     // Stalled?
     const signature = progressSignature(livePeers());
@@ -294,8 +328,8 @@ export async function runDuel(options: DuelOptions): Promise<DuelReport> {
     } else if (now - lastProgressAt > stallMs) {
       const diagnostic = [
         `stalled after ${now - lastProgressAt} ms without progress; in-flight=${net.inFlight()}`,
-        describePeer('host', host.getSnapshot()),
-        ...(guestGone ? [] : [describePeer('guest', guest.getSnapshot())]),
+        ...(gone === 'host' ? [] : [describePeer('host', host.getSnapshot())]),
+        ...(gone === 'guest' ? [] : [describePeer('guest', guest.getSnapshot())]),
       ].join('\n');
       violations.push('the table wedged: no progress while a game was live');
       return finish('stalled', clock, diagnostic);
@@ -304,14 +338,14 @@ export async function runDuel(options: DuelOptions): Promise<DuelReport> {
     await sleep(4);
   }
 
-  if (host.getSnapshot().session?.status !== 'ended') {
+  if (survivor().getSnapshot().session?.status !== 'ended') {
     violations.push('the duel ran out its wall-clock budget before the game ended');
     return finish(
       'budget-exhausted',
       clock,
       [
-        describePeer('host', host.getSnapshot()),
-        ...(guestGone ? [] : [describePeer('guest', guest.getSnapshot())]),
+        ...(gone === 'host' ? [] : [describePeer('host', host.getSnapshot())]),
+        ...(gone === 'guest' ? [] : [describePeer('guest', guest.getSnapshot())]),
       ].join('\n'),
     );
   }
@@ -319,10 +353,10 @@ export async function runDuel(options: DuelOptions): Promise<DuelReport> {
   // -------------------------------------------------------------------------
   // Endgame invariants.
   // -------------------------------------------------------------------------
-  const hostFinal = multiplayerSession<unknown, never>(host.getSnapshot(), options.gameId);
-  const walkover = hostFinal?.result?.reason === 'opponent-left';
+  const judged = multiplayerSession<unknown, never>(survivor().getSnapshot(), options.gameId);
+  const walkover = judged?.result?.reason === 'opponent-left';
 
-  if (!guestGone) {
+  if (gone === null) {
     try {
       await eventually(() => {
         const left = multiplayerSession<unknown, never>(host.getSnapshot(), options.gameId);
@@ -349,13 +383,16 @@ export async function runDuel(options: DuelOptions): Promise<DuelReport> {
         `convergence: ${error instanceof Error ? error.message : String(error)}\n${describePeer('host', host.getSnapshot())}\n${describePeer('guest', guest.getSnapshot())}`,
       );
     }
-  } else if (options.fault?.kind === 'guest-crash' && !walkover) {
+  } else if (
+    (options.fault?.kind === 'guest-crash' || options.fault?.kind === 'host-crash') &&
+    !walkover
+  ) {
     violations.push(
-      `a two-seat table lost its opponent but did not award the walkover: result=${JSON.stringify(hostFinal?.result)} paused=${JSON.stringify(host.getSnapshot().security.paused)}`,
+      `a two-seat table lost its opponent but did not award the walkover: result=${JSON.stringify(judged?.result)} paused=${JSON.stringify(survivor().getSnapshot().security.paused)}`,
     );
   }
 
-  for (const peer of guestGone ? [host] : [host, guest]) {
+  for (const peer of livePeers()) {
     const error = visibleError(peer.getSnapshot());
     if (error) violations.push(`ended with a player-visible error: ${error}`);
     if (peer.getSnapshot().security.paused) {

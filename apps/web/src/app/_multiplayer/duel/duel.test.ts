@@ -73,6 +73,28 @@ describe('fast two-player veiled duels', () => {
     expect(report.outcome).toBe('walkover');
   }, 150_000);
 
+  it('hands the table to the guest and awards the walkover when the HOST dies', async () => {
+    const report = await runDuel({
+      gameId: 'blitz',
+      seed: 606,
+      config: BLITZ_CONFIG,
+      fault: { kind: 'host-crash', afterPlies: 4 },
+    });
+    expectClean(report);
+    expect(report.outcome).toBe('walkover');
+  }, 150_000);
+
+  it('hands a Wild table to the guest when the HOST dies mid-match', async () => {
+    const report = await runDuel({
+      gameId: 'wildpile',
+      seed: 707,
+      config: WILD_CONFIG,
+      fault: { kind: 'host-crash', afterPlies: 6 },
+    });
+    expectClean(report);
+    expect(report.outcome).toBe('walkover');
+  }, 150_000);
+
   it('holds the seat for a Blitz player who quits and rejoins, then finishes', async () => {
     const report = await runDuel({
       gameId: 'blitz',

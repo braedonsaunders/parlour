@@ -3,8 +3,10 @@ import {
   Fx,
   addTo,
   drawFrom,
+  recycleSpentPile,
   shuffledIds,
   type CardId,
+  type CardRecycle,
   type FxEmitter,
   type Rng,
   type SeatId,
@@ -190,11 +192,27 @@ export interface EightsDrawOptions {
   stopWhen?: (card: CardId) => boolean;
   /** Announces the pickup as a single countable event. */
   announce?: EightsPickupReason;
+  /** The re-veiled exchange a veiled round hands the first replenish. */
+  recycle?: CardRecycle;
 }
 
 /** Turns the spent discard back into a stock, keeping the face-up card in place. */
-export function replenish(round: EightsRound, fx: FxEmitter, rng: Rng): EightsRound {
+export function replenish(
+  round: EightsRound,
+  fx: FxEmitter,
+  rng: Rng,
+  recycle?: CardRecycle,
+): EightsRound {
   if (round.stock.length > 0 || round.discard.length <= 1) return round;
+  // A re-veiled exchange swaps exactly the cards its ceremony covered; cards
+  // played after the cut stay face up for the next recycle to sweep.
+  if (recycle) {
+    const swapped = recycleSpentPile(round.stock, round.discard, recycle);
+    if (swapped) {
+      fx.emit(Fx.ShuffleStock, {});
+      return { ...round, ...swapped };
+    }
+  }
   const [top, ...recyclable] = round.discard;
   // Every card in a spent discard is face up. Shuffling those into a stock with
   // the session rng makes the rest of the deal readable by the whole table, so
@@ -220,7 +238,7 @@ export function drawCards(
   let next = round;
   const drawn: CardId[] = [];
   while (drawn.length < count) {
-    next = replenish(next, fx, rng);
+    next = replenish(next, fx, rng, options.recycle);
     if (next.stock.length === 0) break;
     const take = drawFrom(next.stock, 1);
     const card = take.drawn[0];

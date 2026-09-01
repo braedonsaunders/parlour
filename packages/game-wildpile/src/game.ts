@@ -21,6 +21,7 @@ import {
   type PhaseState,
   type RuleError,
   type SeatId,
+  recycleSpentPile,
 } from '@parlour/engine';
 import { wildpileHowToPlay } from './howto';
 import {
@@ -717,11 +718,24 @@ const playCard: Move<WildpileState> = {
 
 function replenish(state: WildpileState, ctx: MoveCtx): WildpileState {
   if (state.stock.length > 0 || state.discard.length <= 1) return state;
+  // A re-veiled exchange swaps exactly the cards its ceremony covered; cards
+  // played after the cut stay face up on the discard for the next recycle.
+  if (ctx.recycle) {
+    const swapped = recycleSpentPile(state.stock, state.discard, ctx.recycle);
+    if (swapped) {
+      ctx.fx.emit(Fx.ShuffleStock, {});
+      return { ...state, ...swapped };
+    }
+  }
+  // A veiled pile must never be shuffled by the session rng — that would put
+  // face-up cards into a stock the table believes is hidden. With no usable
+  // exchange the pile simply stays down and the draw comes up empty.
   const [top, ...recyclable] = state.discard;
+  if (state.veiled && recyclable.some(isRealCard)) return state;
   ctx.fx.emit(Fx.ShuffleStock, {});
   return {
     ...state,
-    stock: ctx.recycle ? [...ctx.recycle.issue] : ctx.rng.shuffle(recyclable),
+    stock: ctx.rng.shuffle(recyclable),
     discard: top ? [top] : [],
   };
 }
@@ -812,6 +826,11 @@ const draw: Move<WildpileState> = {
         'stock-not-reveiled',
         'the discard pile must be re-veiled before it becomes the stock',
       );
+    }
+    // An exchange that no longer fits the pile — the board moved while its
+    // ceremony ran — is refused cleanly so the sender can cut a fresh one.
+    if (ctx?.recycle && recycleSpentPile(state.stock, state.discard, ctx.recycle) === null) {
+      return error('stale-recycle', 'the re-veiled exchange no longer matches the pile');
     }
     return state.turn === seat ? true : error('not-your-turn', 'seat is not taking this turn');
   },

@@ -255,6 +255,37 @@ export function validateRecycle(
 }
 
 /**
+ * Applies a recycle exchange to a spent draw pile, preserving stragglers.
+ *
+ * The exchange was cut when the ceremony started, and the table kept playing
+ * while it ran: cards landed on the discard AFTER the cut, so the pile the
+ * exchange arrives at is usually a superset of the one it was made for. Those
+ * stragglers are already public — hiding them was never possible, the epoch
+ * does not cover them — so they simply stay on the discard, face up, for the
+ * NEXT recycle to sweep. What the exchange does cover is swapped exactly:
+ * every retired card leaves the pile, the issued handles become the stock.
+ *
+ * Returns null when the exchange cannot apply — a retired card is not in the
+ * spent pile (it moved to a hand through some later play) or the stock is not
+ * actually empty. The caller should refuse the move cleanly rather than throw.
+ */
+export function recycleSpentPile(
+  stock: readonly CardId[],
+  discard: readonly CardId[],
+  recycle: CardRecycle,
+): { stock: CardId[]; discard: CardId[] } | null {
+  if (stock.length > 0 || discard.length <= 1) return null;
+  const [top, ...spent] = discard;
+  const retired = new Set(recycle.retire);
+  if (recycle.retire.some((card) => !spent.includes(card))) return null;
+  const stragglers = spent.filter((card) => !retired.has(card));
+  return {
+    stock: [...recycle.issue],
+    discard: top === undefined ? [...stragglers] : [top, ...stragglers],
+  };
+}
+
+/**
  * Conservation check run *after* the move placed the handles. A reducer that
  * left a retired card on the table, or dropped an issued handle, has silently
  * changed the deck — better to fail loudly than to play on with a board the

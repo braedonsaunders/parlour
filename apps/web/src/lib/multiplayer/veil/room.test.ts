@@ -297,14 +297,21 @@ describe('the mesh rejects bad traffic', () => {
     ).rejects.toThrow(/different game/);
   });
 
-  it('will not accept a ceremony entry that breaks the chain', async () => {
+  it('shrugs off a replayed entry, but refuses one that contradicts the head', async () => {
     const mesh = new Mesh(2);
     await mesh.openRound();
     await mesh.rooms[0]!.advanceCeremony();
     await mesh.settle();
-    const entry = mesh.sessions[0]!.transcriptRef()!.all()[0]!;
-    await expect(mesh.rooms[1]!.receive('peer:0', { type: 'veil.entry', entry })).rejects.toThrow(
-      /transcript rejected/,
-    );
+    // A duplicate of an entry already in the chain is ordinary traffic — a
+    // peer replaying after a reconnect — and must not read as a fork.
+    const accepted = mesh.sessions[1]!.transcriptRef()!.all().length;
+    const replayed = mesh.sessions[0]!.transcriptRef()!.all()[0]!;
+    await mesh.rooms[1]!.receive('peer:0', { type: 'veil.entry', entry: replayed });
+    expect(mesh.sessions[1]!.transcriptRef()!.all()).toHaveLength(accepted);
+    // An entry AT the head that does not extend it is a real fork: refused.
+    const forged = { ...replayed, seq: accepted, previous: 'f'.repeat(64) };
+    await expect(
+      mesh.rooms[1]!.receive('peer:0', { type: 'veil.entry', entry: forged }),
+    ).rejects.toThrow(/transcript rejected/);
   });
 });

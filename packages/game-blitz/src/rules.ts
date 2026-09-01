@@ -16,6 +16,7 @@ import {
   type MoveCtx,
   type PhaseState,
   type SeatId,
+  recycleSpentPile,
 } from '@parlour/engine';
 import { blitzHowToPlay } from './howto';
 import { blitzConfigSchema, outSeatsFromMask, type BlitzConfig } from './config';
@@ -88,12 +89,25 @@ function discardable(state: BlitzState, seat: SeatId, card: CardId): boolean {
 }
 
 function reshuffleStock(state: BlitzState, ctx: MoveCtx): BlitzState {
+  // A re-veiled exchange swaps exactly the cards its ceremony covered; cards
+  // discarded after the cut stay face up for the next recycle to sweep.
+  if (ctx.recycle) {
+    const swapped = recycleSpentPile(state.stock, state.discard, ctx.recycle);
+    if (swapped) {
+      ctx.fx.emit(Fx.ShuffleStock, { cards: swapped.stock.length });
+      return { ...state, ...swapped };
+    }
+  }
   const kept = state.discard.slice(1);
   const flipped = state.discard[0] as CardId;
+  // A veiled pile is never shuffled by the session rng — face-up cards would
+  // enter a stock the table believes is hidden. The validate gate keeps a
+  // veiled round from reaching here without a usable exchange.
+  if (state.veiled && kept.some(isRealCard)) return state;
   ctx.fx.emit(Fx.ShuffleStock, { cards: kept.length });
   return {
     ...state,
-    stock: ctx.recycle ? [...ctx.recycle.issue] : ctx.rng.shuffle(kept),
+    stock: ctx.rng.shuffle(kept),
     discard: [flipped],
   };
 }
@@ -121,6 +135,18 @@ const drawStock: Move<BlitzState> = {
       return {
         code: 'stock-not-reveiled',
         message: 'the discard pile must be re-veiled before it becomes the stock',
+      };
+    }
+    // An exchange that no longer fits the pile — the board moved while its
+    // ceremony ran — is refused cleanly so the sender can cut a fresh one.
+    if (
+      ctx?.recycle &&
+      state.stock.length === 0 &&
+      recycleSpentPile(state.stock, state.discard, ctx.recycle) === null
+    ) {
+      return {
+        code: 'stale-recycle',
+        message: 'the re-veiled exchange no longer matches the pile',
       };
     }
     return true;
