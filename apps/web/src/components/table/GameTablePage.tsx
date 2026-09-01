@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useRef, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import type { FxEvent, GameSession, RuleValues } from '@parlour/engine';
 import { useWipeRouter } from '@/hooks/useWipeRouter';
 import { holdFxForCountdown } from '@/lib/table/opening-countdown';
@@ -267,14 +267,15 @@ function RoomTablePage<TSnapshot, TDispatch, TTransport, S, C extends RuleValues
 
   // The burst on screen when this device first seats is the opening deal, and
   // it waits for the table's 3·2·1; every later burst (moves, rematches whose
-  // frame is already mounted) plays live.
-  const openingFxKey = useRef<number | null>(null);
-  if (openingFxKey.current === null && session && localSeat !== null) {
-    openingFxKey.current = snapshot.fxKey;
+  // frame is already mounted) plays live. Captured with the adjust-state-
+  // during-render pattern — the guarded set re-renders before anything paints.
+  const [openingFxKey, setOpeningFxKey] = useState<number | null>(null);
+  if (openingFxKey === null && session && localSeat !== null) {
+    setOpeningFxKey(snapshot.fxKey);
   }
   const fx = useMemo(
-    () => (snapshot.fxKey === openingFxKey.current ? holdFxForCountdown(snapshot.fx) : snapshot.fx),
-    [snapshot.fx, snapshot.fxKey],
+    () => (snapshot.fxKey === openingFxKey ? holdFxForCountdown(snapshot.fx) : snapshot.fx),
+    [snapshot.fx, snapshot.fxKey, openingFxKey],
   );
 
   const ctx: RoomTableContext<S, C> | null =
