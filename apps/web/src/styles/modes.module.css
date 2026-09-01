@@ -576,11 +576,32 @@
     scroll-padding-block: 0.5rem;
   }
 
+  /* Half-height tiles: two modes visible at once, the pick obvious at a
+     glance, the selected one glowing mid-column via the centering hook. */
   .fitCarousel > * {
     flex: none;
     width: min(21rem, 100%);
-    height: 100%;
+    height: 52%;
     max-height: none;
+  }
+
+  .fitCarousel .description {
+    display: none;
+  }
+
+  .fitCarousel .preview {
+    margin-bottom: 0.5rem;
+  }
+
+  /* The lift-and-scale reads as a glow ring here; keep the lift out of a
+     vertical stack where it collides with the neighbour above, and let the
+     ring burn brighter than the desktop hover language needs to. */
+  .fitCarousel .tile[data-selected='true'] {
+    transform: scale(1.02);
+    border-color: var(--tile-accent, var(--hearth-core));
+    box-shadow:
+      0 0 0 2px var(--tile-accent, var(--hearth-core)),
+      0 0 34px -4px var(--tile-accent, var(--hearth-core));
   }
 
   /* Aligned to the top rather than centred: a centred flex column that
