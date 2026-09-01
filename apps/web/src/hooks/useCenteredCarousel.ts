@@ -10,7 +10,9 @@ export function centerSelectedCarouselItem(carousel: HTMLElement, behavior: Scro
   const selectedRect = selected.getBoundingClientRect();
   // The same carousel scrolls sideways in portrait and vertically on a short
   // landscape phone; center on whichever axis actually overflows.
-  if (carousel.scrollHeight - carousel.clientHeight > carousel.scrollWidth - carousel.clientWidth) {
+  const verticalOverflow = Math.max(0, carousel.scrollHeight - carousel.clientHeight);
+  const horizontalOverflow = Math.max(0, carousel.scrollWidth - carousel.clientWidth);
+  if (verticalOverflow > horizontalOverflow) {
     const selectedMiddle =
       selectedRect.top - carouselRect.top + carousel.scrollTop + selectedRect.height / 2;
     carousel.scrollTo({ top: selectedMiddle - carousel.clientHeight / 2, behavior });
