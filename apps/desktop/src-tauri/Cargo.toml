@@ -1,6 +1,6 @@
 [package]
 name = "parlour-desktop"
-version = "0.4.0"
+version = "0.5.0"
 description = "Native desktop shell for Parlour"
 authors = ["Braedon Saunders"]
 edition = "2021"
