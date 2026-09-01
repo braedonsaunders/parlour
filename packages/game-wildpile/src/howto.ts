@@ -36,7 +36,7 @@ export const wildpileHowToPlay: HowToPlayDoc = {
     {
       heading: 'Last card',
       body: [
-        'Down to two cards? Hit "Last card!" before you play. Reach one card without calling it and you are caught for two.',
+        'Down to two cards? Hit "Last card!" before you play. Reach one card without calling it and anyone at the table can catch you for two — until the next play lands, or you call it first.',
         'Drawing puts you back above the line, so the call has to be made again.',
       ],
     },

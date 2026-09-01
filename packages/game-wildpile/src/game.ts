@@ -114,6 +114,13 @@ export interface WildpileState {
    * down to one without it costs {@link LAST_CARD_PENALTY}; drawing disarms it.
    */
   calledLastCard: boolean[];
+  /**
+   * Seat that reached one card without calling it — exposed, but only until
+   * someone notices. Any other seat may `catchLastCard` for the penalty; the
+   * exposed seat may still save themself with a late call. The window closes
+   * quietly when the table's next play, draw, or pass lands.
+   */
+  catchable: SeatId | null;
   winner: SeatId | null;
   /** Filled only by the replay-logged match clock expiry. */
   timeoutRankings: SeatId[] | null;
@@ -475,19 +482,37 @@ function exactJumpCards(state: WildpileState, seat: SeatId): CardId[] {
   return hand(state, seat).filter((card) => sameWildpileFace(card, target));
 }
 
+/**
+ * An open catch window makes the whole table acting seats — primary actor
+ * first, so every driver that takes "the" actor keeps taking the same one.
+ */
+function withCatchWindow(
+  state: WildpileState,
+  phase: { phase: string; actor: SeatId | null; round: number },
+) {
+  if (state.catchable === null || phase.actor === null) return phase;
+  const actors = [phase.actor];
+  for (let seatIndex = 0; seatIndex < state.seats; seatIndex += 1) {
+    if (seatIndex !== phase.actor) actors.push(seatIndex);
+  }
+  return { ...phase, actors };
+}
+
 function phaseFor(state: WildpileState) {
   if (state.winner !== null || state.timeoutRankings !== null) {
     return { phase: 'ended', actor: null, round: 1 };
   }
   if (state.awaitingColor !== null) {
-    return { phase: 'choose-color', actor: state.awaitingColor, round: 1 };
+    return withCatchWindow(state, { phase: 'choose-color', actor: state.awaitingColor, round: 1 });
   }
   if (state.awaitingSwap !== null) {
-    return { phase: 'choose-target', actor: state.awaitingSwap, round: 1 };
+    return withCatchWindow(state, { phase: 'choose-target', actor: state.awaitingSwap, round: 1 });
   }
   const interrupter = state.interrupt?.candidates[0];
-  if (interrupter !== undefined) return { phase: 'interrupt', actor: interrupter, round: 1 };
-  return { phase: 'play', actor: state.turn, round: 1 };
+  if (interrupter !== undefined) {
+    return withCatchWindow(state, { phase: 'interrupt', actor: interrupter, round: 1 });
+  }
+  return withCatchWindow(state, { phase: 'play', actor: state.turn, round: 1 });
 }
 
 /**
@@ -628,17 +653,11 @@ function playResolved(
     challenge: null,
     calledLastCard: state.calledLastCard.map((armed, index) => (index === seat ? false : armed)),
     winner: hands[seat]?.length === 0 ? seat : null,
+    // Reaching one card unprotected is no longer punished by the table itself:
+    // it quietly opens a window, and it costs two only if a *player* calls it.
+    // Any previous window dies with this play — the moment has passed.
+    catchable: reachedLastCard && !protectedSeat ? seat : null,
   };
-
-  // Caught short: reaching one card unprotected costs two, before anything else
-  // reads the hand (so jump-in candidacy and card counts stay consistent).
-  if (reachedLastCard && !protectedSeat) {
-    ctx.fx.emit('wildpile.caught', { seat, amount: LAST_CARD_PENALTY }, FORCED_DRAW_DELAY_MS);
-    next = drawCards(next, seat, LAST_CARD_PENALTY, ctx, {
-      delayMs: FORCED_DRAW_DELAY_MS,
-      announce: 'caught',
-    });
-  }
 
   if (isWildKind(face.meta.kind)) {
     if (face.meta.kind === 'wild-draw-four') {
@@ -855,6 +874,8 @@ const draw: Move<WildpileState> = {
       drawnCard: null,
       // Taking the pickup is how a seat accepts a Draw Four: window closed.
       challenge: null,
+      // A draw is the table moving on; an uncaught slip stays uncaught.
+      catchable: null,
     };
 
     // A pickup is a lost turn. A voluntary draw that lands something playable
@@ -883,7 +904,7 @@ const pass: Move<WildpileState> = {
   apply(state, seat, _payload, ctx) {
     const turn = nextSeat(state, seat);
     ctx.fx.emit(Fx.TurnRing, { seat: turn }, 80);
-    return { ...state, drawnCard: null, turn };
+    return { ...state, drawnCard: null, turn, catchable: null };
   },
 };
 
@@ -965,6 +986,8 @@ const challengeDrawFour: Move<WildpileState> = {
 const callLastCard: Move<WildpileState> = {
   validate(state, seat) {
     if (state.calledLastCard[seat]) return error('already-called', 'protection is already armed');
+    // Exposed but not yet caught: a late call is a race the seat may still win.
+    if (state.catchable === seat) return true;
     const cards = hand(state, seat);
     if (!cards.every(isRealCard)) {
       return cards.length > 1 ? true : error('not-last-card', 'nothing to protect');
@@ -979,10 +1002,36 @@ const callLastCard: Move<WildpileState> = {
   },
   apply(state, seat, _payload, ctx) {
     ctx.fx.emit('wildpile.last-card-armed', { seat });
+    if (state.catchable === seat) ctx.fx.emit('wildpile.last-card', { seat });
     return {
       ...state,
+      catchable: state.catchable === seat ? null : state.catchable,
       calledLastCard: state.calledLastCard.map((armed, index) => (index === seat ? true : armed)),
     };
+  },
+};
+
+/**
+ * Point at the seat that reached one card without calling it. This is a
+ * player's accusation, never the table's own bookkeeping — the whole point of
+ * the rule is the moment someone shouts it first. Whoever is exposed takes
+ * {@link LAST_CARD_PENALTY}, and the window closes.
+ */
+const catchLastCard: Move<WildpileState> = {
+  validate(state, seat) {
+    if (state.catchable === null) return error('nothing-to-catch', 'no one is exposed');
+    return state.catchable === seat
+      ? error('cannot-catch-self', 'call your last card instead')
+      : true;
+  },
+  apply(state, seat, _payload, ctx) {
+    const offender = state.catchable;
+    if (offender === null) throw new Error('catchLastCard apply requires an exposed seat');
+    ctx.fx.emit('wildpile.caught', { seat: offender, by: seat, amount: LAST_CARD_PENALTY });
+    return drawCards({ ...state, catchable: null }, offender, LAST_CARD_PENALTY, ctx, {
+      delayMs: FORCED_DRAW_DELAY_MS,
+      announce: 'caught',
+    });
   },
 };
 
@@ -1147,11 +1196,19 @@ const timeout: Move<WildpileState> = {
   },
 };
 
+/** The catch on offer to `seat`, when someone else sits exposed. */
+function catchMoves(state: WildpileState, seat: SeatId): LegalMove[] {
+  if (state.catchable === null || state.catchable === seat) return [];
+  return [{ id: 'catchLastCard', hint: 'they never called last card' }];
+}
+
 /** Offered alongside the seat's real options — arming never costs the turn. */
 function lastCardMoves(state: WildpileState, seat: SeatId): LegalMove[] {
   if (state.calledLastCard[seat]) return [];
   const cards = hand(state, seat);
   const offer: LegalMove[] = [{ id: 'callLastCard', hint: 'protect your last card' }];
+  // Exposed: the only call that matters now is the one that saves you.
+  if (state.catchable === seat) return offer;
   /*
    * Whether the HAND is readable, not whether the ROOM is veiled.
    *
@@ -1187,6 +1244,7 @@ function legalMoves(state: WildpileState): LegalMove[] {
     return [
       ...exactJumpCards(state, actor).map((card) => ({ id: 'playCard', payload: { card } })),
       ...lastCardMoves(state, actor),
+      ...catchMoves(state, actor),
       { id: 'declineJump' },
     ];
   }
@@ -1196,6 +1254,7 @@ function legalMoves(state: WildpileState): LegalMove[] {
     return [
       ...(playable ? [{ id: 'playCard', payload: { card: state.drawnCard } }] : []),
       ...lastCardMoves(state, state.turn),
+      ...catchMoves(state, state.turn),
       ...(playable && state.rules.forcePlay ? [] : [{ id: 'pass' }]),
     ];
   }
@@ -1204,11 +1263,30 @@ function legalMoves(state: WildpileState): LegalMove[] {
       .filter((card) => canPlay(state, card))
       .map((card) => ({ id: 'playCard', payload: { card } })),
     ...lastCardMoves(state, state.turn),
+    ...catchMoves(state, state.turn),
     ...(canChallenge(state, state.turn)
       ? [{ id: 'challengeDrawFour', hint: 'call the bluff' }]
       : []),
     { id: 'draw' },
   ];
+}
+
+/**
+ * Per-seat enumeration for the catch window. While someone sits exposed the
+ * whole table is acting: the turn seat keeps its ordinary options, every other
+ * seat holds the catch, and the exposed seat holds its own late call.
+ */
+function legalMovesForSeat(state: WildpileState, phase: PhaseState, seat: SeatId): LegalMove[] {
+  const base = phase.actor === seat ? legalMoves(state) : [];
+  if (state.catchable === null || phase.actor === null || state.winner !== null) return base;
+  if (seat === state.catchable) {
+    return base.some((move) => move.id === 'callLastCard')
+      ? base
+      : [...base, { id: 'callLastCard', hint: 'save yourself — call it' }];
+  }
+  return base.some((move) => move.id === 'catchLastCard')
+    ? base
+    : [...base, ...catchMoves(state, seat)];
 }
 
 /**
@@ -1259,6 +1337,9 @@ const flow: Flow<WildpileState> = {
   legalMoves(state) {
     return legalMoves(state);
   },
+  legalMovesFor(state, phase, seat) {
+    return legalMovesForSeat(state, phase, seat);
+  },
   advance(state) {
     const phase = phaseFor(state);
     const ended = result(state);
@@ -1297,6 +1378,24 @@ function preferredColor(state: WildpileState, seat: SeatId): WildpileColor {
 const BOT_LAST_CARD_SLIP_IN = 6;
 
 /**
+ * How often a bot notices an uncalled last card, per hundred. Catching is a
+ * player's job now, so the bots have to play the part — sharp ones almost
+ * always shout it, easy ones usually miss it, and nobody is perfect, so a
+ * quick human can still be the one who calls it first.
+ */
+const BOT_CATCH_CHANCE: Record<number, number> = { 1: 35, 2: 65, 3: 90 };
+
+function botCatch(
+  legal: readonly LegalMove[],
+  rng: { int(bound: number): number },
+  tier: number,
+): LegalMove | null {
+  const move = legal.find((candidate) => candidate.id === 'catchLastCard');
+  if (!move) return null;
+  return rng.int(100) < (BOT_CATCH_CHANCE[tier] ?? 50) ? move : null;
+}
+
+/**
  * A bot cannot see the accused's hand, so it plays the odds the way a person
  * does: the more cards someone is holding, the likelier one of them was in the
  * live colour. Capped well under certainty — a bot that always challenges would
@@ -1313,6 +1412,8 @@ const easyBot: BotPolicy<WildpileState> = {
   chooseMove(_state, _seat, legal, rng) {
     const colorMoves = legal.filter((move) => move.id === 'chooseColor');
     if (colorMoves.length > 0) return colorMoves[rng.int(colorMoves.length)]!;
+    const caught = botCatch(legal, rng, 1);
+    if (caught) return caught;
     const call = legal.find((move) => move.id === 'callLastCard');
     if (call) return call;
     const targets = legal.filter((move) => move.id === 'chooseTarget');
@@ -1341,6 +1442,8 @@ const mediumBot: BotPolicy<WildpileState> = {
         (move.payload as { color?: unknown } | undefined)?.color === color,
     );
     if (colorMove) return colorMove;
+    const caught = botCatch(legal, rng, 2);
+    if (caught) return caught;
     // Arming is free and never ends the turn, so take it first — but slip
     // occasionally so players see the rule bite someone other than themselves.
     const callMove = legal.find((move) => move.id === 'callLastCard');
@@ -1385,6 +1488,8 @@ const hardBot: BotPolicy<WildpileState> = {
         (move.payload as { color?: unknown } | undefined)?.color === color,
     );
     if (colorMove) return colorMove;
+    const caught = botCatch(legal, rng, 3);
+    if (caught) return caught;
     const callMove = legal.find((move) => move.id === 'callLastCard');
     if (callMove) return callMove;
     const swapMoves = legal.filter((move) => move.id === 'chooseTarget');
@@ -1495,6 +1600,7 @@ export const wildpileGame: GameDef<WildpileState, WildpileRules> = {
       drawnCard: null,
       challenge: null,
       calledLastCard: Array.from({ length: seats }, () => false),
+      catchable: null,
       winner: null,
       timeoutRankings: null,
       rules: config,
@@ -1509,6 +1615,7 @@ export const wildpileGame: GameDef<WildpileState, WildpileRules> = {
     chooseTarget,
     declineJump,
     callLastCard,
+    catchLastCard,
     challengeDrawFour,
     timeout,
   },

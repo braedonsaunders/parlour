@@ -55,6 +55,7 @@ function fixture(overrides: Partial<WildpileState> = {}): GameSession<WildpileSt
     drawnCard: null,
     challenge: null,
     calledLastCard: [false, false, false],
+    catchable: null,
     winner: null,
     timeoutRankings: null,
     rules: defaults,
@@ -217,7 +218,7 @@ describe('wildpile moves and flow', () => {
     expect(played.fx.some((event) => event.kind === 'wildpile.caught')).toBe(false);
   });
 
-  it('catches a seat that reaches one card without arming protection', () => {
+  it('exposes an unprotected last card for the table to catch, never auto-penalizes', () => {
     const played = sessionApply(
       wildpileGame,
       fixture({ hands: [[card('5'), card('6')], [card('1')], [card('2')]] }),
@@ -226,10 +227,51 @@ describe('wildpile moves and flow', () => {
       { card: card('5') },
     );
 
-    expect(played.fx).toContainEqual(
-      expect.objectContaining({ kind: 'wildpile.caught', payload: { seat: 0, amount: 2 } }),
+    // The table stays quiet: no penalty, just an open window every seat can act in.
+    expect(played.fx.some((event) => event.kind === 'wildpile.caught')).toBe(false);
+    expect(played.session.state.catchable).toBe(0);
+    expect(played.session.phase.actors).toEqual([1, 0, 2]);
+    const forCatcher = wildpileGame.flow.legalMovesFor!(
+      played.session.state,
+      played.session.phase,
+      2,
     );
-    expect(played.session.state.hands[0]).toHaveLength(3);
+    expect(forCatcher.map((move) => move.id)).toContain('catchLastCard');
+
+    // A player shouts it: the exposed seat takes the two, the window closes.
+    const caught = sessionApply(wildpileGame, played.session, 2, 'catchLastCard');
+    expect(caught.rejected).toBeUndefined();
+    expect(caught.fx).toContainEqual(
+      expect.objectContaining({
+        kind: 'wildpile.caught',
+        payload: { seat: 0, by: 2, amount: 2 },
+      }),
+    );
+    expect(caught.session.state.hands[0]).toHaveLength(3);
+    expect(caught.session.state.catchable).toBeNull();
+  });
+
+  it('lets the exposed seat save itself, and closes the window when play moves on', () => {
+    const exposed = sessionApply(
+      wildpileGame,
+      fixture({ hands: [[card('5'), card('6')], [card('1')], [card('2')]] }),
+      0,
+      'playCard',
+      { card: card('5') },
+    ).session;
+
+    // The late call wins the race: protection arms and there is nothing to catch.
+    const saved = sessionApply(wildpileGame, exposed, 0, 'callLastCard');
+    expect(saved.rejected).toBeUndefined();
+    expect(saved.session.state.catchable).toBeNull();
+    expect(saved.session.state.calledLastCard[0]).toBe(true);
+    expect(sessionApply(wildpileGame, saved.session, 1, 'catchLastCard').rejected?.code).toBe(
+      'illegal-move',
+    );
+
+    // Unsaved and unnoticed: the next seat taking its turn closes the window.
+    const movedOn = sessionApply(wildpileGame, exposed, 1, 'draw').session;
+    expect(movedOn.state.catchable).toBeNull();
   });
 
   it('only offers protection on the second-to-last card, and re-arms after a draw', () => {

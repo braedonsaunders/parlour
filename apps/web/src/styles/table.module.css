@@ -4,7 +4,10 @@
   height: 100dvh;
   height: var(--app-height, 100dvh);
   min-height: min(420px, 100dvh);
-  overflow: hidden;
+  /* `clip`, not `hidden`: tapping a card that pokes below the fold must never
+     let the browser scroll this box to the focused button — that shifted the
+     whole felt up and cropped the HUD off the top. */
+  overflow: clip;
 }
 
 .hud {

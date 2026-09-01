@@ -83,6 +83,8 @@ export type WildTableScreenProps = {
   onChooseTarget?: (seat: number) => void;
   onPass?: () => void;
   onChallengeDrawFour?: () => void;
+  /** Shout that the exposed seat never called their last card. */
+  onCatchLastCard?: () => void;
   /** Authority deadline for the configurable match clock. */
   matchEndsAt?: number;
   /** Duration and replay-derived key for the current seat's visible decision clock. */
@@ -253,6 +255,21 @@ function WildTableScreenView(props: WildTableScreenProps) {
           themselves. The only rail action left is protecting your last card. */}
         <TableActionRail className={wildStyles.actionRail}>
           <AnimatePresence initial={false}>
+            {view.catchable && view.legal.catchLastCard && !deal.dealing && (
+              <motion.button
+                key="catch-last-card"
+                type="button"
+                data-testid="catch-last-card"
+                className={`btn-fat ${wildStyles.catchButton}`}
+                initial={{ opacity: 0, scale: 0.6, y: 12 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.7, y: 12 }}
+                transition={{ duration: 0.2, ease: [0.34, 1.56, 0.64, 1] }}
+                onClick={props.onCatchLastCard}
+              >
+                Catch {view.catchable.name}!
+              </motion.button>
+            )}
             {view.legal.pass && !localBusy && (
               <motion.button
                 key="pass"
@@ -268,7 +285,9 @@ function WildTableScreenView(props: WildTableScreenProps) {
                 Keep it
               </motion.button>
             )}
-            {view.legal.callLastCard && !localBusy && (
+            {/* Gated on the deal, not on the turn: saving yourself after an
+                unprotected last card is an off-turn race with the catchers. */}
+            {view.legal.callLastCard && !deal.dealing && (
               <motion.button
                 key="call-last-card"
                 type="button"

@@ -43,12 +43,19 @@ export interface WildTableView {
     /** What a failed challenge would cost instead. */
     penalty: number;
   } | null;
+  /**
+   * Someone reached one card without calling it. Catching is a player's shout,
+   * not the table's bookkeeping, so this is public state every seat sees live —
+   * the local seat may act on it even off turn.
+   */
+  catchable: { seat: number; name: string } | null;
   legal: {
     playCards: readonly string[];
     draw: boolean;
     declineJump: boolean;
     chooseColor: boolean;
     callLastCard: boolean;
+    catchLastCard: boolean;
     challengeDrawFour: boolean;
     /** Decline the card you just drew. Absent when the table forces the play. */
     pass: boolean;
@@ -94,6 +101,16 @@ export function wildTableView(
   const playCards = offered.flatMap((move) =>
     move.id === 'playCard' && payloadCard(move) ? [payloadCard(move)!] : [],
   );
+  // The catch window is public state, live for every seat — on turn or off.
+  const playing = session.status === 'playing';
+  const exposedSeat = playing ? state.catchable : null;
+  const exposed =
+    exposedSeat === null
+      ? null
+      : {
+          seat: exposedSeat,
+          name: snapshot.players.find((player) => player.seat === exposedSeat)?.name ?? 'them',
+        };
   return {
     localSeat,
     players: snapshot.players.map((player) => ({
@@ -117,12 +134,15 @@ export function wildTableView(
     lastCardArmed: state.calledLastCard[localSeat] ?? false,
     drawnCard: state.turn === localSeat ? state.drawnCard : null,
     challenge: challengeView(snapshot, localSeat),
+    catchable: exposed && exposed.seat !== localSeat ? exposed : null,
     legal: {
       playCards,
       draw: offered.some((move) => move.id === 'draw'),
       declineJump: offered.some((move) => move.id === 'declineJump'),
       chooseColor: offered.some((move) => move.id === 'chooseColor'),
-      callLastCard: offered.some((move) => move.id === 'callLastCard'),
+      callLastCard:
+        offered.some((move) => move.id === 'callLastCard') || exposedSeat === localSeat,
+      catchLastCard: exposedSeat !== null && exposedSeat !== localSeat,
       challengeDrawFour: offered.some((move) => move.id === 'challengeDrawFour'),
       pass: offered.some((move) => move.id === 'pass'),
       swapTargets: offered.flatMap((move) =>

@@ -678,6 +678,30 @@
   pointer-events: none;
 }
 
+/* The shout itself: a hot magenta call-out that begs to be slammed. */
+.catchButton.catchButton {
+  position: relative;
+  background: linear-gradient(180deg, #e668a0, #9c2660);
+  border-color: rgba(255, 214, 235, 0.85);
+  animation: catchWobble 0.55s ease-in-out infinite;
+}
+
+@keyframes catchWobble {
+  0%,
+  100% {
+    rotate: -1.2deg;
+  }
+  50% {
+    rotate: 1.2deg;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .catchButton.catchButton {
+    animation: none;
+  }
+}
+
 /* Doubled class on purpose: these sit on top of the global `btn-fat`, which
    declares its own amber background at the same specificity, so which one wins
    would otherwise come down to the order the style chunks happen to load in.
@@ -821,15 +845,16 @@
   --turn-clock-color: #77d7c4;
   position: absolute;
   z-index: 9;
-  left: 50%;
-  top: calc(46% + 4.2rem);
+  /* Beside the piles, not beneath them — the grown hand fan owns that lane. */
+  left: calc(50% + clamp(8.6rem, 13vw, 10.5rem));
+  top: 46%;
   display: grid;
   grid-template-rows: auto auto;
   place-content: center;
   justify-items: center;
   width: 3.4rem;
   aspect-ratio: 1;
-  translate: -50% 0;
+  translate: 0 -50%;
   border-radius: 50%;
   background: radial-gradient(circle, rgba(17, 42, 48, 0.96) 52%, rgba(9, 22, 28, 0.98) 54%);
   color: #ddfff7;
@@ -898,6 +923,15 @@
   margin-top: 0.12rem;
   font-size: 1.05rem;
   font-variant-numeric: tabular-nums;
+}
+
+/* Portrait has vertical room to spare: the clock sits under the piles there. */
+@media (orientation: portrait) {
+  .turnClock {
+    left: 50%;
+    top: calc(46% + 4.2rem);
+    translate: -50% 0;
+  }
 }
 
 .turnClock[data-warning] {
@@ -988,7 +1022,8 @@
     top: 8%;
   }
   .turnClock {
-    top: calc(50.5% + 2.9rem);
+    left: calc(50% + 7.6rem);
+    top: 50.5%;
     width: 2.9rem;
   }
   .turnClock span {

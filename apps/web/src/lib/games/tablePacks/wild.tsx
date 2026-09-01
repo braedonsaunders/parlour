@@ -194,6 +194,7 @@ export const wildTablePack = defineTablePack<
         onChooseTarget={(seat: number) => dispatch('chooseTarget', { seat })}
         onPass={() => dispatch('pass')}
         onChallengeDrawFour={() => dispatch('challengeDrawFour')}
+        onCatchLastCard={() => dispatch('catchLastCard')}
         onQuit={quit}
       />
     );
@@ -266,6 +267,7 @@ export const wildTablePack = defineTablePack<
         onChooseTarget={(seat: number) => dispatch('chooseTarget', { seat })}
         onPass={() => dispatch('pass')}
         onChallengeDrawFour={() => dispatch('challengeDrawFour')}
+        onCatchLastCard={() => dispatch('catchLastCard')}
         onQuit={quit}
       />
     );

@@ -42,12 +42,14 @@ const VIEW: WildTableView = {
   lastCardArmed: false,
   drawnCard: null,
   challenge: null,
+  catchable: null,
   legal: {
     playCards: ['red-7-0'],
     draw: true,
     declineJump: false,
     chooseColor: false,
     callLastCard: false,
+    catchLastCard: false,
     challengeDrawFour: false,
     pass: false,
     swapTargets: [],
@@ -188,6 +190,32 @@ describe('WildTableScreen turn affordances', () => {
     expect(
       container.querySelector('[aria-label="Play green 1"]')?.closest('[data-just-drawn]'),
     ).not.toBeNull();
+  });
+
+  it('offers the catch even off turn, and shouts the exposed seat by name', () => {
+    const onCatchLastCard = vi.fn();
+    act(() =>
+      root.render(
+        createElement(WildTableScreen, {
+          view: {
+            ...VIEW,
+            activeSeat: 1,
+            decision: null,
+            catchable: { seat: 1, name: 'Slate' },
+            legal: { ...VIEW.legal, playCards: [], draw: false, catchLastCard: true },
+          },
+          fx: [],
+          fxKey: 0,
+          busy: true,
+          onCatchLastCard,
+        }),
+      ),
+    );
+
+    const button = container.querySelector<HTMLButtonElement>('[data-testid="catch-last-card"]');
+    expect(button?.textContent).toBe('Catch Slate!');
+    act(() => button?.click());
+    expect(onCatchLastCard).toHaveBeenCalledOnce();
   });
 
   it('opens the shared table settings and confirms before quitting', () => {

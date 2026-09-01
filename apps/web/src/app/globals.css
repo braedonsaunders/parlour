@@ -45,7 +45,7 @@
    * destinations, so it is a token rather than a number copied into a second
    * stylesheet where the two could drift.
    */
-  --unplayable-filter: grayscale(0.42) saturate(0.5) brightness(0.76);
+  --unplayable-filter: grayscale(0.28) saturate(0.66) brightness(0.86);
   --unplayable-opacity: 1;
   --playable-filter: saturate(1.2) brightness(1.09);
 
@@ -66,7 +66,7 @@ html {
 
 html[data-color-mode='richer'] {
   filter: saturate(1.26);
-  --unplayable-filter: grayscale(0.2) saturate(0.6) brightness(0.78);
+  --unplayable-filter: grayscale(0.14) saturate(0.72) brightness(0.88);
   --unplayable-opacity: 1;
 }
 
