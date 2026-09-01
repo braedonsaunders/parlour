@@ -6,14 +6,14 @@ name: Balance gates
 # simulate. Run in the blocking lane they failed for load, not for regressions —
 # three of eight `main` runs went red, and one fix was literally
 # "allow balance gate under CI load". The PR lane now runs the exact, cheap half
-# (determinism, coverage, no stalls) and this runs the rest nightly.
+# (determinism, coverage, no stalls) and this runs the rest on push.
 #
 # See packages/engine/src/sim/scale.ts.
 
 on:
-  schedule:
-    # 07:00 UTC daily — after the evening's merges, before the working day.
-    - cron: '0 7 * * *'
+  push:
+    branches: [main]
+  pull_request:
   workflow_dispatch:
     inputs:
       games:

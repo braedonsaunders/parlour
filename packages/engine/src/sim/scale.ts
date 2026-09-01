@@ -20,7 +20,7 @@
  *   negative gates — an impossible threshold must fail, every persona must be
  *   represented, the same seed must reproduce the same report, and no match may
  *   stall. These are exact, cheap, and cannot flake.
- * - **Full** (`PARLOUR_FULL_SIM=1`, nightly): the win-rate bands, at a sample
+ * - **Full** (`PARLOUR_FULL_SIM=1`, push lane): the win-rate bands, at a sample
  *   size where they actually mean something.
  *
  * A skipped band assertion names itself as skipped rather than passing
@@ -58,5 +58,5 @@ export function simGames(quick: number, full: number): number {
  * quick run reports what it did not check instead of looking complete.
  */
 export function scaleNote(): string {
-  return isFullSim() ? '[full sample]' : '[quick sample — bands checked nightly]';
+  return isFullSim() ? '[full sample]' : '[quick sample — bands checked on push]';
 }

@@ -14,7 +14,7 @@ import { defineConfig, devices } from '@playwright/test';
  * because the export is what ships — to Vercel, into the Tauri shell, and into
  * the service worker's cache.
  */
-/** Set by the scheduled multiplayer workflow; unset in the push lane. */
+/** Set by the multiplayer workflow; unset in the default browser gate. */
 const multiplayerLane =
   process.env.PARLOUR_MULTIPLAYER_E2E === '1' || process.env.PARLOUR_MULTIPLAYER_E2E === 'true';
 
@@ -25,13 +25,10 @@ export default defineConfig({
   // Frame-budget runs are slow, assert almost nothing, and produce a table to
   // read rather than a verdict.
   //
-  // The multi-context multiplayer suite establishes real WebRTC connections
-  // over public Nostr relays, so it fails when those relays are busy or
-  // unreachable — regardless of the code under test. It belongs in the
-  // scheduled lane (.github/workflows/multiplayer.yml), which opts in through
-  // the environment variable below, the same way the engine's balance gates
-  // opt in through PARLOUR_FULL_SIM. Leaving it in the push lane made every
-  // commit hostage to somebody else's relay.
+  // The multi-context suite is opted in by .github/workflows/multiplayer.yml
+  // via PARLOUR_MULTIPLAYER_E2E, the same way the engine's balance gates opt
+  // in through PARLOUR_FULL_SIM. It stays out of the default browser gate so
+  // a WebRTC flake does not hide a deal or PWA failure.
   testIgnore: multiplayerLane ? ['**/perf/**'] : ['**/perf/**', '**/multiplayer.spec.ts'],
   outputDir: '../../output/playwright',
   fullyParallel: true,

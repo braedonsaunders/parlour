@@ -1,21 +1,13 @@
 name: Multiplayer gate
 
-# Runs the multi-context friend-room suite against the static export.
-#
-# This suite connects to public Nostr relays and establishes real WebRTC
-# peer connections, so it is sensitive to relay availability in a way the
-# correctness e2e suite is not. It runs on a schedule (daily) and on manual
-# dispatch rather than on every push, because a relay outage must not block
-# a code change that has nothing to do with signalling.
-#
-# When the hermetic signalling seam lands (see the seam proposal in
-# apps/web/e2e/multiplayer.spec.ts), this workflow moves into the push lane
-# alongside the main browser gate.
+# Multi-context friend-room suite against the static export. Signalling is
+# hermetic (in-process broker), so this belongs on the same push/PR lane as
+# the rest of CI rather than a morning cron that goes red with nobody pushing.
 
 on:
-  schedule:
-    # 08:00 UTC daily — after the CI lane has passed, before the working day.
-    - cron: '0 8 * * *'
+  push:
+    branches: [main]
+  pull_request:
   workflow_dispatch:
 
 concurrency:
@@ -63,10 +55,8 @@ jobs:
           path: output/playwright
           retention-days: 7
 
-      - name: Report relay failure
+      - name: Report failure
         if: failure()
         run: |
-          echo "::warning::Multi-context suite failed on ${{ matrix.project }}." \
-            "This may be a relay outage rather than a code regression —" \
-            "check the trace for Nostr publish/resolve failures before" \
-            "assuming the transport is broken."
+          echo "::error::Multi-context suite failed on ${{ matrix.project }}." \
+            "Signalling is hermetic; treat this as a code or test regression."
