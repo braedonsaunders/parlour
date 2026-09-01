@@ -84,19 +84,19 @@ export function RoomLobby({
   }
 
   return (
-    <section className="panel-soft w-full max-w-4xl p-6" aria-labelledby="room-heading">
-      <div className="flex flex-wrap items-center justify-between gap-5">
+    <section className="panel-soft w-full max-w-4xl p-6 shortscape:p-3" aria-labelledby="room-heading">
+      <div className="flex flex-wrap items-center justify-between gap-5 shortscape:gap-3">
         <div>
-          <p className="text-xs font-bold uppercase tracking-[0.25em] text-dusk-200">
+          <p className="text-xs font-bold uppercase tracking-[0.25em] text-dusk-200 shortscape:hidden">
             {t('room.codeLabel')}
           </p>
           <h1
             id="room-heading"
-            className="text-warm-glow font-display text-6xl font-black tracking-[0.16em]"
+            className="text-warm-glow font-display text-6xl font-black tracking-[0.16em] shortscape:text-3xl"
           >
             {code}
           </h1>
-          <p className="mt-1 text-sm text-dusk-100" role="status">
+          <p className="mt-1 text-sm text-dusk-100 shortscape:mt-0 shortscape:text-xs" role="status">
             {connection === 'connected'
               ? t('room.connected')
               : connection === 'reconnecting'
@@ -120,20 +120,20 @@ export function RoomLobby({
         </p>
       )}
 
-      <ol className="mt-7 grid grid-cols-2 gap-3 sm:grid-cols-4" aria-label={t('room.seatsLabel')}>
+      <ol className="mt-7 grid grid-cols-2 gap-3 sm:grid-cols-4 shortscape:mt-2 shortscape:gap-2" aria-label={t('room.seatsLabel')}>
         {Array.from({ length: capacity }, (_, seat) => {
           const player = occupied.get(seat);
           return (
             <li
               key={seat}
-              className="panel-soft flex min-h-36 flex-col items-center justify-center p-4 text-center"
+              className="panel-soft flex min-h-36 flex-col items-center justify-center p-4 text-center shortscape:min-h-20 shortscape:p-2"
             >
               {player ? (
                 <>
-                  <span className="text-4xl" aria-hidden="true">
+                  <span className="text-4xl shortscape:text-2xl" aria-hidden="true">
                     {player.avatar}
                   </span>
-                  <strong className="mt-2 font-display">
+                  <strong className="mt-2 font-display shortscape:mt-0.5 shortscape:text-sm">
                     {player.name}
                     {player.bot ? ` (${t('room.bot')})` : ''}
                   </strong>
@@ -166,7 +166,7 @@ export function RoomLobby({
 
       {isHost && onListedChange && (
         <label
-          className="panel-soft mt-4 flex cursor-pointer items-start gap-3 p-4"
+          className="panel-soft mt-4 flex cursor-pointer items-start gap-3 p-4 shortscape:mt-2 shortscape:p-2"
           data-testid="list-publicly"
         >
           <input
@@ -177,7 +177,7 @@ export function RoomLobby({
           />
           <span>
             <strong className="font-display text-dusk-50">{t('room.listPublicly')}</strong>
-            <span className="mt-0.5 block text-sm text-dusk-100/85">
+            <span className="mt-0.5 block text-sm text-dusk-100/85 shortscape:hidden">
               {snapshot.listed ? t('room.listedDetail') : t('room.listPubliclyDetail')}
             </span>
           </span>
@@ -192,7 +192,7 @@ export function RoomLobby({
 
       {isHost && (
         <button
-          className="btn-fat mt-6 w-full"
+          className="btn-fat mt-6 w-full shortscape:mt-2"
           type="button"
           // Addressed by test id, not by label: this button reads "Start match",
           // "Waiting for one more" or "Dealing…" depending on the table, in five

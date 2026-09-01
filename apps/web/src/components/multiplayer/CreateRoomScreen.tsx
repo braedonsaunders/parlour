@@ -114,7 +114,7 @@ function ActiveLobby({
   const capacity = snapshot.settings?.seats ?? snapshot.seats.length;
 
   return (
-    <main className="flex min-h-dvh flex-col items-center justify-center gap-5 px-6 py-8">
+    <main className="flex min-h-dvh flex-col items-center justify-center gap-5 px-6 py-8 shortscape:gap-2 shortscape:pb-8 shortscape:pt-14">
       <Link
         href={screen.backHref}
         onClick={leave}
@@ -140,7 +140,7 @@ function ActiveLobby({
         onStart={() => session.start()}
       />
       {screen.blurb && (
-        <p className="max-w-xl text-center text-sm text-dusk-100/80">{screen.blurb(capacity)}</p>
+        <p className="max-w-xl text-center text-sm text-dusk-100/80 shortscape:hidden">{screen.blurb(capacity)}</p>
       )}
     </main>
   );
