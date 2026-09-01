@@ -268,7 +268,7 @@ export const PARLOUR_SFX_PACK: SfxPack = {
     sound(PARLOUR_SFX.cardFlip, '/audio/sfx/card-flip.mp3', 0.82, 4, 35),
     sound(PARLOUR_SFX.dealCard, '/audio/sfx/deal-card.mp3', 0.68, 6, 45),
     sound(PARLOUR_SFX.stockShuffle, '/audio/sfx/stock-shuffle.mp3', 0.72, 1, 500),
-    sound(PARLOUR_SFX.turnReady, '/audio/sfx/turn-ready.mp3', 0.54, 2, 100),
+    sound(PARLOUR_SFX.turnReady, '/audio/sfx/turn-ready.mp3', 0.72, 2, 100),
     sound(PARLOUR_SFX.uiPress, '/audio/sfx/ui-press.mp3', 0.5, 3, 55),
     sound(PARLOUR_SFX.roomPlayerJoined, '/audio/sfx/president-role-chime.mp3', 0.58, 1, 220),
     sound(PARLOUR_SFX.roomPlayerLeft, '/audio/sfx/president-pass.mp3', 0.42, 1, 220),

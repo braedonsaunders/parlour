@@ -1,10 +1,10 @@
 'use client';
 
-import { useEffect, type RefObject } from 'react';
+import { useEffect, useRef, type RefObject } from 'react';
 import { type FxEvent } from '@parlour/engine';
 import { gsap } from 'gsap';
 import { getAudioManager } from '@/lib/audio/AudioManager';
-import { soundCuesForFx, soundDefsForSfxPack } from '@/lib/audio/sfx';
+import { PARLOUR_SFX, soundCuesForFx, soundDefsForSfxPack } from '@/lib/audio/sfx';
 import { calculateFanStep, fanStepRatioOf } from '@/components/table/HandRail';
 import { prefersCalmMotion } from '@/lib/table/calm-motion';
 import { FX_TIMING, type FxCue, type Zone } from '@/lib/table/fx-motion';
@@ -33,6 +33,22 @@ export function useTableAudio(fx: readonly FxEvent[], fxKey: string | number, sf
     );
     return () => timers.forEach((timer) => window.clearTimeout(timer));
   }, [fx, fxKey, sfxPackId]);
+}
+
+/**
+ * A soft chime the moment the table becomes yours.
+ *
+ * The visual language (hand spotlight, piles ring, the "Your turn" pill) all
+ * assume you are looking at the felt; the chime is the cue that works when
+ * you are not. It fires only on the false→true edge, so re-renders during
+ * your turn and the ticks of someone else's do not retrigger it.
+ */
+export function useLocalTurnAlert(myTurn: boolean): void {
+  const wasMyTurn = useRef(myTurn);
+  useEffect(() => {
+    if (myTurn && !wasMyTurn.current) getAudioManager().play(PARLOUR_SFX.turnReady);
+    wasMyTurn.current = myTurn;
+  }, [myTurn]);
 }
 
 export function useFxAnimation(

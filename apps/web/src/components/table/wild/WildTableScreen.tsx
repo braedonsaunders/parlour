@@ -33,7 +33,7 @@ import {
 import { useWildPickupCount, wildPickup, type WildPickup } from '@/lib/wild/pickup';
 import { WILD_DROP_EFFECTS } from '@/lib/wild/drop-effects';
 import { CardDropFx } from '../CardDropFx';
-import { discardRotation, useTableAudio } from '../fx-animation';
+import { discardRotation, useLocalTurnAlert, useTableAudio } from '../fx-animation';
 import { HandRail, HandRailCard } from '../HandRail';
 import { StockStack } from '../StockStack';
 import {
@@ -106,6 +106,9 @@ function WildTableScreenView(props: WildTableScreenProps) {
   const deal = useDealPhase();
   const dealStore = useDealStore();
   useTableAudio(props.fx, props.fxKey, WILDPILE_SFX_PACK.id);
+  useLocalTurnAlert(
+    Boolean(view && !deal.dealing && view.activeSeat === view.localSeat && !props.busy),
+  );
 
   // Pickups are counted out card by card so a stacked penalty reads as it
   // arrives instead of appearing in the hand all at once. The running total

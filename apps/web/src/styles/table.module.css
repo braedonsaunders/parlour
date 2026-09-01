@@ -250,18 +250,18 @@
   position: absolute;
   z-index: -1;
   inset: -1.65rem -2rem;
-  border: 2px solid rgba(255, 218, 160, 0.48);
+  border: 2px solid rgba(255, 218, 160, 0.62);
   border-radius: 2.2rem;
   background: radial-gradient(
     ellipse,
-    rgba(255, 188, 92, 0.3),
-    rgba(75, 177, 185, 0.08) 55%,
+    rgba(255, 188, 92, 0.38),
+    rgba(75, 177, 185, 0.1) 55%,
     transparent 76%
   );
   box-shadow:
-    0 0 22px rgba(255, 194, 105, 0.48),
-    0 0 54px rgba(75, 177, 185, 0.25),
-    inset 0 0 24px rgba(255, 222, 171, 0.15);
+    0 0 28px rgba(255, 194, 105, 0.6),
+    0 0 64px rgba(75, 177, 185, 0.3),
+    inset 0 0 28px rgba(255, 222, 171, 0.2);
   animation: pileTurnGlow 1.25s ease-in-out infinite;
   pointer-events: none;
 }
@@ -270,21 +270,63 @@
   position: absolute;
   z-index: 4;
   left: 50%;
-  top: -2.25rem;
+  top: -2.6rem;
   translate: -50% 0;
-  padding: 0.22rem 0.66rem;
-  border: 1px solid rgba(255, 237, 207, 0.72);
+  padding: 0.3rem 0.9rem;
+  border: 2px solid rgba(255, 237, 207, 0.85);
   border-radius: 999px;
-  background: linear-gradient(180deg, rgba(226, 147, 73, 0.96), rgba(150, 71, 28, 0.96));
+  background: linear-gradient(180deg, rgba(226, 147, 73, 0.98), rgba(150, 71, 28, 0.98));
   color: #fff4df;
-  box-shadow: 0 5px 16px rgba(4, 14, 20, 0.44);
+  box-shadow:
+    0 5px 16px rgba(4, 14, 20, 0.44),
+    0 0 22px rgba(255, 194, 105, 0.55);
   font:
-    800 0.68rem/1 var(--font-display),
+    800 0.8rem/1 var(--font-display),
     sans-serif;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   white-space: nowrap;
   pointer-events: none;
+  animation: turnIndicatorBob 1.25s ease-in-out infinite;
+}
+
+@keyframes turnIndicatorBob {
+  0%,
+  100% {
+    translate: -50% 0;
+  }
+  50% {
+    translate: -50% -0.3rem;
+  }
+}
+
+/*
+ * Your-turn spotlight under the fan. `data-playable='true'` only ever appears
+ * on a hand whose owner has a live decision, so the rail can light itself
+ * without a single screen passing turn state down — every game that marks
+ * legality inherits the spotlight for free.
+ */
+.localHand:has(.handCard[data-playable='true'])::after {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  left: -12%;
+  right: -12%;
+  bottom: -1.4rem;
+  height: 7.5rem;
+  background: radial-gradient(58% 100% at 50% 100%, rgba(255, 188, 92, 0.34), transparent 72%);
+  animation: handSpotlight 1.4s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes handSpotlight {
+  0%,
+  100% {
+    opacity: 0.75;
+  }
+  50% {
+    opacity: 1;
+  }
 }
 
 .pileButton {
@@ -1002,6 +1044,8 @@ button.card {
     opacity: 0.86;
   }
 
+  .turnIndicator,
+  .localHand:has(.handCard[data-playable='true'])::after,
   .opponentCards > *,
   .localHand[data-deal-state='complete'] .handTrack {
     animation: none;
