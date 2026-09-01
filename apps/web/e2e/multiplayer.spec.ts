@@ -131,16 +131,8 @@ async function joinRoomByCode(page: Page, code: string): Promise<void> {
   const submit = page.getByTestId('join-submit');
   await expect(submit).toBeEnabled({ timeout: 10_000 });
   await submit.click();
-  const heading = page.locator(ROOM_HEADING);
-  // WebKit can swallow the first submit before React commits the code.
-  try {
-    await expect(heading).toBeVisible({ timeout: 8_000 });
-  } catch {
-    await expect(submit).toBeEnabled({ timeout: 5_000 });
-    await submit.click();
-    await expect(heading).toBeVisible({ timeout: CONNECT_TIMEOUT_MS });
-  }
-  await expect(heading).toContainText(code);
+  await expect(page.locator(ROOM_HEADING)).toBeVisible({ timeout: CONNECT_TIMEOUT_MS });
+  await expect(page.locator(ROOM_HEADING)).toContainText(code);
 }
 
 /**

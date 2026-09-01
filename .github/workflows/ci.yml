@@ -43,13 +43,14 @@ jobs:
       - name: Type check
         run: pnpm --filter './packages/**' --filter @parlour/web -r type-check
 
-      # Packages first, then the web suite. `pnpm -r test` otherwise piles the
-      # Spider solver and the veiled-duel SRA math onto the same 2-core runner
-      # as twenty other packages; card-open deadlines miss and hint tests
-      # trip the default 5s hook. Web's own script then runs the cheap
-      # project before the duel, so the long liveness suite owns the machine.
+      # Packages first, then the web suite. A bare `pnpm -r test` also
+      # runs the root package, whose test script is `pnpm -r test` again —
+      # that second wave piles the Spider solver and the veiled-duel SRA
+      # math onto the same 2-core runner and card-open deadlines miss.
+      # Restrict the first step to ./packages so the root never re-enters,
+      # then give web (cheap project, then duel) the machine to itself.
       - name: Test packages
-        run: pnpm -r --no-bail --filter '!@parlour/web' test
+        run: pnpm -r --no-bail --filter './packages/**' test
 
       - name: Test web
         run: pnpm --filter @parlour/web test
