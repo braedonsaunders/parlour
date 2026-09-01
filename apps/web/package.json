@@ -8,7 +8,7 @@
     "postbuild": "node scripts/generate-pwa.mjs",
     "start": "next start",
     "type-check": "tsc --noEmit",
-    "test": "vitest run",
+    "test": "vitest run --project web && vitest run --project duel",
     "generate:audio": "pnpm run generate:ambience && pnpm run generate:sfx && pnpm run generate:voice && pnpm run generate:music",
     "generate:ambience": "node scripts/generate-ambience.mjs",
     "generate:sfx": "node --env-file=../../.env.local scripts/generate-sfx.mjs",

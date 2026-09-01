@@ -131,8 +131,16 @@ async function joinRoomByCode(page: Page, code: string): Promise<void> {
   const submit = page.getByTestId('join-submit');
   await expect(submit).toBeEnabled({ timeout: 10_000 });
   await submit.click();
-  await expect(page.locator(ROOM_HEADING)).toBeVisible({ timeout: CONNECT_TIMEOUT_MS });
-  await expect(page.locator(ROOM_HEADING)).toContainText(code);
+  const heading = page.locator(ROOM_HEADING);
+  // WebKit can swallow the first submit before React commits the code.
+  try {
+    await expect(heading).toBeVisible({ timeout: 8_000 });
+  } catch {
+    await expect(submit).toBeEnabled({ timeout: 5_000 });
+    await submit.click();
+    await expect(heading).toBeVisible({ timeout: CONNECT_TIMEOUT_MS });
+  }
+  await expect(heading).toContainText(code);
 }
 
 /**
@@ -190,6 +198,9 @@ async function expectSeatsAtTable(seats: readonly Seat[]): Promise<void> {
 async function roomSnapshot(page: Page): Promise<{
   localSeat: number | null;
   seats: { seat: number; bot: boolean; connected: boolean; profileId: string }[];
+  stage: string | null;
+  sessionStatus: string | null;
+  resultReason: string | null;
 }> {
   return page.evaluate(() => {
     const session = (
@@ -197,7 +208,9 @@ async function roomSnapshot(page: Page): Promise<{
         __parlourActiveRoom?: {
           getSnapshot(): {
             localSeat: number | null;
+            stage?: string;
             seats: { seat: number; bot: boolean; connected: boolean; profileId: string }[];
+            session?: { status?: string; result?: { reason?: string } | null } | null;
           };
         };
       }
@@ -205,6 +218,9 @@ async function roomSnapshot(page: Page): Promise<{
     return {
       localSeat: session?.localSeat ?? null,
       seats: session?.seats ?? [],
+      stage: session?.stage ?? null,
+      sessionStatus: session?.session?.status ?? null,
+      resultReason: session?.session?.result?.reason ?? null,
     };
   });
 }
@@ -570,9 +586,20 @@ test.describe('multiplayer resilience (hermetic)', () => {
 
     // Drop the only other human.
     await closeSeat(guest, broker);
+    // WebKit throttles timers on a background page; the heartbeat that
+    // expires the guest (and the podium hand-off after it) never fire if
+    // this context is not the frontmost one.
+    await host.page.bringToFront();
 
-    // The host's match ends on the podium with a walkover reason.
-    await expect(host.page.getByTestId('match-end-page')).toBeVisible({ timeout: 20_000 });
+    // The session result is the walkover. The podium route is the hand-off
+    // that follows it — assert both, and dump the chair list if neither
+    // moves, so a hang is not just "element(s) not found".
+    await expect
+      .poll(async () => (await roomSnapshot(host.page)).resultReason, {
+        timeout: 45_000,
+      })
+      .toBe('opponent-left');
+    await expect(host.page.getByTestId('match-end-page')).toBeVisible({ timeout: 15_000 });
 
     await host.context.close();
   });

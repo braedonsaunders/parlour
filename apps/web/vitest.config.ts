@@ -44,8 +44,11 @@ export default defineConfig({
      * with the veil's SRA math running in-thread (jsdom has no Worker). Run
      * six-wide with the rest of the suite they stop measuring the room code
      * and start measuring the scheduler: ceremonies overrun their windows and
-     * perfectly healthy tables read as wedged. Serial, after everything else,
-     * they measure what they claim to.
+     * perfectly healthy tables read as wedged.
+     *
+     * Vitest still schedules projects in parallel, so `package.json`'s test
+     * script runs `--project web` then `--project duel`. Serial, after
+     * everything else, they measure what they claim to.
      */
     projects: [
       {

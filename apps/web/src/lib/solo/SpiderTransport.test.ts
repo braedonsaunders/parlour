@@ -37,6 +37,9 @@ describe('SpiderTransport', () => {
     expect(undone.snapshot.session.state).toEqual(before.session.state);
   });
 
+  // Same budget as packages/game-spider: the daily-deal search is the
+  // expensive thing on this screen, and `pnpm -r test` used to starve it
+  // under the default 5s hook.
   it('publishes a greedy hint the engine accepts', () => {
     const table = transport();
     const hinted = table.getSnapshot().hint;
@@ -44,7 +47,7 @@ describe('SpiderTransport', () => {
     const played = table.dispatch(hinted!.move.id, hinted!.move.payload);
     expect(played.rejected).toBeNull();
     expect(played.snapshot.eventCount).toBe(1);
-  });
+  }, 20_000);
 
   it('restarts the same seed with the original setup choreography', () => {
     const table = transport(88);

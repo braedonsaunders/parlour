@@ -150,7 +150,7 @@ describe('SpiderTableScreen', () => {
 
     act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })));
     expect(textSurface().hint).toBeNull();
-  });
+  }, 20_000);
 
   it('moves a public run between tableau columns with arrows and Enter', () => {
     let chosen:
