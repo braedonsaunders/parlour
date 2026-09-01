@@ -24,7 +24,6 @@ import {
 import {
   auditSummary,
   layerStream,
-  clearRoundMaterial,
   loadRoundMaterial,
   recoveryPolicyFor,
   isSeatLeftFault,
@@ -643,17 +642,16 @@ export class MultiplayerRoomSession {
       throw new Error('the current match has not finished yet');
     }
 
-    // A walkover has nobody to redeal against. The room outlives the match:
-    // the same code, settings and share link go back to a lobby with the
-    // departed chair emptied, ready to seat whoever comes next. Only ever a
-    // host decision — at two seats the survivor IS the host (either it always
-    // was, or the migration made it so when the host died).
+    // A walkover's "play again" deals the next hand NOW, like every other
+    // rematch: the departed chair becomes a bot takeover and the survivor
+    // keeps playing without a detour. The dropped player still owns the
+    // chair by profile, so coming back mid-match reclaims it from the bot.
     if (current.result.reason === 'opponent-left') {
-      if (!this.snapshot.isHost) {
-        throw new Error('the table is waiting for its host to reopen the lobby');
-      }
-      await this.reopenLobby();
-      return;
+      this.update({
+        seats: this.snapshot.seats.map((chair) =>
+          !chair.connected && !chair.bot ? { ...chair, bot: true, away: false } : chair,
+        ),
+      });
     }
 
     if (this.snapshot.isHost) {
@@ -695,14 +693,36 @@ export class MultiplayerRoomSession {
     if (!settings || !code || !current || !this.authority || !this.transport) {
       throw new Error('the table is no longer ready for a rematch');
     }
+    // A walkover ends the match in the SNAPSHOT only — the authority's log
+    // still reads "playing", because nobody's move ended it. Either voice
+    // saying the match is over is enough to deal the next one.
     const live = this.authority.getSession();
-    if (live.status !== 'ended' || !live.result) return;
+    const over =
+      Boolean(live.status === 'ended' && live.result) || Boolean(this.snapshot.session?.result);
+    if (!over) return;
 
     this.rematchPending = true;
     try {
       const seed = await rematchDealSeed(code, current.seed, current.stateHash);
-      const runtime = createRoomRuntime(settings, seed, (seat, bot) =>
-        this.acceptSeatBot(seat, bot),
+      // The second match is as private as the first. A veiled rematch runs a
+      // fresh shuffle ceremony over the full deck — the same machinery a
+      // multi-hand game uses between deals — and deals from its handles;
+      // silently downgrading hand two to open play was a promise broken the
+      // moment nobody was looking. Only when the ceremony itself cannot run
+      // does the table fall back to an open deal, the same policy Start has.
+      let deckOrder: readonly string[] | undefined;
+      if (settings.security === 'veil' && this.veil && this.ceremonySeats().length > 0) {
+        try {
+          deckOrder = await this.shuffleNextHand();
+        } catch {
+          deckOrder = undefined;
+        }
+      }
+      const runtime = createRoomRuntime(
+        settings,
+        seed,
+        (seat, bot) => this.acceptSeatBot(seat, bot),
+        deckOrder,
       );
       await this.authority.importSnapshot(runtime.authority.exportSnapshot());
       this.seed = seed;
@@ -718,9 +738,16 @@ export class MultiplayerRoomSession {
         fxKey: this.snapshot.fxKey + 1,
         stage: 'table',
         error: null,
-        security: securityFor('open', settings.seats, 'open'),
+        security: deckOrder
+          ? { ...this.snapshot.security, paused: null, waitingOn: null }
+          : securityFor('open', settings.seats, 'open'),
       });
-      this.driveBotSeats();
+      if (deckOrder) {
+        void this.openMyHandles();
+        void this.openBotHandles().then(() => this.driveBotSeats());
+      } else {
+        this.driveBotSeats();
+      }
     } catch (error) {
       this.update({
         error: error instanceof Error ? error.message : 'The rematch could not be dealt',
@@ -728,77 +755,6 @@ export class MultiplayerRoomSession {
       throw error;
     } finally {
       this.rematchPending = false;
-    }
-  }
-
-  /**
-   * Returns a finished table to its lobby on the same code.
-   *
-   * "Play again" after a walkover used to dead-end at the game shelf: the
-   * in-room rematch needs an opponent, and the one this room had is gone. But
-   * the ROOM is not over — the code still resolves, the share link still
-   * works, and the survivor is already hosting. So the departed chairs are
-   * emptied, the finished round's veil is retired (fresh keys for the next
-   * deal), and the table waits for company where it stands.
-   */
-  private async reopenLobby(): Promise<void> {
-    const transport = this.transport;
-    const settings = this.snapshot.settings;
-    const code = this.snapshot.room?.code;
-    if (!transport || !settings || !code || !this.authority) {
-      throw new Error('the table is no longer connected');
-    }
-    // The finished match leaves the authority. Anyone who joins the reopened
-    // lobby is welcomed with the authority's current log, and a guest only
-    // accepts the next deal's snapshot over an EMPTY one — so the lobby
-    // placeholder runtime replaces the spent match, exactly as a rematch does.
-    const runtime = createRoomRuntime(settings, this.seed, (chair, bot) =>
-      this.acceptSeatBot(chair, bot),
-    );
-    await this.authority.importSnapshot(runtime.authority.exportSnapshot());
-    for (const timer of this.pendingReturns.values()) clearTimeout(timer);
-    this.pendingReturns.clear();
-    // Retire this round's veil entirely: material, session, listener. The next
-    // deal opens a new round with new keys — reusing a finished round's stream
-    // would re-derive layers the last match already spent.
-    this.veil?.room.cancelAll('the table went back to its lobby');
-    this.veilDetach?.();
-    this.veilDetach = null;
-    this.veil = null;
-    this.veilAttach = null;
-    clearRoundMaterial(code, this.profile.profileId);
-    this.epochCursor = 0;
-    this.usedRecycleEpochs.clear();
-    this.sentSelfOpens.clear();
-    this.primedDeck = null;
-    this.localDealFaults.clear();
-    for (const seat of this.snapshot.seats) {
-      if (seat.profileId === this.profile.profileId) continue;
-      if (!seat.connected || seat.bot) transport.vacateSeat(seat.seat);
-    }
-    transport.holdLobby(true);
-    // A second deal on the same code mixes a fresh shared seed: the old
-    // round's commitments and reveals are spent, so the exchange restarts.
-    this.dealNonce = null;
-    this.dealRound = new DealSeedRound();
-    this.dealRevealStarted = false;
-    const tier = settings.security ?? 'veil';
-    this.update({
-      stage: 'lobby',
-      session: null,
-      error: null,
-      fx: [],
-      fxKey: this.snapshot.fxKey + 1,
-      security: securityFor(tier, settings.seats, tier === 'veil' ? 'veiled' : 'open'),
-      seats: this.snapshot.seats.filter(
-        (seat) => seat.profileId === this.profile.profileId || (seat.connected && !seat.bot),
-      ),
-    });
-    this.commitDealShare();
-    // This host's half of the NEXT round's veil, attached now so the deal can
-    // run the moment the chairs fill (a joining guest attaches its own half).
-    if (tier === 'veil') {
-      this.veilAttach = this.attachVeil(settings, this.seed).catch(() => undefined);
     }
   }
 

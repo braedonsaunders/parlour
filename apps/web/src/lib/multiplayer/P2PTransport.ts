@@ -350,25 +350,6 @@ export class P2PTransport implements Transport {
   }
 
   /** Match has started — host loss elects, guest loss becomes a bot. */
-  /**
-   * Host-only: empties a departed player's chair so the lobby can seat
-   * somebody new. The walkover that follows a two-seat drop ends the match
-   * but not the room — vacating the chair is what lets the same code host
-   * the next one.
-   */
-  vacateSeat(seat: SeatId): void {
-    this.assertReady();
-    if (!this.isHost()) throw new Error('only the host may vacate a seat');
-    const occupant = this.resilience!.seats.get(seat);
-    if (!occupant) return;
-    if (occupant.peerId === this.signaling.publicKey) {
-      throw new Error('the host cannot vacate its own seat');
-    }
-    this.resilience!.clearSeat(seat);
-    this.broadcast({ type: 'mesh.peers', peers: this.peerDescriptors() });
-    this.broadcastPresence();
-  }
-
   holdLobby(hold: boolean): void {
     this.lobbyHold = hold;
   }
