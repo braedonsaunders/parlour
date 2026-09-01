@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { LobbyChrome } from '@/components/multiplayer/LobbyChrome';
 import { RoomLobby } from '@/components/multiplayer/RoomLobby';
 import { HostRoomMatch } from '@/lib/games/RoomGameTable';
 import { createScreenFor, type CreateScreen } from '@/lib/rooms/createScreens';
@@ -98,6 +99,7 @@ function ActiveLobby({
       >
         ← Leave
       </Link>
+      <LobbyChrome />
       <RoomLobby
         snapshot={snapshot}
         code={room.code}

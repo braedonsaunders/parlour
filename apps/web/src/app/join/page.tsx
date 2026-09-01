@@ -10,6 +10,7 @@ import {
   normalizeRoomCode,
   validateRoomHostPubkey,
 } from '@/lib/rooms/code';
+import { LobbyChrome } from '@/components/multiplayer/LobbyChrome';
 import { OpenTables } from '@/components/multiplayer/OpenTables';
 import { RoomLobby } from '@/components/multiplayer/RoomLobby';
 import { RoomGameTable } from '@/lib/games/RoomGameTable';
@@ -242,6 +243,7 @@ function GuestLobby({
       >
         {t('common.leaveArrow')}
       </button>
+      <LobbyChrome />
       <RoomLobby
         snapshot={snapshot}
         code={room.code}
