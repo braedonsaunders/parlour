@@ -4,6 +4,24 @@ import { useEffect, useRef, useState } from 'react';
 import { useT } from '@/lib/i18n';
 import { isTauriRuntime, syncAppViewportHeight } from '@/lib/pwa';
 
+/**
+ * A reload is only disruptive where live state would be lost: at a table, in
+ * a friend-room flow (the mesh does not survive a reload), or on the podium
+ * (whose report lives in client stores). Everywhere else — home, shelves,
+ * setup, profile — the app swaps itself for the new version without asking.
+ * Judged by route rather than by importing the multiplayer store, which must
+ * stay out of the layout's module graph.
+ */
+function safeToAutoApply(): boolean {
+  const path = window.location.pathname;
+  return !(
+    path.includes('/table') ||
+    path.startsWith('/create') ||
+    path.startsWith('/join') ||
+    path.startsWith('/match-end')
+  );
+}
+
 export function PwaRegister() {
   const t = useT();
   const [online, setOnline] = useState(true);
@@ -34,7 +52,14 @@ export function PwaRegister() {
     let lastUpdateCheck = 0;
 
     const offerUpdate = (worker: ServiceWorker | null) => {
-      if (!disposed && worker && navigator.serviceWorker.controller) setWaitingWorker(worker);
+      if (disposed || !worker || !navigator.serviceWorker.controller) return;
+      // Away from a live table, don't ask — apply. The prompt is only for the
+      // moments where a reload would cost the player something.
+      if (safeToAutoApply()) {
+        activateWorker(worker);
+        return;
+      }
+      setWaitingWorker(worker);
     };
 
     const activateWorker = (worker: ServiceWorker) => {
@@ -81,7 +106,7 @@ export function PwaRegister() {
     const checkForUpdate = () => {
       if (!registration || !navigator.onLine || document.visibilityState !== 'visible') return;
       const now = Date.now();
-      if (now - lastUpdateCheck < 5 * 60 * 1000) return;
+      if (now - lastUpdateCheck < 45 * 1000) return;
       lastUpdateCheck = now;
       void registration.update().catch(() => undefined);
     };
@@ -94,7 +119,11 @@ export function PwaRegister() {
 
     navigator.serviceWorker.addEventListener('controllerchange', onControllerChange);
     document.addEventListener('visibilitychange', checkForUpdate);
+    window.addEventListener('focus', checkForUpdate);
     window.addEventListener('online', checkForUpdate);
+    // A deploy that lands while the tab sits open should not wait for the
+    // player to switch tabs: poll for it.
+    const updateTimer = window.setInterval(checkForUpdate, 60 * 1000);
 
     if (document.readyState === 'complete') {
       void register();
@@ -104,8 +133,10 @@ export function PwaRegister() {
 
     return () => {
       disposed = true;
+      window.clearInterval(updateTimer);
       window.removeEventListener('load', register);
       window.removeEventListener('online', checkForUpdate);
+      window.removeEventListener('focus', checkForUpdate);
       document.removeEventListener('visibilitychange', checkForUpdate);
       navigator.serviceWorker.removeEventListener('controllerchange', onControllerChange);
     };

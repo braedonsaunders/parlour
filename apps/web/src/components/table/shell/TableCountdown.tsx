@@ -1,0 +1,56 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { getAudioManager } from '@/lib/audio/AudioManager';
+import { PARLOUR_SFX } from '@/lib/audio/sfx';
+import { prefersCalmMotion } from '@/lib/table/calm-motion';
+import { useProfileStore } from '@/stores/profile';
+import styles from '@/styles/table.module.css';
+
+/**
+ * The shared 3·2·1 that opens every table, solo or with friends.
+ *
+ * Purely presentational: it runs over the opening deal rather than delaying
+ * it, so no game's fx timeline had to learn about it — by "1" the cards are
+ * mostly down and "Deal!" lands as the table becomes playable. Each beat is a
+ * clock tick; the release is the turn-ready chime. Calm-motion players skip
+ * it entirely — a full-screen numeral is exactly what they turned off.
+ */
+const STEPS = ['3', '2', '1', 'Deal!'] as const;
+const BEAT_MS = 800;
+const RELEASE_MS = 700;
+
+export function TableCountdown() {
+  const reducedMotion = useProfileStore((state) => state.settings.reducedMotion);
+  const [step, setStep] = useState(0);
+  const [skipped] = useState(() => prefersCalmMotion());
+
+  const done = skipped || reducedMotion || step >= STEPS.length;
+
+  useEffect(() => {
+    if (done) return;
+    getAudioManager().play(
+      step === STEPS.length - 1 ? PARLOUR_SFX.turnReady : PARLOUR_SFX.clockTick,
+    );
+    const timer = window.setTimeout(
+      () => setStep((current) => current + 1),
+      step === STEPS.length - 1 ? RELEASE_MS : BEAT_MS,
+    );
+    return () => window.clearTimeout(timer);
+  }, [done, step]);
+
+  if (done) return null;
+
+  const label = STEPS[step] ?? '';
+  return (
+    <div className={styles.countdown} aria-hidden="true" data-testid="table-countdown">
+      <span
+        key={step}
+        className={styles.countdownDigit}
+        data-final={step === STEPS.length - 1 || undefined}
+      >
+        {label}
+      </span>
+    </div>
+  );
+}

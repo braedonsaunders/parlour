@@ -3,6 +3,7 @@
 import type { ReactNode } from 'react';
 import type { HowToPlayDoc } from '@parlour/engine';
 import { TableMenu } from '@/components/table/TableMenu';
+import { TableCountdown } from './TableCountdown';
 import { TableHud } from './TableHud';
 import { TableShell, type TableShellProps } from './TableShell';
 import type { TableMenuController } from './useTableMenu';
@@ -33,6 +34,7 @@ export function TableScreenFrame({
     <TableShell rootRef={rootRef} className={className} dealState={dealState}>
       <TableHud onOpenMenu={menu.open}>{hud}</TableHud>
       {children}
+      <TableCountdown />
       <TableMenu open={menu.isOpen} onClose={menu.close} onQuit={menu.quit} howToPlay={howToPlay} />
     </TableShell>
   );

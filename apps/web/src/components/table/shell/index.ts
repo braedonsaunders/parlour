@@ -9,6 +9,7 @@ export {
 export { TableHud, TableMenuButton, TableTitlePill } from './TableHud';
 export { DiscardPileButton, StockPile, TablePiles } from './TablePiles';
 export { TableActionRail, TablePlayfield, TableTurnIndicator } from './TablePlayfield';
+export { TableCountdown } from './TableCountdown';
 export { TableShell, useTableAnnouncer, type TableShellProps } from './TableShell';
 export { TableScreenFrame, type TableScreenFrameProps } from './TableScreenFrame';
 export { canOfferSolitaireHint } from './solitaireHint';
