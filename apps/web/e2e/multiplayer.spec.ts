@@ -130,9 +130,19 @@ async function joinRoomByCode(page: Page, code: string): Promise<void> {
   await input.pressSequentially(code, { delay: 20 });
   const submit = page.getByTestId('join-submit');
   await expect(submit).toBeEnabled({ timeout: 10_000 });
-  await submit.click();
-  await expect(page.locator(ROOM_HEADING)).toBeVisible({ timeout: CONNECT_TIMEOUT_MS });
-  await expect(page.locator(ROOM_HEADING)).toContainText(code);
+  // WebKit iPhone: a click on the button is often eaten by the software
+  // keyboard still covering it. Enter on the field is the same path the
+  // page already handles, and a later click is a no-op while join is in
+  // flight (`checking` early-returns).
+  await input.press('Enter');
+  const heading = page.locator(ROOM_HEADING);
+  try {
+    await expect(heading).toBeVisible({ timeout: 12_000 });
+  } catch {
+    await submit.click();
+    await expect(heading).toBeVisible({ timeout: CONNECT_TIMEOUT_MS });
+  }
+  await expect(heading).toContainText(code);
 }
 
 /**
@@ -785,7 +795,10 @@ async function createVeiledRoom(page: Page): Promise<string> {
  * table with no error.
  */
 test.describe('veiled-deck rooms', () => {
-  test.describe.configure({ mode: 'serial', timeout: 180_000 });
+  // Independent rooms — not serial. A WebKit join flake in D2c used to
+  // skip D2d on the same worker. The multiplayer lane already runs one
+  // worker, so these still go one at a time without the skip coupling.
+  test.describe.configure({ timeout: 180_000 });
 
   test('D2a — ceremony failure degrades silently to open play', async ({ browser }) => {
     const broker = new HermeticSignalingBroker();
@@ -928,7 +941,10 @@ test.describe('veiled-deck rooms', () => {
     await returnInput.pressSequentially(code, { delay: 20 });
     const returnSubmit = guest2b.page.getByTestId('join-submit');
     await expect(returnSubmit).toBeEnabled({ timeout: 10_000 });
-    await returnSubmit.click();
+    await returnInput.press('Enter');
+    if (!(await guest2b.page.locator('[role="list"][data-zone]').first().isVisible().catch(() => false))) {
+      await returnSubmit.click();
+    }
 
     // The table should resume: guest2 reclaims seat 2.
     await expectAtTable(host.page, 10_000);
