@@ -942,7 +942,13 @@ test.describe('veiled-deck rooms', () => {
     const returnSubmit = guest2b.page.getByTestId('join-submit');
     await expect(returnSubmit).toBeEnabled({ timeout: 10_000 });
     await returnInput.press('Enter');
-    if (!(await guest2b.page.locator('[role="list"][data-zone]').first().isVisible().catch(() => false))) {
+    if (
+      !(await guest2b.page
+        .locator('[role="list"][data-zone]')
+        .first()
+        .isVisible()
+        .catch(() => false))
+    ) {
       await returnSubmit.click();
     }
 
