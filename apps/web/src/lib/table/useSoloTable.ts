@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { FxEvent } from '@parlour/engine';
 import { delayUntilFxSettles } from './fx-motion';
+import { holdFxForCountdown } from './opening-countdown';
 import { isStaleMoveFault } from './useRoomTable';
 
 /**
@@ -119,7 +120,10 @@ export function useSoloTable<TSnapshot, TDispatch extends SoloTableDispatch<TSna
   } = options;
 
   const [snapshot, setSnapshot] = useState(() => transport.getSnapshot());
-  const [fx, setFx] = useState<readonly FxEvent[]>(() => round(snapshot).setupFx ?? []);
+  // The opening deal waits for the table's 3·2·1; every later burst is live.
+  const [fx, setFx] = useState<readonly FxEvent[]>(() =>
+    holdFxForCountdown(round(snapshot).setupFx ?? []),
+  );
   const [fxKey, setFxKey] = useState(0);
   const [error, setError] = useState<string | null>(null);
 

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { getAudioManager } from '@/lib/audio/AudioManager';
 import { PARLOUR_SFX } from '@/lib/audio/sfx';
 import { prefersCalmMotion } from '@/lib/table/calm-motion';
+import { OPENING_COUNTDOWN_LEAD_MS } from '@/lib/table/opening-countdown';
 import { useProfileStore } from '@/stores/profile';
 import styles from '@/styles/table.module.css';
 
@@ -17,7 +18,8 @@ import styles from '@/styles/table.module.css';
  * it entirely — a full-screen numeral is exactly what they turned off.
  */
 const STEPS = ['3', '2', '1', 'Deal!'] as const;
-const BEAT_MS = 800;
+/** Three beats fill the opening-fx hold exactly, so "Deal!" lands on card one. */
+const BEAT_MS = OPENING_COUNTDOWN_LEAD_MS / 3;
 const RELEASE_MS = 700;
 /** One extra beat after "Deal!" where the veil fades instead of vanishing. */
 const VEIL_OUT_MS = 320;

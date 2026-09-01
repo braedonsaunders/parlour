@@ -5,26 +5,26 @@
 /* --- card faces ---------------------------------------------------------- */
 
 .face {
-  color: #fffdf6;
-  text-shadow: 0 2px 0 rgba(20, 12, 4, 0.28);
+  color: #ffffff;
+  text-shadow: 0 2.5px 0 rgba(20, 12, 4, 0.4);
 }
 
 .red {
-  background: linear-gradient(150deg, #e0685c, #b23c33);
+  background: linear-gradient(150deg, #ef5b49, #c22d20);
 }
 .yellow {
-  background: linear-gradient(150deg, #f2c45c, #cf8f24);
+  background: linear-gradient(150deg, #fac643, #e08e10);
 }
 .green {
-  background: linear-gradient(150deg, #6cbb87, #3d7f56);
+  background: linear-gradient(150deg, #4cc276, #2b8d4d);
 }
 .blue {
-  background: linear-gradient(150deg, #58acc7, #2e6d86);
+  background: linear-gradient(150deg, #3db2dc, #1c7095);
 }
 .wildFace {
   background:
     radial-gradient(circle at 50% 46%, rgba(16, 24, 30, 0) 34%, rgba(16, 24, 30, 0.92) 35%),
-    conic-gradient(#b23c33 0 25%, #cf8f24 0 50%, #3d7f56 0 75%, #2e6d86 0);
+    conic-gradient(#c22d20 0 25%, #e08e10 0 50%, #2b8d4d 0 75%, #1c7095 0);
 }
 
 .corner {

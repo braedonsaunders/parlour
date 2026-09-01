@@ -25,5 +25,5 @@
   /* One constant vibrancy pass over the painted scene. Constant matters: the
      layer never gains or loses its filter, so Windows DComp has nothing to
      flash, and the diorama's dusk palette stops reading as murk behind cards. */
-  filter: saturate(1.16) contrast(1.04);
+  filter: saturate(1.04) contrast(1.04);
 }
