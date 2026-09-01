@@ -13,6 +13,12 @@ export type MusicPack = {
   /** Title-screen theme; packs without one inherit the parlour menu theme. */
   menu?: readonly MusicTrack[];
   /**
+   * Scenes whose playlist should keep playing on menu routes too. The cozy
+   * scenes hand the menus their title waltz; a party scene like the beach
+   * would sound wrong dropping to it, so it brings its own music along.
+   */
+  sceneMenus?: Partial<Record<SceneId, readonly MusicTrack[]>>;
+  /**
    * Mood cues a running game can switch on from its own state (never pickable
    * in settings). This is the simple game-pack authoring path: a global cue
    * such as `moods: { tense: [...] }` overrides every background.
@@ -109,6 +115,7 @@ export const PARLOUR_PACK: MusicPack = {
     beach: BEACH_PLAYLIST,
   },
   menu: MENU_PLAYLIST,
+  sceneMenus: { beach: BEACH_PLAYLIST },
   sceneMoods: {
     campfire: { tense: TENSE_PLAYLISTS.campfire },
     casino: { tense: TENSE_PLAYLISTS.casino },
@@ -185,7 +192,9 @@ export function playlistForPack(pack: MusicPack | undefined, scene: SceneId): Mu
 }
 
 /** Menu-theme playlist for a pack, resolved against the parlour base. */
-export function menuForPack(pack: MusicPack | undefined): MusicTrack[] {
+export function menuForPack(pack: MusicPack | undefined, scene?: SceneId): MusicTrack[] {
+  const sceneMenu = scene ? (pack?.sceneMenus?.[scene] ?? PARLOUR_PACK.sceneMenus?.[scene]) : null;
+  if (sceneMenu && sceneMenu.length > 0) return [...sceneMenu];
   if (pack?.menu && pack.menu.length > 0) return [...pack.menu];
   return [...MENU_PLAYLIST];
 }

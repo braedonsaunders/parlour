@@ -10,6 +10,7 @@ import {
   TENSE_PLAYLISTS,
   getMusicPack,
   getMusicTrack,
+  menuForPack,
   listMusicPacks,
   moodForPack,
   playlistForPack,
@@ -73,6 +74,14 @@ describe('music library', () => {
   it('provides a menu theme on the base pack and keeps tense out of the picker', () => {
     expect(PARLOUR_PACK.menu).toEqual(MENU_PLAYLIST);
     expect(menuPlaylistSrc()).toContain('/audio/music/music-title.m4a');
+
+    // The cozy scenes hand menus the title waltz; the beach keeps its party.
+    expect(menuForPack(PARLOUR_PACK, 'campfire')[0]?.id).toBe('title-1');
+    expect(menuForPack(PARLOUR_PACK, 'beach').map((song) => song.id)).toEqual([
+      'beach-1',
+      'beach-2',
+      'beach-3',
+    ]);
 
     expect(getMusicPack('tense')).toBeUndefined();
     expect(listMusicPacks().map((pack) => pack.id)).not.toContain('tense');

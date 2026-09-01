@@ -265,12 +265,16 @@ export class MusicController {
     this.notify();
   }
 
-  /** Background changes swap playlists at the table; on menus they only arm the pick. */
+  /**
+   * Background changes swap playlists at the table. Menus usually just arm the
+   * pick and keep their title theme — but a scene that carries its own menu
+   * music (the beach) swaps right there on the picker.
+   */
   setScene(scene: SceneId): void {
     if (scene === this.scene) return;
     this.scene = scene;
     this.history = [];
-    if (this.inMenu || !this.wantPlaying || this.state.status === 'idle') return;
+    if (!this.wantPlaying || this.state.status === 'idle') return;
 
     const head = this.playablePlaylist()[0];
     if (!head || head.id === this.state.trackId) return;
@@ -400,7 +404,7 @@ export class MusicController {
     const mood = moodPool.filter((track) => !this.voices.get(track.id)?.failed);
     if (mood.length > 0) return mood;
 
-    const pool = this.inMenu ? menuForPack(pack) : playlistForPack(pack, this.scene);
+    const pool = this.inMenu ? menuForPack(pack, this.scene) : playlistForPack(pack, this.scene);
     const list = pool.filter((track) => !this.voices.get(track.id)?.failed);
     if (list.length > 0) return list;
     // A game pack whose songs have not shipped yet should sound like the
