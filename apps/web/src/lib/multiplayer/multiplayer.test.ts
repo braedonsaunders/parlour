@@ -536,6 +536,7 @@ describe('only the current host may move the board', () => {
       origin: 'https://parlour.test',
     });
     const harness = transport as unknown as {
+      resilience: MultiplayerState;
       startRoom(code: string, hostId: string): void;
       receiveWire(peerId: string, message: unknown): Promise<void>;
       sendTo: ReturnType<typeof vi.fn>;
@@ -580,6 +581,42 @@ describe('only the current host may move the board', () => {
 
     expect(events).toEqual([packet]);
     expect(authority.exportSnapshot().log).toHaveLength(packet.events.length);
+    transport.close();
+  });
+
+  it('imports a host.changed snapshot after independently electing the same host', async () => {
+    const { transport, harness, authority } = guestOnBlitz();
+    const local = harness.resilience.localPeerId;
+    const elected = '0'.repeat(64);
+    const oldHost = 'host';
+
+    harness.resilience.assignSeat(0, oldHost, 'p-host');
+    harness.resilience.assignSeat(1, local, 'guest-profile');
+    const now = Date.now();
+    harness.resilience.seePeer(oldHost, now - HEARTBEAT_TIMEOUT_MS - 1);
+    harness.resilience.seePeer(elected, now);
+    harness.resilience.seePeer(local, now);
+
+    expect(harness.resilience.expireAndElect(now).hostId).toBe(elected);
+    expect(harness.resilience.seats.get(0)?.bot).toBe(false);
+
+    await harness.receiveWire(elected, {
+      type: 'host.changed',
+      hostId: elected,
+      term: 1,
+      snapshot: {
+        replay: authority.exportSnapshot(),
+        presence: {
+          version: 10,
+          seats: [
+            [0, { peerId: oldHost, profileId: 'p-host', bot: true }],
+            [1, { peerId: local, profileId: 'guest-profile', bot: false }],
+          ],
+        },
+      },
+    });
+
+    expect(harness.resilience.seats.get(0)?.bot).toBe(true);
     transport.close();
   });
 });

@@ -177,9 +177,50 @@ async function fillBotsAndStart(page: Page): Promise<void> {
   await expect(start).toBeEnabled({ timeout: 20_000 });
   await start.click();
 
-  await expectAtTable(page, 20_000);
+  await expectAtTable(page, 30_000);
   const hand = page.locator('[role="list"][data-zone]').first();
   await expect(hand.locator('[role="listitem"]').first()).toBeVisible({ timeout: 15_000 });
+}
+
+/** Waits until every listed seat is actually sitting at the dealt table. */
+async function expectSeatsAtTable(seats: readonly Seat[]): Promise<void> {
+  for (const seat of seats) await expectAtTable(seat.page, CONNECT_TIMEOUT_MS);
+}
+
+async function roomSnapshot(page: Page): Promise<{
+  localSeat: number | null;
+  seats: { seat: number; bot: boolean; connected: boolean }[];
+}> {
+  return page.evaluate(() => {
+    const session = (
+      globalThis as unknown as {
+        __parlourActiveRoom?: {
+          getSnapshot(): {
+            localSeat: number | null;
+            seats: { seat: number; bot: boolean; connected: boolean }[];
+          };
+        };
+      }
+    ).__parlourActiveRoom?.getSnapshot();
+    return {
+      localSeat: session?.localSeat ?? null,
+      seats: session?.seats ?? [],
+    };
+  });
+}
+
+/** The chair became a bot in the session and the nameplate says so. */
+async function expectSeatBecameBot(page: Page, seat: number, timeout = 30_000): Promise<void> {
+  await expect
+    .poll(
+      async () => {
+        const snap = await roomSnapshot(page);
+        return snap.seats.find((occupant) => occupant.seat === seat)?.bot ?? false;
+      },
+      { timeout },
+    )
+    .toBe(true);
+  await expect(seatIsBot(page, seat)).toBeVisible({ timeout: 10_000 });
 }
 
 /** Drops a seat's broker handlers and closes its context. */
@@ -389,7 +430,7 @@ test.describe('multi-context friend room (hermetic)', () => {
 });
 
 test.describe('multiplayer resilience (hermetic)', () => {
-  test.describe.configure({ timeout: 120_000 });
+  test.describe.configure({ mode: 'serial', timeout: 120_000 });
 
   /**
    * Host death and deterministic re-election.
@@ -411,6 +452,9 @@ test.describe('multiplayer resilience (hermetic)', () => {
     await joinRoomByCode(guest1.page, code);
     await joinRoomByCode(guest2.page, code);
     await fillBotsAndStart(host.page);
+    // Guests used to still be in lobbyHold when the host died — their
+    // heartbeat then took the lobby branch and dissolved the table.
+    await expectSeatsAtTable([guest1, guest2]);
 
     // Kill the host. This closes its WebRTC links; the guests detect the loss
     // through heartbeats (3.5s) and re-elect the lowest surviving peer.
@@ -455,7 +499,8 @@ test.describe('multiplayer resilience (hermetic)', () => {
     });
 
     // The host's seat (0) is now driven by a bot on whichever peer won.
-    await expect(seatIsBot(guest1.page, 0)).toBeVisible({ timeout: 20_000 });
+    await expectSeatBecameBot(guest1.page, 0);
+    await expectSeatBecameBot(guest2.page, 0);
 
     await guest1.context.close();
     await guest2.context.close();
@@ -478,12 +523,15 @@ test.describe('multiplayer resilience (hermetic)', () => {
     await joinRoomByCode(guest1.page, code);
     await joinRoomByCode(guest2.page, code);
     await fillBotsAndStart(host.page);
+    await expectSeatsAtTable([guest1, guest2]);
 
-    // guest2 occupies seat 2 (host=0, guest1=1, guest2=2). Drop it.
+    const guest2Seat = (await roomSnapshot(guest2.page)).localSeat;
+    expect(guest2Seat, 'guest2 was seated before it left').not.toBeNull();
+
     await closeSeat(guest2, broker);
 
-    // The host sees seat 2 become a bot, and the table stays alive.
-    await expect(seatIsBot(host.page, 2)).toBeVisible({ timeout: 20_000 });
+    // The host sees that chair become a bot, and the table stays alive.
+    await expectSeatBecameBot(host.page, guest2Seat!);
     await expectAtTable(host.page, 5_000);
     await expect(host.page.getByRole('alert').filter({ hasText: /.+/ })).toHaveCount(0, {
       timeout: 10_000,
@@ -510,6 +558,7 @@ test.describe('multiplayer resilience (hermetic)', () => {
     const code = await createRoom(host.page);
     await joinRoomByCode(guest.page, code);
     await fillBotsAndStart(host.page);
+    await expectSeatsAtTable([guest]);
 
     // Drop the only other human.
     await closeSeat(guest, broker);
@@ -599,8 +648,7 @@ test.describe('multiplayer resilience (hermetic)', () => {
     const code = await createRoom(host.page);
     await joinRoomByCode(guest.page, code);
     await fillBotsAndStart(host.page);
-
-    await expectAtTable(guest.page, CONNECT_TIMEOUT_MS);
+    await expectSeatsAtTable([guest]);
     await host.page.waitForTimeout(DEAL_SETTLE_MS);
     await guest.page.waitForTimeout(DEAL_SETTLE_MS);
 
@@ -710,7 +758,7 @@ async function createVeiledRoom(page: Page): Promise<string> {
  * table with no error.
  */
 test.describe('veiled-deck rooms', () => {
-  test.describe.configure({ timeout: 180_000 });
+  test.describe.configure({ mode: 'serial', timeout: 180_000 });
 
   test('D2a — ceremony failure degrades silently to open play', async ({ browser }) => {
     const broker = new HermeticSignalingBroker();
@@ -761,7 +809,6 @@ test.describe('veiled-deck rooms', () => {
     // Under Veil, each seat's DOM must not contain another seat's card faces.
     // The host plays a non-wild card; the guest sees the card land on the
     // centre pile but must not see the host's remaining hand cards.
-    const hostHandCards = host.page.locator('[role="list"][data-zone] [role="listitem"]');
 
     /*
      * Ask the rail which cards are legal instead of inferring it from opacity.
@@ -775,12 +822,13 @@ test.describe('veiled-deck rooms', () => {
       hasNot: host.page.locator('[aria-label^="Play wild"]'),
     });
     if (await playable.count()) {
-      const hostHandBefore = await hostHandCards.count();
+      const card = playable.last();
+      const cardId = await card.getAttribute('data-card-id');
       // Forced, because overlap is the design: a fanned hand covers each card's
       // centre with the one dealt after it, and Playwright clicks centres. What
       // `force` skips is hit-testing, not the outcome — the assertion below is
       // still that the card actually left the hand.
-      await playable.last().click({ force: true });
+      await card.click({ force: true });
 
       // Only wilds open this, and they are filtered out above — but a pack may
       // add another chooser later, and a modal left open would block the rest.
@@ -789,9 +837,13 @@ test.describe('veiled-deck rooms', () => {
         await picker.getByRole('button').first().click();
       }
 
-      // The card leaving the hand is the assertion; a fixed sleep was only ever
-      // standing in for it, and four veiled tables sharing a CPU outran it.
-      await expect(hostHandCards).toHaveCount(hostHandBefore - 1, { timeout: 15_000 });
+      // Count-of-listitems was the wrong fact: a departing card stays in the
+      // DOM through its exit animation, and a later draw adds more, so the
+      // total went 7 → 9 while the played card was already gone.
+      expect(cardId, 'playable card published a data-card-id').toBeTruthy();
+      await expect(host.page.locator(`[data-hand-card][data-card-id="${cardId}"]`)).toHaveCount(0, {
+        timeout: 15_000,
+      });
     }
 
     // The guest must NOT see any new card faces in their own DOM.
@@ -844,8 +896,13 @@ test.describe('veiled-deck rooms', () => {
      * deals" while their own hand was live behind it.
      */
     await guest2b.page.goto('/join/');
-    await guest2b.page.locator(JOIN_INPUT).fill(code);
-    await guest2b.page.getByTestId('join-submit').click();
+    const returnInput = guest2b.page.locator(JOIN_INPUT);
+    await expect(returnInput).toBeVisible({ timeout: CONNECT_TIMEOUT_MS });
+    await returnInput.click();
+    await returnInput.pressSequentially(code, { delay: 20 });
+    const returnSubmit = guest2b.page.getByTestId('join-submit');
+    await expect(returnSubmit).toBeEnabled({ timeout: 10_000 });
+    await returnSubmit.click();
 
     // The table should resume: guest2 reclaims seat 2.
     await expectAtTable(host.page, 10_000);

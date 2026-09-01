@@ -34,7 +34,10 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
-  workers: process.env.CI ? 2 : undefined,
+  // Multiplayer opens several WebRTC contexts per test. Two workers on a
+  // shared CI CPU starve heartbeats and the deal, which is how D1i/D1j
+  // flickered even when the room logic was fine.
+  workers: process.env.CI ? (multiplayerLane ? 1 : 2) : undefined,
   reporter: process.env.CI ? [['github'], ['list']] : [['list']],
 
   use: {

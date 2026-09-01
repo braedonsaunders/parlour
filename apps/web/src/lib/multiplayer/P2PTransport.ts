@@ -716,14 +716,28 @@ export class P2PTransport implements Transport {
         if (message.term === undefined) {
           const legacyElection = this.resilience!.expireAndElect(this.now());
           if (legacyElection.hostId !== message.hostId) return;
-        } else if (
-          !this.resilience!.considerHostClaim(message.hostId, message.term, false, this.now())
-        )
-          return;
+        } else {
+          // Every surviving peer runs expireAndElect on its own clock, so by
+          // the time the winner announces we have often already elected the
+          // same host at the same term. considerHostClaim then returns false
+          // (a no-op claim does not "win"), and we used to drop the snapshot
+          // that marks the dead seat as a bot. Accept that already-settled
+          // claim so the presence still lands.
+          const already =
+            this.resilience!.hostId === message.hostId &&
+            this.resilience!.electionTerm === message.term;
+          if (
+            !already &&
+            !this.resilience!.considerHostClaim(message.hostId, message.term, false, this.now())
+          ) {
+            return;
+          }
+        }
         await this.importMigration(message.snapshot, true);
         this.pendingResync = false;
         this.pendingHostMigration = false;
         this.emitPresence({ kind: 'host.changed', hostId: message.hostId });
+        this.emitPresence({ kind: 'connection', state: 'connected' });
         return;
       case 'veil':
         // A peel addressed to another seat is not ours to look at, even though
@@ -894,6 +908,7 @@ export class P2PTransport implements Transport {
         snapshot: this.exportMigration(),
       });
       this.emitPresence({ kind: 'host.changed', hostId: election.hostId });
+      this.emitPresence({ kind: 'connection', state: 'connected' });
       for (const action of election.resend) this.send(action);
     } else if (
       this.isHost() &&
