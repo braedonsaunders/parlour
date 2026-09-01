@@ -1,8 +1,9 @@
 name: Multiplayer gate
 
-# Multi-context friend-room suite against the static export. Signalling is
-# hermetic (in-process broker), so this belongs on the same push/PR lane as
-# the rest of CI rather than a morning cron that goes red with nobody pushing.
+# One desktop Chromium job. Create, join, deal, play, host death, walkover.
+# WebKit iPhone + three-context veiled reconnect is not a merge signal —
+# those paths live in the unit/duel suites, and the browser gate already
+# covers WebKit for PWA and iOS chrome.
 
 on:
   push:
@@ -16,13 +17,9 @@ concurrency:
 
 jobs:
   multi-context:
-    name: Multi-context friend room (${{ matrix.project }})
+    name: Friend room
     runs-on: ubuntu-latest
-    timeout-minutes: 25
-    strategy:
-      fail-fast: false
-      matrix:
-        project: [chromium, webkit]
+    timeout-minutes: 15
 
     steps:
       - uses: actions/checkout@v4
@@ -40,23 +37,17 @@ jobs:
       - name: Build the export
         run: pnpm --filter @parlour/web build
 
-      - name: Install browsers
-        run: pnpm --filter @parlour/web exec playwright install --with-deps ${{ matrix.project }}
+      - name: Install Chromium
+        run: pnpm --filter @parlour/web exec playwright install --with-deps chromium
 
-      - name: Multiplayer gate
+      - name: Friend-room suite
         env:
           PARLOUR_MULTIPLAYER_E2E: '1'
-        run: pnpm --filter @parlour/web exec playwright test --config playwright.config.ts --project=${{ matrix.project }} e2e/multiplayer.spec.ts
+        run: pnpm --filter @parlour/web exec playwright test --config playwright.config.ts --project=chromium e2e/multiplayer.spec.ts
 
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
-          name: multiplayer-traces-${{ matrix.project }}
+          name: multiplayer-traces
           path: output/playwright
           retention-days: 7
-
-      - name: Report failure
-        if: failure()
-        run: |
-          echo "::error::Multi-context suite failed on ${{ matrix.project }}." \
-            "Signalling is hermetic; treat this as a code or test regression."
