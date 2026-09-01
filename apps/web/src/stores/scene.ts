@@ -79,7 +79,17 @@ if (typeof window !== 'undefined') {
       // First boot on this storage — or the storage was wiped. The cookie is
       // the last pick that survived; setScene re-seeds localStorage from it.
       const remembered = readSceneCookie();
-      if (remembered) useSceneStore.getState().setScene(remembered);
+      if (remembered) {
+        useSceneStore.getState().setScene(remembered);
+      } else {
+        // Nobody has ever chosen: deal a random background instead of always
+        // opening on the campfire. The roll is per-session — nothing persists
+        // until the player actually picks one, so tomorrow deals fresh.
+        const rolled = SCENE_IDS[Math.floor(Math.random() * SCENE_IDS.length)] ?? DEFAULT_SCENE;
+        useSceneStore.getState().setScene(rolled);
+        window.localStorage.removeItem(SCENE_STORAGE_KEY);
+        document.cookie = `${SCENE_COOKIE}=; path=/; max-age=0`;
+      }
     } else {
       writeSceneCookie(useSceneStore.getState().sceneId);
     }
