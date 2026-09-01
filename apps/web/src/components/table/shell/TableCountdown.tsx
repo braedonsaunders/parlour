@@ -19,38 +19,50 @@ import styles from '@/styles/table.module.css';
 const STEPS = ['3', '2', '1', 'Deal!'] as const;
 const BEAT_MS = 800;
 const RELEASE_MS = 700;
+/** One extra beat after "Deal!" where the veil fades instead of vanishing. */
+const VEIL_OUT_MS = 320;
 
 export function TableCountdown() {
   const reducedMotion = useProfileStore((state) => state.settings.reducedMotion);
   const [step, setStep] = useState(0);
   const [skipped] = useState(() => prefersCalmMotion());
 
-  const done = skipped || reducedMotion || step >= STEPS.length;
+  const leaving = step === STEPS.length;
+  const done = skipped || reducedMotion || step > STEPS.length;
 
   useEffect(() => {
     if (done) return;
-    getAudioManager().play(
-      step === STEPS.length - 1 ? PARLOUR_SFX.turnReady : PARLOUR_SFX.clockTick,
-    );
+    if (!leaving) {
+      getAudioManager().play(
+        step === STEPS.length - 1 ? PARLOUR_SFX.turnReady : PARLOUR_SFX.clockTick,
+      );
+    }
     const timer = window.setTimeout(
       () => setStep((current) => current + 1),
-      step === STEPS.length - 1 ? RELEASE_MS : BEAT_MS,
+      leaving ? VEIL_OUT_MS : step === STEPS.length - 1 ? RELEASE_MS : BEAT_MS,
     );
     return () => window.clearTimeout(timer);
-  }, [done, step]);
+  }, [done, leaving, step]);
 
   if (done) return null;
 
   const label = STEPS[step] ?? '';
   return (
-    <div className={styles.countdown} aria-hidden="true" data-testid="table-countdown">
-      <span
-        key={step}
-        className={styles.countdownDigit}
-        data-final={step === STEPS.length - 1 || undefined}
-      >
-        {label}
-      </span>
+    <div
+      className={styles.countdown}
+      aria-hidden="true"
+      data-testid="table-countdown"
+      data-leaving={leaving || undefined}
+    >
+      {!leaving && (
+        <span
+          key={step}
+          className={styles.countdownDigit}
+          data-final={step === STEPS.length - 1 || undefined}
+        >
+          {label}
+        </span>
+      )}
     </div>
   );
 }

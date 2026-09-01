@@ -33,7 +33,12 @@ describe('TableCountdown', () => {
     expect(digit()).toBe('1');
     act(() => void vi.advanceTimersByTime(800));
     expect(digit()).toBe('Deal!');
+    // The veil lingers a beat to fade instead of vanishing, then it is gone.
     act(() => void vi.advanceTimersByTime(700));
+    expect(
+      container.querySelector('[data-testid="table-countdown"]')?.getAttribute('data-leaving'),
+    ).toBe('true');
+    act(() => void vi.advanceTimersByTime(400));
     expect(container.querySelector('[data-testid="table-countdown"]')).toBeNull();
   });
 

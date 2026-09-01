@@ -128,7 +128,8 @@
 .tableBadges {
   position: absolute;
   left: 50%;
-  top: 31%;
+  /* Clear of the bigger bobbing "Your turn" pill that rides above the piles. */
+  top: 25.5%;
   z-index: 6;
   display: flex;
   gap: 0.5rem;

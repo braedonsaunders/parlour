@@ -299,6 +299,31 @@
   display: grid;
   place-items: center;
   pointer-events: none;
+  /* A plain painted veil — never backdrop-filter over the scene canvas. */
+  background: radial-gradient(ellipse at 50% 46%, rgba(6, 14, 19, 0.34), rgba(6, 14, 19, 0.66));
+  animation: countdownVeilIn 240ms ease-out both;
+}
+
+.countdown[data-leaving] {
+  animation: countdownVeilOut 320ms ease-in both;
+}
+
+@keyframes countdownVeilIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes countdownVeilOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
 }
 
 .countdownDigit {
