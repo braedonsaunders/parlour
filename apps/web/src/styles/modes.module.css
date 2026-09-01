@@ -561,10 +561,26 @@
     padding-top: max(0.6rem, env(safe-area-inset-top));
   }
 
+  /* Sideways, the modes stack and scroll vertically down the left column —
+     a thumb flicks up through the pile instead of dragging across it. */
   .fitCarousel {
     height: 100%;
     min-height: 0;
-    padding-block: 0.5rem;
+    flex-direction: column;
+    align-items: center;
+    overflow-x: clip;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scroll-snap-type: y mandatory;
+    padding: 0.5rem 1rem;
+    scroll-padding-block: 0.5rem;
+  }
+
+  .fitCarousel > * {
+    flex: none;
+    width: min(21rem, 100%);
+    height: 100%;
+    max-height: none;
   }
 
   /* Aligned to the top rather than centred: a centred flex column that

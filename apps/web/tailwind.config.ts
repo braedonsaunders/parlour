@@ -4,6 +4,10 @@ const config: Config = {
   content: ['./src/**/*.{ts,tsx}'],
   theme: {
     extend: {
+      screens: {
+        /** A phone held sideways: wide, but with almost no vertical room. */
+        shortscape: { raw: '(orientation: landscape) and (max-height: 560px)' },
+      },
       colors: {
         // cozy diorama palette (spec §8) — warm ambers/teals, saturated pops
         hearth: {

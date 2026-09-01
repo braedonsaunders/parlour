@@ -494,30 +494,6 @@
   }
 }
 
-/* A phone held sideways gets one swipeable row instead of a page of vertical
-   scrolling: every card the same height, thumbed through like a hand. */
-@media (orientation: landscape) and (max-height: 560px) {
-  .gameGrid {
-    display: flex;
-    gap: 0.9rem;
-    overflow-x: auto;
-    overflow-y: clip;
-    scroll-snap-type: x proximity;
-    padding-bottom: 0.6rem;
-    scrollbar-width: none;
-  }
-
-  .gameGrid::-webkit-scrollbar {
-    display: none;
-  }
-
-  .gameGrid .tileWrap {
-    flex: none;
-    width: min(17rem, 72vw);
-    scroll-snap-align: start;
-  }
-}
-
 @media (max-width: 820px) {
   .header {
     grid-template-columns: auto 1fr;

@@ -37,7 +37,7 @@ export default function TitlePage() {
   }, [nav]);
 
   return (
-    <main className="flex min-h-dvh flex-col items-center justify-center gap-5 px-6 text-center">
+    <main className="flex min-h-dvh flex-col items-center justify-center gap-5 px-6 text-center shortscape:gap-2">
       {/* One cluster, so sound and language read as a pair rather than two
           pieces of furniture that happen to share a corner. */}
       <div className="chrome-nw fixed z-30 flex items-center gap-2">
@@ -56,13 +56,13 @@ export default function TitlePage() {
         </span>
       </Link>
 
-      <h1 aria-label="parlour" className="-my-8">
+      <h1 aria-label="parlour" className="-my-8 shortscape:-my-5">
         {/* eslint-disable-next-line @next/next/no-img-element -- static asset with baked-in SVG animation; next/image would proxy it needlessly */}
         <img
           src="/parlour-logo-home.svg"
           alt=""
           draggable={false}
-          className="pointer-events-none w-[min(84vw,27rem)] select-none"
+          className="pointer-events-none w-[min(84vw,27rem)] select-none shortscape:w-52"
         />
       </h1>
 
@@ -71,7 +71,7 @@ export default function TitlePage() {
         initial="hidden"
         animate="shown"
         custom={0.12}
-        className="max-w-md text-balance text-dusk-100/90"
+        className="max-w-md text-balance text-dusk-100/90 shortscape:text-sm"
       >
         {t('home.tagline')}
       </motion.p>
@@ -81,7 +81,7 @@ export default function TitlePage() {
         initial="hidden"
         animate="shown"
         custom={0.18}
-        className="mt-3 flex flex-col items-center gap-3"
+        className="mt-3 flex flex-col items-center gap-3 shortscape:mt-0 shortscape:gap-2"
       >
         <button
           type="button"
@@ -98,7 +98,7 @@ export default function TitlePage() {
           {t('home.joinPrompt')}
         </Link>
         <PwaInstall />
-        <span className="pill-soft mt-1 cursor-default select-none text-xs uppercase tracking-[0.25em] text-dusk-200">
+        <span className="pill-soft mt-1 cursor-default select-none text-xs uppercase tracking-[0.25em] text-dusk-200 shortscape:hidden">
           {t('home.shelfNote')}
         </span>
       </motion.div>
