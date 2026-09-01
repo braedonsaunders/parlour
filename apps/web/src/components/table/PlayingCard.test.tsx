@@ -25,9 +25,7 @@ describe('PlayingCard', () => {
     });
     expect(container.textContent).toContain('Q');
     expect(container.textContent).toContain('♠');
-    expect(container.querySelector('[aria-label]')?.getAttribute('aria-label')).toBe(
-      'Q of spades',
-    );
+    expect(container.querySelector('[aria-label]')?.getAttribute('aria-label')).toBe('Q of spades');
   });
 
   it('prints a pinochle copy id as rank and suit, not the copy suffix', () => {
@@ -37,9 +35,7 @@ describe('PlayingCard', () => {
     expect(container.textContent).not.toContain('Q-1');
     expect(container.textContent).toContain('Q');
     expect(container.textContent).toContain('♠');
-    expect(container.querySelector('[aria-label]')?.getAttribute('aria-label')).toBe(
-      'Q of spades',
-    );
+    expect(container.querySelector('[aria-label]')?.getAttribute('aria-label')).toBe('Q of spades');
   });
 
   it('prints a pinochle ten without eating the rank', () => {

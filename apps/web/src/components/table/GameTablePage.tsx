@@ -273,8 +273,7 @@ function RoomTablePage<TSnapshot, TDispatch, TTransport, S, C extends RuleValues
     openingFxKey.current = snapshot.fxKey;
   }
   const fx = useMemo(
-    () =>
-      snapshot.fxKey === openingFxKey.current ? holdFxForCountdown(snapshot.fx) : snapshot.fx,
+    () => (snapshot.fxKey === openingFxKey.current ? holdFxForCountdown(snapshot.fx) : snapshot.fx),
     [snapshot.fx, snapshot.fxKey],
   );
 

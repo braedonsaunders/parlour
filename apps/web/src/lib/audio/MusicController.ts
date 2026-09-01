@@ -411,9 +411,7 @@ export class MusicController {
     // parlour, not like silence: fall through to the base scene playlist
     // before giving up and droning the ambience bed.
     if (!this.inMenu && pack && pack.id !== BASE_PACK_ID) {
-      const base = tracksForScene(this.scene).filter(
-        (track) => !this.voices.get(track.id)?.failed,
-      );
+      const base = tracksForScene(this.scene).filter((track) => !this.voices.get(track.id)?.failed);
       if (base.length > 0) return base;
     }
     const fallbackFailed = this.voices.get(FALLBACK_TRACK.id)?.failed;

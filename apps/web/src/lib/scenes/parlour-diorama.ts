@@ -4221,13 +4221,7 @@ export function mountParlourDiorama(
     }
 
     /* the two palms that hold the party lights */
-    const palm = (
-      baseX: number,
-      baseY: number,
-      h: number,
-      lean: number,
-      seed: number,
-    ): Anchor => {
+    const palm = (baseX: number, baseY: number, h: number, lean: number, seed: number): Anchor => {
       const rp = mulberry(seed);
       const topX = baseX + lean * h * 0.34;
       const topY = baseY - h;
@@ -4326,10 +4320,8 @@ export function mountParlourDiorama(
     const bulbs: Anchor[] = [];
     for (let i = 1; i < 14; i += 1) {
       const u = i / 14;
-      const x =
-        (1 - u) * (1 - u) * palmL.x + 2 * (1 - u) * u * sagX + u * u * palmR.x;
-      const y =
-        (1 - u) * (1 - u) * palmL.y + 2 * (1 - u) * u * sagY + u * u * palmR.y;
+      const x = (1 - u) * (1 - u) * palmL.x + 2 * (1 - u) * u * sagX + u * u * palmR.x;
+      const y = (1 - u) * (1 - u) * palmL.y + 2 * (1 - u) * u * sagY + u * u * palmR.y;
       bulbs.push({ x, y: y + 5 });
       n.strokeStyle = 'rgba(20,10,22,0.85)';
       n.beginPath();

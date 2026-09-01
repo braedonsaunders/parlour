@@ -140,8 +140,7 @@ export function wildTableView(
       draw: offered.some((move) => move.id === 'draw'),
       declineJump: offered.some((move) => move.id === 'declineJump'),
       chooseColor: offered.some((move) => move.id === 'chooseColor'),
-      callLastCard:
-        offered.some((move) => move.id === 'callLastCard') || exposedSeat === localSeat,
+      callLastCard: offered.some((move) => move.id === 'callLastCard') || exposedSeat === localSeat,
       catchLastCard: exposedSeat !== null && exposedSeat !== localSeat,
       challengeDrawFour: offered.some((move) => move.id === 'challengeDrawFour'),
       pass: offered.some((move) => move.id === 'pass'),

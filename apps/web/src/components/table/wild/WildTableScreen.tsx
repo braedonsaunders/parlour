@@ -366,12 +366,15 @@ function useWildClosingCues(endsAt: number | undefined, running: boolean): void 
     // timeout ends the match and this effect gets cleaned up.
     if (endsAt - 120 > now) {
       timers.push(
-        window.setTimeout(() => {
-          audio.play(PARLOUR_SFX.timeUp);
-          const music = getMusicController();
-          music.setFrantic(null);
-          music.setDuck(0.45);
-        }, endsAt - 120 - now),
+        window.setTimeout(
+          () => {
+            audio.play(PARLOUR_SFX.timeUp);
+            const music = getMusicController();
+            music.setFrantic(null);
+            music.setDuck(0.45);
+          },
+          endsAt - 120 - now,
+        ),
       );
     }
     return () => timers.forEach((timer) => window.clearTimeout(timer));
