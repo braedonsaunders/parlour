@@ -24,6 +24,7 @@ import {
 import {
   auditSummary,
   layerStream,
+  clearRoundMaterial,
   loadRoundMaterial,
   recoveryPolicyFor,
   isSeatLeftFault,
@@ -101,6 +102,12 @@ export type MultiplayerSeat = MultiplayerProfile & {
   seat: number;
   connected: boolean;
   bot: boolean;
+  /**
+   * A veiled table is holding this chair for a player who dropped. Nothing is
+   * playing it — calling it a bot during the hold was a lie the table told —
+   * and the countdown in {@link MultiplayerSecurity.waitingOn} says how long.
+   */
+  away?: boolean;
 };
 
 export type MultiplayerRoomSnapshot = {
@@ -262,6 +269,8 @@ export class MultiplayerRoomSession {
    * be pressed while the room's own key is still being read back.
    */
   private veilAttach: Promise<void> | null = null;
+  /** unhooks the previous round's veil listener before a new one attaches */
+  private veilDetach: (() => void) | null = null;
   private seed = 0;
   /** This seat's shuffle share, minted once per room and revealed at the deal. */
   private dealNonce: string | null = null;
@@ -633,6 +642,19 @@ export class MultiplayerRoomSession {
       throw new Error('the current match has not finished yet');
     }
 
+    // A walkover has nobody to redeal against. The room outlives the match:
+    // the same code, settings and share link go back to a lobby with the
+    // departed chair emptied, ready to seat whoever comes next. Only ever a
+    // host decision — at two seats the survivor IS the host (either it always
+    // was, or the migration made it so when the host died).
+    if (current.result.reason === 'opponent-left') {
+      if (!this.snapshot.isHost) {
+        throw new Error('the table is waiting for its host to reopen the lobby');
+      }
+      await this.reopenLobby();
+      return;
+    }
+
     if (this.snapshot.isHost) {
       await this.beginRematch();
       return;
@@ -705,6 +727,77 @@ export class MultiplayerRoomSession {
       throw error;
     } finally {
       this.rematchPending = false;
+    }
+  }
+
+  /**
+   * Returns a finished table to its lobby on the same code.
+   *
+   * "Play again" after a walkover used to dead-end at the game shelf: the
+   * in-room rematch needs an opponent, and the one this room had is gone. But
+   * the ROOM is not over — the code still resolves, the share link still
+   * works, and the survivor is already hosting. So the departed chairs are
+   * emptied, the finished round's veil is retired (fresh keys for the next
+   * deal), and the table waits for company where it stands.
+   */
+  private async reopenLobby(): Promise<void> {
+    const transport = this.transport;
+    const settings = this.snapshot.settings;
+    const code = this.snapshot.room?.code;
+    if (!transport || !settings || !code || !this.authority) {
+      throw new Error('the table is no longer connected');
+    }
+    // The finished match leaves the authority. Anyone who joins the reopened
+    // lobby is welcomed with the authority's current log, and a guest only
+    // accepts the next deal's snapshot over an EMPTY one — so the lobby
+    // placeholder runtime replaces the spent match, exactly as a rematch does.
+    const runtime = createRoomRuntime(settings, this.seed, (chair, bot) =>
+      this.acceptSeatBot(chair, bot),
+    );
+    await this.authority.importSnapshot(runtime.authority.exportSnapshot());
+    for (const timer of this.pendingReturns.values()) clearTimeout(timer);
+    this.pendingReturns.clear();
+    // Retire this round's veil entirely: material, session, listener. The next
+    // deal opens a new round with new keys — reusing a finished round's stream
+    // would re-derive layers the last match already spent.
+    this.veil?.room.cancelAll('the table went back to its lobby');
+    this.veilDetach?.();
+    this.veilDetach = null;
+    this.veil = null;
+    this.veilAttach = null;
+    clearRoundMaterial(code, this.profile.profileId);
+    this.epochCursor = 0;
+    this.usedRecycleEpochs.clear();
+    this.sentSelfOpens.clear();
+    this.primedDeck = null;
+    this.localDealFaults.clear();
+    for (const seat of this.snapshot.seats) {
+      if (seat.profileId === this.profile.profileId) continue;
+      if (!seat.connected || seat.bot) transport.vacateSeat(seat.seat);
+    }
+    transport.holdLobby(true);
+    // A second deal on the same code mixes a fresh shared seed: the old
+    // round's commitments and reveals are spent, so the exchange restarts.
+    this.dealNonce = null;
+    this.dealRound = new DealSeedRound();
+    this.dealRevealStarted = false;
+    const tier = settings.security ?? 'veil';
+    this.update({
+      stage: 'lobby',
+      session: null,
+      error: null,
+      fx: [],
+      fxKey: this.snapshot.fxKey + 1,
+      security: securityFor(tier, settings.seats, tier === 'veil' ? 'veiled' : 'open'),
+      seats: this.snapshot.seats.filter(
+        (seat) => seat.profileId === this.profile.profileId || (seat.connected && !seat.bot),
+      ),
+    });
+    this.commitDealShare();
+    // This host's half of the NEXT round's veil, attached now so the deal can
+    // run the moment the chairs fill (a joining guest attaches its own half).
+    if (tier === 'veil') {
+      this.veilAttach = this.attachVeil(settings, this.seed).catch(() => undefined);
     }
   }
 
@@ -946,7 +1039,8 @@ export class MultiplayerRoomSession {
       settings.seats,
       (restored) => this.onVeilResume(restored),
     );
-    transport.onVeil((peerId, message) => {
+    this.veilDetach?.();
+    this.veilDetach = transport.onVeil((peerId, message) => {
       this.veilInbox = this.veilInbox
         .then(async () => {
           await room.receive(peerId, message);
@@ -1568,10 +1662,11 @@ export class MultiplayerRoomSession {
     // presence, which every peer sees; the hold only delays acting on it.
     this.veil?.room.markSeatLost(seat);
     const graceMs = this.dependencies.reconnectGraceMs ?? RECONNECT_GRACE_MS;
+    const who = this.snapshot.seats.find((chair) => chair.seat === seat)?.name;
     this.update({
       security: {
         ...this.snapshot.security,
-        paused: `Seat ${seat + 1} dropped. Waiting for them to come back…`,
+        paused: `${who ?? `Seat ${seat + 1}`} dropped. Waiting for them to come back…`,
         waitingOn: { seat, endsAtMs: Date.now() + graceMs },
       },
     });
@@ -1603,6 +1698,13 @@ export class MultiplayerRoomSession {
         return;
       }
     }
+    // The hold is over and they are not coming back: from here a bot actually
+    // does play the chair, so only now does the label say so.
+    this.update({
+      seats: this.snapshot.seats.map((chair) =>
+        chair.seat === seat ? { ...chair, bot: true, away: false } : chair,
+      ),
+    });
     void this.recoverLostSeat(seat);
   }
 
@@ -1720,6 +1822,9 @@ export class MultiplayerRoomSession {
       },
       error: null,
       security: { ...this.snapshot.security, paused: null, waitingOn: null },
+      seats: this.snapshot.seats.map((seat) =>
+        seat.seat === departedSeat ? { ...seat, away: false } : seat,
+      ),
     });
   }
 
@@ -2190,9 +2295,16 @@ export class MultiplayerRoomSession {
         });
         return;
       }
+      // At a veiled table the chair is HELD, not taken over: nothing plays it
+      // during the hold, so labelling it a bot was a lie that read as a bot
+      // asleep at the table. It stays the absent player, marked away, until
+      // the hold resolves — into a return, a recovery, or a walkover.
+      const holding = Boolean(this.veil);
       this.update({
         seats: this.snapshot.seats.map((seat) =>
-          seat.seat === presence.seat ? { ...seat, connected: false, bot: true } : seat,
+          seat.seat === presence.seat
+            ? { ...seat, connected: false, bot: !holding, away: holding }
+            : seat,
         ),
       });
       // A veiled room cannot keep dealing while a departed seat's layer is

@@ -35,8 +35,37 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     maxWorkers,
-    include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
     setupFiles: ['./src/test/setup.ts'],
+    /**
+     * The duel suites get the machine to themselves.
+     *
+     * They play whole multiplayer matches between two full clients and assert
+     * LIVENESS — that a table under churn keeps moving inside real deadlines —
+     * with the veil's SRA math running in-thread (jsdom has no Worker). Run
+     * six-wide with the rest of the suite they stop measuring the room code
+     * and start measuring the scheduler: ceremonies overrun their windows and
+     * perfectly healthy tables read as wedged. Serial, after everything else,
+     * they measure what they claim to.
+     */
+    projects: [
+      {
+        extends: true,
+        test: {
+          name: 'web',
+          include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
+          exclude: ['**/node_modules/**', 'src/app/_multiplayer/duel/**'],
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: 'duel',
+          include: ['src/app/_multiplayer/duel/**/*.test.ts'],
+          fileParallelism: false,
+          maxWorkers: 1,
+        },
+      },
+    ],
   },
   resolve: {
     alias: {

@@ -12,7 +12,7 @@ import { MatchRivalry } from '@/components/celebration/MatchRivalry';
 import { getGame } from '@/lib/games';
 import { deriveRivalry, hasRivalryToShow } from '@/lib/match/rivalry';
 import { isMultiplayerGameId } from '@/lib/rooms/gameIds';
-import { tableRouteFor } from '@/lib/rooms/tableRoute';
+import { roomSegmentFor, tableRouteFor } from '@/lib/rooms/tableRoute';
 import { useAnyActiveRoom } from '@/lib/table/useRoomTable';
 import { useHistoryStore } from '@/stores/history';
 import { useMatchFlowStore } from '@/stores/matchFlow';
@@ -45,15 +45,23 @@ export default function MatchEndPage() {
   // fresh playing snapshot—even if only one person needed to press the button.
   useEffect(() => {
     if (!snapshot?.id?.startsWith('multiplayer:')) return;
-    const gameId = activeRoomSnapshot?.gameId;
-    if (
-      !isMultiplayerGameId(gameId) ||
-      activeRoomSnapshot?.session?.status !== 'playing' ||
-      activeRoomSnapshot.connection === 'closed'
-    ) {
+    if (activeRoomSnapshot?.connection === 'closed') return;
+    const gameId = activeRoomSnapshot?.gameId ?? activeRoomSnapshot?.settings?.gameId;
+    if (!isMultiplayerGameId(gameId)) return;
+    if (activeRoomSnapshot?.session?.status === 'playing') {
+      router.replace(tableRouteFor(gameId));
       return;
     }
-    router.replace(tableRouteFor(gameId));
+    // A walkover's "play again" reopens the room as a lobby instead of
+    // dealing: there is nobody to deal against yet. Follow it to the screen
+    // that can seat somebody — the host back to their lobby, a guest to the
+    // join page that adopts the live session.
+    if (activeRoomSnapshot?.stage === 'lobby' && activeRoomSnapshot.room) {
+      const segment = roomSegmentFor(gameId);
+      router.replace(
+        activeRoomSnapshot.isHost ? (segment ? `/${segment}/create` : '/create') : '/join',
+      );
+    }
   }, [activeRoomSnapshot, router, snapshot?.id]);
 
   const playAgain = useCallback(() => {

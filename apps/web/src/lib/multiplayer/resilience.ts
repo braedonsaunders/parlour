@@ -182,6 +182,11 @@ export class MultiplayerState {
    * A profile match is enough. Two peers claiming one profile is one player on
    * two devices, and the newest connection is the one they are looking at.
    */
+  /** Empties a chair whose occupant is gone for good, so someone new can sit. */
+  clearSeat(seat: number): void {
+    if (this.seats.delete(seat)) this.presenceVersion++;
+  }
+
   reclaimSeat(peerId: string, profileId: ProfileId): number | null {
     for (const [seat, occupant] of this.seats) {
       if (occupant.profileId === profileId) {

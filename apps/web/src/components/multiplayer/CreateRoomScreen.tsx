@@ -12,6 +12,7 @@ import { usePersistHydrated } from '@/stores/usePersistHydrated';
 import {
   activateMultiplayerSession,
   clearActiveMultiplayerSession,
+  getActiveMultiplayerSession,
   multiplayerProfile,
   MultiplayerRoomSession,
 } from '@/app/_multiplayer/roomSession';
@@ -30,9 +31,31 @@ export function CreateRoomScreen({ gameId }: { gameId: MultiplayerGameId }) {
   const avatarId = useProfileStore((state) => state.avatarId);
   const ready = usePersistHydrated(screen.hydrate);
   const sessionRef = useRef<MultiplayerRoomSession | null>(null);
-  const [session, setSession] = useState<MultiplayerRoomSession | null>(null);
+  // A live room this profile already hosts is adopted, not replaced: a
+  // walkover's "play again" reopens the room as a lobby and routes back
+  // here, and a host reloading this page mid-lobby is the same story. The
+  // old behaviour minted a fresh room and orphaned the one whose code
+  // everyone was holding.
+  const [session, setSession] = useState<MultiplayerRoomSession | null>(() => {
+    const active = getActiveMultiplayerSession();
+    const held = active?.getSnapshot();
+    const adoptable =
+      active &&
+      held &&
+      held.isHost &&
+      held.stage === 'lobby' &&
+      held.room &&
+      held.connection !== 'closed' &&
+      (held.gameId ?? held.settings?.gameId) === gameId;
+    return adoptable ? active : null;
+  });
 
   useEffect(() => {
+    // An adopted room only needs the ref that stops a second one being made.
+    if (session && !sessionRef.current) {
+      sessionRef.current = session;
+      return;
+    }
     if (!ready || sessionRef.current) return;
     const next = new MultiplayerRoomSession(multiplayerProfile(name, avatarId));
     sessionRef.current = next;
@@ -46,7 +69,7 @@ export function CreateRoomScreen({ gameId }: { gameId: MultiplayerGameId }) {
     // which is why the rule values are not dependencies here. Each old page
     // listed its own — and then guarded the body so a change could never open a
     // second room, so the dependency never did anything but re-run a no-op.
-  }, [avatarId, gameId, name, ready, screen]);
+  }, [avatarId, gameId, name, ready, screen, session]);
 
   if (!ready || !session) return <CreateRoomLoading screen={screen} />;
   return (
