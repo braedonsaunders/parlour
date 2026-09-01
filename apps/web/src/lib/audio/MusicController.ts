@@ -28,6 +28,14 @@ export type MusicState = {
   packId: string;
   /** Active game-state cue (e.g. `tense`), or null when the scene plays. */
   mood: MusicMoodId | null;
+  /**
+   * Playback rate of the current song. Games drive this for the Mario-Kart
+   * final-minute lift: the same song, slightly faster, pitch riding along
+   * (plain resampling — never a time-stretch, so nothing smears).
+   */
+  rate: number;
+  /** Volume multiplier games use to duck the song under a stinger (1 = none). */
+  duck: number;
 };
 
 export type MusicManagerPort = {
@@ -54,6 +62,20 @@ function html5NodeOf(howl: Howl): HTMLMediaElement | undefined {
   return (howl as unknown as HowlHtml5)._sounds?.[0]?._node;
 }
 
+/**
+ * A frantic rate must be varispeed, not a time-stretch. Browsers default
+ * `preservesPitch` on, which runs a phase-vocoder that smears percussive
+ * mixes; turning it off gives clean tape-style resampling.
+ */
+function setVarispeed(node: HTMLMediaElement): void {
+  try {
+    node.preservesPitch = false;
+    (node as HTMLMediaElement & { webkitPreservesPitch?: boolean }).webkitPreservesPitch = false;
+  } catch {
+    /* older engines without the property */
+  }
+}
+
 function clamp01(value: number): number {
   if (!Number.isFinite(value)) return 0;
   return Math.min(1, Math.max(0, value));
@@ -72,6 +94,8 @@ export class MusicController {
     shuffle: false,
     packId: BASE_PACK_ID,
     mood: null,
+    rate: 1,
+    duck: 1,
   };
   private listeners = new Set<(state: MusicState) => void>();
   private voices = new Map<string, Voice>();
@@ -306,6 +330,35 @@ export class MusicController {
     this.start(target.id, false);
   }
 
+  /**
+   * The final-minute lift: the current song plays `rate`× faster with its
+   * pitch riding along, Mario Kart style. `null` restores normal speed.
+   * Never persisted — a frantic rate belongs to one match's closing stretch.
+   */
+  setFrantic(rate: number | null): void {
+    const resolved = rate ?? 1;
+    if (resolved === this.state.rate) return;
+    this.state.rate = resolved;
+    for (const voice of this.voices.values()) {
+      if (voice.soundId !== null) voice.howl.rate(resolved, voice.soundId);
+      const node = html5NodeOf(voice.howl);
+      if (node) setVarispeed(node);
+    }
+    this.notify();
+  }
+
+  /**
+   * Ducks the song to `level` of its volume (game-audio convention for making
+   * a stinger read: ~0.45 ≈ −7 dB). `null` releases it. Never persisted.
+   */
+  setDuck(level: number | null): void {
+    const resolved = level ?? 1;
+    if (resolved === this.state.duck) return;
+    this.state.duck = resolved;
+    this.syncGain();
+    this.notify();
+  }
+
   /** Menu routes swap to the pack's title theme; table routes use scene playlists. */
   setMenu(active: boolean): void {
     if (active === this.inMenu) return;
@@ -332,6 +385,8 @@ export class MusicController {
     this.voices.clear();
     this.state.status = 'idle';
     this.state.mood = null;
+    this.state.rate = 1;
+    this.state.duck = 1;
     this.preMoodTrackId = null;
     this.notify();
   }
@@ -363,7 +418,7 @@ export class MusicController {
 
   private gainFor(trackId: string): number {
     const track = getMusicTrack(trackId);
-    return clamp01(this.manager.gainFor('music') * (track?.volume ?? 1));
+    return clamp01(this.manager.gainFor('music') * (track?.volume ?? 1) * this.state.duck);
   }
 
   private start(trackId: string, rememberPrevious: boolean): void {
@@ -429,6 +484,7 @@ export class MusicController {
       existing.gain = this.gainFor(trackId);
       existing.howl.volume(0, soundId);
       existing.howl.fade(0, existing.gain, fadeMs, soundId);
+      if (this.state.rate !== 1) existing.howl.rate(this.state.rate, soundId);
       return;
     }
 
@@ -462,6 +518,9 @@ export class MusicController {
     voice.soundId = soundId;
     voice.gain = this.gainFor(trackId);
     voice.howl.fade(0, voice.gain, fadeMs, soundId);
+    if (this.state.rate !== 1) voice.howl.rate(this.state.rate, soundId);
+    const node = html5NodeOf(voice.howl);
+    if (node) setVarispeed(node);
   }
 
   /** Drops a voice we have moved on from, handing its media slot straight back. */

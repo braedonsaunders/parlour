@@ -3,8 +3,6 @@ import { Fx } from '@parlour/engine';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getMusicController } from '@/lib/audio/MusicController';
-import { DEFAULT_TENSE_WINDOW_MS } from '@/lib/audio/tension';
-import { WILD_MATCH_PACE_MS } from '@/lib/wild/modes';
 import type { WildTableView } from '@/lib/wild/view';
 import { fanOpenAtMs } from '@/lib/table/arrival-presentation';
 import { FX_TIMING } from '@/lib/table/fx-motion';
@@ -216,16 +214,20 @@ describe('WildTableScreen turn affordances', () => {
     expect(onQuit).toHaveBeenCalledOnce();
   });
 
-  it('arms the tense music cue for the final minute and releases it when the hand ends', () => {
+  it('lifts the song Mario-Kart style for the final minute and releases it when the hand ends', () => {
     vi.useFakeTimers();
-    act(() => root.render(createElement(WildTableScreen, { view: VIEW, fx: [], fxKey: 0 })));
+    vi.setSystemTime(new Date('2026-08-24T12:00:00Z'));
+    const matchEndsAt = Date.now() + 90_000;
+    act(() =>
+      root.render(createElement(WildTableScreen, { view: VIEW, fx: [], fxKey: 0, matchEndsAt })),
+    );
+    // No tense-track swap anymore, and no lift outside the final minute.
     expect(getMusicController().getState().mood).toBeNull();
+    expect(getMusicController().getState().rate).toBe(1);
 
-    act(() => void vi.advanceTimersByTime(WILD_MATCH_PACE_MS - DEFAULT_TENSE_WINDOW_MS - 1_000));
+    act(() => void vi.advanceTimersByTime(31_000));
+    expect(getMusicController().getState().rate).toBeCloseTo(1.07);
     expect(getMusicController().getState().mood).toBeNull();
-
-    act(() => void vi.advanceTimersByTime(2_000));
-    expect(getMusicController().getState().mood).toBe('tense');
 
     act(() =>
       root.render(
@@ -233,13 +235,45 @@ describe('WildTableScreen turn affordances', () => {
           view: { ...VIEW, activeSeat: null, decision: null },
           fx: [],
           fxKey: 0,
+          matchEndsAt,
         }),
       ),
     );
-    expect(getMusicController().getState().mood).toBeNull();
+    expect(getMusicController().getState().rate).toBe(1);
   });
 
-  it('shows live places and tense music from the real final-minute deadline', () => {
+  it('ducks the music under the time-up flutter as the clock zeroes', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-24T12:00:00Z'));
+    const matchEndsAt = Date.now() + 61_000;
+    act(() =>
+      root.render(createElement(WildTableScreen, { view: VIEW, fx: [], fxKey: 0, matchEndsAt })),
+    );
+    expect(getMusicController().getState().duck).toBe(1);
+
+    act(() => void vi.advanceTimersByTime(61_000));
+    expect(getMusicController().getState().duck).toBeCloseTo(0.45);
+
+    // The engine ends the match a beat later; the lift releases, the duck holds.
+    act(() =>
+      root.render(
+        createElement(WildTableScreen, {
+          view: { ...VIEW, activeSeat: null, decision: null },
+          fx: [],
+          fxKey: 0,
+          matchEndsAt,
+        }),
+      ),
+    );
+    expect(getMusicController().getState().rate).toBe(1);
+    expect(getMusicController().getState().duck).toBeCloseTo(0.45);
+
+    act(() => root.unmount());
+    root = createRoot(container);
+    expect(getMusicController().getState().duck).toBe(1);
+  });
+
+  it('shows live places and the frantic lift from the real final-minute deadline', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-08-24T12:00:00Z'));
     act(() =>
@@ -257,7 +291,8 @@ describe('WildTableScreen turn affordances', () => {
     expect(standings?.textContent).toContain('59s left');
     expect(standings?.textContent).toContain('1stYou2 cards');
     expect(standings?.textContent).toContain('2ndSlate5 cards');
-    expect(getMusicController().getState().mood).toBe('tense');
+    expect(getMusicController().getState().rate).toBeCloseTo(1.07);
+    expect(getMusicController().getState().mood).toBeNull();
   });
 
   it('keeps the game clock visible and counts the turn down on a circular progress ring', () => {

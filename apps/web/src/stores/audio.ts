@@ -50,6 +50,8 @@ export const useMusicStore = create<MusicStore>(() => ({
   shuffle: false,
   packId: BASE_PACK_ID,
   mood: null,
+  rate: 1,
+  duck: 1,
   toggle: () => getMusicController().toggle(),
   next: () => getMusicController().next(),
   previous: () => getMusicController().previous(),
@@ -140,6 +142,20 @@ export function useMusicMood(mood: MusicMoodId | null): void {
   }, [controller, mood]);
 
   useEffect(() => () => getMusicController().setMood(null), []);
+}
+
+/**
+ * The Mario-Kart final-minute lift: while `active`, the current song plays
+ * slightly faster with its pitch riding along. Leaving the table releases it.
+ */
+export function useMusicFrantic(active: boolean, rate = 1.07): void {
+  const controller = useMusicController();
+
+  useEffect(() => {
+    controller.setFrantic(active ? rate : null);
+  }, [active, controller, rate]);
+
+  useEffect(() => () => getMusicController().setFrantic(null), []);
 }
 
 /**

@@ -10,10 +10,11 @@ import {
 } from '@parlour/game-wildpile';
 import { AnimatePresence, motion } from 'motion/react';
 import { getAvatar } from '@/lib/avatars';
-import { WILDPILE_SFX_PACK } from '@/lib/audio/sfx';
-import { useMatchTension } from '@/lib/audio/tension';
+import { getAudioManager } from '@/lib/audio/AudioManager';
+import { getMusicController } from '@/lib/audio/MusicController';
+import { PARLOUR_SFX, WILDPILE_SFX_PACK } from '@/lib/audio/sfx';
 import { WILD_MUSIC_PACK } from '@/lib/audio/wild-music';
-import { useMusicGamePack, useMusicMood } from '@/stores/audio';
+import { useMusicFrantic, useMusicGamePack } from '@/stores/audio';
 import { ArrivalProvider, useAdmittedHand } from '@/lib/table/arrival-presentation';
 import {
   DealProvider,
@@ -118,26 +119,20 @@ function WildTableScreenView(props: WildTableScreenProps) {
     [deal.dealing, props.fx],
   );
 
-  // Real Wild tables use the authority deadline. The fallback keeps isolated
-  // story/tests musical even when they render the screen without a transport.
-  const fallbackTense = useMatchTension({
-    expectedMs: 300_000,
-    running: Boolean(view) && view?.activeSeat !== null,
-  });
   // The clock used to tick a state field on this component once a second,
   // which re-rendered the entire table — every seat, the whole fan and every
   // motion subtree — purely to redraw two digits. Only the boolean the table
   // itself reacts to lives up here now, and it flips once; the digits are
   // owned by the leaves that show them.
   const finalMinute = useFinalMinute(props.matchEndsAt);
-  const tense =
-    props.matchEndsAt === undefined
-      ? fallbackTense
-      : Boolean(view?.activeSeat !== null && finalMinute);
+  const running = Boolean(view) && view?.activeSeat !== null;
   // Wild brings its own soundtrack: tropical house while seated, released on
-  // the way out. The tense cue below rides the same pack's mood tracks.
+  // the way out. The final minute is Mario Kart, not a different song — the
+  // same track lifts 7% with the pitch riding along, the last fifteen seconds
+  // tick down, and the cards flutter over ducked music as the clock zeroes.
   useMusicGamePack(WILD_MUSIC_PACK.id);
-  useMusicMood(tense ? 'tense' : null);
+  useMusicFrantic(props.matchEndsAt !== undefined && running && finalMinute);
+  useWildClosingCues(props.matchEndsAt, running);
 
   const calls = useMemo(
     () => (!view || deal.dealing ? [] : wildAnnouncements(props.fx, view.players)),
@@ -325,6 +320,46 @@ function useSecondsLeft(endsAt: number | undefined): number {
   }, [endsAt]);
 
   return seconds;
+}
+
+/**
+ * The last fifteen seconds, out loud: a clock tick once a second, doubling at
+ * ten and again at five, then the cards fluttering down as the clock zeroes
+ * while the music ducks to ~45% (−7 dB, the stinger convention) instead of
+ * stopping — the podium's own stings land on top of it.
+ */
+function useWildClosingCues(endsAt: number | undefined, running: boolean): void {
+  useEffect(() => {
+    if (endsAt === undefined || !running) return;
+    const audio = getAudioManager();
+    const timers: number[] = [];
+    const now = Date.now();
+    for (let seconds = 15; seconds >= 1; seconds -= 1) {
+      const perSecond = seconds <= 5 ? 4 : seconds <= 10 ? 2 : 1;
+      for (let i = 0; i < perSecond; i += 1) {
+        const at = endsAt - seconds * 1_000 + (i * 1_000) / perSecond;
+        if (at > now) {
+          timers.push(window.setTimeout(() => audio.play(PARLOUR_SFX.clockTick), at - now));
+        }
+      }
+    }
+    // A touch early, so the flutter is already airborne when the engine's own
+    // timeout ends the match and this effect gets cleaned up.
+    if (endsAt - 120 > now) {
+      timers.push(
+        window.setTimeout(() => {
+          audio.play(PARLOUR_SFX.timeUp);
+          const music = getMusicController();
+          music.setFrantic(null);
+          music.setDuck(0.45);
+        }, endsAt - 120 - now),
+      );
+    }
+    return () => timers.forEach((timer) => window.clearTimeout(timer));
+  }, [endsAt, running]);
+
+  // Leaving the table hands the mix back, however the match ended.
+  useEffect(() => () => getMusicController().setDuck(null), []);
 }
 
 /**

@@ -150,6 +150,8 @@ describe('MusicController', () => {
       shuffle: false,
       packId: 'parlour',
       mood: null,
+      rate: 1,
+      duck: 1,
     });
   });
 

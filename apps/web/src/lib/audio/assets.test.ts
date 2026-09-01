@@ -12,6 +12,8 @@ const REQUIRED_SOUNDS = [
   'parlour.deal.card',
   'parlour.stock.shuffle',
   'parlour.turn.ready',
+  'parlour.clock.tick',
+  'parlour.time.up',
   'parlour.ui.press',
   'parlour.room.player-joined',
   'parlour.room.player-left',
