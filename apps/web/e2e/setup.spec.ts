@@ -26,6 +26,7 @@ test('a chosen seat count survives a reload at the table', async ({ page }) => {
 test('the setup screen reopens on the table you last picked', async ({ page }) => {
   await page.goto('/wild/');
   await page.getByRole('group', { name: 'Seats' }).getByRole('button', { name: '3' }).click();
+  await expect(page.getByRole('button', { name: '3' })).toHaveAttribute('aria-pressed', 'true');
 
   await page.goto('/wild/');
   await expect(page.getByRole('button', { name: '3' })).toHaveAttribute('aria-pressed', 'true');

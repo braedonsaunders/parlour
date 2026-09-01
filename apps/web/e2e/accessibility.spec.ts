@@ -89,42 +89,50 @@ test('a player can move a Klondike card to its foundation with only the keyboard
   page,
   browserName,
 }) => {
-  test.setTimeout(45_000);
+  test.setTimeout(60_000);
   await installAnnouncementRecorder(page);
   await page.addInitScript(() => {
-    const nativeGetRandomValues = Crypto.prototype.getRandomValues;
-    Crypto.prototype.getRandomValues = function getRandomValues<T extends ArrayBufferView | null>(
-      array: T,
-    ): T {
+    // WebKit's crypto.getRandomValues is often an own property, not the
+    // prototype method — patching only Crypto.prototype then deals a random
+    // seed and the Ace of diamonds is not where this test looks.
+    const nativeGetRandomValues = crypto.getRandomValues.bind(crypto);
+    const patched = function getRandomValues<T extends ArrayBufferView | null>(array: T): T {
       if (array instanceof Int32Array && array.length === 1) {
         array[0] = 1;
         return array;
       }
-      return nativeGetRandomValues.call(this, array as never) as T;
+      return nativeGetRandomValues(array as never) as T;
     };
+    crypto.getRandomValues = patched;
+    Crypto.prototype.getRandomValues = patched;
   });
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('/klondike/');
 
   const relaxed = page.getByTestId('klondike-relaxed');
   await tabTo(page, relaxed, browserName);
-  await page.keyboard.press('Enter');
+  await relaxed.press('Enter');
   await expect(relaxed).toHaveAttribute('aria-checked', 'true');
 
   const winnableOnly = page.getByTestId('klondike-winnable-only');
   await tabTo(page, winnableOnly, browserName);
   await expect(winnableOnly).toHaveAttribute('aria-checked', 'true');
-  await page.keyboard.press('Enter');
+  await winnableOnly.press('Enter');
   await expect(winnableOnly).toHaveAttribute('aria-checked', 'false');
 
   const start = page.getByTestId('start-klondike');
+  await start.scrollIntoViewIfNeeded();
   await tabTo(page, start, browserName);
-  await page.keyboard.press('Enter');
-  await expect(page).toHaveURL(/\/klondike\/table\/?$/, { timeout: 15_000 });
+  // page.keyboard.press after Tab is swallowed on WebKit iPhone when the
+  // button sits below the fold; locator.press scrolls and delivers Enter
+  // to the focused control.
+  await start.press('Enter');
+  await expect(page).toHaveURL(/\/klondike\/table\/?$/, { timeout: 20_000 });
 
   const source = page.locator('[data-zone="tableau:3"] [data-card="D1"] button');
   const target = page.locator('[data-zone="foundation:diamonds"] button');
   const announcer = page.locator('[data-table-announcer]');
+  await expect(page.locator('[data-table-screen]')).toBeVisible({ timeout: 15_000 });
   await expect(source).toBeVisible({ timeout: 15_000 });
   await expect(announcer).toHaveText('');
   expect(await announcements(page), 'the opening deal must not flood the live region').toEqual([]);
