@@ -467,7 +467,13 @@ export class P2PTransport implements Transport {
     pc.ondatachannel = (event) => this.attachChannel(peerId, event.channel);
     pc.onconnectionstatechange = () => {
       if (pc.connectionState === 'failed' || pc.connectionState === 'closed') {
-        this.emitPresence({ kind: 'connection', state: 'reconnecting' });
+        // Only the guest-to-host link is the room connection. A host that
+        // loses one friend must not flip the lobby to "reconnecting" — that
+        // disabled Start after a guest left (D2a) even though the host was
+        // still sitting in a live room.
+        if (peerId === this.resilience?.hostId && !this.isHost()) {
+          this.emitPresence({ kind: 'connection', state: 'reconnecting' });
+        }
         // "Reconnecting" used to be a label, not an act: the dead link stayed
         // in `links`, and `connect` refuses to dial a peer it already has an
         // entry for, so the peer was gone for the life of the session. On a

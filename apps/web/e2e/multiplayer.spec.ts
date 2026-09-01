@@ -122,9 +122,15 @@ async function createRoom(page: Page): Promise<string> {
 async function joinRoomByCode(page: Page, code: string): Promise<void> {
   await page.goto('/join/');
   const input = page.locator(JOIN_INPUT);
-  await input.fill(code);
-  // Test id, not copy: this button idles at "Pull up a chair" in five languages.
-  await page.getByTestId('join-submit').click();
+  await expect(input).toBeVisible({ timeout: CONNECT_TIMEOUT_MS });
+  await input.click();
+  await input.fill('');
+  // WebKit's fill() sometimes skips React onChange, so the submit stays
+  // disabled and Playwright retries the click until the test timeout.
+  await input.pressSequentially(code, { delay: 20 });
+  const submit = page.getByTestId('join-submit');
+  await expect(submit).toBeEnabled({ timeout: 10_000 });
+  await submit.click();
   await expect(page.locator(ROOM_HEADING)).toBeVisible({ timeout: CONNECT_TIMEOUT_MS });
   await expect(page.locator(ROOM_HEADING)).toContainText(code);
 }
@@ -164,10 +170,11 @@ async function fillBotsAndStart(page: Page): Promise<void> {
   }
 
   // The start button may become enabled as soon as every chair is filled.
-  // Wait for it to be both visible and enabled, then click.
+  // Wait for it to be both visible and enabled, then click. A departed
+  // guest used to leave the host "reconnecting" and this waited forever.
   const start = page.getByTestId('start-match');
   await expect(start).toBeVisible({ timeout: 10_000 });
-  await expect(start).toBeEnabled({ timeout: 10_000 });
+  await expect(start).toBeEnabled({ timeout: 20_000 });
   await start.click();
 
   await expectAtTable(page, 20_000);
@@ -719,6 +726,10 @@ test.describe('veiled-deck rooms', () => {
     // runs when start is pressed, and a missing seat means its layer never
     // arrives, which is exactly the fault we are testing.
     await closeSeat(guest, broker);
+
+    // Let the lobby drop the empty chair before we start clicking add-bot.
+    // Start must stay enabled for a host who is still in the room.
+    await expect(host.page.getByTestId('start-match')).toBeVisible({ timeout: 10_000 });
 
     // The host fills the remaining chairs (now 3 empty — guest is gone) with
     // bots and presses Start. The ceremony should fail (missing guest layer)

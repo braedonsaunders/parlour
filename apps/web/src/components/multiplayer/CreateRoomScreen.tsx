@@ -140,7 +140,9 @@ function ActiveLobby({
         onStart={() => session.start()}
       />
       {screen.blurb && (
-        <p className="max-w-xl text-center text-sm text-dusk-100/80 shortscape:hidden">{screen.blurb(capacity)}</p>
+        <p className="max-w-xl text-center text-sm text-dusk-100/80 shortscape:hidden">
+          {screen.blurb(capacity)}
+        </p>
       )}
     </main>
   );

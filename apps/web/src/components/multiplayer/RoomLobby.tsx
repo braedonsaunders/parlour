@@ -84,7 +84,10 @@ export function RoomLobby({
   }
 
   return (
-    <section className="panel-soft w-full max-w-4xl p-6 shortscape:p-3" aria-labelledby="room-heading">
+    <section
+      className="panel-soft w-full max-w-4xl p-6 shortscape:p-3"
+      aria-labelledby="room-heading"
+    >
       <div className="flex flex-wrap items-center justify-between gap-5 shortscape:gap-3">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.25em] text-dusk-200 shortscape:hidden">
@@ -96,7 +99,10 @@ export function RoomLobby({
           >
             {code}
           </h1>
-          <p className="mt-1 text-sm text-dusk-100 shortscape:mt-0 shortscape:text-xs" role="status">
+          <p
+            className="mt-1 text-sm text-dusk-100 shortscape:mt-0 shortscape:text-xs"
+            role="status"
+          >
             {connection === 'connected'
               ? t('room.connected')
               : connection === 'reconnecting'
@@ -120,7 +126,10 @@ export function RoomLobby({
         </p>
       )}
 
-      <ol className="mt-7 grid grid-cols-2 gap-3 sm:grid-cols-4 shortscape:mt-2 shortscape:gap-2" aria-label={t('room.seatsLabel')}>
+      <ol
+        className="mt-7 grid grid-cols-2 gap-3 sm:grid-cols-4 shortscape:mt-2 shortscape:gap-2"
+        aria-label={t('room.seatsLabel')}
+      >
         {Array.from({ length: capacity }, (_, seat) => {
           const player = occupied.get(seat);
           return (

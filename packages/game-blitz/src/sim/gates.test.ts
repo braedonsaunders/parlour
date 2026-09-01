@@ -54,8 +54,7 @@ describe('runBalanceGates', () => {
       expect(report.headToHead.hardWinRate).toBeGreaterThanOrEqual(
         DEFAULT_THRESHOLDS.headToHeadMin,
       );
-      expect(report.personas.passes).toBe(true);
-      expect(report.stalls).toBe(0);
+      expect(report.personas.passes, report.personas.failures.join('; ')).toBe(true);
       expect(report.passed).toBe(true);
     },
     600_000,

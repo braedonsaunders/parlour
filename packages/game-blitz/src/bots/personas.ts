@@ -57,7 +57,7 @@ export const PERSONAS: readonly PersonaDef[] = [
     blurb: 'Learned the rules on Tuesday. Mostly.',
     emotes: ['oh!', 'which suit again?', 'oops'],
     tier: 1,
-    params: EASY_BASE,
+    params: { ...EASY_BASE, knockAt: 26 },
   },
   {
     id: 'nan-peg',
