@@ -23,6 +23,14 @@ describe('mode tile compositing', () => {
     expect(hover).not.toMatch(/filter:/);
     expect(hover).toMatch(/transform:/);
   });
+
+  it('paints the selected ring and glow on the tile at every breakpoint', () => {
+    const selected = declarationsFor(".tile[data-selected='true']");
+
+    expect(selected).toMatch(/border-color:\s*var\(--tile-accent/);
+    expect(selected).toMatch(/0 0 0 2px var\(--tile-accent/);
+    expect(selected).toMatch(/0 0 34px -4px var\(--tile-accent/);
+  });
 });
 
 describe('mode picker artwork containment', () => {

@@ -39,15 +39,25 @@
   cursor: pointer;
   transition:
     transform var(--dur-feedback) var(--ease-pop),
-    border-color var(--dur-tap) ease;
+    border-color var(--dur-tap) ease,
+    box-shadow var(--dur-feedback) ease;
 }
 
 .tile:hover {
   transform: translateY(-4px) scale(1.02);
 }
 
+/* The selected ring and glow live on the tile itself. A child halo is clipped
+   by the card's overflow, which is why this used to only read on landscape
+   phones — that breakpoint painted the same shadows here. */
 .tile[data-selected='true'] {
   transform: translateY(-8px) scale(1.04);
+  border-color: var(--tile-accent, var(--hearth-core));
+  box-shadow:
+    inset 0 2px 0 rgba(215, 237, 242, 0.18),
+    0 0 0 2px var(--tile-accent, var(--hearth-core)),
+    0 0 34px -4px var(--tile-accent, var(--hearth-core)),
+    var(--shadow-lift);
 }
 
 .tile:focus-visible {
@@ -368,7 +378,9 @@
   flex: 1 1 0;
   min-height: 0;
   align-items: center;
-  padding-block: 0.85rem;
+  /* Room for the selected tile's lift and accent glow, so overflow-x on the
+     carousel does not shear the ring off the top and bottom. */
+  padding-block: 1.35rem;
 }
 
 /* Whatever sits directly in the carousel carries the height cap. If a page
@@ -593,15 +605,10 @@
     margin-bottom: 0.5rem;
   }
 
-  /* The lift-and-scale reads as a glow ring here; keep the lift out of a
-     vertical stack where it collides with the neighbour above, and let the
-     ring burn brighter than the desktop hover language needs to. */
+  /* Keep the lift out of a vertical stack — it collides with the neighbour
+     above. The accent ring and glow are already on the base selected tile. */
   .fitCarousel .tile[data-selected='true'] {
     transform: scale(1.02);
-    border-color: var(--tile-accent, var(--hearth-core));
-    box-shadow:
-      0 0 0 2px var(--tile-accent, var(--hearth-core)),
-      0 0 34px -4px var(--tile-accent, var(--hearth-core));
   }
 
   /* Aligned to the top rather than centred: a centred flex column that
