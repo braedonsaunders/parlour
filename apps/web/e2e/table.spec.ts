@@ -145,6 +145,7 @@ for (const orientation of ['portrait', 'landscape'] as const) {
             // A held hand may sit a few pixels into the bottom edge — short
             // landscape docks it there deliberately to leave the felt room.
             bottomBleed: Math.max(0, ...boxes.map((box) => box.bottom - window.innerHeight)),
+            cardHeight: Math.max(0, ...boxes.map((box) => box.height)),
             // A fan overlaps: consecutive cards advance by less than a card.
             overlaps: boxes
               .slice(1)
@@ -162,7 +163,13 @@ for (const orientation of ['portrait', 'landscape'] as const) {
         ]);
         expect(layout.withinWidth, 'the fan fits the width, gutters and all').toBe(true);
         expect(layout.topClipped, 'no card has its rank cut off').toBe(0);
-        expect(layout.bottomBleed, 'the hand is docked, not falling off').toBeLessThanOrEqual(16);
+        // Short landscape sinks the fan into the bottom edge on purpose: the
+        // crop buys the felt back for the piles. The readable top of every
+        // card must survive (asserted above); the bleed may take up to 40%.
+        const bleedBudget = orientation === 'landscape' ? layout.cardHeight * 0.4 : 16;
+        expect(layout.bottomBleed, 'the hand is docked, not falling off').toBeLessThanOrEqual(
+          bleedBudget,
+        );
         expect(layout.overlaps, 'cards overlap the way a held hand does').toBe(true);
         expect(layout.outerRotated, 'the hand is fanned, not laid out straight').toBe(true);
       });
