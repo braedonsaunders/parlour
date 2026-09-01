@@ -1,4 +1,11 @@
-import { Fx, type FxEvent } from '@parlour/engine';
+import {
+  TABLE_PACING,
+  Fx,
+  botThinkTimeMs,
+  type BotThinkTimeInput,
+  type FxEvent,
+  type TablePacingMode,
+} from '@parlour/engine';
 
 export const FX_TIMING = {
   cardFlightMs: 180,
@@ -20,8 +27,8 @@ export const FX_TIMING = {
  * `stock`, `hand:2`, `payoff:1`, `discard:0:3`, `board:3`, `table`. It was a
  * closed list of five names, which meant a game with per-seat piles could not
  * name them: Spite emits `discard:<seat>:<pile>` and `centre:<pile>`, and the
- * list rejected both — throwing out of `delayUntilFxSettles`, which every solo
- * table calls to pace its bots, and taking the whole screen down with it.
+ * list rejected both — throwing out of the shared pacing timeline and taking
+ * the whole screen down with it.
  *
  * Widening this loses nothing real. Zone strings only ever become a
  * `[data-zone="..."]` lookup, and `zonePoint` already falls back to the table
@@ -338,11 +345,20 @@ export function fxTimelineDurationMs(events: readonly FxEvent[]): number {
   );
 }
 
-/** Human pacing that never advances the table before the current burst settles. */
-export function delayUntilFxSettles(
-  paceMs: number,
-  events: readonly FxEvent[],
-  settleMs = 160,
-): number {
-  return Math.max(paceMs, fxTimelineDurationMs(events) + settleMs);
+/**
+ * Minimum time before the next human decision is offered.
+ *
+ * The card flight stays quick; the shared post-fx beat is what lets the new
+ * board register before another person can change it again.
+ */
+export function tableHandoffDelayMs(mode: TablePacingMode, events: readonly FxEvent[]): number {
+  return fxTimelineDurationMs(events) + TABLE_PACING[mode].postFxMs;
+}
+
+/** The same handoff policy, with a deterministic bot thinking beat folded in. */
+export function botTurnDelayMs(input: BotThinkTimeInput, events: readonly FxEvent[]): number {
+  const mode = input.mode ?? 'casual';
+  return (
+    fxTimelineDurationMs(events) + Math.max(TABLE_PACING[mode].postFxMs, botThinkTimeMs(input))
+  );
 }

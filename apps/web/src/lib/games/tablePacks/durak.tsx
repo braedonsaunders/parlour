@@ -50,10 +50,6 @@ export const durakTablePack = defineTablePack<
 
   useSoloDriver: turnBasedDriver({
     round: (snapshot) => snapshot.session,
-    // Ordinary attack/defend decisions keep human pace; a match already over
-    // (podium waiting) needs no bot pacing at all.
-    botPaceMs: (current) =>
-      current.session.phase.phase === 'over' ? 200 : 420 + (current.session.phase.actor ?? 0) * 90,
   }),
 
   renderPending: ({ fx, fxKey, error }) => (

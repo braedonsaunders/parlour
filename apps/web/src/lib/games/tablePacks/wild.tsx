@@ -165,8 +165,6 @@ export const wildTablePack = defineTablePack<
 
   useSoloDriver: turnBasedDriver({
     round: (snapshot) => snapshot.session,
-    botPaceMs: (current) =>
-      current.session.phase.phase === 'play' ? 480 + (current.session.phase.actor ?? 0) * 90 : 240,
   }),
   useSoloEffects: useSoloClocks,
   useRoomEffects: useRoomClocks,

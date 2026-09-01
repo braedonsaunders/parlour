@@ -67,7 +67,6 @@ export const cribbageTablePack = defineTablePack<
 
   useSoloDriver: turnBasedDriver({
     round: (snapshot) => snapshot.match.round,
-    botPaceMs: () => 420,
   }),
 
   renderPending: ({ fx, fxKey, error }) => (

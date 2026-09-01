@@ -48,11 +48,6 @@ export const spadesTablePack = defineTablePack<
 
   useSoloDriver: turnBasedDriver({
     round: (snapshot) => snapshot.session,
-    // Bidding is a conversation; trick play keeps a human beat.
-    botPaceMs: (current) =>
-      current.session.state.stage === 'bidding'
-        ? 520
-        : 420 + (current.session.phase.actor ?? 0) * 70,
   }),
 
   renderPending: ({ fx, fxKey, error }) => (

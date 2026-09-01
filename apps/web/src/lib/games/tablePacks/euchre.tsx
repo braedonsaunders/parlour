@@ -48,10 +48,6 @@ export const euchreTablePack = defineTablePack<
 
   useSoloDriver: turnBasedDriver({
     round: (snapshot) => snapshot.session,
-    botPaceMs: (current) =>
-      current.session.state.stage === 'playing'
-        ? 480 + (current.session.phase.actor ?? 0) * 90
-        : 320,
   }),
 
   renderPending: ({ fx, fxKey, error }) => (

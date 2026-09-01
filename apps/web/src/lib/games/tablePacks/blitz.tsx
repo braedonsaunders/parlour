@@ -42,8 +42,7 @@ const useBlitzDriver: SoloDriver<LocalTransport, SoloSnapshot, LocalDispatch> = 
   }
   return useSoloTable(transport, {
     round: (current) => current.session,
-    botPaceMs: (current) =>
-      current.mode === 'timed' ? 120 : 480 + (current.session.phase.actor ?? 0) * 90,
+    pacing: (current) => (current.mode === 'timed' ? 'timed' : 'casual'),
     onAccepted: (outcome) => rememberRoundFx(transport, outcome),
   });
 };

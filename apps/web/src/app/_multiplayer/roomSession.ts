@@ -49,8 +49,9 @@ import {
 import { validateRoomCode } from '@/lib/rooms/code';
 import { hasValidSeatCount } from '@/lib/rooms/seatRange';
 import type { MultiplayerGameId } from '@/lib/rooms/gameIds';
-import { delayUntilFxSettles, fxTimelineDurationMs } from '@/lib/table/fx-motion';
+import { botTurnDelayMs, fxTimelineDurationMs } from '@/lib/table/fx-motion';
 import { createFxQueue } from '@/lib/table/fx-queue';
+import { holdFxForCountdown } from '@/lib/table/opening-countdown';
 import {
   roomGame,
   seatRefusal,
@@ -1867,11 +1868,18 @@ export class MultiplayerRoomSession {
        * longer in wall-clock there, so it is the device most likely to still be
        * mid-animation when the next move lands.
        *
-       * `thinkMs` is a floor, not a schedule. Solo tables have always paced
-       * their bots this way (`useSoloTable`); room tables were the ones adding
-       * to the pile regardless of what was still moving.
+       * The engine owns the semantic cadence. A lobby house bot keeps casual
+       * table rhythm; a disconnected player's takeover bot snaps after the
+       * current visual lands. Game packs never supply millisecond timings.
        */
-      const pace = delayUntilFxSettles(turn.thinkMs, this.snapshot.fx);
+      const chair = this.snapshot.seats.find((seat) => seat.seat === turn.seat);
+      const mode = chair?.connected ? 'casual' : 'takeover';
+      const visibleFx =
+        session.log.length === 0 ? holdFxForCountdown(this.snapshot.fx) : this.snapshot.fx;
+      const pace = botTurnDelayMs(
+        { mode, seed: session.seed, turn: session.log.length, seat: turn.seat },
+        visibleFx,
+      );
       setTimeout(() => void this.submitBotTurn(key, turn.seat, turn.move), pace);
     }
   }

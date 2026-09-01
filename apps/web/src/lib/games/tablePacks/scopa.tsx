@@ -43,7 +43,6 @@ export const scopaTablePack = defineTablePack<
 
   useSoloDriver: turnBasedDriver({
     round: (current) => current.session,
-    botPaceMs: () => 420,
   }),
 
   renderPending: ({ fx, fxKey, error }) => (

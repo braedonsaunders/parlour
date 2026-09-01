@@ -1,6 +1,6 @@
 import { Fx, type FxEvent } from '@parlour/engine';
 import { describe, expect, it } from 'vitest';
-import { buildFxTimeline, delayUntilFxSettles, FX_TIMING } from './fx-motion';
+import { botTurnDelayMs, buildFxTimeline, FX_TIMING, tableHandoffDelayMs } from './fx-motion';
 
 describe('table fx timeline', () => {
   it('turns unordered engine fx into a stable choreography for every table moment', () => {
@@ -94,16 +94,32 @@ describe('table fx timeline', () => {
     });
   });
 
-  it('holds the next actor until the final cue has landed and settled', () => {
+  it('adds the shared human read beat after the last card has landed', () => {
     const events: FxEvent[] = [
-      {
-        kind: Fx.DealCard,
-        payload: { card: 'H5', from: 'stock', to: 'hand:1', dur: 220 },
-        at: 900,
-      },
+      { kind: Fx.DiscardCard, payload: { card: 'H5', seat: 0, to: 'discard' } },
     ];
 
-    expect(delayUntilFxSettles(420, events)).toBe(1_280);
-    expect(delayUntilFxSettles(1_500, events)).toBe(1_500);
+    expect(tableHandoffDelayMs('casual', events)).toBe(860);
+    expect(tableHandoffDelayMs('casual', [])).toBe(600);
+  });
+
+  it('uses one shared cadence for bot thought and visual handoff', () => {
+    const input = { mode: 'casual' as const, seed: 9, turn: 4, seat: 2 };
+    const delay = botTurnDelayMs(input, []);
+
+    expect(delay).toBeGreaterThanOrEqual(600);
+    expect(delay).toBeLessThanOrEqual(840);
+    expect(botTurnDelayMs(input, [])).toBe(delay);
+  });
+
+  it('keeps explicitly timed tables fast without bypassing their visual burst', () => {
+    const input = { mode: 'timed' as const, seed: 9, turn: 4, seat: 2 };
+    const events: FxEvent[] = [
+      { kind: Fx.DrawCard, payload: { card: 'C8', seat: 2, from: 'stock' } },
+    ];
+    const delay = botTurnDelayMs(input, events);
+
+    expect(delay).toBeGreaterThanOrEqual(FX_TIMING.drawFlightMs + 100);
+    expect(delay).toBeLessThanOrEqual(FX_TIMING.drawFlightMs + 140);
   });
 });

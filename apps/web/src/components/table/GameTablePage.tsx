@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState, type ReactNode } from 'react';
-import type { FxEvent, GameSession, RuleValues } from '@parlour/engine';
+import type { FxEvent, GameSession, RuleValues, TablePacingMode } from '@parlour/engine';
 import { useWipeRouter } from '@/hooks/useWipeRouter';
 import { holdFxForCountdown } from '@/lib/table/opening-countdown';
 import { useDeferredTransport } from '@/lib/table/useDeferredTransport';
@@ -28,8 +28,9 @@ import type { MultiplayerRoomSession } from '@/app/_multiplayer/roomSession';
  * device is sitting at a friend room or a solo table, build a transport a tick
  * after mount, run the bot loop, keep the fx timeline in step, report the match
  * when it ends, and hand over to the podium. Only four things ever differed —
- * which transport, how long a bot pauses, how a snapshot becomes a view, and
- * which screen draws it — and those are the fields of {@link TableGamePack}.
+ * which transport, how a snapshot becomes a view, and which screen draws it —
+ * and those are the fields of {@link TableGamePack}. Pacing is a shared engine
+ * policy; a pack can name urgency, but cannot invent durations.
  *
  * The screens themselves are untouched. Their prop shapes are genuinely
  * game-specific (`onBid`/`onBidNil` versus `onPass`/`onPlayCard`), so a pack
@@ -95,6 +96,8 @@ export interface TableGamePack<TSnapshot, TDispatch, TTransport, S, C extends Ru
    * `/play`, not `/blitz`.
    */
   homeHref?: string;
+  /** Shared urgency profile; games never supply millisecond timings. */
+  pacing?: TablePacingMode;
 
   /**
    * Reads whatever setup state a fresh deal depends on and returns the factory
@@ -170,7 +173,7 @@ export function turnBasedDriver<
   TTransport extends SoloTableTransport<TSnapshot, TDispatch>,
 >(options: {
   round(snapshot: TSnapshot): SoloRound;
-  botPaceMs(snapshot: TSnapshot): number;
+  pacing?: TablePacingMode | ((snapshot: TSnapshot) => TablePacingMode);
   fxFor?(outcome: TDispatch): readonly FxEvent[];
   onAccepted?(outcome: TDispatch): void;
 }): SoloDriver<TTransport, TSnapshot, TDispatch> {
@@ -261,7 +264,7 @@ function RoomTablePage<TSnapshot, TDispatch, TTransport, S, C extends RuleValues
   room: MultiplayerRoomSession;
 }) {
   const router = useWipeRouter();
-  const table = useRoomTable<S, C>(room, pack.gameId);
+  const table = useRoomTable<S, C>(room, pack.gameId, pack.pacing);
   const { session, localSeat, snapshot, error } = table;
   const home = pack.homeHref ?? `/${pack.id}`;
 

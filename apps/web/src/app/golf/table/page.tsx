@@ -55,7 +55,7 @@ function ActiveGolfTable({
   );
   const { snapshot, fx, fxKey, error, dispatch, accept } = useSoloTable(transport, {
     round: (current: GolfSnapshot) => current.session,
-    botPaceMs: () => 0,
+    pacing: 'automatic',
   });
   const recordStart = useGolfStatsStore((state) => state.recordStart);
   const recordHole = useGolfStatsStore((state) => state.recordHole);

@@ -43,9 +43,6 @@ export const pokerTablePack = defineTablePack<
 
   useSoloDriver: turnBasedDriver({
     round: (snapshot) => snapshot.session,
-    // A betting decision should look considered. Board cards land on their own
-    // fx timing, so this paces the seats rather than the deal.
-    botPaceMs: (current) => (current.session.state.street === 'preflop' ? 480 : 620),
   }),
 
   renderPending: ({ fx, fxKey, error }) => (

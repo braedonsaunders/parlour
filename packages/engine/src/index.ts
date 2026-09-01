@@ -5,6 +5,7 @@ export * from './teams';
 export * from './seats';
 export * from './undo';
 export * from './bots';
+export * from './pacing';
 export * from './match';
 export { defineConfig, applyPreset } from './config';
 export { makeRng } from './rng';

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { isStaleMoveFault } from './useRoomTable';
+import type { GameSession, RuleValues } from '@parlour/engine';
+import { isStaleMoveFault, latestPlayerActionKey, withoutActingSeats } from './useRoomTable';
 
 /**
  * Reported from a real table: hosting on a Mac with a phone as the second
@@ -35,5 +36,29 @@ describe('a refused move is not a broken table', () => {
     expect(isStaleMoveFault(new Error('action seat does not belong to this profile'))).toBe(false);
     expect(isStaleMoveFault(new Error('transport is not ready'))).toBe(false);
     expect(isStaleMoveFault(new Error('the shuffle ceremony stalled'))).toBe(false);
+  });
+});
+
+describe('the shared human handoff gate', () => {
+  it('opens once per deliberate seat action, not for its automatic follow-ups', () => {
+    const session = {
+      seed: 42,
+      log: [
+        { seq: 0, seat: 0, move: 'playCard' },
+        { seq: 1, seat: null, move: 'advance', automatic: true },
+      ],
+    } as unknown as GameSession<unknown, RuleValues>;
+
+    expect(latestPlayerActionKey(session)).toBe('42:0:0');
+  });
+
+  it('keeps the destination board visible while withholding every acting seat', () => {
+    const session = {
+      phase: { phase: 'play', actor: 1, actors: [1, 2], round: 3 },
+    } as unknown as GameSession<unknown, RuleValues>;
+
+    const paced = withoutActingSeats(session);
+    expect(paced.phase).toEqual({ phase: 'play', actor: null, actors: [], round: 3 });
+    expect(session.phase.actor).toBe(1);
   });
 });

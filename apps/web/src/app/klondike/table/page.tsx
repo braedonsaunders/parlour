@@ -61,7 +61,7 @@ function ActiveKlondikeTable({
   );
   const { snapshot, fx, fxKey, error, dispatch, accept } = useSoloTable(transport, {
     round: (current: KlondikeSnapshot) => current.session,
-    botPaceMs: () => 0,
+    pacing: 'automatic',
   });
   const recordStart = useKlondikeStatsStore((state) => state.recordStart);
   const recordWin = useKlondikeStatsStore((state) => state.recordWin);

@@ -54,9 +54,6 @@ export const palaceTablePack = defineTablePack<
 
   useSoloDriver: turnBasedDriver({
     round: (snapshot) => snapshot.session,
-    // Ordinary turns keep human pace; the swap phase moves briskly.
-    botPaceMs: (current) =>
-      current.session.phase.phase === 'play' ? 460 + (current.session.phase.actor ?? 0) * 90 : 220,
   }),
 
   renderPending: ({ fx, fxKey, error }) => (

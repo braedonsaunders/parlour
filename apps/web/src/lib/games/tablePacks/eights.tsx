@@ -54,9 +54,6 @@ export const eightsTablePack = defineTablePack<
 
   useSoloDriver: turnBasedDriver({
     round: (snapshot) => snapshot.session,
-    // Ordinary turns keep human pace; the ready window between deals is instant.
-    botPaceMs: (current) =>
-      current.session.phase.phase === 'play' ? 480 + (current.session.phase.actor ?? 0) * 90 : 200,
   }),
 
   renderPending: ({ fx, fxKey, error }) => (

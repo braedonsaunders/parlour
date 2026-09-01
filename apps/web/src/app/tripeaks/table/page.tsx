@@ -60,7 +60,7 @@ function ActiveTripeaksTable({
   );
   const { snapshot, fx, fxKey, error, dispatch, accept } = useSoloTable(transport, {
     round: (current: TripeaksSnapshot) => current.session,
-    botPaceMs: () => 0,
+    pacing: 'automatic',
   });
   const recordStart = useTripeaksStatsStore((state) => state.recordStart);
   const recordHole = useTripeaksStatsStore((state) => state.recordHole);

@@ -109,6 +109,7 @@ export const ratscrewTablePack = defineTablePack<
 >({
   id: 'ratscrew',
   gameId: 'ratscrew',
+  pacing: 'realtime',
 
   useSoloDeal() {
     const mode = useRatscrewSetupStore((state) => state.mode);

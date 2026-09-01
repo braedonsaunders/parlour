@@ -21,6 +21,7 @@ export const spiteTablePack = defineTablePack<
 >({
   id: 'spite',
   gameId: 'spite',
+  pacing: 'brisk',
 
   useSoloDeal() {
     const mode = useSpiteSetupStore((state) => state.mode);
@@ -43,9 +44,7 @@ export const spiteTablePack = defineTablePack<
 
   useSoloDriver: turnBasedDriver({
     round: (current) => current.session,
-    // A Spite turn is a run of builds and then one discard, so a bot pausing
-    // between every build would make its turn interminable.
-    botPaceMs: () => 240,
+    pacing: 'brisk',
   }),
 
   renderPending: ({ fx, fxKey, error }) => (

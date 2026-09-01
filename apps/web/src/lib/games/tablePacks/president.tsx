@@ -71,9 +71,6 @@ export const presidentTablePack = defineTablePack<
 
   useSoloDriver: turnBasedDriver({
     round: (snapshot) => snapshot.session,
-    // Exchange decisions read as deliberation; regular turns keep human pace.
-    botPaceMs: (current) =>
-      current.session.phase.phase === 'play' ? 520 + (current.session.phase.actor ?? 0) * 80 : 420,
   }),
 
   renderPending: ({ fx, fxKey, error }) => (

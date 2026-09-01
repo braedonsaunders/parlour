@@ -32,15 +32,9 @@ import {
   type SeatId,
 } from '@parlour/engine';
 
-/** Takeover bots snap-play so a vanished player never becomes another delay. */
-export const BOT_THINK_MIN_MS = 80;
-export const BOT_THINK_MAX_MS = 140;
-
 export interface BotTurn {
   seat: SeatId;
   move: LegalMove;
-  /** how long to wait before submitting, so the table can follow along */
-  thinkMs: number;
 }
 
 export interface BotDecisionInput<S, C extends RuleValues> {
@@ -88,17 +82,16 @@ export function botTurns<S, C extends RuleValues>({
     // same position pick the same move, so a host handover mid-turn cannot make
     // the bot change its mind.
     const rng = makeRng(session.seed).fork(`bot:${seat}:${session.log.length}`);
-    const thinkMs = BOT_THINK_MIN_MS + rng.int(BOT_THINK_MAX_MS - BOT_THINK_MIN_MS);
     // A bot policy is game code reasoning over card faces. If it throws — an
     // unreadable card, a rule it did not expect — that must cost the table one
     // bot turn, not the host's whole session.
     let chosen: LegalMove | null = null;
     try {
-      chosen = policy.chooseMove(view, seat, legal, rng, { thinkMs: () => thinkMs });
+      chosen = policy.chooseMove(view, seat, legal, rng, { thinkMs: () => 120 });
     } catch {
       chosen = null;
     }
-    if (chosen) turns.push({ seat, move: chosen, thinkMs });
+    if (chosen) turns.push({ seat, move: chosen });
   }
   return turns;
 }

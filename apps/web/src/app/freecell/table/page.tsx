@@ -59,7 +59,7 @@ function ActiveFreecellTable({
   );
   const { snapshot, fx, fxKey, error, dispatch, accept } = useSoloTable(transport, {
     round: (current: FreecellSnapshot) => current.session,
-    botPaceMs: () => 0,
+    pacing: 'automatic',
   });
   const recordStart = useFreecellStatsStore((state) => state.recordStart);
   const recordWin = useFreecellStatsStore((state) => state.recordWin);

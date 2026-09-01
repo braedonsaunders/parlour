@@ -46,7 +46,6 @@ export const ohhellTablePack = defineTablePack<
 
   useSoloDriver: turnBasedDriver({
     round: (current) => current.hand,
-    botPaceMs: (current) => (current.hand.state.stage === 'bidding' ? 520 : 430),
     fxFor: (outcome) =>
       outcome.fx.length > 0 ? outcome.fx : (outcome.snapshot.hand.setupFx ?? []),
   }),

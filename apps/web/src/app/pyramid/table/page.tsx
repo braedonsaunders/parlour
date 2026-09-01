@@ -60,7 +60,7 @@ function ActivePyramidTable({
   );
   const { snapshot, fx, fxKey, error, dispatch, accept } = useSoloTable(transport, {
     round: (current: PyramidSnapshot) => current.session,
-    botPaceMs: () => 0,
+    pacing: 'automatic',
   });
   const recordStart = usePyramidStatsStore((state) => state.recordStart);
   const recordHole = usePyramidStatsStore((state) => state.recordHole);

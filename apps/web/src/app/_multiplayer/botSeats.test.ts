@@ -13,7 +13,7 @@ import {
   type BlitzConfig,
   type BlitzState,
 } from '@parlour/game-blitz';
-import { BOT_THINK_MAX_MS, BOT_THINK_MIN_MS, botTurnKey, botTurns } from './botSeats';
+import { botTurnKey, botTurns } from './botSeats';
 
 const def = createBlitzDef();
 const CONFIG = blitzConfigSchema.defaults();
@@ -45,13 +45,6 @@ describe('who a bot plays for', () => {
     const session = blitz();
     const ended = { ...session, status: 'ended' as const };
     expect(botTurns({ def, session: ended, view: ended.state, botSeats: [0] })).toEqual([]);
-  });
-
-  it('paces itself so the table can follow along', () => {
-    const session = blitz();
-    const turn = botTurns({ def, session, view: session.state, botSeats: [0] })[0]!;
-    expect(turn.thinkMs).toBeGreaterThanOrEqual(BOT_THINK_MIN_MS);
-    expect(turn.thinkMs).toBeLessThan(BOT_THINK_MAX_MS);
   });
 });
 

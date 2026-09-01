@@ -1,8 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import type { FxEvent } from '@parlour/engine';
-import { delayUntilFxSettles } from './fx-motion';
+import type { FxEvent, TablePacingMode } from '@parlour/engine';
+import { botTurnDelayMs } from './fx-motion';
 import { holdFxForCountdown } from './opening-countdown';
 import { isStaleMoveFault } from './useRoomTable';
 
@@ -17,8 +17,9 @@ import { isStaleMoveFault } from './useRoomTable';
  * the others — roughly 2,300 lines of glue holding no game logic at all, and a
  * ninth game meant a ninth copy.
  *
- * Only two things genuinely differed: which transport class is constructed,
- * and how long a bot should pause for a given phase. Both are parameters here.
+ * Only two things genuinely differ: which transport class is constructed and,
+ * rarely, whether the table is casual, brisk, timed or automatic. The engine
+ * turns that semantic intent into one cadence shared by every game.
  *
  * The engine's promise is that a rules module inherits the whole table. This
  * is the app honouring that promise instead of contradicting it.
@@ -31,6 +32,8 @@ import { isStaleMoveFault } from './useRoomTable';
  * hook assuming one shape.
  */
 export interface SoloRound {
+  seed?: number;
+  log?: readonly unknown[];
   status: 'playing' | 'ended';
   phase: { actor: number | null };
   setupFx?: readonly FxEvent[];
@@ -56,14 +59,8 @@ export interface SoloTableTransport<TSnapshot, TDispatch> {
 export interface SoloTableOptions<TSnapshot, TDispatch> {
   /** Where this game keeps the live round on its snapshot. */
   round(snapshot: TSnapshot): SoloRound;
-  /**
-   * How long the bot should appear to think, given the table in front of it.
-   * Games use this to make deliberation read differently from reflex — a
-   * bidding decision is a conversation, a trick play keeps a human beat.
-   * The returned value is a floor: the runtime always waits for the fx
-   * timeline to finish first, so a bot never talks over its own deal.
-   */
-  botPaceMs(snapshot: TSnapshot): number;
+  /** Semantic urgency only; the engine owns every actual duration. */
+  pacing?: TablePacingMode | ((snapshot: TSnapshot) => TablePacingMode);
   /** Seat the human occupies; the bot loop never plays it. Defaults to 0. */
   localSeat?: number;
   /** Copy shown when a bot policy throws. */
@@ -112,7 +109,7 @@ export function useSoloTable<TSnapshot, TDispatch extends SoloTableDispatch<TSna
 ): SoloTable<TSnapshot, TDispatch> {
   const {
     round,
-    botPaceMs,
+    pacing = 'casual',
     localSeat = 0,
     botErrorMessage = 'The bot lost the thread.',
     fxFor,
@@ -155,16 +152,18 @@ export function useSoloTable<TSnapshot, TDispatch extends SoloTableDispatch<TSna
     [accept, transport],
   );
 
-  // Each page previously spelled out its own dependency list of game-specific
-  // state fields. Those fields were only ever read to compute the pace, and
-  // `snapshot` is a fresh object on every accepted outcome, so depending on the
-  // snapshot itself is both simpler and strictly safer than enumerating them.
+  // `snapshot` is a fresh object on every accepted outcome, so one dependency
+  // covers the replay position and the rare snapshot-derived pacing mode.
   useEffect(() => {
     const live = round(snapshot);
     if (live.status !== 'playing') return;
     const actor = live.phase.actor;
     if (actor === null || actor === localSeat) return;
-    const delay = delayUntilFxSettles(botPaceMs(snapshot), fx);
+    const mode = typeof pacing === 'function' ? pacing(snapshot) : pacing;
+    const delay = botTurnDelayMs(
+      { mode, seed: live.seed ?? 0, turn: live.log?.length ?? 0, seat: actor },
+      fx,
+    );
     const timer = window.setTimeout(() => {
       try {
         accept(transport.playBotTurn());
@@ -174,7 +173,7 @@ export function useSoloTable<TSnapshot, TDispatch extends SoloTableDispatch<TSna
       }
     }, delay);
     return () => window.clearTimeout(timer);
-  }, [accept, botErrorMessage, botPaceMs, fx, localSeat, round, snapshot, transport]);
+  }, [accept, botErrorMessage, fx, localSeat, pacing, round, snapshot, transport]);
 
   return { snapshot, fx, fxKey, error, dispatch, accept, setError, setSnapshot };
 }

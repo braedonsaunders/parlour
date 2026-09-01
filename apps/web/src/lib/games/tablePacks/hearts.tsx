@@ -19,8 +19,6 @@ import { useProfileStore } from '@/stores/profile';
 import { heartsRulesFor, useHeartsSetupStore } from '@/stores/heartsSetup';
 import type { HeartsRules, HeartsState } from '@parlour/game-hearts';
 
-const BOT_THINK_MS = 520;
-
 /** The podium wants the whole match, not just the last hand. */
 function matchResultFrom(snapshot: HeartsSnapshot) {
   if (snapshot.matchResult) return snapshot.matchResult;
@@ -75,7 +73,6 @@ export const heartsTablePack = defineTablePack<
 
   useSoloDriver: turnBasedDriver({
     round: (snapshot) => snapshot.hand,
-    botPaceMs: () => BOT_THINK_MS,
     // A move that emitted nothing falls back to the deal timeline, so the
     // opening cascade is not swallowed by the first pass.
     fxFor: (outcome) =>

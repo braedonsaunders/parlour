@@ -35,8 +35,6 @@ export const ginTablePack = defineTablePack<
 
   useSoloDriver: turnBasedDriver({
     round: (snapshot) => snapshot.session,
-    botPaceMs: (current) =>
-      current.session.state.folded && current.session.phase.phase === 'hand-end' ? 420 : 520,
   }),
 
   renderPending: ({ fx, fxKey, error }) => (

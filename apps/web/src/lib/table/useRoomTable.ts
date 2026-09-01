@@ -1,7 +1,13 @@
 'use client';
 
-import { useCallback, useState, useSyncExternalStore } from 'react';
-import type { GameSession, RuleValues } from '@parlour/engine';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import {
+  actingSeats,
+  tableTransitionPacing,
+  type GameSession,
+  type RuleValues,
+  type TablePacingMode,
+} from '@parlour/engine';
 import {
   clearActiveMultiplayerSession,
   expectedRoomGameId,
@@ -12,6 +18,7 @@ import {
   type MultiplayerRoomSnapshot,
 } from '@/app/_multiplayer/roomSession';
 import { isSeatLeftFault } from '@/lib/multiplayer/veil';
+import { tableHandoffDelayMs } from './fx-motion';
 
 /**
  * The friend-room half of a table page, written once.
@@ -59,12 +66,64 @@ export function isStaleMoveFault(error: unknown): boolean {
 export function useRoomTable<S, C extends RuleValues>(
   room: MultiplayerRoomSession,
   gameId: string,
+  pacing: TablePacingMode = 'casual',
 ): RoomTable<S, C> {
   const [localError, setLocalError] = useState<string | null>(null);
   const snapshot = useSyncExternalStore(room.subscribe, room.getSnapshot, room.getSnapshot);
-  const session = multiplayerSession<S, C>(snapshot, gameId);
+  const liveSession = multiplayerSession<S, C>(snapshot, gameId);
+  const actionKey = latestPlayerActionKey(liveSession);
+  const pacesActions = pacing !== 'realtime';
+  const currentActors = liveSession ? actingSeats(liveSession.phase) : [];
+  const [gate, setGate] = useState(() => ({
+    actionKey,
+    actors: currentActors,
+    fx: snapshot.fx,
+    fxKey: snapshot.fxKey,
+    locked: pacesActions && actionKey !== null,
+    mode: pacing,
+  }));
 
-  const dispatch = useCallback(
+  // A new player action closes the controls immediately. A room publishes its
+  // authoritative state and its fx in adjacent notifications, so the guarded
+  // second branch refreshes the hold if the visual burst arrives one render
+  // later. Follow-up auto events can extend a hold that is already active, but
+  // never close controls again after the handoff has been offered.
+  if (gate.actionKey !== actionKey) {
+    setGate({
+      actionKey,
+      actors: currentActors,
+      fx: snapshot.fx,
+      fxKey: snapshot.fxKey,
+      locked: pacesActions && actionKey !== null,
+      mode: tableTransitionPacing(pacing, gate.actors, currentActors),
+    });
+  } else if (gate.locked && gate.fxKey !== snapshot.fxKey) {
+    setGate({ ...gate, fx: snapshot.fx, fxKey: snapshot.fxKey });
+  } else if (!gate.locked && !sameSeats(gate.actors, currentActors)) {
+    setGate({ ...gate, actors: currentActors });
+  }
+
+  useEffect(() => {
+    if (!gate.locked || gate.actionKey === null) return;
+    const timer = window.setTimeout(
+      () => {
+        setGate((current) =>
+          current.actionKey === gate.actionKey ? { ...current, locked: false } : current,
+        );
+      },
+      tableHandoffDelayMs(gate.mode, gate.fx),
+    );
+    return () => window.clearTimeout(timer);
+  }, [gate]);
+
+  const session = gate.locked && liveSession ? withoutActingSeats(liveSession) : liveSession;
+  const pendingMove = useRef<{
+    move: string;
+    payload?: unknown;
+    reveals?: readonly string[];
+  } | null>(null);
+
+  const dispatchNow = useCallback(
     (move: string, payload?: unknown, reveals?: readonly string[]) => {
       try {
         room.send(move, payload, reveals);
@@ -96,6 +155,24 @@ export function useRoomTable<S, C extends RuleValues>(
     [gameId, room],
   );
 
+  const dispatch = useCallback(
+    (move: string, payload?: unknown, reveals?: readonly string[]) => {
+      if (gate.locked) {
+        pendingMove.current ??= { move, payload, reveals };
+        return;
+      }
+      dispatchNow(move, payload, reveals);
+    },
+    [dispatchNow, gate.locked],
+  );
+
+  useEffect(() => {
+    if (gate.locked || !pendingMove.current) return;
+    const pending = pendingMove.current;
+    pendingMove.current = null;
+    dispatchNow(pending.move, pending.payload, pending.reveals);
+  }, [dispatchNow, gate.locked]);
+
   const leave = useCallback(
     (go: () => void) => {
       room.close();
@@ -113,6 +190,34 @@ export function useRoomTable<S, C extends RuleValues>(
     dispatch,
     leave,
   };
+}
+
+/** One key per deliberate seat action; automatic flow packets share its gate. */
+export function latestPlayerActionKey<S, C extends RuleValues>(
+  session: GameSession<S, C> | null,
+): string | null {
+  if (!session) return null;
+  for (let index = session.log.length - 1; index >= 0; index--) {
+    const event = session.log[index];
+    if (event && event.seat !== null && !event.automatic && !event.injected) {
+      return `${session.seed}:${event.seq}:${event.seat}`;
+    }
+  }
+  return null;
+}
+
+/** Keeps the destination state visible while withholding its next controls. */
+export function withoutActingSeats<S, C extends RuleValues>(
+  session: GameSession<S, C>,
+): GameSession<S, C> {
+  return {
+    ...session,
+    phase: { ...session.phase, actor: null, actors: [] },
+  };
+}
+
+function sameSeats(left: readonly number[], right: readonly number[]): boolean {
+  return left.length === right.length && left.every((seat, index) => seat === right[index]);
 }
 
 /**

@@ -54,7 +54,7 @@ function ActiveSpiderTable({
   );
   const { snapshot, fx, fxKey, error, dispatch, accept } = useSoloTable(transport, {
     round: (current: SpiderSnapshot) => current.session,
-    botPaceMs: () => 0,
+    pacing: 'automatic',
   });
   const recordStart = useSpiderStatsStore((state) => state.recordStart);
   const recordWin = useSpiderStatsStore((state) => state.recordWin);
