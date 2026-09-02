@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { usePathname } from 'next/navigation';
 import { useT } from '@/lib/i18n';
 import { isTauriRuntime, syncAppViewportHeight } from '@/lib/pwa';
 
@@ -9,25 +10,29 @@ import { isTauriRuntime, syncAppViewportHeight } from '@/lib/pwa';
  * a friend-room flow (the mesh does not survive a reload), or on the podium
  * (whose report lives in client stores). Everywhere else — home, shelves,
  * setup, profile — the app swaps itself for the new version without asking.
- * Judged by route rather than by importing the multiplayer store, which must
- * stay out of the layout's module graph.
+ * Judged by route, with the rendered table as a backstop, rather than by
+ * importing the multiplayer store into the layout's module graph.
  */
 function safeToAutoApply(): boolean {
   const path = window.location.pathname;
-  return !(
+  const protectedRoute =
     path.includes('/table') ||
     path.startsWith('/create') ||
     path.startsWith('/join') ||
-    path.startsWith('/match-end')
-  );
+    path.startsWith('/match-end');
+  return !protectedRoute && !document.querySelector('[data-table-screen]');
 }
+
+type UpdateReloadIntent = 'automatic' | 'player';
 
 export function PwaRegister() {
   const t = useT();
+  const pathname = usePathname();
   const [online, setOnline] = useState(true);
   const [waitingWorker, setWaitingWorker] = useState<ServiceWorker | null>(null);
   const [applyingUpdate, setApplyingUpdate] = useState(false);
-  const reloadForUpdate = useRef(false);
+  const [deferredReload, setDeferredReload] = useState(false);
+  const reloadForUpdate = useRef<UpdateReloadIntent | null>(null);
 
   useEffect(() => syncAppViewportHeight(), []);
 
@@ -51,33 +56,28 @@ export function PwaRegister() {
     let registration: ServiceWorkerRegistration | undefined;
     let lastUpdateCheck = 0;
 
+    const activateWorker = (worker: ServiceWorker, intent: UpdateReloadIntent) => {
+      reloadForUpdate.current = intent;
+      setApplyingUpdate(true);
+      worker.postMessage({ type: 'SKIP_WAITING' });
+    };
+
     const offerUpdate = (worker: ServiceWorker | null) => {
       if (disposed || !worker || !navigator.serviceWorker.controller) return;
       // Away from a live table, don't ask — apply. The prompt is only for the
       // moments where a reload would cost the player something.
       if (safeToAutoApply()) {
-        activateWorker(worker);
+        activateWorker(worker, 'automatic');
         return;
       }
       setWaitingWorker(worker);
     };
 
-    const activateWorker = (worker: ServiceWorker) => {
-      reloadForUpdate.current = true;
-      setApplyingUpdate(true);
-      worker.postMessage({ type: 'SKIP_WAITING' });
-    };
-
-    const watchRegistration = (
-      nextRegistration: ServiceWorkerRegistration,
-      activateWaiting: boolean,
-    ) => {
+    const watchRegistration = (nextRegistration: ServiceWorkerRegistration) => {
       registration = nextRegistration;
-      if (activateWaiting && nextRegistration.waiting && navigator.serviceWorker.controller) {
-        activateWorker(nextRegistration.waiting);
-      } else {
-        offerUpdate(nextRegistration.waiting);
-      }
+      // A worker can already be waiting when this component mounts. It still
+      // has to pass the same live-game gate as a worker installed moments ago.
+      offerUpdate(nextRegistration.waiting);
       nextRegistration.addEventListener('updatefound', () => {
         const worker = nextRegistration.installing;
         if (!worker) return;
@@ -92,7 +92,7 @@ export function PwaRegister() {
         const nextRegistration = await navigator.serviceWorker.register('/sw.js', {
           updateViaCache: 'none',
         });
-        watchRegistration(nextRegistration, true);
+        watchRegistration(nextRegistration);
         lastUpdateCheck = Date.now();
         // `register()` already checks the script. Asking the same registration
         // to update before its first install has settled can make WebKit queue
@@ -112,9 +112,20 @@ export function PwaRegister() {
     };
 
     const onControllerChange = () => {
-      if (!reloadForUpdate.current) return;
-      reloadForUpdate.current = false;
-      window.location.reload();
+      const intent = reloadForUpdate.current;
+      if (!intent) return;
+      reloadForUpdate.current = null;
+      if (intent === 'player' || safeToAutoApply()) {
+        window.location.reload();
+        return;
+      }
+
+      // Activation may finish after a menu-to-table navigation. The new
+      // worker can control this document without replacing it; reload only
+      // after the player leaves the live/client-state surface.
+      setWaitingWorker(null);
+      setApplyingUpdate(false);
+      setDeferredReload(true);
     };
 
     navigator.serviceWorker.addEventListener('controllerchange', onControllerChange);
@@ -142,9 +153,14 @@ export function PwaRegister() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!deferredReload || !safeToAutoApply()) return;
+    window.location.reload();
+  }, [deferredReload, pathname]);
+
   const applyUpdate = () => {
     if (!waitingWorker) return;
-    reloadForUpdate.current = true;
+    reloadForUpdate.current = 'player';
     setApplyingUpdate(true);
     waitingWorker.postMessage({ type: 'SKIP_WAITING' });
   };

@@ -1,8 +1,10 @@
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useLocaleStore } from '@/stores/locale';
 import { PwaRegister } from './PwaRegister';
+
+vi.mock('next/navigation', () => ({ usePathname: () => window.location.pathname }));
 
 let container: HTMLDivElement;
 let root: Root;

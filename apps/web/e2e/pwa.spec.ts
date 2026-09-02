@@ -110,6 +110,99 @@ test('a real update toast leaves the table menu hit-testable', async ({ page }) 
   await expect(page.getByTestId('table-menu')).toBeVisible();
 });
 
+test('a worker already waiting at startup cannot reload a live table', async ({ page }) => {
+  await page.addInitScript(() => {
+    const boots = Number(window.sessionStorage.getItem('pwa-race-boots') ?? '0') + 1;
+    window.sessionStorage.setItem('pwa-race-boots', String(boots));
+    const alreadyActivated = window.sessionStorage.getItem('pwa-race-activated') === '1';
+
+    const worker = Object.assign(new EventTarget(), {
+      state: 'installed',
+      scriptURL: `${location.origin}/sw.js`,
+      postMessage: (message: { type?: string }) => {
+        if (message.type !== 'SKIP_WAITING') return;
+        window.sessionStorage.setItem('pwa-race-activated', '1');
+        window.setTimeout(() => serviceWorker.dispatchEvent(new Event('controllerchange')), 0);
+      },
+    });
+    const registration = Object.assign(new EventTarget(), {
+      active: worker,
+      installing: null as typeof worker | null,
+      waiting: alreadyActivated ? null : worker,
+      update: async () => undefined,
+    });
+    const serviceWorker = Object.assign(new EventTarget(), {
+      controller: worker,
+      register: async () => registration,
+    });
+    Object.defineProperty(navigator, 'serviceWorker', {
+      configurable: true,
+      value: serviceWorker,
+    });
+  });
+
+  await page.goto('/wild/table/');
+  await expect(page.locator('[data-table-screen]')).toBeVisible();
+  await page.waitForTimeout(500);
+
+  expect(await page.evaluate(() => Number(sessionStorage.getItem('pwa-race-boots')))).toBe(1);
+  await expect(page.getByTestId('pwa-update-status')).toBeVisible();
+});
+
+test('an update armed on a menu waits when the player enters a table route', async ({ page }) => {
+  await page.addInitScript(() => {
+    const boots = Number(window.sessionStorage.getItem('pwa-route-race-boots') ?? '0') + 1;
+    window.sessionStorage.setItem('pwa-route-race-boots', String(boots));
+    const alreadyActivated = window.sessionStorage.getItem('pwa-route-race-activated') === '1';
+
+    const worker = Object.assign(new EventTarget(), {
+      state: 'installed',
+      scriptURL: `${location.origin}/sw.js`,
+      postMessage: (message: { type?: string }) => {
+        if (message.type !== 'SKIP_WAITING') return;
+        window.sessionStorage.setItem('pwa-route-race-activated', '1');
+        window.sessionStorage.setItem('pwa-route-race-armed', '1');
+      },
+    });
+    const registration = Object.assign(new EventTarget(), {
+      active: worker,
+      installing: null as typeof worker | null,
+      waiting: alreadyActivated ? null : worker,
+      update: async () => undefined,
+    });
+    const serviceWorker = Object.assign(new EventTarget(), {
+      controller: worker,
+      register: async () => registration,
+    });
+    Object.defineProperty(navigator, 'serviceWorker', {
+      configurable: true,
+      value: serviceWorker,
+    });
+    (
+      window as typeof window & { dispatchPwaControllerChangeForTest: () => void }
+    ).dispatchPwaControllerChangeForTest = () => {
+      serviceWorker.dispatchEvent(new Event('controllerchange'));
+    };
+  });
+
+  await page.goto('/wild/');
+  await page.waitForFunction(() => sessionStorage.getItem('pwa-route-race-armed') === '1');
+  await page.evaluate(() => window.history.pushState({}, '', '/wild/table/'));
+  await page.evaluate(() =>
+    (
+      window as typeof window & { dispatchPwaControllerChangeForTest: () => void }
+    ).dispatchPwaControllerChangeForTest(),
+  );
+  await page.waitForTimeout(100);
+
+  expect(await page.evaluate(() => Number(sessionStorage.getItem('pwa-route-race-boots')))).toBe(1);
+
+  const safeScreenReload = page.waitForEvent('load');
+  await page.evaluate(() => window.history.pushState({}, '', '/wild/'));
+  await safeScreenReload;
+  expect(await page.evaluate(() => Number(sessionStorage.getItem('pwa-route-race-boots')))).toBe(2);
+});
+
 test('the offline shell is cached after a first visit', async ({ page, context, browserName }) => {
   test.skip(browserName === 'webkit', 'WebKit blocks service workers on plain http origins');
 
