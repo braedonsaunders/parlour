@@ -1,12 +1,21 @@
-name: Balance gates
+name: Balance and soak gates
 
-# The statistical half of the bot balance gates.
+# The slow half of the gates: statistical claims and real-time soaks.
 #
-# These assert win-rate bands, which need a sample size that takes minutes to
-# simulate. Run in the blocking lane they failed for load, not for regressions —
-# three of eight `main` runs went red, and one fix was literally
-# "allow balance gate under CI load". The PR lane now runs the exact, cheap half
-# (determinism, coverage, no stalls) and this runs the rest on push.
+# Both need minutes of wall clock. Run in the blocking PR lane they failed for
+# load, not for regressions — three of eight `main` runs went red, and one fix
+# was literally "allow balance gate under CI load". The PR lane now runs the
+# exact, cheap half and this runs the rest on push.
+#
+#   balance  — win-rate bands at a sample size where they mean something.
+#   soak     — the duel lanes that drive REAL timers to prove a table under
+#              churn keeps moving inside real deadlines. Measured at 233s for
+#              three tests, because each duel runs until a real match clock
+#              expires. Fake timers would make them faster and prove less, so
+#              they are opted out of the PR lane instead: `PARLOUR_SLOW_LANES`.
+#              The PR lane still runs the same harness in under a minute via
+#              duel.test.ts and reopen.test.ts — walkovers, host migration,
+#              rejoin, seed sweeps.
 #
 # See packages/engine/src/sim/scale.ts.
 
@@ -54,3 +63,36 @@ jobs:
           echo "::error::Balance gates failed at full sample. This is a real signal:" \
                "the quick lane already proved determinism and coverage, so a failure" \
                "here means bot strength or persona balance actually moved."
+
+  soak:
+    name: Real-time duel soak
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 26
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      # The duel project alone: --project web is the PR lane's job and would
+      # only lengthen this one. fileParallelism is false and maxWorkers is 1 in
+      # its vitest config, so it measures the room code rather than the runner.
+      - name: Run the duel lanes with real timers
+        env:
+          PARLOUR_SLOW_LANES: '1'
+        run: pnpm --filter @parlour/web exec vitest run --project duel
+
+      - name: Report
+        if: failure()
+        run: |
+          echo "::error::A real-time duel lane failed. Check whether the table" \
+               "genuinely wedged (a real finding) or the runner was slow enough" \
+               "to overrun a deadline (a flake) — the report prints plies and a" \
+               "per-move tally, and every duel reproduces from its seed."

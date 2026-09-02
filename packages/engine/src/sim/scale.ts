@@ -60,3 +60,41 @@ export function simGames(quick: number, full: number): number {
 export function scaleNote(): string {
   return isFullSim() ? '[full sample]' : '[quick sample — bands checked on push]';
 }
+
+/**
+ * Wall-clock budget for a lane that measures LIVENESS rather than statistics.
+ *
+ * The duel suites drive real timers on purpose — they assert that a table under
+ * churn keeps moving inside real deadlines, which a fake clock cannot speak to.
+ * That makes them slow by construction: measured, the Wild coverage file alone
+ * is 332s for three tests, because each duel runs until a real two-minute match
+ * clock expires. On every PR that is minutes of wall clock spent re-proving
+ * something that almost never changes, and the longer the window the more
+ * chance a loaded runner overruns a deadline and reads a healthy table as
+ * wedged — a flake that cost real time to chase.
+ *
+ * So these share the same split as the statistical gates: a quick lane with
+ * short clocks and short budgets that still proves convergence, fault recovery
+ * and replay, and a full lane with today's budgets for the long soak. Unlike
+ * `simGames` this is opt-out rather than opt-in — see
+ * `PARLOUR_FULL_SIM` — because the quick lane keeps the valuable assertions and
+ * only gives up soak depth.
+ */
+export function simMs(quick: number, full: number): number {
+  return isFullSim() ? full : quick;
+}
+
+/**
+ * Whether the slow, real-time lanes run at all.
+ *
+ * Separate from {@link isFullSim} because the two answer different questions.
+ * `PARLOUR_FULL_SIM` says "at full sample"; that is the right switch for a
+ * statistical gate, where a bigger sample is strictly more signal. It is the
+ * wrong switch for a six-minute soak, which nobody wants on every PR even at
+ * quick scale — so the duel lane needs its own opt-in.
+ */
+export function isSlowLane(): boolean {
+  const flag = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process
+    ?.env?.PARLOUR_SLOW_LANES;
+  return flag === '1' || flag === 'true';
+}

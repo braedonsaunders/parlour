@@ -30,19 +30,31 @@ wall-clock scheduling still varies, so soak flaky suspects in a loop).
   restore + catch-up). Reports the survivor's full applied log and a per-move
   tally so tests can PROVE coverage instead of hoping for it.
 - `duel.test.ts` — the scenario lane (clean duels, walkovers both directions,
-  rejoin, seed sweep). `wild-coverage.test.ts` — complicated Wild: every house
-  rule on, clock-driven play, and a witnessed-coverage assertion over moves
-  and card kinds.
+  rejoin, seed sweep). Runs in the PR lane, ~49s for eight tests.
+- `wild-coverage.test.ts` — complicated Wild: every house rule on, clock-driven
+  play, and a witnessed-coverage assertion over moves and card kinds. **Opt-in**
+  behind `PARLOUR_SLOW_LANES`: every duel runs until a real match clock expires,
+  which measures at 233s for three tests. That is not a cost worth paying on
+  every pull request, so it runs on push instead.
 
 ## Running
 
 ```sh
-# quick lane (runs in the ordinary web test suite)
-pnpm --filter @parlour/web exec vitest run src/app/_multiplayer/duel
+# PR lane: scenarios only, ~60s (this is what `pnpm --filter @parlour/web test` runs)
+pnpm --filter @parlour/web exec vitest run --project duel
 
-# nightly scale: more seeds, exhaustive Wild coverage
-PARLOUR_FULL_SIM=1 pnpm --filter @parlour/web exec vitest run src/app/_multiplayer/duel
+# add the real-time Wild soak (233s)
+PARLOUR_SLOW_LANES=1 pnpm --filter @parlour/web exec vitest run --project duel
+
+# full sample: more seeds, exhaustive Wild coverage
+PARLOUR_FULL_SIM=1 PARLOUR_SLOW_LANES=1 \
+  pnpm --filter @parlour/web exec vitest run --project duel
 ```
+
+`PARLOUR_SLOW_LANES` and `PARLOUR_FULL_SIM` are separate switches on purpose.
+The first asks "should the soak run at all", the second "at what sample size" —
+a bigger sample is strictly more signal for a statistical gate, but a six-minute
+soak is not something anyone wants on every PR even at quick scale.
 
 ## Adding a game
 
