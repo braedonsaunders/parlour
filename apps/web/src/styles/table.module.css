@@ -753,6 +753,19 @@
   transform: rotate(var(--card-rotation));
   transform-origin: 50% 100%;
   transition: transform 140ms var(--ease-pop);
+  /*
+   * Every measurement on the face below is a share of THIS card, not of the
+   * viewport.
+   *
+   * The index and the centre pip used to be `clamp(…, Nvw, …)`. A full card is
+   * `clamp(6.3rem, 9vw, 8.1rem)` but a compact one is `clamp(3rem, 4.2vw, 4rem)`,
+   * so the same viewport-derived glyph that was 56% of a full card's width was
+   * 125% of a compact one's — the centre heart spilled over the corner heart
+   * and off the edge. `cqw` ties the face to the card in both, so one set of
+   * numbers is correct everywhere and a compact card can never outgrow its
+   * own index again.
+   */
+  container-type: inline-size;
 }
 
 button.card {
@@ -795,27 +808,43 @@ button.card {
 }
 .cardIndex {
   position: absolute;
-  top: 0.25rem;
-  left: 0.35rem;
+  top: 0.3rem;
+  left: 0.32rem;
   display: grid;
   justify-items: center;
-  line-height: 0.82;
+  line-height: 0.84;
   font-family: var(--font-display), sans-serif;
 }
 .cardIndex b {
-  font-size: clamp(1rem, 1.7vw, 1.45rem);
+  font-size: 30cqw;
+  font-weight: 800;
+  letter-spacing: -0.02em;
 }
 .cardIndex i {
+  margin-top: 0.03em;
   font-style: normal;
-  font-size: 0.9rem;
+  font-size: 19cqw;
 }
+/*
+ * The centre mark is the one that used to swallow the card.
+ *
+ * `padding-top` keeps it clear of the corner index rather than relying on the
+ * two never meeting by accident, and 34cqw puts it back to roughly the share
+ * of a full card it always looked right at — while a compact card, which used
+ * to get the same absolute glyph at 125% of its width, now gets 34% of its own.
+ */
 .cardSuit {
   position: absolute;
   inset: 0;
   display: grid;
   place-items: center;
-  font-size: clamp(2.6rem, 4.7vw, 4.4rem);
-  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.1);
+  padding-top: 8cqw;
+  font-size: 34cqw;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+.cardCompact .cardIndex {
+  top: 0.16rem;
+  left: 0.18rem;
 }
 .cardRed {
   color: #c9423b;
