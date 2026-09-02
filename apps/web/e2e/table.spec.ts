@@ -81,11 +81,11 @@ test('leaving a table returns to its shelf without orphaning keyboard focus', as
 });
 
 /*
- * The hand is one held fan in both orientations. It compresses to fit whatever
- * it holds; it never pans, and it never has its cards cut off. A previous batch
- * replaced portrait with a scrolling row that hid nine of thirteen cards and
- * sliced the top off every playable one, so these assertions are deliberately
- * about what a player can SEE rather than about what exists in the DOM.
+ * The hand is one held fan in every viewport. It compresses to fit whatever it
+ * holds and never pans. Its lower half deliberately passes behind the screen
+ * edge so the cards can stay large; its readable top must always remain intact.
+ * These assertions are deliberately about what a player can SEE rather than
+ * about what exists in the DOM.
  */
 const HAND_GAMES = [
   { game: 'spades', cards: 13 },
@@ -94,9 +94,13 @@ const HAND_GAMES = [
   { game: 'gin', cards: 10 },
 ] as const;
 
-for (const orientation of ['portrait', 'landscape'] as const) {
+for (const orientation of ['portrait', 'landscape', 'desktop'] as const) {
   const viewport =
-    orientation === 'portrait' ? { width: 390, height: 844 } : { width: 844, height: 390 };
+    orientation === 'portrait'
+      ? { width: 390, height: 844 }
+      : orientation === 'landscape'
+        ? { width: 844, height: 390 }
+        : { width: 1440, height: 900 };
 
   test.describe(`${orientation} hand rails`, () => {
     test.use({ viewport });
@@ -124,11 +128,17 @@ for (const orientation of ['portrait', 'landscape'] as const) {
         const layout = await hand.evaluate((rail) => {
           const track = rail.querySelector<HTMLElement>('[data-hand-track]');
           if (!track) throw new Error('hand rail has no track');
-          const cardEls = [...rail.querySelectorAll<HTMLElement>('[data-hand-card]')];
-          const boxes = cardEls.map((card) => card.getBoundingClientRect());
-          const fans = cardEls.map(
-            (card) =>
-              getComputedStyle(card.querySelector<HTMLElement>('[data-hand-fan]')!).transform,
+          const items = [...rail.querySelectorAll<HTMLElement>('[data-hand-card]')];
+          // Measure the transformed physical card, not its centered motion
+          // wrapper. Every wrapper occupies the same untransformed box; using
+          // it here would claim a fan fits even while an outer card is visibly
+          // hanging past the bezel.
+          const boxes = items.map((item) =>
+            item.querySelector<HTMLElement>('[data-hand-fan]')!.getBoundingClientRect(),
+          );
+          const fans = items.map(
+            (item) =>
+              getComputedStyle(item.querySelector<HTMLElement>('[data-hand-fan]')!).transform,
           );
 
           const trackStyle = getComputedStyle(track);
@@ -163,11 +173,14 @@ for (const orientation of ['portrait', 'landscape'] as const) {
         ]);
         expect(layout.withinWidth, 'the fan fits the width, gutters and all').toBe(true);
         expect(layout.topClipped, 'no card has its rank cut off').toBe(0);
-        // Short landscape sinks the fan into the bottom edge on purpose: the
-        // crop buys the felt back for the piles. The readable top of every
-        // card must survive (asserted above); the bleed may take up to 45% —
-        // WebKit rounds the fan's arc a hair taller than Chromium does.
-        const bleedBudget = orientation === 'landscape' ? layout.cardHeight * 0.45 : 16;
+        // The crop buys the felt back for play. The readable top of every card
+        // must survive (asserted above); the bleed may take the lower half,
+        // with a little rounding room for WebKit's taller fan arc.
+        const bleedFloor = layout.cardHeight * (orientation === 'landscape' ? 0.18 : 0.35);
+        const bleedBudget = layout.cardHeight * 0.58;
+        expect(layout.bottomBleed, 'the hand is visibly held from below').toBeGreaterThanOrEqual(
+          bleedFloor,
+        );
         expect(layout.bottomBleed, 'the hand is docked, not falling off').toBeLessThanOrEqual(
           bleedBudget,
         );

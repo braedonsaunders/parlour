@@ -530,13 +530,16 @@
   --fan-n: 3;
   --fan-un: 0.334;
   --fan-step: 0px;
-  --hand-card-width: clamp(7.1rem, 10.2vw, 9.1rem);
+  --hand-card-width: clamp(8.6rem, 12.5vw, 11.2rem);
   --hand-rail-span: calc(9rem + var(--fan-n) * 3.4rem);
   --hand-rail-max: 92vw;
   position: absolute;
   z-index: 10;
   left: 50%;
-  bottom: -0.35rem;
+  /* A hand is held from below the table, not laid flat on top of it. Cropping
+     the lower half keeps a physical deck-sized face without taking the felt
+     away from play. The rank and the exposed band of every card stay on-screen. */
+  bottom: -4rem;
   display: flex;
   justify-content: center;
   width: min(var(--hand-rail-span), var(--hand-rail-max));
@@ -1217,25 +1220,22 @@ button.card {
     top: 48%;
     transform: translate(-50%, -50%) scale(0.85);
   }
-  /* Portrait holds the hand the way a hand is held: one fan, compressed until
-     it fits. `calculateFanStep` already solves for the width, so a thirteen
-     card hand tightens its step rather than growing a rail that pans. Portrait
-     therefore inherits the landscape fan wholesale and only restates the two
-     numbers a narrow screen changes — a smaller card, and a rail no wider than
-     the phone. Nothing here may introduce a scroll or a clip: the hand must be
-     readable in one look, and a lifted playable card needs somewhere to go. */
+  /* Portrait keeps the same real card size as short landscape. The fan step is
+     the part that compresses as the hand grows, so even a huge Wild hand stays
+     one fixed arc instead of turning into a miniature deck or a scroll strip. */
   .localHand {
-    --hand-card-width: clamp(5.4rem, 19.5vw, 6.4rem);
+    --hand-card-width: 7.2rem;
     /* The fan's outermost cards rotate past the rail, so its ceiling stops
        short of the screen to leave the arc its gutters. At full width the
        corner cards sit on the bezel. */
     --hand-rail-max: calc(100vw - 2rem);
-    bottom: calc(env(safe-area-inset-bottom) + 0.9rem);
+    /* Sink the lower half behind the phone edge, matching the landscape hand.
+       The home indicator is below the interactive, readable half of the card. */
+    bottom: -6rem;
     height: 12.4rem;
   }
-  /* The fan's outermost cards rotate away from centre, so the widest part of
-     the hand is above its own box. Portrait gives that overhang room by
-     shrinking the card rather than by letting the rail clip or scroll. */
+  /* The fan's outermost cards rotate away from centre. The rail remains
+     overflow-visible so their readable tops and lifted play states survive. */
   .localHand .card {
     min-height: 2.75rem;
   }

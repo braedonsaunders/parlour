@@ -66,7 +66,10 @@ export function calculateFanStep(
    * edge cards were running off a narrow screen.
    */
   const spread = 1 + (ratio / DEFAULT_FAN_STEP_RATIO - 1) * 1.25;
-  const edgeGutter = Math.max(20, Math.min(40, width * 0.06)) * spread;
+  // A 7.2rem portrait card rotates around a point below its own bottom edge;
+  // that arc reaches about 24px past its unrotated box. Keep a little more
+  // than that at either bezel so the rank corner never gets shaved off.
+  const edgeGutter = Math.max(28, Math.min(40, width * 0.06)) * spread;
   const availableSpan = Math.max(0, width - edgeGutter * 2 - cardWidth);
   return Math.min(cardWidth * ratio, availableSpan / (count - 1));
 }
