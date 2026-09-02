@@ -71,6 +71,7 @@ describe('installable offline shell', () => {
 
     expect(worker).toContain("importScripts('/precache-manifest.js')");
     expect(worker).toContain("event.data?.type === 'SKIP_WAITING'");
+    expect(worker).toContain('event.data?.safeReload === true');
     expect(worker).toContain('`parlour-runtime-${manifest.version}`');
     expect(worker).toContain('`parlour-music-${manifest.version}`');
     expect(worker).toContain("const MUSIC_PATH_PREFIX = '/audio/music/'");
@@ -89,6 +90,7 @@ describe('installable offline shell', () => {
     const register = readFileSync(join(process.cwd(), 'src/components/PwaRegister.tsx'), 'utf8');
     expect(register).toContain("register('/sw.js', {");
     expect(register).toContain("updateViaCache: 'none'");
+    expect(register).toContain("type: 'SKIP_WAITING', safeReload: true");
     expect(register).not.toContain('void nextRegistration.update()');
     expect(register).toContain('void registration.update()');
 

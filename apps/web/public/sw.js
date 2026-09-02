@@ -100,7 +100,12 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('message', (event) => {
-  if (event.data?.type === 'SKIP_WAITING') void self.skipWaiting();
+  // Do not let a legacy client activate this worker with its unconditional
+  // controllerchange reload. The current client marks activation requests only
+  // after installing its protected-surface/deferred-reload lifecycle.
+  if (event.data?.type === 'SKIP_WAITING' && event.data?.safeReload === true) {
+    void self.skipWaiting();
+  }
 });
 
 self.addEventListener('fetch', (event) => {

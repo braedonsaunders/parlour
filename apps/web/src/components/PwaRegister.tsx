@@ -24,6 +24,7 @@ function safeToAutoApply(): boolean {
 }
 
 type UpdateReloadIntent = 'automatic' | 'player';
+const SAFE_ACTIVATION_MESSAGE = { type: 'SKIP_WAITING', safeReload: true } as const;
 
 export function PwaRegister() {
   const t = useT();
@@ -59,7 +60,7 @@ export function PwaRegister() {
     const activateWorker = (worker: ServiceWorker, intent: UpdateReloadIntent) => {
       reloadForUpdate.current = intent;
       setApplyingUpdate(true);
-      worker.postMessage({ type: 'SKIP_WAITING' });
+      worker.postMessage(SAFE_ACTIVATION_MESSAGE);
     };
 
     const offerUpdate = (worker: ServiceWorker | null) => {
@@ -162,7 +163,7 @@ export function PwaRegister() {
     if (!waitingWorker) return;
     reloadForUpdate.current = 'player';
     setApplyingUpdate(true);
-    waitingWorker.postMessage({ type: 'SKIP_WAITING' });
+    waitingWorker.postMessage(SAFE_ACTIVATION_MESSAGE);
   };
 
   if (online && !waitingWorker) return null;
