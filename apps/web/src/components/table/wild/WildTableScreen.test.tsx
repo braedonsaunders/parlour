@@ -619,7 +619,14 @@ describe('WildTableScreen turn affordances', () => {
           view: {
             ...VIEW,
             pendingDraw: 4,
-            challenge: { accused: 1, accusedName: 'Slate', amount: 4, penalty: 6 },
+            challenge: {
+              accused: 1,
+              accusedName: 'Slate',
+              amount: 4,
+              penalty: 6,
+              stackCards: [],
+              stackAmount: 8,
+            },
             legal: { ...VIEW.legal, playCards: [], challengeDrawFour: true },
           },
           fx: [],
@@ -643,6 +650,78 @@ describe('WildTableScreen turn affordances', () => {
       container.querySelector<HTMLButtonElement>('[data-testid="challenge-draw-four"]')?.click(),
     );
     expect(onChallengeDrawFour).toHaveBeenCalledOnce();
+  });
+
+  /*
+   * Stacking was always legal through the hand rail, but the prompt implied two
+   * answers were the only answers. These cover the third one being offered when
+   * the hand can answer, and — the commoner case — being absent rather than
+   * disabled when it cannot.
+   */
+  it('offers stacking as a third way out when the hand holds another Draw Four', () => {
+    const onPlay = vi.fn();
+    act(() =>
+      root.render(
+        createElement(WildTableScreen, {
+          view: {
+            ...VIEW,
+            pendingDraw: 4,
+            challenge: {
+              accused: 1,
+              accusedName: 'Slate',
+              amount: 4,
+              penalty: 6,
+              stackCards: ['wild-draw-four-1'],
+              stackAmount: 8,
+            },
+            legal: { ...VIEW.legal, challengeDrawFour: true },
+          },
+          fx: [],
+          fxKey: 0,
+          onPlay,
+        }),
+      ),
+    );
+
+    const prompt = container.querySelector('[data-testid="challenge-prompt"]');
+    expect(prompt?.textContent).toContain('next seat faces 8');
+
+    act(() =>
+      container.querySelector<HTMLButtonElement>('[data-testid="stack-draw-four"]')?.click(),
+    );
+    expect(onPlay).toHaveBeenCalledOnce();
+    expect(onPlay).toHaveBeenCalledWith('wild-draw-four-1');
+  });
+
+  it('leaves the stack button out entirely when nothing in hand can answer', () => {
+    act(() =>
+      root.render(
+        createElement(WildTableScreen, {
+          view: {
+            ...VIEW,
+            pendingDraw: 4,
+            challenge: {
+              accused: 1,
+              accusedName: 'Slate',
+              amount: 4,
+              penalty: 6,
+              stackCards: [],
+              stackAmount: 8,
+            },
+            legal: { ...VIEW.legal, playCards: [], challengeDrawFour: true },
+          },
+          fx: [],
+          fxKey: 0,
+        }),
+      ),
+    );
+
+    const prompt = container.querySelector('[data-testid="challenge-prompt"]');
+    // A dead button invites a tap that does nothing; absent is the honest answer.
+    expect(prompt?.querySelector('[data-testid="stack-draw-four"]')).toBeNull();
+    expect(prompt?.textContent).not.toContain('next seat faces');
+    expect(prompt?.querySelector('[data-testid="challenge-draw-four"]')).not.toBeNull();
+    expect(prompt?.querySelector('[data-testid="accept-draw-four"]')).not.toBeNull();
   });
 
   it('counts a stacked pickup out card by card instead of dumping it', () => {

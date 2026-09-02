@@ -675,6 +675,13 @@
   border-color: rgba(255, 226, 240, 0.75);
 }
 
+/* Stacking is the escalating choice, so it wears the hot end of the palette —
+   the same amber the draw pile uses when it wants a card. */
+.stackButton.stackButton {
+  background: linear-gradient(180deg, #efa14b, #b45c18);
+  border-color: rgba(255, 234, 199, 0.78);
+}
+
 /* --- draw + last-card affordances ----------------------------------------- */
 
 .stockPile[data-can-draw='true']::after {

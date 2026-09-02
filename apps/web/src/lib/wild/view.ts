@@ -42,6 +42,14 @@ export interface WildTableView {
     amount: number;
     /** What a failed challenge would cost instead. */
     penalty: number;
+    /**
+     * Cards this seat could answer with, growing the pile and passing the
+     * accusation on. Empty when the seat holds nothing stackable, which is the
+     * usual case — most hands cannot answer a Draw Four.
+     */
+    stackCards: readonly string[];
+    /** What the pickup becomes if this seat stacks: more cards, next seat's problem. */
+    stackAmount: number;
   } | null;
   /**
    * Someone reached one card without calling it. Catching is a player's shout,
@@ -133,7 +141,7 @@ export function wildTableView(
     decision: isLocalTurn ? localDecision(session.phase.phase, offered) : null,
     lastCardArmed: state.calledLastCard[localSeat] ?? false,
     drawnCard: state.turn === localSeat ? state.drawnCard : null,
-    challenge: challengeView(snapshot, localSeat),
+    challenge: challengeView(snapshot, localSeat, playCards),
     catchable: exposed && exposed.seat !== localSeat ? exposed : null,
     legal: {
       playCards,
@@ -151,7 +159,19 @@ export function wildTableView(
   };
 }
 
-function challengeView(snapshot: WildSnapshot, localSeat: number): WildTableView['challenge'] {
+/**
+ * The Draw Four window, as the challenged seat sees it.
+ *
+ * `stackCards` is the third way out. While a pickup is pending `canPlay`
+ * routes through `canStack`, so the seat's playable cards at that moment ARE
+ * the stackable ones — no second rule to keep in step. Stacking adds four and
+ * passes the accusation to the next seat rather than settling it.
+ */
+function challengeView(
+  snapshot: WildSnapshot,
+  localSeat: number,
+  playCards: readonly string[],
+): WildTableView['challenge'] {
   const open = snapshot.session.state.challenge;
   if (!open || open.challenger !== localSeat) return null;
   const accused = snapshot.players.find((player) => player.seat === open.accused);
@@ -160,6 +180,8 @@ function challengeView(snapshot: WildSnapshot, localSeat: number): WildTableView
     accusedName: accused?.name ?? `Seat ${open.accused}`,
     amount: open.amount,
     penalty: open.amount + CHALLENGE_PENALTY,
+    stackCards: playCards,
+    stackAmount: open.amount + 4,
   };
 }
 

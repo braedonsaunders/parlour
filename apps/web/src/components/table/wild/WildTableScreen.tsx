@@ -247,6 +247,10 @@ function WildTableScreenView(props: WildTableScreenProps) {
               challenge={view.challenge}
               onChallenge={props.onChallengeDrawFour}
               onAccept={props.onDraw}
+              onStack={() => {
+                const card = view.challenge?.stackCards[0];
+                if (card) props.onPlay?.(card);
+              }}
             />
           )}
         </TablePlayfield>
@@ -846,16 +850,28 @@ const PICKUP_DONE: Record<WildPickup['reason'], string> = {
   challenge: 'Challenge settled',
 };
 
-/** The Draw Four window: take the pile, or say they had the colour all along. */
+/**
+ * The Draw Four window, as a three-way choice.
+ *
+ * Stacking was always legal here, but it lived only in the hand rail: the seat
+ * had to notice a +4 had lit up and play it from there, while the prompt sat
+ * over the felt offering two buttons and implying those were the only answers.
+ * Putting it in the prompt makes the real choice visible, and the button is
+ * absent rather than disabled when the hand cannot answer — most hands cannot,
+ * and a dead button invites a tap that does nothing.
+ */
 function ChallengePrompt({
   challenge,
   onChallenge,
   onAccept,
+  onStack,
 }: {
   challenge: NonNullable<WildTableView['challenge']>;
   onChallenge?: () => void;
   onAccept?: () => void;
+  onStack?: () => void;
 }) {
+  const stackCard = challenge.stackCards[0] ?? null;
   return (
     <motion.div
       className={`${wildStyles.challengePrompt} panel-soft`}
@@ -870,8 +886,19 @@ function ChallengePrompt({
       <small>
         They can only play it holding nothing in the old colour. Call it and they take{' '}
         {challenge.amount} — be wrong and you take {challenge.penalty}.
+        {stackCard && ` Stack and the next seat faces ${challenge.stackAmount}.`}
       </small>
       <div className={wildStyles.challengeActions}>
+        {stackCard && (
+          <button
+            type="button"
+            className={`btn-fat ${wildStyles.stackButton}`}
+            data-testid="stack-draw-four"
+            onClick={onStack}
+          >
+            Stack +4 → {challenge.stackAmount}
+          </button>
+        )}
         <button
           type="button"
           className={`btn-fat ${wildStyles.challengeButton}`}
