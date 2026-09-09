@@ -48,4 +48,17 @@ describe('PlayingCard', () => {
       '10 of hearts',
     );
   });
+
+  // A veiled handle is the card in the air on a draw, before this client has
+  // peeled it. There is no face to print, so it flew as "#42 ✦" and became the
+  // real card only once it landed.
+  it('shows a card it cannot read yet as a card back', () => {
+    act(() => {
+      root.render(createElement(PlayingCard, { card: 'v#42' }));
+    });
+    expect(container.textContent).not.toContain('42');
+    expect(container.querySelector('[aria-label]')?.getAttribute('aria-label')).toBe(
+      'Face-down card',
+    );
+  });
 });

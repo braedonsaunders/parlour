@@ -1,4 +1,5 @@
 import type { CSSProperties } from 'react';
+import { isVeilHandle } from '@parlour/engine';
 import styles from '@/styles/table.module.css';
 
 const SUITS: Record<string, { glyph: string; name: string }> = {
@@ -43,13 +44,22 @@ export type PlayingCardProps = {
 export function PlayingCard({
   card,
   face,
-  faceDown = false,
+  faceDown: askedFaceDown = false,
   compact = false,
   disabled = false,
   rotation = 0,
   onClick,
   actionLabel = 'Discard',
 }: PlayingCardProps) {
+  /*
+   * A veiled handle names a card this client cannot read yet — the one in the
+   * air on a draw, before the peel that opens it lands. There is no face to
+   * parse, so it used to render as the raw handle with its prefix eaten ("#42
+   * ✦") and then become the real card when it settled. A card whose face is
+   * unknown is a card back.
+   */
+  const faceDown =
+    askedFaceDown || (face === undefined && card !== undefined && isVeilHandle(card));
   const parsed = face ? faceToParsed(face) : card ? parseCard(card) : null;
   const className = [
     styles.card,

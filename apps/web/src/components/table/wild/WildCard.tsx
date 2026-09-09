@@ -1,4 +1,5 @@
 import type { CSSProperties } from 'react';
+import { isVeilHandle } from '@parlour/engine';
 import { wildpileFace, type WildpileFace } from '@parlour/game-wildpile';
 import tableStyles from '@/styles/table.module.css';
 import wildStyles from '@/styles/wild.module.css';
@@ -15,12 +16,21 @@ export type WildCardProps = {
 /** Wild deck skin over the shared card chassis (size/border/hover from table.module.css). */
 export function WildCard({
   card,
-  faceDown = false,
+  faceDown: askedFaceDown = false,
   compact = false,
   disabled = false,
   rotation = 0,
   onClick,
 }: WildCardProps) {
+  /*
+   * A veiled handle is a card this client cannot read yet — most visibly the
+   * one flying out of the stock on a draw, which arrives before the peel that
+   * opens it does. Its face has no colour, so the deck skin painted it as the
+   * four-colour wild: every pickup flew to the hand looking like a colour
+   * changer and then became the real card on landing. A card whose face is not
+   * known is a card back, which is what it is at a real table too.
+   */
+  const faceDown = askedFaceDown || (card !== undefined && isVeilHandle(card));
   const face = !faceDown && card ? safeFace(card) : null;
   const className = [
     tableStyles.card,
