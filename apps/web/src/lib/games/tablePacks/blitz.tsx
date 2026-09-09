@@ -1,7 +1,14 @@
 'use client';
 
 import { useEffect } from 'react';
-import { Fx, isActingSeat, isVeilHandle, type FxEvent, type MatchResult } from '@parlour/engine';
+import {
+  Fx,
+  isActingSeat,
+  isVeilHandle,
+  type FxEvent,
+  type MatchResult,
+  type PhaseState,
+} from '@parlour/engine';
 import { isBlitz, type BlitzConfig, type BlitzState } from '@parlour/game-blitz';
 import { RoundEndOverlay } from '@/components/celebration/RoundEndOverlay';
 import { TableScreen, type TableView } from '@/components/table/TableScreen';
@@ -167,6 +174,21 @@ function roomTableView(
   };
 }
 
+/**
+ * Whose turn it is — which under Veil is not the same as who may act.
+ *
+ * A veiled Blitz round lists every live seat as an acting seat so that any of
+ * them can claim a blitz the table cannot see (`withClaimants` in game-blitz).
+ * The felt is asking a narrower question: the piles ring, the hand spotlight
+ * and the "Your turn" whisper belong to `phase.actor` alone. Asking
+ * `isActingSeat` instead meant every player in every veiled room was told it
+ * was their turn for the whole match. `showdown.reveal` names an actor too, but
+ * the room answers it on the seat's behalf, so it is nobody's turn either.
+ */
+export function isBlitzTurn(phase: PhaseState, seat: number): boolean {
+  return phase.actor === seat && phase.phase !== 'showdown.reveal';
+}
+
 /** This seat's presented hand is fully readable and actually holds 31. */
 function claimableHand(state: BlitzState, seat: number): boolean {
   const hand = state.hands[seat] ?? [];
@@ -295,11 +317,14 @@ export const blitzTablePack = defineTablePack<
   },
 
   renderRoom({ session, snapshot, localSeat, error, dispatch, quit }) {
-    const myTurn = session.status === 'playing' && isActingSeat(session.phase, localSeat);
-    const legal = myTurn
-      ? (session.def.flow.legalMovesFor?.(session.state, session.phase, localSeat) ??
-        session.def.flow.legalMoves(session.state, session.phase))
-      : [];
+    const playing = session.status === 'playing';
+    const myTurn = playing && isBlitzTurn(session.phase, localSeat);
+    // Legality follows the wider question: the claim is deliberately off-turn.
+    const legal =
+      playing && isActingSeat(session.phase, localSeat)
+        ? (session.def.flow.legalMovesFor?.(session.state, session.phase, localSeat) ??
+          session.def.flow.legalMoves(session.state, session.phase))
+        : [];
 
     return (
       <TableScreen
