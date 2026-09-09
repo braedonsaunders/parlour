@@ -133,12 +133,8 @@ function useArrivalClock(
     () => inboundArrivalCues(queued, localSeat).map((cue) => cue.card),
     [queued, localSeat],
   );
-  const heldOut = useMemo(
-    () => outboundDepartureCues(queued, localSeat).map((cue) => cue.card),
-    [queued, localSeat],
-  );
   store.prepare(fxKey, inbound, outbound);
-  store.setWaiting(heldIn, heldOut);
+  store.setWaiting(heldIn);
 
   // Both `prepare` and `setWaiting` only stage the new sets — publishing them
   // is a commit-time job, and either one can move on its own: a queued burst
@@ -146,7 +142,7 @@ function useArrivalClock(
   // backlog at the same time.
   useLayoutEffect(() => {
     store.flushPrepare();
-  }, [inbound, outbound, heldIn, heldOut, fxKey, store]);
+  }, [inbound, outbound, heldIn, fxKey, store]);
 
   useLayoutEffect(() => {
     if (inbound.length === 0 && outbound.length === 0) return;

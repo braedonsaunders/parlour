@@ -189,6 +189,41 @@ describe('ArrivalProvider', () => {
     expect(container.querySelector('span')?.getAttribute('data-admitted')).toBe('true');
   });
 
+  /*
+   * The hold is inbound only, and deliberately so. Holding a PLAYED card in
+   * the fan until its queued flight leaves is the tempting mirror image, but
+   * the failure modes are not mirrored: a withheld arrival shows up a beat
+   * late, while a held departure strands a card the game state says is gone.
+   * It took the veiled friend-room suite from a 2-in-6 flake to 7-in-8.
+   */
+  it('does not keep a played card in the fan while its flight is queued', () => {
+    vi.useFakeTimers();
+    const play = [{ kind: Fx.DiscardCard, payload: { card: 'C4', seat: 0 }, at: 0 }] as const;
+    act(() => {
+      root.render(
+        <FxWaitingProvider fx={[]}>
+          <ArrivalProvider fx={[]} fxKey={'idle'} localSeat={0}>
+            <Probe cardId="C4" hand={['H1', 'C4']} />
+          </ArrivalProvider>
+        </FxWaitingProvider>,
+      );
+    });
+    expect(container.querySelector('span')?.getAttribute('data-admitted')).toBe('true');
+
+    // The play has been applied — C4 is out of the hand — and its burst is
+    // still queued behind someone else's card.
+    act(() => {
+      root.render(
+        <FxWaitingProvider fx={play}>
+          <ArrivalProvider fx={[]} fxKey={'idle'} localSeat={0}>
+            <Probe cardId="C4" hand={['H1']} />
+          </ArrivalProvider>
+        </FxWaitingProvider>,
+      );
+    });
+    expect(container.querySelector('span')?.getAttribute('data-admitted')).toBe('false');
+  });
+
   it('does not park another seat’s discard in the local fan', () => {
     act(() => {
       root.render(

@@ -762,6 +762,96 @@ async function playOutWildMatch(hostPage: Page, _guestPage: Page): Promise<void>
  * Creates a veiled room by injecting the 'veil' security tier before
  * the create page constructs its room session.
  */
+/**
+ * Plays one non-wild card from this seat's hand, and says which.
+ *
+ * Wild's table hands a seat fifteen seconds and then plays for it, so every
+ * fixed `waitForTimeout` before a click is spent off that clock: this used to
+ * sleep six seconds and then read the rail, click, and demand the card had
+ * gone. On a slower box the clock had already made the play, the turn had
+ * moved on, and the click landed on a disabled button — which is a correctly
+ * refused off-turn click reported as a Veil failure. It was the single biggest
+ * source of red in this lane.
+ *
+ * So: no sleeps, and one attempt is not the test. Wait for the turn to come
+ * round, take the shot, and if the clock won that race wait for the next turn
+ * and take another. Returns null only if no play landed in the whole window,
+ * which is a genuine failure rather than a lost race.
+ */
+async function playFromHand(page: Page, attempts = 4): Promise<string | null> {
+  // The rail publishes `data-playable`; reading opacity instead was guessing at
+  // the same fact through its presentation.
+  //
+  // Wilds are included. They were excluded to dodge the colour chooser, but the
+  // chooser is handled below and a seven-card Wild hand often has no other
+  // legal card — so excluding them meant waiting out whole turns for a card
+  // that was never coming, which is the other half of why this test was red.
+  const playable = page.locator('[data-hand-card][data-playable="true"]');
+  const stock = page.locator('[data-zone="stock"][data-can-draw="true"]');
+
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    // A seat's turn comes round behind three others, two of which are bots and
+    // one of which sits its whole clock, so this is a wait for a turn: either
+    // something is playable or the stock is offering a draw.
+    const turn = await Promise.race([
+      playable.last().waitFor({ state: 'attached', timeout: CONNECT_TIMEOUT_MS }),
+      stock.waitFor({ state: 'attached', timeout: CONNECT_TIMEOUT_MS }),
+    ])
+      .then(() => true)
+      .catch(() => false);
+    if (!turn) return null;
+
+    const card = playable.last();
+    if (!(await card.count())) {
+      // Nothing legal in hand: take the stock and let the next turn come round.
+      await stock.dispatchEvent('click').catch(() => undefined);
+      continue;
+    }
+
+    const cardId = await card.getAttribute('data-card-id');
+    if (!cardId) continue;
+
+    /*
+     * Dispatch the click rather than aim one.
+     *
+     * A hand is a fan, so a card's centre is covered by the neighbour drawn on
+     * top of it — measured here, the element under the middle of the card we
+     * meant to play was usually the next card's pip, and often a DISABLED
+     * card, which swallowed the click. `force: true` does not help: it skips
+     * the actionability CHECKS but still clicks the point, so it hit the
+     * neighbour just the same, and the hand never shrank. That is what this
+     * test kept reporting as a Veil failure.
+     *
+     * Whether the fan is hit-testable is a real question and it has its own
+     * coverage — the hand-rail geometry tests in table.spec.ts and the
+     * keyboard path in accessibility.spec.ts. Here it is in the way, so the
+     * event goes straight to the handler. The disabled check keeps that
+     * honest: dispatching on a disabled control would pass without playing.
+     */
+    const button = card.locator('button');
+    if (await button.isDisabled().catch(() => true)) continue;
+    await button.dispatchEvent('click').catch(() => undefined);
+
+    // Only wilds open this, and they are filtered out above — but a pack may
+    // add another chooser later, and a modal left open would block the rest.
+    const picker = page.locator('[role="dialog"][aria-label="Choose a color"]');
+    if (await picker.isVisible().catch(() => false)) {
+      await picker.getByRole('button').first().click();
+    }
+
+    // Count-of-listitems was the wrong fact: a departing card stays in the DOM
+    // through its exit animation, and a later draw adds more, so the total went
+    // 7 → 9 while the played card was already gone.
+    const gone = await page
+      .locator(`[data-hand-card][data-card-id="${cardId}"]`)
+      .waitFor({ state: 'detached', timeout: 10_000 })
+      .then(() => true)
+      .catch(() => false);
+    if (gone) return cardId;
+  }
+  return null;
+}
+
 async function createVeiledRoom(page: Page): Promise<string> {
   // addInitScript, not page.evaluate: the global must survive navigation.
   // createRoom() calls page.goto('/wild/create'), which creates a new
@@ -830,47 +920,12 @@ test.describe('veiled-deck rooms', () => {
     await joinRoomByCode(guest.page, code);
     await fillBotsAndStart(host.page);
     await expectAtTable(guest.page, CONNECT_TIMEOUT_MS);
-    await host.page.waitForTimeout(DEAL_SETTLE_MS);
-    await guest.page.waitForTimeout(DEAL_SETTLE_MS);
 
     // Under Veil, each seat's DOM must not contain another seat's card faces.
     // The host plays a non-wild card; the guest sees the card land on the
     // centre pile but must not see the host's remaining hand cards.
-
-    /*
-     * Ask the rail which cards are legal instead of inferring it from opacity.
-     * The rail publishes `data-playable`, and reading the computed style was
-     * guessing at the same fact through its presentation: a card dimmed for any
-     * other reason read as legal, the click was refused, and the hand did not
-     * shrink — which surfaced as "expected 6, received 7" and looked like a
-     * Veil failure rather than a mis-aimed click.
-     */
-    const playable = host.page.locator('[data-hand-card][data-playable="true"]').filter({
-      hasNot: host.page.locator('[aria-label^="Play wild"]'),
-    });
-    if (await playable.count()) {
-      const card = playable.last();
-      const cardId = await card.getAttribute('data-card-id');
-      // The play handler is on the button inside the rail item. A force-click
-      // on the wrapper never reaches it — Playwright fires the event on the
-      // node it was given — so the card sat in the hand and the test blamed Veil.
-      await card.locator('button').click({ force: true });
-
-      // Only wilds open this, and they are filtered out above — but a pack may
-      // add another chooser later, and a modal left open would block the rest.
-      const picker = host.page.locator('[role="dialog"][aria-label="Choose a color"]');
-      if (await picker.isVisible().catch(() => false)) {
-        await picker.getByRole('button').first().click();
-      }
-
-      // Count-of-listitems was the wrong fact: a departing card stays in the
-      // DOM through its exit animation, and a later draw adds more, so the
-      // total went 7 → 9 while the played card was already gone.
-      expect(cardId, 'playable card published a data-card-id').toBeTruthy();
-      await expect(host.page.locator(`[data-hand-card][data-card-id="${cardId}"]`)).toHaveCount(0, {
-        timeout: 15_000,
-      });
-    }
+    const played = await playFromHand(host.page);
+    expect(played, 'the host played a card from a veiled hand').toBeTruthy();
 
     // The guest must NOT see any new card faces in their own DOM.
     await expect(host.page.getByRole('alert').filter({ hasText: /.+/ })).toHaveCount(0, {

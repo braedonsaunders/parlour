@@ -34,12 +34,20 @@ export type ArrivalStore = {
     outbound: readonly OutboundCue[],
   ) => void;
   /**
-   * Cards whose flight has been accepted but not started — the animation
-   * queue's backlog. The state that moved them already landed, so until their
-   * burst goes on screen an incoming card is held out of the fan and an
-   * outgoing one is held in it, exactly as if its own cue were running.
+   * Incoming cards whose flight has been accepted but not started — the
+   * animation queue's backlog. The state that moved them already landed, so
+   * until their burst goes on screen they are held out of the fan exactly as
+   * if their own cue were running.
+   *
+   * Inbound only, deliberately. The mirror case is tempting — hold a played
+   * card IN the fan until its flight leaves — but the failure modes are not
+   * mirrored: withholding a card that has arrived shows it a beat late, while
+   * holding one that has gone strands an element the game state says is not
+   * there. Measured on the veiled friend-room suite, that turned a 2-in-6
+   * flake into 7-in-8: the card the test had just played was still sitting in
+   * the hand.
    */
-  setWaiting: (inboundCards: readonly string[], outboundCards: readonly string[]) => void;
+  setWaiting: (inboundCards: readonly string[]) => void;
   flushPrepare: () => void;
   open: (cardId: string) => void;
   land: (cardId: string) => void;
@@ -55,7 +63,6 @@ export function createArrivalStore(): ArrivalStore {
   let landed: ReadonlySet<string> = EMPTY;
   let departed: ReadonlySet<string> = EMPTY;
   let waitingIn: ReadonlySet<string> = EMPTY;
-  let waitingOut: ReadonlySet<string> = EMPTY;
   let snapshot: ArrivalState = DEFAULT_ARRIVAL;
   let admission: ArrivalAdmission = DEFAULT_ADMISSION;
   let published: ArrivalState = DEFAULT_ARRIVAL;
@@ -74,12 +81,7 @@ export function createArrivalStore(): ArrivalStore {
   }
 
   function recompute(): ArrivalState {
-    if (
-      inbound.length === 0 &&
-      outbound.length === 0 &&
-      waitingIn.size === 0 &&
-      waitingOut.size === 0
-    ) {
+    if (inbound.length === 0 && outbound.length === 0 && waitingIn.size === 0) {
       snapshot = DEFAULT_ARRIVAL;
       admission = DEFAULT_ADMISSION;
       return snapshot;
@@ -94,10 +96,9 @@ export function createArrivalStore(): ArrivalStore {
     for (const cue of outbound) {
       if (!departed.has(cue.card)) nextDeparting.add(cue.card);
     }
-    // A queued burst has no clock of its own: its cards stay held until the
-    // burst is published and its cues take over the same two sets.
+    // A queued burst has no clock of its own: its cards stay out of the fan
+    // until the burst is published and its own cues take the hold over.
     for (const card of waitingIn) pending.add(card);
-    for (const card of waitingOut) nextDeparting.add(card);
     if (
       sameSet(snapshot.arriving, arriving) &&
       sameSet(snapshot.pending, pending) &&
@@ -129,12 +130,10 @@ export function createArrivalStore(): ArrivalStore {
     recompute();
   }
 
-  function setWaiting(inboundCards: readonly string[], outboundCards: readonly string[]): void {
+  function setWaiting(inboundCards: readonly string[]): void {
     const nextIn = inboundCards.length === 0 ? EMPTY : new Set(inboundCards);
-    const nextOut = outboundCards.length === 0 ? EMPTY : new Set(outboundCards);
-    if (sameSet(waitingIn, nextIn) && sameSet(waitingOut, nextOut)) return;
+    if (sameSet(waitingIn, nextIn)) return;
     waitingIn = nextIn;
-    waitingOut = nextOut;
     recompute();
   }
 
