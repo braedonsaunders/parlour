@@ -2,10 +2,10 @@ name: Balance and soak gates
 
 # The slow half of the gates: statistical claims and real-time soaks.
 #
-# Both need minutes of wall clock. Run in the blocking PR lane they failed for
+# Both need minutes of wall clock. Run in the blocking lane they failed for
 # load, not for regressions — three of eight `main` runs went red, and one fix
-# was literally "allow balance gate under CI load". The PR lane now runs the
-# exact, cheap half and this runs the rest on push.
+# was literally "allow balance gate under CI load". CI runs the exact, cheap
+# half; this runs the rest.
 #
 #   balance  — win-rate bands at a sample size where they mean something.
 #   soak     — the duel lanes that drive REAL timers to prove a table under
@@ -19,10 +19,16 @@ name: Balance and soak gates
 #
 # See packages/engine/src/sim/scale.ts.
 
+# Nightly, not per-push. These are statistical and real-time claims: a
+# full-sample balance run and duels driven by real clocks. They take tens of
+# minutes, they answer a question nobody asks per-commit ("has bot strength
+# moved?"), and run in the blocking lane they failed for runner load rather
+# than for regressions. Nightly keeps the signal and takes it off the path
+# between a push and a deploy; `workflow_dispatch` is there for when a change
+# to bots or pacing deserves the answer immediately.
 on:
-  push:
-    branches: [main]
-  pull_request:
+  schedule:
+    - cron: '0 7 * * *'
   workflow_dispatch:
     inputs:
       games:
