@@ -125,7 +125,7 @@ for (const orientation of ['portrait', 'landscape', 'desktop'] as const) {
         await expect(hand.locator('[data-hand-card]')).toHaveCount(cards, { timeout: 15_000 });
         await expect(page.locator('[data-testid$="-rotate-notice"]')).toHaveCount(0);
 
-        const layout = await hand.evaluate((rail) => {
+        const measure = (rail: SVGElement | HTMLElement) => {
           const track = rail.querySelector<HTMLElement>('[data-hand-track]');
           if (!track) throw new Error('hand rail has no track');
           const items = [...rail.querySelectorAll<HTMLElement>('[data-hand-card]')];
@@ -164,7 +164,35 @@ for (const orientation of ['portrait', 'landscape', 'desktop'] as const) {
             outerRotated: fans[0] !== fans[Math.floor(fans.length / 2)],
             count: boxes.length,
           };
-        });
+        };
+
+        /*
+         * Measure the fan that settles, not the one still moving into place.
+         *
+         * A rail that mounted empty has no card to measure, so `calculateFanStep`
+         * solves the real step only once the hand arrives — and `.card` carries a
+         * 140ms transform transition, so every card then GLIDES to its new slot.
+         * Measured on a spades hand: the step is right at 50ms and the cards are
+         * still arriving at their slots until ~150ms, reading 125px of bleed on
+         * the way to the 101px it rests at. Chromium happened to land inside the
+         * first measurement and WebKit did not, which is the whole of the
+         * difference between them here.
+         *
+         * So the wait is for quiet, not for one repeat: three identical reads
+         * spans 200ms, comfortably past the transition.
+         */
+        const QUIET_READS = 3;
+        let layout = await hand.evaluate(measure);
+        let signature = JSON.stringify(layout);
+        let quiet = 1;
+        for (let attempt = 0; attempt < 60 && quiet < QUIET_READS; attempt += 1) {
+          await page.waitForTimeout(100);
+          layout = await hand.evaluate(measure);
+          const next = JSON.stringify(layout);
+          quiet = next === signature ? quiet + 1 : 1;
+          signature = next;
+        }
+        expect(quiet, 'the hand rail settles').toBe(QUIET_READS);
 
         expect(layout.count).toBe(cards);
         expect(layout.overflow, 'the hand never pans and never clips').toEqual([
