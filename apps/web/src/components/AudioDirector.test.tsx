@@ -2,6 +2,8 @@ import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_SETTINGS, resetAudioManagerForTests } from '@/lib/audio/AudioManager';
+import { resetMusicControllerForTests } from '@/lib/audio/MusicController';
+import { DEFAULT_SCENE, useSceneStore } from '@/stores/scene';
 import { resetMusicBindingsForTests, useAudioStore } from '@/stores/audio';
 import {
   activateMultiplayerSession,
@@ -113,7 +115,18 @@ describe('AudioDirector', () => {
     localStorage.clear();
     FakeHowl.instances = [];
     nav.pathname = '/';
+    /*
+     * Pin the background.
+     *
+     * A first boot with empty storage deals a RANDOM scene (see stores/scene),
+     * and the beach is the one background that brings its own menu music — so
+     * on roughly one run in five the title theme these tests are about was
+     * legitimately replaced by the beach playlist and all four failed together.
+     * It read as a load flake because every CI run re-rolls.
+     */
+    useSceneStore.setState({ sceneId: DEFAULT_SCENE });
     resetAudioManagerForTests();
+    resetMusicControllerForTests();
     resetMusicBindingsForTests();
     clearActiveMultiplayerSession();
     useAudioStore.setState({ channels: DEFAULT_SETTINGS, unlocked: false });
@@ -130,6 +143,7 @@ describe('AudioDirector', () => {
     if (root) act(() => root.unmount());
     container?.remove();
     resetAudioManagerForTests();
+    resetMusicControllerForTests();
     resetMusicBindingsForTests();
     clearActiveMultiplayerSession();
     vi.unstubAllGlobals();
