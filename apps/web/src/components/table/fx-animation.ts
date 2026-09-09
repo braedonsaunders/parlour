@@ -26,13 +26,46 @@ export function useTableAudio(fx: readonly FxEvent[], fxKey: string | number, sf
     getAudioManager().preload(soundDefsForSfxPack(sfxPackId));
   }, [sfxPackId]);
 
+  /*
+   * Scheduled cues outlive the burst that authored them.
+   *
+   * They used to be cancelled by this effect's own cleanup, which runs the
+   * moment the NEXT burst is published — and several authored accents land
+   * after their burst's motion has finished. Wild's "Last card!" is the clearest
+   * case: the burst is a discard flight (180ms + 80ms settle) and the voice is
+   * authored at 320ms, so the fx queue moves on 60ms before the line was due to
+   * speak. When nothing was waiting behind it the voice played; when the next
+   * packet was already queued — which is the normal case for a move made by
+   * someone else's device, arriving back-to-back with its turn ring — it was
+   * silently cancelled. So a player heard their own last-card call and never
+   * anyone else's, and the same race quietly clipped the skip, reverse, wild
+   * and draw-stack callouts.
+   *
+   * A sound is fire-and-forget: nothing about a new burst makes the line the
+   * last one authored wrong. Only leaving the table does, so that is the only
+   * thing that cancels now.
+   */
+  const pending = useRef(new Set<number>());
+
   useEffect(() => {
     const audio = getAudioManager();
-    const timers = soundCuesForFx(fx, sfxPackId).map((cue) =>
-      window.setTimeout(() => audio.play(cue.id, { rate: cue.rate }), cue.atMs),
-    );
-    return () => timers.forEach((timer) => window.clearTimeout(timer));
+    const timers = pending.current;
+    for (const cue of soundCuesForFx(fx, sfxPackId)) {
+      const timer = window.setTimeout(() => {
+        timers.delete(timer);
+        audio.play(cue.id, { rate: cue.rate });
+      }, cue.atMs);
+      timers.add(timer);
+    }
   }, [fx, fxKey, sfxPackId]);
+
+  useEffect(() => {
+    const timers = pending.current;
+    return () => {
+      timers.forEach((timer) => window.clearTimeout(timer));
+      timers.clear();
+    };
+  }, []);
 }
 
 /**
