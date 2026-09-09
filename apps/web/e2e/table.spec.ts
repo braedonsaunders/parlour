@@ -154,6 +154,17 @@ for (const orientation of ['portrait', 'landscape', 'desktop'] as const) {
             topClipped: Math.max(0, ...boxes.map((box) => -box.top)),
             // A held hand may sit a few pixels into the bottom edge — short
             // landscape docks it there deliberately to leave the felt room.
+            //
+            // Two numbers, because two different things set them. How deep the
+            // hand is docked is the CSS `bottom` and reads the same in every
+            // engine; how much further the fan's OUTERMOST cards dip is the arc,
+            // and that is engine geometry — the same spades hand rests 28px
+            // deeper at its corners under WebKit on macOS and 52px deeper under
+            // the Linux WebKit the browser gate runs.
+            dockBleed: Math.max(
+              0,
+              boxes[Math.floor(boxes.length / 2)]!.bottom - window.innerHeight,
+            ),
             bottomBleed: Math.max(0, ...boxes.map((box) => box.bottom - window.innerHeight)),
             cardHeight: Math.max(0, ...boxes.map((box) => box.height)),
             // A fan overlaps: consecutive cards advance by less than a card.
@@ -201,16 +212,29 @@ for (const orientation of ['portrait', 'landscape', 'desktop'] as const) {
         ]);
         expect(layout.withinWidth, 'the fan fits the width, gutters and all').toBe(true);
         expect(layout.topClipped, 'no card has its rank cut off').toBe(0);
-        // The crop buys the felt back for play. The readable top of every card
-        // must survive (asserted above); the bleed may take the lower half,
-        // with a little rounding room for WebKit's taller fan arc.
+        /*
+         * The crop buys the felt back for play. The readable top of every card
+         * must survive (asserted above); the bleed may take the lower half.
+         *
+         * The docking depth is the assertion with teeth — it is what the CSS
+         * sets, so it is the same everywhere and it stays on the tight budget.
+         * The fan's corners get their own, looser ceiling: how far they dip is
+         * arc geometry, and the engines genuinely disagree about it (0.56 of a
+         * card under WebKit on macOS, 0.69 under the Linux WebKit CI runs, from
+         * an identical DOM). Holding the corners to the macOS number would be
+         * asserting a rendering engine, not a layout.
+         */
         const bleedFloor = layout.cardHeight * (orientation === 'landscape' ? 0.18 : 0.35);
-        const bleedBudget = layout.cardHeight * 0.58;
+        const dockBudget = layout.cardHeight * 0.58;
+        const arcBudget = layout.cardHeight * 0.75;
         expect(layout.bottomBleed, 'the hand is visibly held from below').toBeGreaterThanOrEqual(
           bleedFloor,
         );
-        expect(layout.bottomBleed, 'the hand is docked, not falling off').toBeLessThanOrEqual(
-          bleedBudget,
+        expect(layout.dockBleed, 'the hand is docked, not falling off').toBeLessThanOrEqual(
+          dockBudget,
+        );
+        expect(layout.bottomBleed, 'even the fan corners keep a readable band').toBeLessThanOrEqual(
+          arcBudget,
         );
         expect(layout.overlaps, 'cards overlap the way a held hand does').toBe(true);
         expect(layout.outerRotated, 'the hand is fanned, not laid out straight').toBe(true);
