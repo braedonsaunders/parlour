@@ -7,11 +7,13 @@ const ring = [{ kind: 'turn.ring', payload: {}, at: 0 }] as unknown as readonly 
 
 function rig(durations: Map<readonly FxEvent[], number>) {
   const published: (readonly FxEvent[])[] = [];
+  const announced: (readonly FxEvent[])[] = [];
   const queue = createFxQueue({
     publish: (fx) => published.push(fx),
+    waiting: (fx) => announced.push(fx),
     durationOf: (fx) => durations.get(fx) ?? 100,
   });
-  return { published, queue };
+  return { published, announced, queue };
 }
 
 /*
@@ -79,6 +81,40 @@ describe('one burst does not cancel the one still playing', () => {
     expect(published[0]).toBe(flight);
     expect(published.at(-1), 'the newest burst still gets shown').toBe(c);
     expect(published).not.toContain(b);
+    vi.useRealTimers();
+  });
+
+  /*
+   * The state that a queued burst narrates was published the moment its packet
+   * landed. Reported as a forced pickup in Wild: the cards appeared in the fan,
+   * vanished, and then flew in — the hand had grown while the flight was still
+   * behind someone else's card. The table can only hold them back if it is told
+   * what is waiting.
+   */
+  it('names the bursts still waiting, and stops naming them once shown', () => {
+    vi.useFakeTimers();
+    const { announced, queue } = rig(new Map([[flight, 320]]));
+
+    queue.push(flight);
+    expect(announced, 'nothing is waiting behind the first burst').toEqual([]);
+
+    queue.push(ring);
+    expect(announced.at(-1)).toEqual([...ring]);
+
+    vi.advanceTimersByTime(321);
+    expect(announced.at(-1), 'the ring is on screen now, not waiting').toEqual([]);
+    vi.useRealTimers();
+  });
+
+  it('releases the hold when the room closes', () => {
+    vi.useFakeTimers();
+    const { announced, queue } = rig(new Map([[flight, 320]]));
+
+    queue.push(flight);
+    queue.push(ring);
+    queue.clear();
+
+    expect(announced.at(-1)).toEqual([]);
     vi.useRealTimers();
   });
 

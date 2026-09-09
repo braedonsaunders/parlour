@@ -29,6 +29,17 @@ export interface FxQueue {
 
 export interface FxQueueOptions {
   publish(fx: readonly FxEvent[]): void;
+  /**
+   * Bursts accepted but not yet shown, whenever that set changes.
+   *
+   * Only the presentation waits here; the game state that came with these
+   * bursts was published the moment it arrived. So between the two there is a
+   * window where a card is already in the hand and the flight that carries it
+   * there has not started — which is exactly what a player saw as a pickup
+   * blinking into the fan, vanishing, and then flying in properly. Handing the
+   * table what is still waiting lets it hold those cards back for the gap.
+   */
+  waiting?(fx: readonly FxEvent[]): void;
   durationOf(fx: readonly FxEvent[]): number;
   /**
    * Bursts allowed to back up before the queue starts dropping. Play outrunning
@@ -42,6 +53,7 @@ export interface FxQueueOptions {
 
 export function createFxQueue({
   publish,
+  waiting,
   durationOf,
   maxPending = 3,
   setTimer = setTimeout,
@@ -49,16 +61,30 @@ export function createFxQueue({
 }: FxQueueOptions): FxQueue {
   const pending: (readonly FxEvent[])[] = [];
   let timer: ReturnType<typeof setTimeout> | null = null;
+  let announced: readonly FxEvent[] = [];
+
+  /** Everything behind the burst on screen — `pending[0]` is the one showing. */
+  function announceWaiting(): void {
+    if (!waiting) return;
+    const queued = pending.length > 1 ? pending.slice(1).flat() : [];
+    if (sameEvents(announced, queued)) return;
+    announced = queued;
+    waiting(queued);
+  }
 
   function drain(): void {
     const next = pending[0];
     if (!next) return;
     publish(next);
+    // After the publish, so the burst that just went on screen and the shorter
+    // wait behind it reach the table in one batch and no card changes hands twice.
+    announceWaiting();
     timer = setTimer(
       () => {
         timer = null;
         pending.shift();
         drain();
+        if (pending.length === 0) announceWaiting();
       },
       Math.max(1, durationOf(next)),
     );
@@ -71,11 +97,17 @@ export function createFxQueue({
       if (pending.length >= maxPending) pending.splice(1);
       pending.push(fx);
       if (pending.length === 1) drain();
+      else announceWaiting();
     },
     clear() {
       if (timer !== null) clearTimer(timer);
       timer = null;
       pending.length = 0;
+      announceWaiting();
     },
   };
+}
+
+function sameEvents(left: readonly FxEvent[], right: readonly FxEvent[]): boolean {
+  return left.length === right.length && left.every((event, index) => event === right[index]);
 }

@@ -3,6 +3,7 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import type { FxEvent, GameSession, RuleValues, TablePacingMode } from '@parlour/engine';
 import { useWipeRouter } from '@/hooks/useWipeRouter';
+import { FxWaitingProvider } from '@/lib/table/arrival-presentation';
 import { holdFxForCountdown } from '@/lib/table/opening-countdown';
 import { useDeferredTransport } from '@/lib/table/useDeferredTransport';
 import { useMatchReport, type MatchReport } from '@/lib/table/useMatchReport';
@@ -313,7 +314,9 @@ function RoomTablePage<TSnapshot, TDispatch, TTransport, S, C extends RuleValues
   if (!ctx || !pack.renderRoom) {
     return <>{pack.renderPending({ fx: snapshot.fx, fxKey: snapshot.fxKey, error })}</>;
   }
-  return <>{pack.renderRoom(ctx)}</>;
+  // The room paces presentation behind game state, so the felt has to know what
+  // is still queued or a card lands in the hand before its flight leaves.
+  return <FxWaitingProvider fx={snapshot.fxWaiting}>{pack.renderRoom(ctx)}</FxWaitingProvider>;
 }
 
 /**

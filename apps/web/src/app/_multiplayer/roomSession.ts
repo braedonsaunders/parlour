@@ -121,6 +121,12 @@ export type MultiplayerRoomSnapshot = {
   stage: 'lobby' | 'table';
   fx: readonly FxEvent[];
   fxKey: number;
+  /**
+   * Bursts this device has accepted but not shown yet — the animation queue's
+   * backlog. Game state runs ahead of it by design, so the table uses this to
+   * keep a card out of the fan until the flight that brings it there plays.
+   */
+  fxWaiting: readonly FxEvent[];
   error: string | null;
   isHost: boolean;
   security: MultiplayerSecurity;
@@ -254,6 +260,7 @@ export class MultiplayerRoomSession {
    */
   private readonly fxQueue = createFxQueue({
     publish: (fx) => this.update({ fx: this.presentedFx(fx), fxKey: this.snapshot.fxKey + 1 }),
+    waiting: (fx) => this.update({ fxWaiting: this.presentedFx(fx) }),
     durationOf: fxTimelineDurationMs,
   });
   private authority: SessionAuthority | null = null;
@@ -361,6 +368,7 @@ export class MultiplayerRoomSession {
     stage: 'lobby',
     fx: [],
     fxKey: 0,
+    fxWaiting: [],
     error: null,
     isHost: false,
     security: securityFor('open', 2, 'open'),

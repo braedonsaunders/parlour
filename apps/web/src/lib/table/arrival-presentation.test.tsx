@@ -4,6 +4,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   ArrivalProvider,
+  FxWaitingProvider,
   fanOpenAtMs,
   inboundArrivalCues,
   outboundDepartureCues,
@@ -142,6 +143,50 @@ describe('ArrivalProvider', () => {
 
     act(() => void vi.advanceTimersByTime(0));
     expect(container.querySelector('span')?.getAttribute('data-admitted')).toBe('false');
+  });
+
+  /*
+   * A room publishes game state the moment a packet lands and queues the
+   * animation behind whatever is still in the air. Reported on a forced pickup
+   * in Wild: the cards blinked into the fan, vanished, and then flew in.
+   */
+  it('holds a card whose flight is still queued behind another burst', () => {
+    vi.useFakeTimers();
+    const draw = [
+      { kind: Fx.DrawCard, payload: { card: 'C4', seat: 0, from: 'stock' }, at: 0 },
+    ] as const;
+
+    // The pickup has been applied — the hand already holds C4 — but its burst
+    // is still waiting behind the card someone else is playing.
+    act(() => {
+      root.render(
+        <FxWaitingProvider fx={draw}>
+          <ArrivalProvider
+            fx={[{ kind: Fx.DiscardCard, payload: { card: 'S2', seat: 1 }, at: 0 }]}
+            fxKey={'their-play'}
+            localSeat={0}
+          >
+            <Probe cardId="C4" hand={['H1', 'C4']} />
+          </ArrivalProvider>
+        </FxWaitingProvider>,
+      );
+    });
+    expect(container.querySelector('span')?.getAttribute('data-admitted')).toBe('false');
+
+    // Now the pickup goes on screen and its own cue takes the hold over.
+    act(() => {
+      root.render(
+        <FxWaitingProvider fx={[]}>
+          <ArrivalProvider fx={draw} fxKey={'my-draw'} localSeat={0}>
+            <Probe cardId="C4" hand={['H1', 'C4']} />
+          </ArrivalProvider>
+        </FxWaitingProvider>,
+      );
+    });
+    expect(container.querySelector('span')?.getAttribute('data-admitted')).toBe('false');
+
+    act(() => void vi.advanceTimersByTime(FX_TIMING.drawFlightMs));
+    expect(container.querySelector('span')?.getAttribute('data-admitted')).toBe('true');
   });
 
   it('does not park another seat’s discard in the local fan', () => {

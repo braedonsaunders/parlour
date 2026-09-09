@@ -27,6 +27,30 @@ export type { ArrivalState };
 const IDLE_STORE = createArrivalStore();
 const ArrivalStoreContext = createContext<ArrivalStore>(IDLE_STORE);
 
+const NO_FX: readonly FxEvent[] = [];
+
+/**
+ * Bursts the table has accepted but not started animating.
+ *
+ * Only a room has these: it publishes game state the moment a packet lands and
+ * queues the presentation behind whatever is still in the air, so for the
+ * length of that gap a card is in the hand with no flight to explain it. A
+ * context rather than a prop because it is a property of the transport, not of
+ * any one game — every table screen inherits the hold without knowing about it,
+ * and a solo table reads the empty default.
+ */
+const FxWaitingContext = createContext<readonly FxEvent[]>(NO_FX);
+
+export function FxWaitingProvider({
+  fx,
+  children,
+}: {
+  fx: readonly FxEvent[];
+  children: ReactNode;
+}) {
+  return <FxWaitingContext.Provider value={fx}>{children}</FxWaitingContext.Provider>;
+}
+
 /** Fan opens this far into each inbound flight — late enough to feel invited. */
 export const FAN_OPEN_RATIO = 0.4;
 
@@ -104,10 +128,27 @@ function useArrivalClock(
   const store = useArrivalStoreInstance();
   const inbound = useMemo(() => inboundArrivalCues(events, localSeat), [events, localSeat]);
   const outbound = useMemo(() => outboundDepartureCues(events, localSeat), [events, localSeat]);
+  const queued = useContext(FxWaitingContext);
+  const heldIn = useMemo(
+    () => inboundArrivalCues(queued, localSeat).map((cue) => cue.card),
+    [queued, localSeat],
+  );
+  const heldOut = useMemo(
+    () => outboundDepartureCues(queued, localSeat).map((cue) => cue.card),
+    [queued, localSeat],
+  );
   store.prepare(fxKey, inbound, outbound);
+  store.setWaiting(heldIn, heldOut);
 
+  // Both `prepare` and `setWaiting` only stage the new sets — publishing them
+  // is a commit-time job, and either one can move on its own: a queued burst
+  // arrives without new cues, and a burst going on screen usually shortens the
+  // backlog at the same time.
   useLayoutEffect(() => {
     store.flushPrepare();
+  }, [inbound, outbound, heldIn, heldOut, fxKey, store]);
+
+  useLayoutEffect(() => {
     if (inbound.length === 0 && outbound.length === 0) return;
     const reduced = prefersCalmMotion();
     if (reduced) {

@@ -33,6 +33,13 @@ export type ArrivalStore = {
     inbound: readonly InboundCue[],
     outbound: readonly OutboundCue[],
   ) => void;
+  /**
+   * Cards whose flight has been accepted but not started — the animation
+   * queue's backlog. The state that moved them already landed, so until their
+   * burst goes on screen an incoming card is held out of the fan and an
+   * outgoing one is held in it, exactly as if its own cue were running.
+   */
+  setWaiting: (inboundCards: readonly string[], outboundCards: readonly string[]) => void;
   flushPrepare: () => void;
   open: (cardId: string) => void;
   land: (cardId: string) => void;
@@ -47,6 +54,8 @@ export function createArrivalStore(): ArrivalStore {
   let opened: ReadonlySet<string> = EMPTY;
   let landed: ReadonlySet<string> = EMPTY;
   let departed: ReadonlySet<string> = EMPTY;
+  let waitingIn: ReadonlySet<string> = EMPTY;
+  let waitingOut: ReadonlySet<string> = EMPTY;
   let snapshot: ArrivalState = DEFAULT_ARRIVAL;
   let admission: ArrivalAdmission = DEFAULT_ADMISSION;
   let published: ArrivalState = DEFAULT_ARRIVAL;
@@ -65,7 +74,12 @@ export function createArrivalStore(): ArrivalStore {
   }
 
   function recompute(): ArrivalState {
-    if (inbound.length === 0 && outbound.length === 0) {
+    if (
+      inbound.length === 0 &&
+      outbound.length === 0 &&
+      waitingIn.size === 0 &&
+      waitingOut.size === 0
+    ) {
       snapshot = DEFAULT_ARRIVAL;
       admission = DEFAULT_ADMISSION;
       return snapshot;
@@ -80,6 +94,10 @@ export function createArrivalStore(): ArrivalStore {
     for (const cue of outbound) {
       if (!departed.has(cue.card)) nextDeparting.add(cue.card);
     }
+    // A queued burst has no clock of its own: its cards stay held until the
+    // burst is published and its cues take over the same two sets.
+    for (const card of waitingIn) pending.add(card);
+    for (const card of waitingOut) nextDeparting.add(card);
     if (
       sameSet(snapshot.arriving, arriving) &&
       sameSet(snapshot.pending, pending) &&
@@ -108,6 +126,15 @@ export function createArrivalStore(): ArrivalStore {
     }
     inbound = nextInbound;
     outbound = nextOutbound;
+    recompute();
+  }
+
+  function setWaiting(inboundCards: readonly string[], outboundCards: readonly string[]): void {
+    const nextIn = inboundCards.length === 0 ? EMPTY : new Set(inboundCards);
+    const nextOut = outboundCards.length === 0 ? EMPTY : new Set(outboundCards);
+    if (sameSet(waitingIn, nextIn) && sameSet(waitingOut, nextOut)) return;
+    waitingIn = nextIn;
+    waitingOut = nextOut;
     recompute();
   }
 
@@ -156,6 +183,7 @@ export function createArrivalStore(): ArrivalStore {
     departingHas: (cardId) => snapshot.departing.has(cardId),
     isReceiving: () => snapshot.arriving.size > 0,
     prepare,
+    setWaiting,
     flushPrepare,
     open,
     land,
