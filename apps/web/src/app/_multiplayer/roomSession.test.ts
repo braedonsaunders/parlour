@@ -1063,31 +1063,44 @@ describe('multiplayer route composition', () => {
       10,
     );
 
-    const actor = multiplayerSession<WildpileState, WildpileRules>(host.getSnapshot(), 'wildpile')!
-      .phase.actor;
-    const speaker = actor === 0 ? host : guest;
-    const live = multiplayerSession<WildpileState, WildpileRules>(
-      speaker.getSnapshot(),
-      'wildpile',
-    )!;
-    let play = live.def.flow
-      .legalMoves(live.state, live.phase)
-      .find((move) => move.id === 'playCard');
-    if (!play) {
-      speaker.send('draw');
+    /*
+     * Drive the table until somebody can actually play.
+     *
+     * Party rules leave `drawToMatch` off, so a draw is exactly one card and
+     * the seat may still be left with nothing but a pass — and because the
+     * shuffle is a fresh ceremony between both peers on every run, the deal is
+     * not the same twice. Taking a single draw and demanding a playable card
+     * therefore failed on roughly one run in six, spending the full poll before
+     * it gave up. Any seat's playCard proves what this test is about, so keep
+     * the turn moving until one is on offer.
+     */
+    const wildAt = (session: MultiplayerRoomSession) =>
+      multiplayerSession<WildpileState, WildpileRules>(session.getSnapshot(), 'wildpile')!;
+
+    let speaker = host;
+    let play: { id: string; payload?: unknown } | undefined;
+    for (let turn = 0; turn < 12 && !play; turn += 1) {
+      speaker = wildAt(host).phase.actor === 0 ? host : guest;
+      const live = wildAt(speaker);
+      const legal = live.def.flow.legalMoves(live.state, live.phase);
+      play = legal.find((move) => move.id === 'playCard');
+      if (play) break;
+
+      // A seat that cannot play draws, and passes if the draw did not help.
+      const fallback = legal.find((move) => move.id === 'draw' || move.id === 'pass');
+      if (!fallback) break;
+      const logged = wildAt(host).log.length;
+      speaker.send(fallback.id, fallback.payload);
+      await eventually(() => expect(wildAt(host).log.length).toBeGreaterThan(logged), 1_000, 10);
+      // The card a draw just handed over is a handle until this seat peels it.
       await eventually(
-        () => {
-          const after = multiplayerSession<WildpileState, WildpileRules>(
-            speaker.getSnapshot(),
-            'wildpile',
-          )!;
-          expect(after.log.length).toBeGreaterThan(0);
-          play = after.def.flow
-            .legalMoves(after.state, after.phase)
-            .find((move) => move.id === 'playCard');
-          expect(play).toBeDefined();
-        },
-        1_000,
+        () =>
+          expect(
+            wildAt(speaker)
+              .state.hands.flat()
+              .every((card) => !isVeilHandle(card)),
+          ).toBe(true),
+        500,
         10,
       );
     }
