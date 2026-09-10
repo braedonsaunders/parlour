@@ -211,6 +211,7 @@ export const en = {
 
   // --- match end ------------------------------------------------------------
   'matchEnd.playAgain': 'Play again',
+  'matchEnd.hostDeals': 'The host is dealing the next match…',
   'matchEnd.complete': 'Match complete',
   'matchEnd.none': 'No match on record',
   'matchEnd.noneHint': 'Finish a game at the table and the podium will fill in here.',

@@ -215,6 +215,7 @@ export const pt: Messages = {
 
   // --- match end ------------------------------------------------------------
   'matchEnd.playAgain': 'Jogar de novo',
+  'matchEnd.hostDeals': 'O anfitrião está a dar a próxima partida…',
   'matchEnd.complete': 'Partida encerrada',
   'matchEnd.none': 'Nenhuma partida registrada',
   'matchEnd.noneHint': 'Termine um jogo na mesa e o pódio aparece aqui.',

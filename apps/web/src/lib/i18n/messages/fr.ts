@@ -205,6 +205,7 @@ export const fr: Messages = {
 
   // --- match end ------------------------------------------------------------
   'matchEnd.playAgain': 'Rejouer',
+  'matchEnd.hostDeals': 'L’hôte distribue la prochaine partie…',
   'matchEnd.complete': 'Partie terminée',
   'matchEnd.none': 'Aucune partie enregistrée',
   'matchEnd.noneHint': 'Termine un jeu à la table et le podium se remplira ici.',

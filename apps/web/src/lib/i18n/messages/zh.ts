@@ -207,6 +207,7 @@ export const zh: Messages = {
 
   // --- match end ------------------------------------------------------------
   'matchEnd.playAgain': '再来一局',
+  'matchEnd.hostDeals': '房主正在发下一局…',
   'matchEnd.complete': '本局结束',
   'matchEnd.none': '还没有对局记录',
   'matchEnd.noneHint': '在牌桌上打完一局，领奖台就会出现在这里。',

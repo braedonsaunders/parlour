@@ -56,6 +56,26 @@ export default function MatchEndPage() {
     router.replace(tableRouteFor(gameId));
   }, [activeRoomSnapshot, router, snapshot?.id]);
 
+  /*
+   * Dealing the next match is the host's call, and only the host's.
+   *
+   * Any peer *could* ask for one — a guest's request is relayed and the host
+   * deals it — so everyone used to be shown the same button, which made
+   * starting the next match look like something the whole table had to agree
+   * to one press at a time. It never was: the first press deals, and the effect
+   * above brings every other peer along. So the button belongs to the seat that
+   * owns the decision, and everybody else is simply told it is coming.
+   *
+   * A room that has closed under this player, or a match with no room behind it
+   * at all (a solo table, or a podium restored after a reload), keeps its own
+   * button — there is no host left to wait for.
+   */
+  const waitingOnHost =
+    Boolean(snapshot?.id?.startsWith('multiplayer:')) &&
+    activeRoomSnapshot !== null &&
+    activeRoomSnapshot.connection !== 'closed' &&
+    !activeRoomSnapshot.isHost;
+
   const playAgain = useCallback(() => {
     if (rematching) return;
     // The handler is a closure the table registered; a reload leaves the
@@ -104,17 +124,27 @@ export default function MatchEndPage() {
             )}
           </MatchPodium>
           <div className={styles.actions}>
-            <button
-              type="button"
-              onClick={playAgain}
-              disabled={rematching}
-              aria-busy={rematching}
-              className={`btn-fat ${styles.primary}`}
-              data-testid="play-again"
-            >
-              {t('matchEnd.playAgain')}
-              {rematching ? '…' : ''}
-            </button>
+            {waitingOnHost ? (
+              <p
+                role="status"
+                data-testid="waiting-for-host"
+                className="max-w-[14rem] self-center text-center text-sm font-semibold text-dusk-100/85"
+              >
+                {t('matchEnd.hostDeals')}
+              </p>
+            ) : (
+              <button
+                type="button"
+                onClick={playAgain}
+                disabled={rematching}
+                aria-busy={rematching}
+                className={`btn-fat ${styles.primary}`}
+                data-testid="play-again"
+              >
+                {t('matchEnd.playAgain')}
+                {rematching ? '…' : ''}
+              </button>
+            )}
             <Link href="/" onClick={leaveRoom} className={`btn-fat btn-fat--ghost ${styles.back}`}>
               {t('common.back')}
             </Link>

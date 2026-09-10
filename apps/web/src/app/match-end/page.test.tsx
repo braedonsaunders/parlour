@@ -143,6 +143,51 @@ describe('match end screen', () => {
     expect(navigation.replace).toHaveBeenCalledWith('/wild/table');
   });
 
+  /*
+   * Reported from a real room: both players pressed Play again, because both
+   * were shown it. Only one press was ever needed — the test above is the other
+   * half, every peer following the deal that press produced — so the button
+   * belongs to the seat whose call it is.
+   */
+  it('offers the next deal to the host, and asks nothing of the other seats', () => {
+    const roomWith = (isHost: boolean) => {
+      // One object, handed back every time: `useSyncExternalStore` re-renders
+      // forever on a snapshot that is a new object per read.
+      const snapshot = {
+        gameId: 'blitz',
+        connection: 'connected',
+        session: { status: 'ended' },
+        isHost,
+      } as unknown as MultiplayerRoomSnapshot;
+      return {
+        getSnapshot: () => snapshot,
+        subscribe: () => () => {},
+        close: vi.fn(),
+      } as unknown as MultiplayerRoomSession;
+    };
+
+    play('multiplayer:ABCD:1:finished', 1_000, 1);
+    const playAgain = vi.fn();
+    useMatchFlowStore.setState({ playAgain });
+    activateMultiplayerSession(roomWith(true));
+    render();
+
+    expect(container.querySelector('[data-testid="waiting-for-host"]')).toBeNull();
+    act(() => container.querySelector<HTMLButtonElement>('[data-testid="play-again"]')!.click());
+    expect(playAgain).toHaveBeenCalledOnce();
+
+    act(() => root.unmount());
+    container.remove();
+    container = document.createElement('div');
+    document.body.append(container);
+    root = createRoot(container);
+    activateMultiplayerSession(roomWith(false));
+    render();
+
+    expect(container.querySelector('[data-testid="play-again"]')).toBeNull();
+    expect(container.querySelector('[data-testid="waiting-for-host"]')).not.toBeNull();
+  });
+
   it('closes a finished friend room only when the player leaves the podium', () => {
     play('multiplayer:ABCD:1:finished', 1_000, 1);
     const close = vi.fn();
