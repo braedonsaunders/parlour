@@ -9,6 +9,28 @@ import type {
 export const HEARTBEAT_INTERVAL_MS = 1_000;
 export const HEARTBEAT_TIMEOUT_MS = 3_500;
 
+/**
+ * How long a chair is held for a peer that said it was going away.
+ *
+ * Three and a half seconds of silence is the right test for a phone that has
+ * dropped off the network — and completely the wrong one for a player who
+ * flicked to their messages, because a backgrounded tab is frozen by the
+ * operating system and cannot send anything at all. Long enough to answer a
+ * text and come back; short enough that a chair somebody has truly abandoned
+ * still frees up while the others are deciding what to play.
+ */
+export const AWAY_GRACE_MS = 90_000;
+
+/**
+ * A gap between heartbeat ticks that can only mean this device stopped running.
+ *
+ * Well clear of anything load can produce: a contended machine is late by
+ * fractions of a second, a frozen page by however long its player was away.
+ * Reading a busy device as a sleeping one would delay noticing a host that
+ * genuinely died, so the two must not be confusable.
+ */
+export const STALLED_CLOCK_MS = 10_000;
+
 export function validatePresenceSnapshot(snapshot: unknown, maxSeats: number): PresenceSnapshot {
   if (
     !snapshot ||
@@ -72,6 +94,8 @@ export function validatePresenceSnapshot(snapshot: unknown, maxSeats: number): P
 export class MultiplayerState {
   readonly seats = new Map<number, SeatPresence>();
   private readonly lastSeen = new Map<string, number>();
+  /** Peers that announced they were backgrounding, and until when to hold them. */
+  private readonly awayUntil = new Map<string, number>();
   private readonly pending = new Map<string, PlayerAction>();
   private presenceVersion = 0;
   private hostTerm = 0;
@@ -134,6 +158,38 @@ export class MultiplayerState {
 
   seePeer(peerId: string, now: number): void {
     this.lastSeen.set(peerId, now);
+    this.awayUntil.delete(peerId);
+  }
+
+  /**
+   * Holds this peer's chair while its page is frozen.
+   *
+   * A backgrounded tab cannot heartbeat — the operating system has stopped
+   * running its timers — so the last thing it does before going quiet is say
+   * so. Until the grace runs out, silence from that peer proves nothing and is
+   * not counted against it.
+   */
+  holdAway(peerId: string, now: number, graceMs = AWAY_GRACE_MS): void {
+    this.awayUntil.set(peerId, now + graceMs);
+  }
+
+  /** True while this peer has told us it is backgrounded rather than gone. */
+  isAway(peerId: string, now: number): boolean {
+    return now <= (this.awayUntil.get(peerId) ?? -Infinity);
+  }
+
+  /**
+   * Starts every peer's silence over from now.
+   *
+   * For when *this* device is the one that stopped keeping time: a frozen tab
+   * resumes with a clock that has jumped minutes, and every peer it can still
+   * hear perfectly well looks like it has been silent for the whole gap. Judged
+   * on that, a player coming back from their messages would expire the entire
+   * table on the first tick — closing the lobby they were trying to return to.
+   * Nobody was absent; the listener was.
+   */
+  forgiveSilence(now: number): void {
+    for (const peerId of this.lastSeen.keys()) this.lastSeen.set(peerId, now);
   }
 
   assignSeat(seat: number, peerId: string, profileId: ProfileId): void {
@@ -243,9 +299,13 @@ export class MultiplayerState {
   ): { changed: boolean; hostId: string; term: number; resend: PlayerAction[] } {
     const expired = new Set<string>();
     for (const [peerId, seenAt] of this.lastSeen) {
-      if (peerId !== this.localPeerId && now - seenAt > timeoutMs) {
+      if (peerId === this.localPeerId) continue;
+      // A peer that said it was going away is not missing, it is minimised.
+      if (this.isAway(peerId, now)) continue;
+      if (now - seenAt > timeoutMs) {
         expired.add(peerId);
         this.lastSeen.delete(peerId);
+        this.awayUntil.delete(peerId);
       }
     }
     const previousHostId = this.hostId;

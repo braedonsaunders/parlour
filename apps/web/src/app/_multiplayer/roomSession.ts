@@ -265,6 +265,8 @@ export class MultiplayerRoomSession {
   });
   private authority: SessionAuthority | null = null;
   private transport: P2PTransport | null = null;
+  /** Unhooks the page-lifecycle listeners when the transport goes. */
+  private detachPageLifecycle: (() => void) | null = null;
   private veil: { session: VeilSession; room: VeilRoom } | null = null;
   /** Ordered DataChannel delivery still needs ordered async crypto completion. */
   private veilInbox: Promise<void> = Promise.resolve();
@@ -2078,8 +2080,34 @@ export class MultiplayerRoomSession {
   private teardownTransport(): void {
     this.veil?.room.cancelAll();
     this.veil = null;
+    this.detachPageLifecycle?.();
+    this.detachPageLifecycle = null;
     this.transport?.close();
     this.transport = null;
+  }
+
+  /**
+   * Tells the room when this device stops being able to speak for itself.
+   *
+   * Switching to another app freezes the page: no timers, no heartbeats, and
+   * — reported from a real lobby — a seat dropped within a few seconds for
+   * answering a text. The transport handles both directions of that; this is
+   * only the browser's half of the wiring, kept here because the transport is
+   * handed everything it touches rather than reaching for globals.
+   *
+   * `pagehide` as well as `visibilitychange`, because iOS does not always send
+   * the second one on the way out, and it is the way out that has to be heard.
+   */
+  private attachPageLifecycle(): void {
+    if (typeof document === 'undefined' || this.detachPageLifecycle) return;
+    const hidden = () => this.transport?.setPageHidden(true);
+    const visibility = () => this.transport?.setPageHidden(document.visibilityState === 'hidden');
+    document.addEventListener('visibilitychange', visibility);
+    window.addEventListener('pagehide', hidden);
+    this.detachPageLifecycle = () => {
+      document.removeEventListener('visibilitychange', visibility);
+      window.removeEventListener('pagehide', hidden);
+    };
   }
 
   private prepare(settings: RoomSettings, signaling?: RoomSignaling): void {
@@ -2098,6 +2126,7 @@ export class MultiplayerRoomSession {
       heartbeatIntervalMs: this.dependencies.heartbeatIntervalMs,
       heartbeatTimeoutMs: this.dependencies.heartbeatTimeoutMs,
     });
+    this.attachPageLifecycle();
     this.transport.onEvent((packet) => this.accept(packet));
     this.transport.onPresence((presence) => this.acceptPresence(presence));
     // A guest blocked on a spent stock can only say so by sending the draw

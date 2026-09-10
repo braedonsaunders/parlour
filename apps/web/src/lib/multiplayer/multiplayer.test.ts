@@ -9,6 +9,7 @@ import {
 import { blitzConfigSchema, createBlitzDef } from '@parlour/game-blitz';
 import { describe, expect, it, vi } from 'vitest';
 import {
+  AWAY_GRACE_MS,
   EMOTES,
   EngineAuthority,
   HEARTBEAT_TIMEOUT_MS,
@@ -188,6 +189,59 @@ describe('resilience state', () => {
     state.seePeer('peer-z', 0);
     state.expireAndElect(HEARTBEAT_TIMEOUT_MS + 1, HEARTBEAT_TIMEOUT_MS, true);
     expect(state.seats.has(1)).toBe(false);
+  });
+
+  /*
+   * Reported from a real lobby: switching to messages for a moment lost the
+   * seat. A backgrounded page is frozen — no timers, no heartbeats — so three
+   * and a half seconds of silence arrives on schedule and means nothing.
+   */
+  it('holds the chair of a peer that said it was backgrounding', () => {
+    const state = new MultiplayerState('host', 'host');
+    state.assignSeat(1, 'peer-z', 'profile-z');
+    state.seePeer('peer-z', 0);
+    state.holdAway('peer-z', 0);
+
+    state.expireAndElect(HEARTBEAT_TIMEOUT_MS + 1, HEARTBEAT_TIMEOUT_MS, true);
+    expect(state.seats.has(1)).toBe(true);
+
+    // Still theirs a minute later, and gone once the grace runs out — a chair
+    // nobody comes back to has to free up eventually.
+    state.expireAndElect(60_000, HEARTBEAT_TIMEOUT_MS, true);
+    expect(state.seats.has(1)).toBe(true);
+    state.expireAndElect(AWAY_GRACE_MS + 1, HEARTBEAT_TIMEOUT_MS, true);
+    expect(state.seats.has(1)).toBe(false);
+  });
+
+  it('drops the hold the moment that peer speaks again', () => {
+    const state = new MultiplayerState('host', 'host');
+    state.assignSeat(1, 'peer-z', 'profile-z');
+    state.holdAway('peer-z', 0);
+    state.seePeer('peer-z', 1_000);
+
+    // Back at the table: silence is judged from its return, not from its leave.
+    expect(state.isAway('peer-z', 2_000)).toBe(false);
+    state.expireAndElect(1_000 + HEARTBEAT_TIMEOUT_MS, HEARTBEAT_TIMEOUT_MS, true);
+    expect(state.seats.has(1)).toBe(true);
+    state.expireAndElect(1_000 + HEARTBEAT_TIMEOUT_MS + 1, HEARTBEAT_TIMEOUT_MS, true);
+    expect(state.seats.has(1)).toBe(false);
+  });
+
+  /*
+   * The other end of the same fault, and the one that closed the room: a device
+   * whose own clock stopped comes back to find everybody apparently overdue.
+   */
+  it('writes off the silence a device did not hear because it was asleep', () => {
+    const state = new MultiplayerState('guest', 'host');
+    state.assignSeat(0, 'host', 'profile-host');
+    state.seePeer('host', 0);
+
+    state.forgiveSilence(120_000);
+    expect(state.expireAndElect(120_000, HEARTBEAT_TIMEOUT_MS, true)).toMatchObject({
+      changed: false,
+      hostId: 'host',
+    });
+    expect(state.seats.has(0)).toBe(true);
   });
 
   it('turns an expired human seat into a bot and lets its profile reclaim it', () => {
@@ -554,6 +608,42 @@ describe('only the current host may move the board', () => {
     });
     return { transport, harness, authority, packet };
   }
+
+  /*
+   * Switching to another app for a moment cost a player their seat, and could
+   * cost the whole lobby: a frozen page stops heart-beating, so the table times
+   * it out, and when it thaws its own clock has skipped the whole gap so it
+   * times out the table right back. In a lobby that second half closes the room.
+   */
+  it('says it is backgrounding before the page freezes', () => {
+    const { transport, harness } = guestOnBlitz();
+    (transport as unknown as { links: Map<string, unknown> }).links.set('host', {
+      pc: { close: vi.fn() },
+    });
+
+    transport.setPageHidden(true);
+
+    expect(harness.sendTo).toHaveBeenCalledWith(
+      'host',
+      expect.objectContaining({ type: 'heartbeat', away: true }),
+    );
+    transport.close();
+  });
+
+  it('comes back from a frozen page without expiring the table it left', () => {
+    const { transport, harness } = guestOnBlitz();
+    harness.resilience.assignSeat(0, 'host', 'p-host');
+    harness.resilience.seePeer('host', Date.now() - 120_000);
+    const presence: { kind: string }[] = [];
+    transport.onPresence((event) => presence.push(event));
+
+    transport.setPageHidden(false);
+
+    expect(presence.map(({ kind }) => kind)).not.toContain('room.closed');
+    expect(harness.resilience.seats.has(0)).toBe(true);
+    expect(harness.resilience.hostId).toBe('host');
+    transport.close();
+  });
 
   it('ignores an applied packet that did not come from the host', async () => {
     const { transport, harness, authority, packet } = guestOnBlitz();

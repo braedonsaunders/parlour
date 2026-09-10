@@ -14,6 +14,7 @@ import {
 import {
   HEARTBEAT_INTERVAL_MS,
   HEARTBEAT_TIMEOUT_MS,
+  STALLED_CLOCK_MS,
   MultiplayerState,
   houseBotPeerId,
   houseBotProfile,
@@ -106,6 +107,8 @@ export class P2PTransport implements Transport {
   private roomCode?: string;
   private signalSubscription?: { close(): void };
   private heartbeatTimer?: ReturnType<typeof setInterval>;
+  /** When the last tick actually ran, so a suspended timer can be recognised. */
+  private lastHeartbeatAt?: number;
   private lastEmoteAt = -Infinity;
   private pendingResync = false;
   private pendingHostMigration = false;
@@ -542,6 +545,9 @@ export class P2PTransport implements Transport {
     this.resilience?.seePeer(peerId, this.now());
     switch (message.type) {
       case 'heartbeat':
+        // Said before the operating system froze their page. `seePeer` above
+        // has already cleared any previous hold, so this is the live one.
+        if (message.away) this.resilience?.holdAway(peerId, this.now());
         if (
           message.hostId === peerId &&
           message.term !== undefined &&
@@ -868,22 +874,68 @@ export class P2PTransport implements Transport {
     }
   }
 
+  /**
+   * The page went into the background, or came back from it.
+   *
+   * Both halves matter, and they fix opposite ends of the same fault. Going
+   * away, this peer will stop being able to send anything at all — a frozen tab
+   * runs no timers — so it says so first and its chair is held rather than
+   * expired after three and a half seconds of what looks like silence. Coming
+   * back, its own clock has jumped the whole gap, and every peer it can still
+   * hear perfectly well looks long overdue; judged on that it would expire the
+   * table it just rejoined, which in a lobby means closing the room. So the
+   * silence it "heard" while it was not listening is written off.
+   */
+  setPageHidden(hidden: boolean): void {
+    if (!this.resilience || this.closed) return;
+    if (hidden) {
+      this.broadcast({
+        type: 'heartbeat',
+        sentAt: this.now(),
+        away: true,
+        ...(this.isHost()
+          ? { hostId: this.resilience.hostId, term: this.resilience.electionTerm }
+          : {}),
+      });
+      return;
+    }
+    this.resilience.forgiveSilence(this.now());
+    this.heartbeat();
+  }
+
   private heartbeat(): void {
     if (!this.resilience) return;
+    /*
+     * A tick that arrives long after it was due means this device was asleep —
+     * a throttled background tab, a phone in a pocket, a laptop lid. Nobody
+     * else went quiet; nothing was listening. Expiring the table off that
+     * reading is how a player who looked away came back to an empty room, and
+     * it needs no cooperation from the page to get right, so it guards the
+     * cases `setPageHidden` never hears about too.
+     *
+     * The bar is deliberately far above the timeout rather than at it. A busy
+     * device delivers ticks a second or two late while staying perfectly able
+     * to hear the room, and forgiving silence *there* would postpone noticing a
+     * host that really has died — which is how a soak run that kills the host
+     * mid-match ended up surfacing peel errors while the table waited to be
+     * told. Nothing short of a page that stopped running clears this.
+     */
+    const now = this.now();
+    const stalledClockMs = Math.max(STALLED_CLOCK_MS, this.heartbeatTimeoutMs * 3);
+    const asleep =
+      this.lastHeartbeatAt !== undefined && now - this.lastHeartbeatAt > stalledClockMs;
+    this.lastHeartbeatAt = now;
+    if (asleep) this.resilience.forgiveSilence(now);
     this.broadcast({
       type: 'heartbeat',
-      sentAt: this.now(),
+      sentAt: now,
       ...(this.isHost()
         ? { hostId: this.resilience.hostId, term: this.resilience.electionTerm }
         : {}),
     });
     const before = new Map(this.resilience.seats);
     const beforePresence = this.resilience.exportPresence();
-    const election = this.resilience.expireAndElect(
-      this.now(),
-      this.heartbeatTimeoutMs,
-      this.lobbyHold,
-    );
+    const election = this.resilience.expireAndElect(now, this.heartbeatTimeoutMs, this.lobbyHold);
     if (election.changed && this.lobbyHold) {
       this.emitPresence({ kind: 'room.closed' });
       this.close();

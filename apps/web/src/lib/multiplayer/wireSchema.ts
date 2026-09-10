@@ -55,7 +55,11 @@ export type WireMessage =
   | { type: 'presence.state'; presence: PresenceSnapshot }
   | { type: 'intent'; action: PlayerAction }
   | { type: 'applied'; packet: AppliedPacket }
-  | { type: 'heartbeat'; sentAt: number; hostId?: string; term?: number }
+  /**
+   * `away` is a peer's last word before its page is frozen: hold my chair, the
+   * silence that follows is the operating system, not me leaving.
+   */
+  | { type: 'heartbeat'; sentAt: number; hostId?: string; term?: number; away?: boolean }
   | { type: 'host.changed'; hostId: string; term?: number; snapshot: MigrationSnapshot }
   /** Host is tearing the lobby down — guests must leave, not elect a replacement. */
   | { type: 'room.closed' }
@@ -453,8 +457,9 @@ function isWireMessage(value: unknown): value is WireMessage {
       return hasOnlyKeys(value, ['type', 'packet']) && isAppliedPacket(value.packet);
     case 'heartbeat':
       return (
-        hasOnlyKeys(value, ['type', 'sentAt'], ['hostId', 'term']) &&
+        hasOnlyKeys(value, ['type', 'sentAt'], ['hostId', 'term', 'away']) &&
         isBoundedInteger(value.sentAt, MAX_TIMESTAMP) &&
+        (value.away === undefined || typeof value.away === 'boolean') &&
         ((value.hostId === undefined && value.term === undefined) ||
           (isBoundedString(value.hostId) && isBoundedInteger(value.term, MAX_SEQUENCE)))
       );
