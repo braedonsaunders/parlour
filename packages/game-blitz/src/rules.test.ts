@@ -431,6 +431,44 @@ describe('blitz round flow', () => {
     expect(def.end(state)).toMatchObject({ winner: 0, reason: 'blitz' });
   });
 
+  /*
+   * A blitz ends the round with nobody else's cards turned over, so it used to
+   * name the winner and rank nobody else — and a screen that draws one plaque
+   * per ranking showed the winner alone on an empty podium. Everyone who was
+   * still in the round is placed, because a blitz is something that happened to
+   * all of them.
+   */
+  it('ranks the whole table behind a blitz, not the 31 alone', () => {
+    const state = freshState({
+      seats: 3,
+      hands: [
+        ['C2', 'C3', 'C4'],
+        ['S1', 'S12', 'S13'],
+        ['H5', 'H6', 'H7'],
+      ],
+    });
+    const dealt = def.end(state);
+    expect(dealt).toMatchObject({ winner: 1, reason: 'blitz' });
+    expect(dealt!.rankings).toEqual([
+      { seat: 1, rank: 1, detail: { handValue: 31 } },
+      { seat: 0, rank: 2 },
+      { seat: 2, rank: 2 },
+    ]);
+
+    // The same shape when the 31 arrives in play rather than on the deal.
+    const played = def.moves.blitz!.apply(
+      state,
+      -1,
+      { seat: 1 },
+      {
+        rng: makeRng(1),
+        fx: createFx(),
+        event: { seq: 0 },
+      },
+    );
+    expect(played.outcome?.rankings.map(({ seat }) => seat)).toEqual([1, 0, 2]);
+  });
+
   it('ends instantly when a draw makes 31 mid-round, and replays hash-stable', () => {
     // dealt-blitz seeds end with an empty log; we want a blitz reached in play
     let found: GameSession<BlitzState, BlitzConfig> | null = null;

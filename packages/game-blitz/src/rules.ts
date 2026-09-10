@@ -312,10 +312,29 @@ const blitz: Move<BlitzState> = {
       throw new Error('blitz applied without a seat actually holding 31');
     }
     ctx.fx.emit(Fx.Blitz, { seat, handValue: 31 });
+    /*
+     * Everyone at the table is ranked, not just the 31.
+     *
+     * A blitz ends the round where it stands — no showdown, nobody else's cards
+     * ever turned over — so this used to name the winner and stop. That reads as
+     * a complete result to anything downstream, and the podium draws one plaque
+     * per ranking: a friend room won by a blitz put the winner on an otherwise
+     * empty stage, with the seats they had just beaten missing from the screen.
+     *
+     * The rest share second because that is exactly what the rules say happened
+     * to them — on a blitz every other seat drops a life, whatever they were
+     * holding — and because no hand was read, so there is nothing honest to
+     * separate them by.
+     */
     const outcome: RoundOutcome = {
       reason: 'blitz',
       winners: [seat],
-      rankings: [{ seat, rank: 1, detail: { handValue: 31 } }],
+      rankings: [
+        { seat, rank: 1, detail: { handValue: 31 } },
+        ...liveSeats(state)
+          .filter((other) => other !== seat)
+          .map((other) => ({ seat: other, rank: 2 })),
+      ],
     };
     ctx.fx.emit(Fx.RoundEnd, { reason: outcome.reason });
     return { ...state, outcome };
@@ -573,9 +592,16 @@ export function createBlitzDef(options: BlitzDefOptions = {}): GameDef<BlitzStat
       if (state.outcome) return matchResultOf(state.outcome);
       const dealt = blitzSeat(state);
       if (dealt !== null) {
+        // Ranked like any other blitz: the 31 first and the table behind it,
+        // so a round decided on the deal still reaches the podium whole.
         return {
           winner: dealt,
-          rankings: [{ seat: dealt, rank: 1, detail: { handValue: 31 } }],
+          rankings: [
+            { seat: dealt, rank: 1, detail: { handValue: 31 } },
+            ...liveSeats(state)
+              .filter((other) => other !== dealt)
+              .map((other) => ({ seat: other, rank: 2 })),
+          ],
           reason: 'blitz',
         };
       }

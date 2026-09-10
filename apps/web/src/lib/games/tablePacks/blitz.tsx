@@ -17,7 +17,7 @@ import {
   type SoloDriver,
   type SoloTableContext,
 } from '@/components/table/GameTablePage';
-import { roomMatchId } from '@/lib/table/useMatchReport';
+import { roomMatchId, wonByRank } from '@/lib/table/useMatchReport';
 import { LocalTransport, type LocalDispatch, type SoloSnapshot } from '@/lib/solo/LocalTransport';
 import { botKey, friendKey } from '@/stores/history';
 import { useProfileStore } from '@/stores/profile';
@@ -356,7 +356,10 @@ export const blitzTablePack = defineTablePack<
       mode: 'fast',
       result: session.result,
       localSeat,
-      won: session.result.winner === localSeat,
+      // Rank, not `winner`: a Blitz round can be tied at the top, and a tie
+      // leaves `winner` null — which told both seats who had just shared first
+      // that they had lost, jingle and all.
+      won: wonByRank(session.result, localSeat),
       seats: snapshot.seats.map((seat) => ({
         seat: seat.seat,
         name: seat.name,
