@@ -1,5 +1,5 @@
 import type { FxEvent, LegalMove } from '@parlour/engine';
-import { CHALLENGE_PENALTY, type WildpileColor } from '@parlour/game-wildpile';
+import { CHALLENGE_PENALTY, wildpileDrawAmount, type WildpileColor } from '@parlour/game-wildpile';
 import { getWildMode, type WildModeId } from '@/lib/wild/modes';
 import type { WildSnapshot } from '@/lib/solo/WildTransport';
 
@@ -48,6 +48,8 @@ export interface WildTableView {
      * usual case — most hands cannot answer a Draw Four.
      */
     stackCards: readonly string[];
+    /** What the first stackable card adds — two for a Draw Two, four for a Draw Four. */
+    stackAdds: number;
     /** What the pickup becomes if this seat stacks: more cards, next seat's problem. */
     stackAmount: number;
   } | null;
@@ -130,7 +132,17 @@ export function wildTableView(
       isBot: player.isBot,
       lastCardArmed: state.calledLastCard[player.seat] ?? false,
     })),
-    activeSeat: session.phase.actor,
+    /*
+     * Nobody is the active seat while a jump-in window is open.
+     *
+     * The window's actor is the seat being *asked*, and under Veil it is asked
+     * of everyone — so following the phase actor walked the highlight, the ring
+     * and the turn chime round the whole table on every card played before
+     * landing on the seat that was next the entire time. The seat that jumps in
+     * announces itself by playing; until then the table simply waits, exactly
+     * as it does for Rat Screw's slap window.
+     */
+    activeSeat: playing && state.interrupt ? null : session.phase.actor,
     stockCount: state.stock.length,
     discard: state.discard.slice(0, 3),
     activeColor: state.activeColor,
@@ -164,8 +176,10 @@ export function wildTableView(
  *
  * `stackCards` is the third way out. While a pickup is pending `canPlay`
  * routes through `canStack`, so the seat's playable cards at that moment ARE
- * the stackable ones — no second rule to keep in step. Stacking adds four and
- * passes the accusation to the next seat rather than settling it.
+ * the stackable ones — no second rule to keep in step. Stacking passes the
+ * accusation to the next seat rather than settling it, and now that a Draw Two
+ * in the live colour can join a Draw Four pile, what it adds is a question
+ * about the card in hand rather than a fixed four.
  */
 function challengeView(
   snapshot: WildSnapshot,
@@ -173,20 +187,23 @@ function challengeView(
   playCards: readonly string[],
 ): WildTableView['challenge'] {
   const open = snapshot.session.state.challenge;
-  if (!open || open.challenger !== localSeat) return null;
+  if (!open || open.called || open.challenger !== localSeat) return null;
   const accused = snapshot.players.find((player) => player.seat === open.accused);
+  const stackCard = playCards[0];
   return {
     accused: open.accused,
     accusedName: accused?.name ?? `Seat ${open.accused}`,
     amount: open.amount,
     penalty: open.amount + CHALLENGE_PENALTY,
     stackCards: playCards,
-    stackAmount: open.amount + 4,
+    stackAdds: stackCard ? wildpileDrawAmount(stackCard) : 0,
+    stackAmount: open.amount + (stackCard ? wildpileDrawAmount(stackCard) : 0),
   };
 }
 
 export type WildAnnouncementKind =
   | 'caught'
+  | 'challenge-called'
   | 'skip'
   | 'reverse'
   | 'draw-stack'
@@ -212,6 +229,7 @@ export interface WildAnnouncement {
 
 /** Fixed order so a burst that skips *and* catches someone reads top-down. */
 const ANNOUNCEMENT_ORDER: readonly WildAnnouncementKind[] = [
+  'challenge-called',
   'challenge-won',
   'challenge-lost',
   'reverse',
@@ -286,6 +304,18 @@ export function wildAnnouncements(
           },
         ];
       }
+      // Only a veiled table has this beat: the accused's cards are still face
+      // down, and the room is turning them over to answer the accusation.
+      case 'wildpile.challenge-called':
+        return [
+          {
+            ...base,
+            kind: 'challenge-called',
+            text: 'Bluff called',
+            detail:
+              nameOf(seat) === 'You' ? 'Showing your hand' : `${nameOf(seat)} shows their hand`,
+          },
+        ];
       case 'wildpile.challenge': {
         const upheld = boolField(event, 'upheld') === true;
         const accused = numberField(event, 'accused');

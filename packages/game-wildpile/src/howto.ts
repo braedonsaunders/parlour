@@ -63,7 +63,7 @@ export const wildpileHowToPlay: HowToPlayDoc = {
       bullets: [
         {
           label: 'Stacking',
-          text: 'answer a Draw Two / Draw Four with the same card and the penalty piles up for the next victim',
+          text: 'answer a Draw Two or Draw Four with another and the penalty piles up for the next victim — a Draw Four goes on anything, a Draw Two has to match the colour in play',
         },
         {
           label: 'Jump in',

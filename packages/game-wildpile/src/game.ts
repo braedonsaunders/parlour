@@ -7,6 +7,7 @@ import {
   drawFrom,
   isVeilHandle,
   veilSupport,
+  VEILED_OPEN_PENDING,
   type AutoMove,
   type BotPolicy,
   type CardId,
@@ -32,6 +33,7 @@ import {
   wildpileDeck,
   wildpileFace,
   type WildpileColor,
+  type WildpileKind,
 } from './deck';
 
 export interface WildpileRules {
@@ -80,10 +82,18 @@ export interface WildpileChallenge {
   /** Colour that was live when the card was played; what makes it a bluff. */
   colorAtPlay: WildpileColor;
   /**
-   * The cards in the accused's hand that matched `colorAtPlay` at the moment
-   * they played. Empty means the Draw Four was honest and a challenge fails.
+   * The accused's hand as it stood when the Draw Four left it — the cards the
+   * accusation is actually about, before any later pickup topped the hand back
+   * up. Under Veil these are still handles, and the answer is not knowable from
+   * them until the table turns them over.
    */
-  heldMatches: CardId[];
+  handAtPlay: CardId[];
+  /**
+   * True once the challenger has called it. The table settles the answer from
+   * {@link handAtPlay} on the very next step — under Veil, after the room has
+   * opened those cards in public.
+   */
+  called: boolean;
   /** Pickup riding on the answer, before any challenge penalty. */
   amount: number;
 }
@@ -186,7 +196,7 @@ export const wildpileConfig = defineConfig<WildpileRules>(
       label: 'Stack Draw Twos',
       default: true,
       group: 'Penalties',
-      help: 'Answer a Draw Two with your own and pass the growing pile along.',
+      help: 'Answer a pickup with a Draw Two of your own — matching the colour in play — and pass the growing pile along.',
     },
     {
       key: 'stackDrawFour',
@@ -194,7 +204,7 @@ export const wildpileConfig = defineConfig<WildpileRules>(
       label: 'Stack Draw Fours',
       default: true,
       group: 'Penalties',
-      help: 'Same for Draw Fours. Penalties can climb fast.',
+      help: 'Same for Draw Fours, which go on any pile at all. Penalties can climb fast.',
     },
     {
       key: 'jumpIn',
@@ -324,12 +334,46 @@ function topCard(state: WildpileState): CardId {
   return card;
 }
 
-function canStack(state: WildpileState, card: CardId): boolean {
-  const kind = wildpileFace(card).meta.kind;
-  if (state.pendingKind === null || kind !== state.pendingKind) return false;
+/** True when this table lets a pickup of that kind be passed along at all. */
+function stackable(state: WildpileState, kind: WildpileKind): boolean {
   if (kind === 'draw-two') return state.rules.stackDrawTwo;
   if (kind === 'wild-draw-four') return state.rules.stackDrawFour;
   return false;
+}
+
+/**
+ * Answering a pending pickup with one of your own.
+ *
+ * The pile is a pile: a Draw Four is a wild and joins anything, and a Draw Two
+ * joins when it matches the colour in play — the same test every other coloured
+ * card passes. This used to demand the *same* card kind, so a red Draw Two could
+ * not answer a Draw Four that had just called red, which is the mixed pile
+ * everybody plays at a real table.
+ *
+ * Each half is still gated by its own house rule, and mixing needs both: a table
+ * that has said Draw Fours must be taken should not see one answered by a Draw
+ * Two either.
+ */
+function canStack(state: WildpileState, card: CardId): boolean {
+  const pending = state.pendingKind;
+  if (pending === null) return false;
+  const face = wildpileFace(card);
+  const kind = face.meta.kind;
+  if (!stackable(state, kind)) return false;
+  if (kind === pending) return true;
+  if (!stackable(state, pending)) return false;
+  return kind === 'wild-draw-four' || face.color === state.activeColor;
+}
+
+/**
+ * What playing this card adds to a pickup pile — four for a Draw Four, two for
+ * a Draw Two, nothing for anything else. Exported because the table has to say
+ * what stacking would cost the next seat, and a mixed pile makes that a
+ * question about the card in hand rather than about the pile.
+ */
+export function wildpileDrawAmount(card: CardId): number {
+  const kind = wildpileFace(card).meta.kind;
+  return kind === 'wild-draw-four' ? 4 : kind === 'draw-two' ? 2 : 0;
 }
 
 function canPlay(state: WildpileState, card: CardId): boolean {
@@ -442,11 +486,11 @@ function shuffleHands(state: WildpileState, from: SeatId, ctx: MoveCtx): Wildpil
  * Records what the seat was holding when they played a Draw Four, so the
  * accusation can be settled later without re-deriving history.
  *
- * Only a card in the *live colour* makes the play a bluff: other wilds, and
- * matching numbers or symbols in other colours, are not alternatives the rule
- * cares about. Returns null when the table has the rule off, when there is no
- * live colour to have matched, or under Veil — a veiled room holds opaque
- * handles, so nothing can answer the question without opening the whole hand.
+ * The hand is kept rather than the verdict. Under Veil it is a list of handles
+ * and the verdict cannot be computed at all yet — the room turns those cards
+ * face up if and only if someone actually calls the bluff, and the answer is
+ * read off them then. A veiled table used to skip the window entirely, which
+ * quietly took the whole rule away from every online game.
  */
 function openChallenge(
   state: WildpileState,
@@ -454,22 +498,45 @@ function openChallenge(
   handAtPlay: readonly CardId[],
   amount: number,
 ): WildpileChallenge | null {
-  if (!state.rules.challengeDrawFour || state.veiled) return null;
+  if (!state.rules.challengeDrawFour) return null;
   const colorAtPlay = state.activeColor;
   if (!colorAtPlay) return null;
   return {
     accused,
     challenger: nextSeat(state, accused),
     colorAtPlay,
-    heldMatches: handAtPlay.filter((held) => wildpileFace(held).color === colorAtPlay),
+    handAtPlay: [...handAtPlay],
+    called: false,
     amount,
   };
+}
+
+/**
+ * The cards that make the play a bluff: the accused's own hand, in the colour
+ * that was live when they claimed to have nothing.
+ *
+ * Only the *live colour* counts — other wilds, and matching numbers or symbols
+ * in other colours, are not alternatives the rule cares about. A hand still
+ * holding handles cannot answer, which is why {@link settleChallenge} refuses
+ * to run until the room has opened them.
+ */
+function challengeProof(challenge: WildpileChallenge): CardId[] {
+  return challenge.handAtPlay.filter((held) => wildpileFace(held).color === challenge.colorAtPlay);
+}
+
+/** Handles the table has to turn over before a called bluff can be answered. */
+function challengeOpens(state: WildpileState): { handles: CardId[]; move: string } | null {
+  const challenge = state.challenge;
+  if (!challenge?.called) return null;
+  const handles = challenge.handAtPlay.filter(isVeilHandle);
+  return handles.length > 0 ? { handles, move: 'settleChallenge' } : null;
 }
 
 /** The seat on the clock may call the Draw Four they are staring at a bluff. */
 function canChallenge(state: WildpileState, seat: SeatId): boolean {
   return (
     state.challenge !== null &&
+    !state.challenge.called &&
     state.challenge.challenger === seat &&
     state.pendingDraw > 0 &&
     state.awaitingColor === null
@@ -501,6 +568,12 @@ function withCatchWindow(
 function phaseFor(state: WildpileState) {
   if (state.winner !== null || state.timeoutRankings !== null) {
     return { phase: 'ended', actor: null, round: 1 };
+  }
+  // A called bluff is the table's business, not any seat's: the answer comes off
+  // the accused's own cards, which the room may still be turning over. Nobody
+  // acts in between, or the challenger would be offered the call twice.
+  if (state.challenge?.called) {
+    return { phase: 'challenge-proof', actor: null, round: 1 };
   }
   if (state.awaitingColor !== null) {
     return withCatchWindow(state, { phase: 'choose-color', actor: state.awaitingColor, round: 1 });
@@ -554,7 +627,20 @@ function withInterrupt(
   const candidates = jumpCandidates(state, card, playingSeat, passedOver);
   return {
     ...state,
-    turn: candidates.length > 0 ? (candidates[0] as SeatId) : resumeTurn,
+    /*
+     * The turn belongs to the seat the card passed it to, even while a jump-in
+     * window is open over the top of it.
+     *
+     * A candidate is being asked a question, not handed the turn — and under
+     * Veil that question goes to every seat, because the table cannot see who
+     * holds a match. Moving `turn` down the queue made a single play look like
+     * the table hopping from player to player, ringing and highlighting each
+     * one, before settling on the seat that was next all along. Only an actual
+     * jump moves the turn, and that goes through `playResolved` like any other
+     * play. `interrupt.candidates[0]` is who the window is waiting on;
+     * `phaseFor` hands them the decision without pretending it is their turn.
+     */
+    turn: resumeTurn,
     interrupt: candidates.length > 0 ? { resumeTurn, card, candidates } : null,
   };
 }
@@ -722,7 +808,12 @@ function playResolved(
   }
 
   const interrupted = withInterrupt(next, card, seat, resumeTurn, passedOver);
-  ctx.fx.emit(Fx.TurnRing, { seat: interrupted.turn }, actionDelayMs + 80);
+  // The ring names the seat that has the turn. With a jump-in window open the
+  // table is still asking whether anyone takes this card back, so the ring
+  // waits for the window to close rather than firing once per seat polled.
+  if (interrupted.interrupt === null) {
+    ctx.fx.emit(Fx.TurnRing, { seat: interrupted.turn }, actionDelayMs + 80);
+  }
   return interrupted;
 }
 
@@ -925,22 +1016,59 @@ const challengeDrawFour: Move<WildpileState> = {
       ? true
       : error('challenge-closed', 'the challenge window has passed');
   },
-  apply(state, seat, _payload, ctx) {
+  apply(state, _seat, _payload, ctx) {
     const challenge = state.challenge;
     if (!challenge) throw new Error('challengeDrawFour apply requires an open challenge');
+    // Calling it and answering it are two steps, because between them a veiled
+    // table has cards to turn over. `flow.advance` settles the answer the
+    // instant the hand can be read — immediately at an open table, and once the
+    // room has run the openings at a veiled one — so the seat still experiences
+    // one action.
+    if (state.veiled) ctx.fx.emit('wildpile.challenge-called', { seat: challenge.accused });
+    return { ...state, challenge: { ...challenge, called: true } };
+  },
+};
 
-    const upheld = challenge.heldMatches.length > 0;
+/**
+ * Answer a called bluff from the accused's own cards.
+ *
+ * Never sent by a player: the flow runs it the moment the hand behind the
+ * accusation can be read. At an open table that is the same instant the call
+ * lands. Under Veil the cards are still handles, so this refuses with
+ * {@link VEILED_OPEN_PENDING} and the room turns them face up first — the
+ * online equivalent of the accused laying their hand on the table, which is
+ * exactly what the rule asks of them.
+ */
+const settleChallenge: Move<WildpileState> = {
+  validate(state) {
+    const challenge = state.challenge;
+    if (!challenge?.called) return error('nothing-called', 'no bluff has been called');
+    if (challenge.handAtPlay.some(isVeilHandle)) {
+      return {
+        code: VEILED_OPEN_PENDING,
+        message: 'the accused hand must be turned face up before the bluff can be answered',
+      };
+    }
+    return true;
+  },
+  apply(state, _seat, _payload, ctx) {
+    const challenge = state.challenge;
+    if (!challenge) throw new Error('settleChallenge apply requires a called challenge');
+    const challenger = challenge.challenger;
+    const proof = challengeProof(challenge);
+    const upheld = proof.length > 0;
+
     // The proof is public: an accusation that lands should be seen to land.
     ctx.fx.emit('wildpile.challenge', {
-      challenger: seat,
+      challenger,
       accused: challenge.accused,
       upheld,
       color: challenge.colorAtPlay,
       amount: upheld ? challenge.amount : challenge.amount + CHALLENGE_PENALTY,
-      proof: challenge.heldMatches,
+      proof,
     });
 
-    const loser = upheld ? challenge.accused : seat;
+    const loser = upheld ? challenge.accused : challenger;
     const amount = upheld ? challenge.amount : challenge.amount + CHALLENGE_PENALTY;
     const settled = drawCards(state, loser, amount, ctx, {
       delayMs: CHALLENGE_REVEAL_MS,
@@ -955,7 +1083,7 @@ const challengeDrawFour: Move<WildpileState> = {
 
     // Right: the pile lands on the bluffer and the challenger still has a turn.
     // Wrong: the challenger has picked up and forfeits it.
-    const turn = upheld ? seat : nextSeat(cleared, seat);
+    const turn = upheld ? challenger : nextSeat(cleared, challenger);
     ctx.fx.emit(Fx.TurnRing, { seat: turn }, CHALLENGE_REVEAL_MS + 80);
     return { ...cleared, turn };
   },
@@ -1095,11 +1223,15 @@ const declineJump: Move<WildpileState> = {
   apply(state, _seat, _payload, ctx) {
     if (!state.interrupt) throw new Error('declineJump apply requires an interrupt');
     const candidates = state.interrupt.candidates.slice(1);
-    const turn = candidates[0] ?? state.interrupt.resumeTurn;
-    ctx.fx.emit(Fx.TurnRing, { seat: turn }, 40);
+    // Passing the question to the next candidate is bookkeeping — the turn has
+    // not moved and nothing about the table has changed. Only closing the
+    // window releases the seat that was next, so that is the one moment worth
+    // ringing.
+    if (candidates.length === 0) {
+      ctx.fx.emit(Fx.TurnRing, { seat: state.interrupt.resumeTurn }, 40);
+    }
     return {
       ...state,
-      turn,
       interrupt: candidates.length > 0 ? { ...state.interrupt, candidates } : null,
     };
   },
@@ -1228,6 +1360,9 @@ function lastCardMoves(state: WildpileState, seat: SeatId): LegalMove[] {
 
 function legalMoves(state: WildpileState): LegalMove[] {
   if (state.winner !== null || state.timeoutRankings !== null) return [];
+  // The table is answering a called bluff off the accused's cards. No seat has
+  // anything to add until it has.
+  if (state.challenge?.called) return [];
   if (state.awaitingColor !== null) {
     return WILDPILE_COLORS.map((color) => ({ id: 'chooseColor', payload: { color } }));
   }
@@ -1293,13 +1428,37 @@ function legalMovesForSeat(state: WildpileState, phase: PhaseState, seat: SeatId
  * A pending pickup with nothing to stack on it is not a decision, so the flow
  * takes it for the seat instead of parking the table behind a draw button. An
  * open accusation *is* a decision, so the window is left for the seat to close.
+ *
+ * "Nothing to stack" has to be something the whole table can verify, because
+ * every peer replays this the same way. Under Veil it cannot: the hand is
+ * handles here, `canStack` says no to all of them, and the pickup was taken from
+ * under a seat that was holding the perfect answer — which is why stacking
+ * looked switched off in every online game. A hand the table cannot read
+ * answers for itself; the seat's own client can see its cards, and the turn
+ * clock is what keeps the table moving if it does not.
  */
 function forcedPickup(state: WildpileState, phase: PhaseState): AutoMove | null {
   if (phase.phase !== 'play' || phase.actor === null) return null;
   if (state.pendingDraw <= 0 || state.drawnCard !== null) return null;
   if (canChallenge(state, phase.actor)) return null;
-  if (hand(state, phase.actor).some((card) => canStack(state, card))) return null;
+  const cards = hand(state, phase.actor);
+  if (!cards.every(isRealCard)) return null;
+  if (cards.some((card) => canStack(state, card))) return null;
   return { seat: phase.actor, move: 'draw', reason: 'forced-pickup' };
+}
+
+/**
+ * The answer to a called bluff, run as soon as the accused's hand can be read.
+ *
+ * At an open table that is the same instant the call lands, so calling and
+ * answering stay one beat. Under Veil the room has cards to turn over first —
+ * {@link challengeOpens} names them — and holding the auto-move back until they
+ * are open is what gives the peel chain somewhere to land.
+ */
+function challengeAnswer(state: WildpileState): AutoMove | null {
+  if (!state.challenge?.called) return null;
+  if (challengeOpens(state)) return null;
+  return { seat: null, move: 'settleChallenge', reason: 'bluff called' };
 }
 
 function result(state: WildpileState): MatchResult | null {
@@ -1344,10 +1503,13 @@ const flow: Flow<WildpileState> = {
     const phase = phaseFor(state);
     const ended = result(state);
     if (ended) return { phase, ended };
-    const auto = forcedPickup(state, phase);
+    const auto = challengeAnswer(state) ?? forcedPickup(state, phase);
     return auto ? { phase, autoMoves: [auto] } : { phase };
   },
   canInject(state, phase, moveId, payload, meta) {
+    // The room injects the answer to a called bluff once it has turned the
+    // accused's cards over; the move itself decides whether they are readable.
+    if (moveId === 'settleChallenge') return settleChallenge.validate?.(state, -1, payload) ?? true;
     if (moveId !== 'timeout') return error('unsupported-injection', 'only Wild clocks inject');
     const parsed = timeoutPayload(payload);
     if (!parsed) return error('bad-timeout', 'timeout needs a valid clock payload');
@@ -1555,6 +1717,10 @@ export const wildpileGame: GameDef<WildpileState, WildpileRules> = {
     deck: (config) => wildpileDealtDeck(config as WildpileRules),
     handSize: (config) => (config as WildpileRules).handSize,
     publicSetup: (opened) => opened.some((card) => wildpileFace(card).meta.kind === 'number'),
+    // A called bluff is answered from the accused's own hand, so that hand has
+    // to come face up — the same thing the rule asks for at a real table, and
+    // the price of calling. Nothing opens unless someone actually calls.
+    publicOpens: (state) => challengeOpens(state as WildpileState),
   }),
   setup(ctx) {
     const { config, seats, fx } = ctx;
@@ -1617,6 +1783,7 @@ export const wildpileGame: GameDef<WildpileState, WildpileRules> = {
     callLastCard,
     catchLastCard,
     challengeDrawFour,
+    settleChallenge,
     timeout,
   },
   flow,
@@ -1627,6 +1794,13 @@ export const wildpileGame: GameDef<WildpileState, WildpileRules> = {
         index === seat ? cards.slice() : cards.map(() => '??'),
       ),
       stock: state.stock.map(() => '??'),
+      // An open accusation carries the accused's hand so it can be answered
+      // later. It is evidence, not a peephole: until the bluff is actually
+      // called it stays as hidden as the hand it came from.
+      challenge:
+        state.challenge === null || state.challenge.accused === seat || state.challenge.called
+          ? state.challenge
+          : { ...state.challenge, handAtPlay: state.challenge.handAtPlay.map(() => '??') },
     };
   },
   end: result,

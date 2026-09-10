@@ -1093,12 +1093,16 @@ describe('multiplayer route composition', () => {
       speaker.send(fallback.id, fallback.payload);
       await eventually(() => expect(wildAt(host).log.length).toBeGreaterThan(logged), 1_000, 10);
       // The card a draw just handed over is a handle until this seat peels it.
+      // Its OWN hand, and only that: the other seat is opaque to this peer for
+      // the whole match, which is the point of the veil. Asking `hands.flat()`
+      // asked this peer to be able to read a hand it must never read, and only
+      // escaped notice because the loop usually finds a playable card before it
+      // ever draws.
+      const drawer = speaker.getSnapshot().localSeat!;
       await eventually(
         () =>
           expect(
-            wildAt(speaker)
-              .state.hands.flat()
-              .every((card) => !isVeilHandle(card)),
+            (wildAt(speaker).state.hands[drawer] ?? []).every((card) => !isVeilHandle(card)),
           ).toBe(true),
         500,
         10,

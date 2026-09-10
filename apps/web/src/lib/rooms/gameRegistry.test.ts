@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { createSession } from '@parlour/engine';
+import { wildpileConfig, wildpileGame } from '@parlour/game-wildpile';
 import { MULTIPLAYER_GAME_IDS } from './gameIds';
 import { hasValidSeatCount, seatRangeFor } from './seatRange';
 import { TABLE_ROUTES } from './tableRoute';
@@ -37,6 +39,38 @@ describe('room game registry', () => {
 
   it('never resolves one game to another game', () => {
     for (const id of MULTIPLAYER_GAME_IDS) expect(roomGame(id).id).toBe(id);
+  });
+
+  /*
+   * The seam a Draw Four challenge rides under Veil: the pack names the cards
+   * behind the accusation, the room peels them in public and injects the
+   * answer. Unwired, the rule silently disappears from every online game —
+   * which is exactly how it was found missing.
+   */
+  it('asks a Wild room to turn over the hand behind a called bluff', () => {
+    const dealt = createSession(wildpileGame, {
+      seed: 91,
+      config: wildpileConfig.defaults(),
+      seats: 3,
+    });
+    expect(roomGame('wildpile').publicOpenPending(dealt.state)).toBeNull();
+
+    const called = {
+      ...dealt.state,
+      veiled: true,
+      challenge: {
+        accused: 0,
+        challenger: 1,
+        colorAtPlay: 'red' as const,
+        handAtPlay: ['v#40', 'v#41'],
+        called: true,
+        amount: 4,
+      },
+    };
+    expect(roomGame('wildpile').publicOpenPending(called)).toEqual({
+      handles: ['v#40', 'v#41'],
+      move: 'settleChallenge',
+    });
   });
 
   it('agrees with the seat-range and route tables', () => {

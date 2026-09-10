@@ -250,6 +250,37 @@ describe('veiled jump-in', () => {
     expect(state.turn).toBe(1);
   });
 
+  it('polls every seat in silence and rings once, where the turn lands', () => {
+    // The window a veiled room opens to the whole table is bookkeeping: each
+    // seat that cannot match declines from its own client. Ringing each of them
+    // walked the highlight and the turn chime round the table on every card
+    // played, which is what a real game of this looked like.
+    const { session } = veiled(3, jumpy);
+    const handle = (session.state as WildpileState).hands[0]![0]!;
+    const played = sessionApply(
+      wildpileGame,
+      session,
+      0,
+      'playCard',
+      { card: 'red-9-0' },
+      {
+        reveals: [[handle, 'red-9-0']],
+      },
+    );
+    const rings = (events: readonly { kind: string }[]) =>
+      events.filter((event) => event.kind === 'turn.ring');
+
+    expect((played.session.state as WildpileState).turn).toBe(1);
+    expect(rings(played.fx)).toEqual([]);
+
+    const first = sessionApply(wildpileGame, played.session, 1, 'declineJump');
+    expect(rings(first.fx)).toEqual([]);
+    expect((first.session.state as WildpileState).turn).toBe(1);
+
+    const second = sessionApply(wildpileGame, first.session, 2, 'declineJump');
+    expect(rings(second.fx)).toEqual([{ kind: 'turn.ring', payload: { seat: 1 }, at: 40 }]);
+  });
+
   it('only accepts a jump whose opened card is an exact match', () => {
     const { session } = veiled(3, jumpy);
     const handle = (session.state as WildpileState).hands[0]![0]!;

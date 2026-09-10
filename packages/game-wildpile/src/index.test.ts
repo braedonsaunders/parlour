@@ -9,6 +9,7 @@ import {
   sessionApply,
   sessionInject,
   stateHash,
+  VEILED_OPEN_PENDING,
   type GameSession,
 } from '@parlour/engine';
 import { describe, expect, it } from 'vitest';
@@ -143,6 +144,24 @@ describe('wildpile moves and flow', () => {
     expect(jumped.rejected).toBeUndefined();
     expect(jumped.session.state.hands[1]).toEqual([card('2', 'blue')]);
     expect(jumped.session.state.turn).toBe(2);
+  });
+
+  it('holds the turn — and the ring — still while a jump-in window is polled', () => {
+    // A window asks each candidate a question; it does not hand any of them the
+    // turn. Ringing every seat it polled made one card played look like the
+    // table hopping between players before deciding whose turn it was.
+    const played = sessionApply(wildpileGame, fixture(), 0, 'playCard', { card: card('5') });
+    expect(played.session.state.interrupt?.candidates).toEqual([1]);
+    expect(played.session.state.turn).toBe(1);
+    expect(played.fx.filter((event) => event.kind === Fx.TurnRing)).toEqual([]);
+
+    const declined = sessionApply(wildpileGame, played.session, 1, 'declineJump');
+    expect(declined.rejected).toBeUndefined();
+    expect(declined.session.state.interrupt).toBeNull();
+    expect(declined.session.state.turn).toBe(1);
+    expect(declined.fx.filter((event) => event.kind === Fx.TurnRing)).toEqual([
+      { kind: Fx.TurnRing, payload: { seat: 1 }, at: 40 },
+    ]);
   });
 
   it('keeps a skipped seat out of the jump-in queue so the skip actually skips', () => {
@@ -444,6 +463,138 @@ describe('wildpile moves and flow', () => {
       card: card('wild-draw-four', 'red', 1),
     });
     expect(noStack.rejected?.code).toBe('illegal-move');
+  });
+
+  /*
+   * The pile is a pile. Demanding the same card kind meant a Draw Two could
+   * never answer a Draw Four even in the colour that Draw Four had just called,
+   * which is the mixed pile every house plays.
+   */
+  describe('mixing the two pickups on one pile', () => {
+    const stacking = { ...defaults, challengeDrawFour: false };
+    /** Seat 1 faces `pendingDraw` of `pendingKind` on a blue pile, holding `held`. */
+    function facing(pendingKind: 'draw-two' | 'wild-draw-four', held: string[], rules = stacking) {
+      return fixture({
+        rules,
+        turn: 1,
+        activeColor: 'blue',
+        pendingDraw: pendingKind === 'draw-two' ? 2 : 4,
+        pendingKind,
+        hands: [[card('1')], held, [card('2')]],
+        stock: Array.from({ length: 14 }, (_, index) =>
+          card(String(Math.floor(index / 2) + 1), 'yellow', index % 2),
+        ),
+      });
+    }
+
+    it('lets a Draw Two in the live colour answer a Draw Four', () => {
+      const answered = sessionApply(
+        wildpileGame,
+        facing('wild-draw-four', [card('draw-two', 'blue'), card('3', 'green')]),
+        1,
+        'playCard',
+        { card: card('draw-two', 'blue') },
+      );
+      expect(answered.rejected).toBeUndefined();
+      // Six now rides on it, and seat 2 — holding nothing — takes all six.
+      expect(answered.fx).toContainEqual({
+        kind: 'wildpile.draw-stack',
+        payload: { seat: 1, amount: 6 },
+      });
+      expect(answered.session.state.hands[2]).toHaveLength(7);
+    });
+
+    it('refuses a Draw Two in the wrong colour, exactly like any other card', () => {
+      const refused = sessionApply(
+        wildpileGame,
+        facing('wild-draw-four', [card('draw-two', 'red'), card('3', 'green')]),
+        1,
+        'playCard',
+        { card: card('draw-two', 'red') },
+      );
+      expect(refused.rejected?.code).toBe('illegal-move');
+    });
+
+    it('lets a Draw Four answer a Draw Two, colour or no colour', () => {
+      const answered = sessionApply(
+        wildpileGame,
+        facing('draw-two', [card('wild-draw-four'), card('3', 'green')]),
+        1,
+        'playCard',
+        { card: card('wild-draw-four') },
+      );
+      expect(answered.rejected).toBeUndefined();
+      expect(answered.fx).toContainEqual({
+        kind: 'wildpile.draw-stack',
+        payload: { seat: 1, amount: 6 },
+      });
+      expect(answered.session.state.pendingDraw).toBe(6);
+    });
+
+    it('keeps a pile the table said must be taken out of the mix', () => {
+      // Draw Fours cannot be passed along here, so a Draw Two cannot pass one
+      // along either — the house rule is about the pile, not the card.
+      const refused = sessionApply(
+        wildpileGame,
+        facing('wild-draw-four', [card('draw-two', 'blue')], {
+          ...stacking,
+          stackDrawFour: false,
+        }),
+        1,
+        'playCard',
+        { card: card('draw-two', 'blue') },
+      );
+      expect(refused.rejected?.code).toBe('illegal-move');
+    });
+
+    it('still answers a Draw Two with a Draw Two of any colour', () => {
+      const answered = sessionApply(
+        wildpileGame,
+        facing('draw-two', [card('draw-two', 'red'), card('3', 'green')]),
+        1,
+        'playCard',
+        { card: card('draw-two', 'red') },
+      );
+      expect(answered.rejected).toBeUndefined();
+      expect(answered.fx).toContainEqual({
+        kind: 'wildpile.draw-stack',
+        payload: { seat: 1, amount: 4 },
+      });
+      expect(answered.session.state.hands[2]).toHaveLength(5);
+    });
+  });
+
+  /*
+   * Reported from a real multiplayer game: stacking simply did not happen. The
+   * flow took the pickup the instant it reached the next seat, because under
+   * Veil that seat's hand is handles and "nothing stacks" looked true of every
+   * one of them.
+   */
+  it('leaves a veiled seat the chance to stack instead of taking the pickup', () => {
+    const played = sessionApply(
+      wildpileGame,
+      fixture({
+        veiled: true,
+        // Jump-in has its own veiled window; this is about the pickup alone.
+        rules: { ...defaults, challengeDrawFour: false, jumpIn: false },
+        activeColor: 'red',
+        hands: [[card('draw-two'), card('6', 'green')], ['v#40', 'v#41'], [card('2')]],
+        stock: Array.from({ length: 10 }, (_, index) =>
+          card(String(Math.floor(index / 2) + 1), 'yellow', index % 2),
+        ),
+      }),
+      0,
+      'playCard',
+      { card: card('draw-two') },
+    );
+
+    expect(played.rejected).toBeUndefined();
+    expect(played.session.state.pendingDraw).toBe(2);
+    expect(played.session.phase).toMatchObject({ phase: 'play', actor: 1 });
+    expect(played.session.state.hands[1]).toEqual(['v#40', 'v#41']);
+    expect(
+      wildpileGame.flow.legalMoves(played.session.state, played.session.phase).map((m) => m.id),
+    ).toContain('draw');
   });
 
   it('redacts hidden zones and replays an action log exactly', () => {
@@ -794,10 +945,10 @@ describe('wildpile moves and flow', () => {
       expect(coloured.session.state.challenge).toMatchObject({ accused: 1, challenger: 2 });
       // The live colour when seat 1 stacked was green, and they held no green.
       expect(coloured.session.state.challenge?.colorAtPlay).toBe('green');
-      expect(coloured.session.state.challenge?.heldMatches).toEqual([]);
+      expect(coloured.session.state.challenge?.handAtPlay).toEqual([card('4', 'blue')]);
     });
 
-    it('stays out of the way when the table has the rule off, or the room is veiled', () => {
+    it('stays out of the way when the table has the rule off', () => {
       const off = playDrawFour([card('5')], {
         ...defaults,
         stackDrawFour: false,
@@ -807,26 +958,18 @@ describe('wildpile moves and flow', () => {
       expect(off.session.state.challenge).toBeNull();
       expect(off.session.state.hands[1]).toHaveLength(6);
       expect(off.session.state.turn).toBe(2);
+    });
 
-      const veiled = sessionApply(
-        wildpileGame,
-        fixture({
-          veiled: true,
-          rules: challengeRules,
-          activeColor: 'red',
-          discard: [card('3')],
-          stock: deepStock,
-          hands: [
-            [drawFour, card('5')],
-            [card('1', 'blue'), card('2', 'blue')],
-            [card('9', 'green')],
-          ],
-        }),
-        0,
-        'playCard',
-        { card: drawFour },
-      );
-      expect(veiled.session.state.challenge).toBeNull();
+    it('keeps the accusation to itself until it is called', () => {
+      // The record carries the accused's hand so the answer can be read off it
+      // later. Anyone else looking at the table sees what they saw before.
+      const pending = playDrawFour([card('5'), card('6', 'blue')]);
+      const state = pending.session.state;
+      expect(wildpileGame.playerView!(state, 1).challenge?.handAtPlay).toEqual(['??', '??']);
+      expect(wildpileGame.playerView!(state, 0).challenge?.handAtPlay).toEqual([
+        card('5'),
+        card('6', 'blue'),
+      ]);
     });
 
     it('refuses a challenge from anyone but the seat on the hook', () => {
@@ -834,6 +977,115 @@ describe('wildpile moves and flow', () => {
       expect(
         sessionApply(wildpileGame, pending.session, 2, 'challengeDrawFour').rejected?.code,
       ).toBe('not-your-turn');
+    });
+  });
+
+  /*
+   * A veiled room cannot read the accused's hand, so it used to skip the whole
+   * rule — every online game silently had Draw Four challenges switched off. The
+   * hand is recorded as handles instead, and calling the bluff is what makes the
+   * room turn exactly those cards face up, the way the accused would lay them
+   * out at a real table.
+   */
+  describe('a Draw Four challenge under Veil', () => {
+    const challengeRules = wildpileConfig.resolve({
+      challengeDrawFour: true,
+      stackDrawFour: false,
+    });
+    const drawFour = card('wild-draw-four');
+    const deepStock = Array.from({ length: 20 }, (_, index) =>
+      card(String(Math.floor(index / 2) + 1), 'yellow', index % 2),
+    );
+
+    /** Seat 0 plays the Draw Four holding `kept`, still veiled to the table. */
+    function veiledDrawFour(kept: string[]) {
+      const handles = kept.map((_, index) => `v#${index + 40}`);
+      const dealt = fixture({
+        veiled: true,
+        rules: challengeRules,
+        activeColor: 'red',
+        discard: [card('3')],
+        stock: deepStock,
+        hands: [
+          [drawFour, ...handles],
+          [card('1', 'blue'), card('2', 'blue')],
+          [card('9', 'green'), card('8', 'green')],
+        ],
+      });
+      const played = sessionApply(wildpileGame, { ...dealt, veiled: true }, 0, 'playCard', {
+        card: drawFour,
+      });
+      expect(played.rejected).toBeUndefined();
+      const coloured = sessionApply(wildpileGame, played.session, 0, 'chooseColor', {
+        color: 'green',
+      });
+      return { session: coloured.session, handles, opened: kept };
+    }
+
+    it('opens the window on a hand nobody can read yet', () => {
+      const { session, handles } = veiledDrawFour([card('5'), card('6', 'blue')]);
+      expect(session.state.challenge).toMatchObject({ accused: 0, challenger: 1, called: false });
+      expect(session.state.challenge?.handAtPlay).toEqual(handles);
+      expect(
+        wildpileGame.flow.legalMoves(session.state, session.phase).map((move) => move.id),
+      ).toContain('challengeDrawFour');
+    });
+
+    it('waits for the accused hand to be turned over, then answers from it', () => {
+      const { session, handles, opened } = veiledDrawFour([card('5'), card('6', 'blue')]);
+      const called = sessionApply(wildpileGame, session, 1, 'challengeDrawFour');
+      expect(called.rejected).toBeUndefined();
+
+      // Nothing is settled yet: the table names the cards it needs and holds
+      // still — no seat may act, and the call cannot be made twice.
+      expect(called.session.state.challenge?.called).toBe(true);
+      expect(called.session.phase).toMatchObject({ phase: 'challenge-proof', actor: null });
+      expect(wildpileGame.flow.legalMoves(called.session.state, called.session.phase)).toEqual([]);
+      expect(wildpileGame.veil?.publicOpens?.(called.session.state)).toEqual({
+        handles,
+        move: 'settleChallenge',
+      });
+      expect(called.session.state.hands[0]).toHaveLength(2);
+
+      // The room turns them over and injects the answer with the openings.
+      const settled = sessionInject(wildpileGame, called.session, 'settleChallenge', undefined, {
+        reveals: handles.map((handle, index) => [handle, opened[index]!] as const),
+      });
+      expect(settled.rejected).toBeUndefined();
+      expect(settled.fx).toContainEqual(
+        expect.objectContaining({
+          kind: 'wildpile.challenge',
+          payload: expect.objectContaining({ upheld: true, amount: 4, proof: [card('5')] }),
+        }),
+      );
+      expect(settled.session.state.challenge).toBeNull();
+      expect(settled.session.state.hands[0]).toHaveLength(6);
+      expect(settled.session.state.hands[1]).toHaveLength(2);
+      expect(settled.session.state.turn).toBe(1);
+    });
+
+    it('costs a bad call the same two extra cards it costs anywhere else', () => {
+      const { session, handles, opened } = veiledDrawFour([card('6', 'blue'), card('7', 'green')]);
+      const called = sessionApply(wildpileGame, session, 1, 'challengeDrawFour');
+      const settled = sessionInject(wildpileGame, called.session, 'settleChallenge', undefined, {
+        reveals: handles.map((handle, index) => [handle, opened[index]!] as const),
+      });
+
+      expect(settled.fx).toContainEqual(
+        expect.objectContaining({
+          kind: 'wildpile.challenge',
+          payload: expect.objectContaining({ upheld: false, amount: 6, proof: [] }),
+        }),
+      );
+      expect(settled.session.state.hands[1]).toHaveLength(8);
+      expect(settled.session.state.turn).toBe(2);
+    });
+
+    it('refuses to answer while the hand is still face down', () => {
+      const { session } = veiledDrawFour([card('5')]);
+      const called = sessionApply(wildpileGame, session, 1, 'challengeDrawFour');
+      const early = sessionInject(wildpileGame, called.session, 'settleChallenge');
+      expect(early.rejected?.code).toBe(VEILED_OPEN_PENDING);
     });
   });
 

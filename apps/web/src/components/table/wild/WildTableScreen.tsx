@@ -255,10 +255,29 @@ function WildTableScreenView(props: WildTableScreenProps) {
           )}
         </TablePlayfield>
 
-        {/* No draw button: the stock pile is the draw, and forced pickups resolve
-          themselves. The only rail action left is protecting your last card. */}
+        {/* No draw button for an ordinary turn: the stock pile is the draw. A
+          pending pickup is the exception — at a veiled table the flow cannot
+          take it for you (it cannot see whether you were holding the answer),
+          so the pile you owe is offered as something to accept. */}
         <TableActionRail className={wildStyles.actionRail}>
           <AnimatePresence initial={false}>
+            {view.pendingDraw > 0 && view.legal.draw && !view.challenge && !localBusy && (
+              <motion.button
+                key="take-pickup"
+                type="button"
+                data-testid="take-pickup"
+                // Plain amber, like the pile it is about — this is the table
+                // waiting on you, not an alarm.
+                className="btn-fat"
+                initial={{ opacity: 0, scale: 0.7, y: 12 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.7, y: 12 }}
+                transition={{ duration: 0.2, ease: [0.34, 1.56, 0.64, 1] }}
+                onClick={props.onDraw}
+              >
+                Take +{view.pendingDraw}
+              </motion.button>
+            )}
             {view.catchable && view.legal.catchLastCard && !deal.dealing && (
               <motion.button
                 key="catch-last-card"
@@ -896,7 +915,7 @@ function ChallengePrompt({
             data-testid="stack-draw-four"
             onClick={onStack}
           >
-            Stack +4 → {challenge.stackAmount}
+            Stack +{challenge.stackAdds} → {challenge.stackAmount}
           </button>
         )}
         <button

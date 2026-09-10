@@ -625,7 +625,8 @@ describe('WildTableScreen turn affordances', () => {
               amount: 4,
               penalty: 6,
               stackCards: [],
-              stackAmount: 8,
+              stackAdds: 0,
+              stackAmount: 4,
             },
             legal: { ...VIEW.legal, playCards: [], challengeDrawFour: true },
           },
@@ -672,6 +673,7 @@ describe('WildTableScreen turn affordances', () => {
               amount: 4,
               penalty: 6,
               stackCards: ['wild-draw-four-1'],
+              stackAdds: 4,
               stackAmount: 8,
             },
             legal: { ...VIEW.legal, challengeDrawFour: true },
@@ -693,6 +695,91 @@ describe('WildTableScreen turn affordances', () => {
     expect(onPlay).toHaveBeenCalledWith('wild-draw-four-1');
   });
 
+  it('prices the stack button off the card that would answer, not a flat four', () => {
+    act(() =>
+      root.render(
+        createElement(WildTableScreen, {
+          view: {
+            ...VIEW,
+            pendingDraw: 4,
+            challenge: {
+              accused: 1,
+              accusedName: 'Slate',
+              amount: 4,
+              penalty: 6,
+              stackCards: ['green-draw-two-0'],
+              stackAdds: 2,
+              stackAmount: 6,
+            },
+            legal: { ...VIEW.legal, challengeDrawFour: true },
+          },
+          fx: [],
+          fxKey: 0,
+        }),
+      ),
+    );
+
+    const prompt = container.querySelector('[data-testid="challenge-prompt"]');
+    expect(prompt?.querySelector('[data-testid="stack-draw-four"]')?.textContent).toContain(
+      'Stack +2 → 6',
+    );
+  });
+
+  /*
+   * A veiled table cannot take a pickup for you — it cannot see whether you were
+   * holding the answer — so the pile you owe has to be something you can accept.
+   */
+  it('offers the pending pickup as an action when the table is waiting on it', () => {
+    const onDraw = vi.fn();
+    act(() =>
+      root.render(
+        createElement(WildTableScreen, {
+          view: {
+            ...VIEW,
+            pendingDraw: 6,
+            legal: { ...VIEW.legal, playCards: [], draw: true },
+          },
+          fx: [],
+          fxKey: 0,
+          onDraw,
+        }),
+      ),
+    );
+
+    const take = container.querySelector<HTMLButtonElement>('[data-testid="take-pickup"]');
+    expect(take?.textContent).toContain('Take +6');
+    act(() => take?.click());
+    expect(onDraw).toHaveBeenCalledOnce();
+  });
+
+  it('leaves the pickup action to the challenge prompt when one is open', () => {
+    act(() =>
+      root.render(
+        createElement(WildTableScreen, {
+          view: {
+            ...VIEW,
+            pendingDraw: 4,
+            challenge: {
+              accused: 1,
+              accusedName: 'Slate',
+              amount: 4,
+              penalty: 6,
+              stackCards: [],
+              stackAdds: 0,
+              stackAmount: 4,
+            },
+            legal: { ...VIEW.legal, playCards: [], draw: true, challengeDrawFour: true },
+          },
+          fx: [],
+          fxKey: 0,
+        }),
+      ),
+    );
+
+    expect(container.querySelector('[data-testid="take-pickup"]')).toBeNull();
+    expect(container.querySelector('[data-testid="accept-draw-four"]')).not.toBeNull();
+  });
+
   it('leaves the stack button out entirely when nothing in hand can answer', () => {
     act(() =>
       root.render(
@@ -706,7 +793,8 @@ describe('WildTableScreen turn affordances', () => {
               amount: 4,
               penalty: 6,
               stackCards: [],
-              stackAmount: 8,
+              stackAdds: 0,
+              stackAmount: 4,
             },
             legal: { ...VIEW.legal, playCards: [], challengeDrawFour: true },
           },
