@@ -44,6 +44,21 @@ export interface RoomTable<S, C extends RuleValues> {
    * and is ignored by open rooms.
    */
   dispatch(move: string, payload?: unknown, reveals?: readonly string[]): void;
+  /**
+   * Sends a move that is racing somebody, without the handoff hold.
+   *
+   * {@link dispatch} withholds a tap until the cards have landed, which is
+   * right for the controls that belong to your turn: the board is still moving
+   * and the next decision should wait for it. A race is the exact opposite kind
+   * of action — Wild's "Catch them!" is a window a second wide that any seat
+   * may shout into, on turn or off — and holding it for the read beat is how a
+   * player who tapped in time lost anyway, with nothing on screen to say so.
+   * The refusal that follows a lost race is swallowed as a stale tap, so it
+   * looked exactly like a dead button.
+   *
+   * For anything that is a decision rather than a race, use `dispatch`.
+   */
+  race(move: string, payload?: unknown, reveals?: readonly string[]): void;
   /** Leaves the room and clears it, so the shelf is not haunted by a dead table. */
   leave(go: () => void): void;
 }
@@ -188,6 +203,7 @@ export function useRoomTable<S, C extends RuleValues>(
     localSeat: snapshot.localSeat,
     error: isSeatLeftFault(localError ?? snapshot.error) ? null : (localError ?? snapshot.error),
     dispatch,
+    race: dispatchNow,
     leave,
   };
 }

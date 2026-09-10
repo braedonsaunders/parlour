@@ -220,7 +220,7 @@ export const wildTablePack = defineTablePack<
   },
 
   renderRoom(ctx) {
-    const { session, snapshot, localSeat, error, dispatch, quit } = ctx;
+    const { session, snapshot, localSeat, error, dispatch, race, quit } = ctx;
     const isLocalTurn = session.status === 'playing' && session.phase.actor === localSeat;
     let legal: readonly LegalMove[] = [];
     if (isLocalTurn) {
@@ -261,11 +261,17 @@ export const wildTablePack = defineTablePack<
         onDraw={() => dispatch('draw')}
         onChooseColor={(color: WildpileColor) => dispatch('chooseColor', { color })}
         onDeclineJump={() => dispatch('declineJump')}
-        onCallLastCard={() => dispatch('callLastCard')}
+        // The two shouts, and the only moves here that are not this seat's turn
+        // to take. Both are races — one seat calling their last card before
+        // anyone notices, everyone else calling it first — and the window is
+        // open for about as long as the handoff hold that `dispatch` would sit
+        // them out for. Reported as "I clicked Catch you and nothing happened",
+        // which is exactly what a tap held past the window looks like.
+        onCallLastCard={() => race('callLastCard')}
+        onCatchLastCard={() => race('catchLastCard')}
         onChooseTarget={(seat: number) => dispatch('chooseTarget', { seat })}
         onPass={() => dispatch('pass')}
         onChallengeDrawFour={() => dispatch('challengeDrawFour')}
-        onCatchLastCard={() => dispatch('catchLastCard')}
         onQuit={quit}
       />
     );
