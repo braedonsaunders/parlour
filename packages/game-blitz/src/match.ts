@@ -44,7 +44,8 @@ function winnersOf(result: MatchResult): readonly SeatId[] {
   return result.rankings.filter((r) => r.rank === 1).map((r) => r.seat);
 }
 
-function lowestRankedSeats(rankings: readonly MatchResultRank[]): SeatId[] {
+/** The seats sharing the worst rank — who drops a life on a showdown. */
+export function lowestRankedSeats(rankings: readonly MatchResultRank[]): SeatId[] {
   if (rankings.length === 0) return [];
   const lowestRank = Math.max(...rankings.map(({ rank }) => rank));
   return rankings.flatMap(({ seat, rank }) => (rank === lowestRank ? [seat] : []));

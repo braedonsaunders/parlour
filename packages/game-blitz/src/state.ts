@@ -32,6 +32,47 @@ export interface RoundOutcome {
   rankings: readonly MatchResultRank[];
 }
 
+/** Per-seat counters the podium reports, banked round by round. */
+export interface BlitzSeatMetrics {
+  blitzes: number;
+  knocks: number;
+  knockWins: number;
+}
+
+/** Classic knockout, or a race to a number of round wins. */
+export type BlitzMatchFormat = 'lives' | 'wins';
+
+/**
+ * A whole Blitz match as one state.
+ *
+ * Blitz is a match of many rounds — you start on three lives and play until one
+ * seat is left holding any — and a friend room is a single replicated session,
+ * not a series of them. So the match layer lives inside the game def, the way
+ * Gin's does: `round.fold` banks the lives, seats ready up in the window after
+ * it, and `next.round` deals again from the per-event rng stream.
+ *
+ * The alternative, which is what rooms used to play, is a session per round:
+ * the room ends after one deal, nobody's lives ever move, and the podium is
+ * handed a single round's hand values instead of a match score.
+ */
+export interface BlitzMatchState {
+  rules: BlitzConfig;
+  seats: number;
+  veiled: boolean;
+  format: BlitzMatchFormat;
+  /** Round wins that take the match, in the `wins` format. */
+  target: number;
+  lives: readonly number[];
+  wins: readonly number[];
+  metrics: readonly BlitzSeatMetrics[];
+  roundIndex: number;
+  round: BlitzState;
+  /** True once the finished round has been banked and the table is between rounds. */
+  folded: boolean;
+  readied: readonly SeatId[];
+  lastOutcome: RoundOutcome | null;
+}
+
 export interface BlitzState {
   /** resolved house rules for this round — pure reducers read them from here */
   rules: BlitzConfig;

@@ -14,7 +14,9 @@ import {
   type LegalMove,
   type Move,
   type MoveCtx,
+  type FxEmitter,
   type PhaseState,
+  type Rng,
   type SeatId,
   recycleSpentPile,
 } from '@parlour/engine';
@@ -478,6 +480,119 @@ export interface BlitzDefOptions {
 }
 
 /**
+ * Veil, inherited: three cards a seat, then one card the room turns face up in
+ * public to start the discard. When the knock window closes, every hand still
+ * face down owes the table its cards — that is the showdown reveal, and each
+ * seat's client answers it through `selfOpens`.
+ *
+ * `roundOf` is how the pack finds the live round inside whatever session state
+ * it was handed. A single-round def is its own round; a match def keeps it one
+ * level down, and the room polls the session state without knowing which it
+ * holds. `redealMove` names the move that deals the next round, which is the
+ * room's cue to run a second shuffle ceremony — a veiled deal is one ceremony
+ * over one deck, so a match spanning several rounds needs one per round.
+ */
+export function blitzVeil(
+  roundOf: (state: unknown) => BlitzState,
+  options: { redealMove?: string } = {},
+) {
+  return veilSupport({
+    deck: DECK,
+    handSize: HAND_SIZE,
+    publicSetup: 'one',
+    ...(options.redealMove ? { redealMove: options.redealMove } : {}),
+    selfOpens: (state, seat) => {
+      const round = roundOf(state);
+      if (!round?.veiled || round.outcome) return null;
+      if (round.knocker === null || round.postKnockTurns !== 0) return null;
+      if (isSittingOut(round, seat)) return null;
+      const handles = (round.hands[seat] ?? []).filter(isVeilHandle);
+      return handles.length > 0 ? { move: 'showdown.open', handles } : null;
+    },
+  });
+}
+
+/** Everything a deal needs, whether it is the first of a session or the tenth. */
+export interface BlitzDealCtx {
+  config: BlitzConfig;
+  seats: number;
+  rng: Rng;
+  fx: FxEmitter;
+  veiled?: boolean;
+  deckOrder?: readonly CardId[];
+}
+
+/**
+ * Deals one Blitz round.
+ *
+ * Lifted out of `setup` so a match can deal its second round the same way it
+ * dealt its first — see `matchGame.ts`, which is the shape a friend room plays
+ * because a room is one replicated session rather than a series of them.
+ *
+ * `out` is the seats already knocked out of the match. They are dealt nothing
+ * and never act, but the cursor still steps past their three cards: under Veil
+ * the room opens the starting discard at a fixed deck index (`seats × 3`, from
+ * `publicSetupFrom`), decided by a shuffle ceremony that runs before anybody
+ * has been eliminated. Compressing the deal would move the flip off that index
+ * and the round would start on a handle nobody can read.
+ */
+export function dealBlitzRound(ctx: BlitzDealCtx, out: readonly SeatId[]): BlitzState {
+  const { config, seats, fx } = ctx;
+  const ids = dealOrder(ctx, DECK);
+  const hands: CardId[][] = [];
+  let cursor = 0;
+  for (let seat = 0; seat < seats; seat++) {
+    const hand = ids.slice(cursor, cursor + HAND_SIZE);
+    cursor += HAND_SIZE;
+    hands.push(out.includes(seat) ? [] : hand);
+  }
+  let dealIndex = 0;
+  for (let cardIndex = 0; cardIndex < HAND_SIZE; cardIndex++) {
+    for (let seat = 0; seat < seats; seat++) {
+      const card = hands[seat]?.[cardIndex];
+      if (!card) continue;
+      fx.emit(
+        Fx.DealCard,
+        { card, from: 'stock', to: `hand:${seat}`, dur: 220 },
+        dealIndex * DEAL_STAGGER_MS,
+      );
+      dealIndex += 1;
+    }
+  }
+  const flipped = ids[cursor] as CardId;
+  fx.emit(
+    Fx.FlipCard,
+    { card: flipped, from: 'stock', to: 'discard', dur: 180 },
+    dealIndex * DEAL_STAGGER_MS,
+  );
+
+  const turn = (Array.from({ length: seats }, (_, seat) => seat).find(
+    (seat) => !out.includes(seat),
+  ) ?? 0) as SeatId;
+  const state: BlitzState = {
+    rules: config,
+    seats,
+    hands,
+    stock: ids.slice(cursor + 1),
+    discard: [flipped],
+    turn,
+    knocker: null,
+    postKnockTurns: 0,
+    drawnFromDiscard: null,
+    pickups: [],
+    outcome: null,
+    out,
+    veiled: ctx.veiled === true,
+  };
+
+  // a blitz dealt on the deal ends the round before any turn (spec §5.1)
+  const dealt = blitzSeat(state);
+  if (dealt !== null) fx.emit(Fx.Blitz, { seat: dealt, handValue: 31 });
+
+  return state;
+}
+
+/**
  * The headless Blitz round engine. A match format layer (lives / fast /
  * timed — spec §5.3) composes separate sessions of this def.
  */
@@ -491,80 +606,10 @@ export function createBlitzDef(options: BlitzDefOptions = {}): GameDef<BlitzStat
     // in public to start the discard. When the knock window closes, every hand
     // still face down owes the table its cards — that is the showdown reveal,
     // and each seat's client answers it through `selfOpens`.
-    veil: veilSupport({
-      deck: DECK,
-      handSize: HAND_SIZE,
-      publicSetup: 'one',
-      selfOpens: (state, seat) => {
-        const round = state as BlitzState;
-        if (!round.veiled || round.outcome) return null;
-        if (round.knocker === null || round.postKnockTurns !== 0) return null;
-        if (isSittingOut(round, seat)) return null;
-        const handles = (round.hands[seat] ?? []).filter(isVeilHandle);
-        return handles.length > 0 ? { move: 'showdown.open', handles } : null;
-      },
-    }),
+    veil: blitzVeil((state) => state as BlitzState),
 
     setup(ctx) {
-      const { config, seats, fx } = ctx;
-      const out = outSeatsFromMask(config.outMask, seats);
-      const ids = dealOrder(ctx, DECK);
-      const hands: CardId[][] = [];
-      let cursor = 0;
-      for (let seat = 0; seat < seats; seat++) {
-        if (out.includes(seat)) {
-          hands.push([]);
-          continue;
-        }
-        const hand = ids.slice(cursor, cursor + HAND_SIZE);
-        cursor += HAND_SIZE;
-        hands.push(hand);
-      }
-      let dealIndex = 0;
-      for (let cardIndex = 0; cardIndex < HAND_SIZE; cardIndex++) {
-        for (let seat = 0; seat < seats; seat++) {
-          const card = hands[seat]?.[cardIndex];
-          if (!card) continue;
-          fx.emit(
-            Fx.DealCard,
-            { card, from: 'stock', to: `hand:${seat}`, dur: 220 },
-            dealIndex * DEAL_STAGGER_MS,
-          );
-          dealIndex += 1;
-        }
-      }
-      const flipped = ids[cursor] as CardId;
-      fx.emit(
-        Fx.FlipCard,
-        { card: flipped, from: 'stock', to: 'discard', dur: 180 },
-        dealIndex * DEAL_STAGGER_MS,
-      );
-
-      const turn = out.includes(0)
-        ? (Array.from({ length: seats }, (_, seat) => seat).find((seat) => !out.includes(seat)) ??
-          0)
-        : 0;
-      const state: BlitzState = {
-        rules: config,
-        seats,
-        hands,
-        stock: ids.slice(cursor + 1),
-        discard: [flipped],
-        turn,
-        knocker: null,
-        postKnockTurns: 0,
-        drawnFromDiscard: null,
-        pickups: [],
-        outcome: null,
-        out,
-        veiled: ctx.veiled === true,
-      };
-
-      // a blitz dealt on the deal ends the round before any turn (spec §5.1)
-      const dealt = blitzSeat(state);
-      if (dealt !== null) fx.emit(Fx.Blitz, { seat: dealt, handValue: 31 });
-
-      return state;
+      return dealBlitzRound(ctx, outSeatsFromMask(ctx.config.outMask, ctx.seats));
     },
 
     moves: {

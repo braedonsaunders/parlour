@@ -153,6 +153,27 @@ export function MatchPodium({
                 </>
               ) : (
                 <>
+                  {/*
+                   * The score first, because it is the one figure that says who
+                   * won and by how much. A Blitz room used to reach here with a
+                   * single round's hand values in `detail` — no lives, no round
+                   * wins — so every plaque showed two zeroes and nothing about
+                   * the match, which is what "you can't tell what happened"
+                   * looks like. Whichever number the format is played for is
+                   * on the plaque now, and the others stay below it.
+                   */}
+                  {entry.livesLeft !== null && (
+                    <div>
+                      <dt>Lives</dt>
+                      <dd>{entry.livesLeft}</dd>
+                    </div>
+                  )}
+                  {entry.roundWins !== null && (
+                    <div>
+                      <dt>Rounds won</dt>
+                      <dd>{entry.roundWins}</dd>
+                    </div>
+                  )}
                   <div>
                     <dt>Blitzes</dt>
                     <dd>{entry.blitzes}</dd>
@@ -161,12 +182,6 @@ export function MatchPodium({
                     <dt>Knock wins</dt>
                     <dd>{entry.knockWins}</dd>
                   </div>
-                  {entry.livesLeft !== null && (
-                    <div>
-                      <dt>Lives</dt>
-                      <dd>{entry.livesLeft}</dd>
-                    </div>
-                  )}
                 </>
               )}
             </dl>

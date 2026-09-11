@@ -64,24 +64,30 @@ const wildCockpit: Cockpit = {
   },
 };
 
+/** The live round inside a Blitz room's match state. */
+function blitzRound(session: { state: unknown }): { hands?: readonly string[][] } {
+  return (session.state as { round?: { hands?: readonly string[][] } }).round ?? {};
+}
+
 const blitzCockpit: Cockpit = {
-  // TableScreen's blitz surface: draw either way, discard, knock, and the
-  // veiled-table "Blitz!" claim. `showdown.open` is deliberately absent — the
-  // room answers that one itself, and if that automation ever breaks, the
-  // harness reports the stall a real table would show.
-  expressible: new Set(['draw.stock', 'draw.discard', 'discard', 'knock', 'blitz.claim']),
+  // TableScreen's blitz surface: draw either way, discard, knock, the
+  // veiled-table blitz claim, and readying up in the window between rounds —
+  // a Blitz room plays a whole match of them, so a screen that could not say
+  // "go" would stall at the first round end exactly as a player would.
+  // `showdown.open` is deliberately absent — the room answers that one itself,
+  // and if that automation ever breaks, the harness reports the stall a real
+  // table would show.
+  expressible: new Set(['draw.stock', 'draw.discard', 'discard', 'knock', 'blitz.claim', 'ready']),
   offers(session, localSeat, move) {
     if (move.id !== 'blitz.claim') return true;
-    // The screen only shows "Blitz!" over a readable, genuine 31.
-    const hands = (session.state as { hands?: readonly string[][] }).hands;
-    const mine = hands?.[localSeat] ?? [];
+    // The screen claims for you over a readable, genuine 31, and only then.
+    const mine = blitzRound(session).hands?.[localSeat] ?? [];
     return mine.length === 3 && mine.every((card) => !isVeilHandle(card)) && isBlitz(mine);
   },
   dispatch(peer, session, localSeat, move) {
     if (move.id === 'blitz.claim') {
       // The claim proves itself by opening the whole hand — same as the screen.
-      const hands = (session.state as { hands?: readonly string[][] }).hands;
-      peer.send('blitz.claim', undefined, hands?.[localSeat] ?? []);
+      peer.send('blitz.claim', undefined, blitzRound(session).hands?.[localSeat] ?? []);
       return;
     }
     peer.send(move.id, move.payload);

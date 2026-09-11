@@ -6,7 +6,7 @@ import {
   makeRng,
   stateHash,
 } from '@parlour/engine';
-import { type BlitzConfig, type BlitzState } from '@parlour/game-blitz';
+import { type BlitzConfig, type BlitzMatchState } from '@parlour/game-blitz';
 import {
   cribbageConfigSchema,
   type CribbageConfig,
@@ -769,11 +769,11 @@ describe('multiplayer route composition', () => {
       () => {
         expect(host.getSnapshot().stage).toBe('table');
         expect(guest.getSnapshot().stage).toBe('table');
-        const hostState = multiplayerSession<BlitzState, BlitzConfig>(
+        const hostState = multiplayerSession<BlitzMatchState, BlitzConfig>(
           host.getSnapshot(),
           'blitz',
         )!.state;
-        const guestState = multiplayerSession<BlitzState, BlitzConfig>(
+        const guestState = multiplayerSession<BlitzMatchState, BlitzConfig>(
           guest.getSnapshot(),
           'blitz',
         )!.state;
@@ -781,8 +781,8 @@ describe('multiplayer route composition', () => {
         // handles on both sides — a seat resolves only its own hand, and only
         // for itself. The property this test was always about survives that
         // and is strengthened by it: the two peers still agree byte for byte.
-        expect(hostState.hands.flat().every(isVeilHandle)).toBe(true);
-        expect(guestState.hands.flat().every(isVeilHandle)).toBe(true);
+        expect(hostState.round.hands.flat().every(isVeilHandle)).toBe(true);
+        expect(guestState.round.hands.flat().every(isVeilHandle)).toBe(true);
         expect(stateHash(guestState)).toBe(stateHash(hostState));
       },
       1_000,
@@ -1642,10 +1642,10 @@ describe('multiplayer route composition', () => {
     host.send('draw.stock');
     await eventually(() =>
       expect(
-        multiplayerSession<BlitzState, BlitzConfig>(host.getSnapshot(), 'blitz')?.log,
+        multiplayerSession<BlitzMatchState, BlitzConfig>(host.getSnapshot(), 'blitz')?.log,
       ).toHaveLength(1),
     );
-    const drawn = multiplayerSession<BlitzState, BlitzConfig>(host.getSnapshot(), 'blitz')!;
+    const drawn = multiplayerSession<BlitzMatchState, BlitzConfig>(host.getSnapshot(), 'blitz')!;
     const discard = drawn.def.flow
       .legalMoves(drawn.state, drawn.phase)
       .find((move) => move.id === 'discard');
@@ -1653,11 +1653,13 @@ describe('multiplayer route composition', () => {
     host.send(discard!.id, discard!.payload);
     await eventually(() =>
       expect(
-        multiplayerSession<BlitzState, BlitzConfig>(host.getSnapshot(), 'blitz')?.phase.actor,
+        multiplayerSession<BlitzMatchState, BlitzConfig>(host.getSnapshot(), 'blitz')?.phase.actor,
       ).toBe(1),
     );
-    const beforeDrop = multiplayerSession<BlitzState, BlitzConfig>(host.getSnapshot(), 'blitz')!.log
-      .length;
+    const beforeDrop = multiplayerSession<BlitzMatchState, BlitzConfig>(
+      host.getSnapshot(),
+      'blitz',
+    )!.log.length;
 
     guest.close();
     await eventually(
@@ -1671,7 +1673,7 @@ describe('multiplayer route composition', () => {
         // timing, so it is not asserted here.
         expect(host.getSnapshot().security.paused).toBeNull();
         expect(
-          multiplayerSession<BlitzState, BlitzConfig>(host.getSnapshot(), 'blitz')!.log.length,
+          multiplayerSession<BlitzMatchState, BlitzConfig>(host.getSnapshot(), 'blitz')!.log.length,
         ).toBeGreaterThanOrEqual(beforeDrop);
       },
       1_500,
@@ -2275,7 +2277,10 @@ describe('veiled rooms on the shared stack', () => {
   async function awaitOwnFaces(peer: MultiplayerRoomSession): Promise<void> {
     await eventually(
       () => {
-        const session = multiplayerSession<BlitzState, BlitzConfig>(peer.getSnapshot(), 'blitz');
+        const session = multiplayerSession<BlitzMatchState, BlitzConfig>(
+          peer.getSnapshot(),
+          'blitz',
+        );
         const state =
           session?.state ??
           multiplayerSession<GinMatchState, GinConfig>(peer.getSnapshot(), 'gin')?.state;
@@ -2283,7 +2288,7 @@ describe('veiled rooms on the shared stack', () => {
           state && 'hand' in state
             ? state.hand.hands[peer.getSnapshot().localSeat ?? 0]
             : undefined;
-        const own = hand ?? session?.state.hands[peer.getSnapshot().localSeat ?? 0];
+        const own = hand ?? session?.state.round.hands[peer.getSnapshot().localSeat ?? 0];
         expect(own?.every((card) => !isVeilHandle(card))).toBe(true);
       },
       800,
@@ -2294,7 +2299,7 @@ describe('veiled rooms on the shared stack', () => {
   /** Sends one legal move for whichever seat this peer owns, if it is their turn. */
   function playLegalPly(peer: MultiplayerRoomSession): boolean {
     const snapshot = peer.getSnapshot();
-    const session = multiplayerSession<BlitzState, BlitzConfig>(snapshot, 'blitz');
+    const session = multiplayerSession<BlitzMatchState, BlitzConfig>(snapshot, 'blitz');
     if (!session || snapshot.localSeat === null) return false;
     if (session.phase.actor !== snapshot.localSeat || session.status !== 'playing') return false;
     const move = session.def.flow.legalMovesFor
@@ -2353,9 +2358,12 @@ describe('veiled rooms on the shared stack', () => {
     await eventually(
       () => {
         for (const peer of [host, guest]) {
-          const session = multiplayerSession<BlitzState, BlitzConfig>(peer.getSnapshot(), 'blitz')!;
+          const session = multiplayerSession<BlitzMatchState, BlitzConfig>(
+            peer.getSnapshot(),
+            'blitz',
+          )!;
           const ownSeat = peer.getSnapshot().localSeat!;
-          session.state.hands.forEach((hand, seat) => {
+          session.state.round.hands.forEach((hand, seat) => {
             expect(hand.every(isVeilHandle)).toBe(seat !== ownSeat);
           });
         }
@@ -2370,8 +2378,10 @@ describe('veiled rooms on the shared stack', () => {
       expect(security.ceremony).toMatchObject({ laid: 2, seats: 2, ready: true });
     }
     expect(
-      multiplayerSession<BlitzState, BlitzConfig>(host.getSnapshot(), 'blitz')!.log.length,
-    ).toBe(multiplayerSession<BlitzState, BlitzConfig>(guest.getSnapshot(), 'blitz')!.log.length);
+      multiplayerSession<BlitzMatchState, BlitzConfig>(host.getSnapshot(), 'blitz')!.log.length,
+    ).toBe(
+      multiplayerSession<BlitzMatchState, BlitzConfig>(guest.getSnapshot(), 'blitz')!.log.length,
+    );
   }, 30_000);
 
   it('keeps both logs hash-identical while veiled moves open their own handles', async () => {
@@ -2393,8 +2403,11 @@ describe('veiled rooms on the shared stack', () => {
     }
     await eventually(
       () => {
-        const left = multiplayerSession<BlitzState, BlitzConfig>(host.getSnapshot(), 'blitz')!;
-        const right = multiplayerSession<BlitzState, BlitzConfig>(guest.getSnapshot(), 'blitz')!;
+        const left = multiplayerSession<BlitzMatchState, BlitzConfig>(host.getSnapshot(), 'blitz')!;
+        const right = multiplayerSession<BlitzMatchState, BlitzConfig>(
+          guest.getSnapshot(),
+          'blitz',
+        )!;
         expect(left.log.length).toBe(right.log.length);
         expect(left.lastAppliedHash).toBe(right.lastAppliedHash);
         expect(left.log.length).toBeGreaterThan(0);
@@ -2547,7 +2560,10 @@ describe('veiled rooms on the shared stack', () => {
     guest.close();
     await eventually(
       () => {
-        const session = multiplayerSession<BlitzState, BlitzConfig>(host.getSnapshot(), 'blitz')!;
+        const session = multiplayerSession<BlitzMatchState, BlitzConfig>(
+          host.getSnapshot(),
+          'blitz',
+        )!;
         expect(session.result?.reason).toBe('opponent-left');
         expect(session.result?.winner).toBe(0);
         expect(host.getSnapshot().security.paused).toBeNull();
@@ -2587,13 +2603,16 @@ describe('veiled rooms on the shared stack', () => {
     const third = sessions.find(
       (session) => session.getSnapshot().localSeat === 2,
     ) as MultiplayerRoomSession;
-    const hidden = multiplayerSession<BlitzState, BlitzConfig>(third.getSnapshot(), 'blitz')!;
-    expect(hidden.state.hands[1]!.every(isVeilHandle)).toBe(true);
+    const hidden = multiplayerSession<BlitzMatchState, BlitzConfig>(third.getSnapshot(), 'blitz')!;
+    expect(hidden.state.round.hands[1]!.every(isVeilHandle)).toBe(true);
 
     await eventually(
       () => {
-        const left = multiplayerSession<BlitzState, BlitzConfig>(host.getSnapshot(), 'blitz')!;
-        const right = multiplayerSession<BlitzState, BlitzConfig>(third.getSnapshot(), 'blitz')!;
+        const left = multiplayerSession<BlitzMatchState, BlitzConfig>(host.getSnapshot(), 'blitz')!;
+        const right = multiplayerSession<BlitzMatchState, BlitzConfig>(
+          third.getSnapshot(),
+          'blitz',
+        )!;
         expect(left.log.length).toBe(right.log.length);
         expect(left.lastAppliedHash).toBe(right.lastAppliedHash);
       },
@@ -2648,7 +2667,10 @@ describe('veiled rooms on the shared stack', () => {
     host.resumeWithoutSeat(1);
     await eventually(
       () => {
-        const session = multiplayerSession<BlitzState, BlitzConfig>(host.getSnapshot(), 'blitz')!;
+        const session = multiplayerSession<BlitzMatchState, BlitzConfig>(
+          host.getSnapshot(),
+          'blitz',
+        )!;
         expect(session.result?.reason).toBe('opponent-left');
         expect(session.result?.winner).toBe(0);
         const security = host.getSnapshot().security;

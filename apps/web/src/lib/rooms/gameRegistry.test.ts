@@ -130,8 +130,10 @@ describe('room game registry', () => {
 
   it('reports recyclable stock only for the games that re-veil a discard', () => {
     const spent = { stock: [], discard: ['S1', 'S2', 'S3'] };
-    expect(ROOM_GAMES.blitz.recyclableStock(spent, 'draw.stock')).toEqual(['S2', 'S3']);
-    expect(ROOM_GAMES.blitz.recyclableStock(spent, 'knock')).toBeNull();
+    // Blitz rooms run the whole match as one session, so its pile lives inside
+    // the live round rather than at the top of the state.
+    expect(ROOM_GAMES.blitz.recyclableStock({ round: spent }, 'draw.stock')).toEqual(['S2', 'S3']);
+    expect(ROOM_GAMES.blitz.recyclableStock({ round: spent }, 'knock')).toBeNull();
     expect(ROOM_GAMES.wildpile.recyclableStock(spent, 'draw')).toEqual(['S2', 'S3']);
     expect(ROOM_GAMES.hearts.recyclableStock(spent, 'playCard')).toBeNull();
     expect(ROOM_GAMES.spades.recyclableStock(spent, 'playCard')).toBeNull();
@@ -140,11 +142,13 @@ describe('room game registry', () => {
   it('does not recycle a stock with cards left, or one already hidden', () => {
     const blitz = ROOM_GAMES.blitz;
     expect(
-      blitz.recyclableStock({ stock: ['S4'], discard: ['S1', 'S2'] }, 'draw.stock'),
+      blitz.recyclableStock({ round: { stock: ['S4'], discard: ['S1', 'S2'] } }, 'draw.stock'),
     ).toBeNull();
-    expect(blitz.recyclableStock({ stock: [], discard: ['S1'] }, 'draw.stock')).toBeNull();
     expect(
-      blitz.recyclableStock({ stock: [], discard: ['S1', 'v#7', 'v#8'] }, 'draw.stock'),
+      blitz.recyclableStock({ round: { stock: [], discard: ['S1'] } }, 'draw.stock'),
+    ).toBeNull();
+    expect(
+      blitz.recyclableStock({ round: { stock: [], discard: ['S1', 'v#7', 'v#8'] } }, 'draw.stock'),
     ).toBeNull();
   });
 });

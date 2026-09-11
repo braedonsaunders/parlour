@@ -9,7 +9,10 @@ export {
   suitOf,
   suitSums,
 } from './hand';
-export { blitzSeat, createBlitzDef, HAND_SIZE } from './rules';
+export { blitzSeat, blitzVeil, createBlitzDef, dealBlitzRound, HAND_SIZE } from './rules';
+export type { BlitzDealCtx } from './rules';
+export { createBlitzMatchDef, matchEndResult as blitzMatchEndResult } from './matchGame';
+export type { BlitzMatchDefOptions } from './matchGame';
 export { blitzHowToPlay } from './howto';
 export { blitzCatalog } from './catalog';
 export {
@@ -27,7 +30,15 @@ export type {
   BlitzWinsMatchState,
 } from './match';
 export { matchResultOf, scoreRound } from './score';
-export type { Pickup, RoundOutcome, RoundReason, BlitzState } from './state';
+export type {
+  BlitzMatchFormat,
+  BlitzMatchState,
+  BlitzSeatMetrics,
+  BlitzState,
+  Pickup,
+  RoundOutcome,
+  RoundReason,
+} from './state';
 export { blitzConfigSchema, outMaskFromLives, outSeatsFromMask } from './config';
 export type { BlitzConfig } from './config';
 export { isSittingOut, liveSeats, sittingOut } from './state';

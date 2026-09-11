@@ -31,9 +31,9 @@ import {
 } from '@parlour/engine';
 import {
   blitzConfigSchema,
-  createBlitzDef,
+  createBlitzMatchDef,
   type BlitzConfig,
-  type BlitzState,
+  type BlitzMatchState,
 } from '@parlour/game-blitz';
 import {
   cribbageConfigSchema,
@@ -118,7 +118,7 @@ export type { SeatRange } from './seatRange';
 
 /** Every session shape a room can hold — derived from the packs, not restated. */
 export type MultiplayerGameSession =
-  | GameSession<BlitzState, BlitzConfig>
+  | GameSession<BlitzMatchState, BlitzConfig>
   | GameSession<CribbageState, CribbageConfig>
   | GameSession<WildpileState, WildpileRules>
   | GameSession<RatscrewState, RatscrewConfig>
@@ -371,13 +371,19 @@ function definePack<S, C extends RuleValues>(spec: PackSpec<S, C>): RoomGamePack
 // ---------------------------------------------------------------------------
 
 export const ROOM_GAMES: Record<MultiplayerGameId, RoomGamePack> = {
-  blitz: definePack<BlitzState, BlitzConfig>({
+  blitz: definePack<BlitzMatchState, BlitzConfig>({
     id: 'blitz',
     name: 'Blitz',
     configSchema: blitzConfigSchema,
-    createDef: createBlitzDef,
-    recyclableStock: (state, move) => (move === 'draw.stock' ? spentDiscard(state) : null),
-    spentStock: spentDiscard,
+    // The match, not one round. Blitz is three lives each played out round
+    // after round, and a room is a single replicated session — so a room on the
+    // round def played one deal and stopped, with nobody's lives ever moving.
+    createDef: createBlitzMatchDef,
+    // Like Gin, this pack's cards live one level down, so everything that
+    // reaches into the table has to say where the live round is.
+    privateHandles: (state, seat) => state.round.hands[seat] ?? [],
+    recyclableStock: (state, move) => (move === 'draw.stock' ? spentDiscard(state.round) : null),
+    spentStock: (state) => spentDiscard(state.round),
   }),
 
   cribbage: definePack<CribbageState, CribbageConfig>({

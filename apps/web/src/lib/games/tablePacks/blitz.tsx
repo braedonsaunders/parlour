@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import {
   Fx,
   isActingSeat,
@@ -9,11 +9,17 @@ import {
   type MatchResult,
   type PhaseState,
 } from '@parlour/engine';
-import { isBlitz, type BlitzConfig, type BlitzState } from '@parlour/game-blitz';
+import {
+  isBlitz,
+  type BlitzConfig,
+  type BlitzMatchState,
+  type BlitzState,
+} from '@parlour/game-blitz';
 import { RoundEndOverlay } from '@/components/celebration/RoundEndOverlay';
 import { TableScreen, type TableView } from '@/components/table/TableScreen';
 import {
   defineTablePack,
+  type RoomTableContext,
   type SoloDriver,
   type SoloTableContext,
 } from '@/components/table/GameTablePage';
@@ -25,6 +31,7 @@ import { useSetupStore } from '@/stores/setup';
 import { useSoloTable } from '@/lib/table/useSoloTable';
 
 type BlitzSoloContext = SoloTableContext<LocalTransport, SoloSnapshot, LocalDispatch>;
+type BlitzRoomContext = RoomTableContext<BlitzMatchState, BlitzConfig>;
 
 /**
  * Accumulates a whole round's fx for the round-end overlay.
@@ -128,7 +135,8 @@ function soloTableView(snapshot: SoloSnapshot, transport: LocalTransport): Table
 }
 
 function roomTableView(
-  session: { state: BlitzState; status: string; phase: { actor: number | null } },
+  match: BlitzMatchState,
+  activeSeat: number | null,
   seats: readonly {
     seat: number;
     name: string;
@@ -137,8 +145,8 @@ function roomTableView(
   }[],
   localSeat: number,
   legal: readonly { id: string; payload?: unknown }[],
-  code: string,
 ): TableView {
+  const round = match.round;
   const moveIds = new Set(legal.map((move) => move.id));
   const discardCards = legal.flatMap((move) =>
     move.id === 'discard' &&
@@ -146,32 +154,75 @@ function roomTableView(
       ? [(move.payload as { card: string }).card]
       : [],
   );
+  const scores = match.format === 'lives' ? match.lives : match.wins;
   return {
-    players: seats.map((player) => ({
-      seat: player.seat,
-      name: player.name,
-      avatarId: player.avatarId,
-      hand: player.seat === localSeat ? (session.state.hands[player.seat] ?? []) : [],
-      handCount: session.state.hands[player.seat]?.length ?? 0,
-      lives: 3,
-      isLocal: player.seat === localSeat,
-      isBot: player.bot,
-    })),
-    activeSeat: session.phase.actor,
-    stockCount: session.state.stock.length,
-    discard: session.state.discard,
-    phaseLabel: `friend room ${code}`,
+    players: seats.map((player) => {
+      const eliminated = match.format === 'lives' && (match.lives[player.seat] ?? 0) <= 0;
+      return {
+        seat: player.seat,
+        name: player.name,
+        avatarId: player.avatarId,
+        hand: player.seat === localSeat ? (round.hands[player.seat] ?? []) : [],
+        handCount: round.hands[player.seat]?.length ?? 0,
+        // The room used to hardcode three here, so every seat showed a full
+        // rack for the whole match however many rounds they had lost.
+        lives: scores[player.seat] ?? 0,
+        isLocal: player.seat === localSeat,
+        isBot: player.bot,
+        eliminated,
+      };
+    }),
+    activeSeat,
+    stockCount: round.stock.length,
+    discard: round.discard,
+    phaseLabel: `round ${match.roundIndex + 1} · ${match.format === 'lives' ? 'lives' : 'wins'}`,
     legal: {
       drawStock: moveIds.has('draw.stock'),
       drawDiscard: moveIds.has('draw.discard'),
       discardCards,
       knock: moveIds.has('knock'),
-      // Only offered when this hand really is 31: a false claim is refused
-      // without entering the log, so the button would be a tap that does
-      // nothing. The engine's own count-based legality still gates the move.
-      claim: moveIds.has('blitz.claim') && claimableHand(session.state, localSeat),
+      // No claim button: a 31 announces itself (see `useBlitzRoomClaim`).
     },
   };
+}
+
+/**
+ * Declares a blitz for you, the moment you are holding one.
+ *
+ * In an open room the flow spots a 31 the instant it exists, because it can
+ * read every hand. Under Veil only the owner's own client can — so the rules
+ * carry a `blitz.claim` move, and the room turned that into a "Blitz!" button
+ * the player had to notice and press. That is not a decision: the claim opens
+ * your hand and settles the round in your favour, there is never a reason to
+ * decline it, and a seat that missed the button played on holding a winning
+ * hand. Reading your own cards is the client's job, so the client does it.
+ *
+ * Guarded by the log position rather than a boolean: one claim per position,
+ * re-armed by the next thing that happens, so a refused claim (someone else got
+ * there first) is not a seat that can never claim again.
+ */
+function useBlitzRoomClaim(ctx: BlitzRoomContext | null): void {
+  const sent = useRef<number | null>(null);
+  const session = ctx?.session ?? null;
+  const localSeat = ctx?.localSeat ?? null;
+  const dispatch = ctx?.dispatch;
+  const position = session?.log.length ?? -1;
+
+  useEffect(() => {
+    if (!session || localSeat === null || !dispatch) return;
+    if (session.status !== 'playing' || sent.current === position) return;
+    const round = session.state.round;
+    if (!isActingSeat(session.phase, localSeat)) return;
+    const legal = session.def.flow.legalMovesFor?.(session.state, session.phase, localSeat) ?? [];
+    if (!legal.some((move) => move.id === 'blitz.claim')) return;
+    // The engine's own legality is count-based, so it says "you may claim", not
+    // "you are holding 31". Only send when the hand has peeled and really is.
+    if (!claimableHand(round, localSeat)) return;
+    sent.current = position;
+    // A race, not a decision: two seats can be holding 31 at once and the hold
+    // that waits for the cards to land is exactly how you lose that race.
+    ctx.race('blitz.claim', undefined, round.hands[localSeat] ?? []);
+  }, [ctx, dispatch, localSeat, position, session]);
 }
 
 /**
@@ -230,7 +281,7 @@ export const blitzTablePack = defineTablePack<
   SoloSnapshot,
   LocalDispatch,
   LocalTransport,
-  BlitzState,
+  BlitzMatchState,
   BlitzConfig
 >({
   id: 'blitz',
@@ -316,34 +367,67 @@ export const blitzTablePack = defineTablePack<
     };
   },
 
+  useRoomEffects: useBlitzRoomClaim,
+
   renderRoom({ session, snapshot, localSeat, error, dispatch, quit }) {
     const playing = session.status === 'playing';
-    const myTurn = playing && isBlitzTurn(session.phase, localSeat);
+    const match = session.state;
+    // Between rounds the table is not busy waiting on a turn, it is waiting on
+    // everyone to look at the result and say go.
+    const betweenRounds = playing && match.folded;
+    const myTurn = playing && !betweenRounds && isBlitzTurn(session.phase, localSeat);
     // Legality follows the wider question: the claim is deliberately off-turn.
     const legal =
-      playing && isActingSeat(session.phase, localSeat)
+      playing && !betweenRounds && isActingSeat(session.phase, localSeat)
         ? (session.def.flow.legalMovesFor?.(session.state, session.phase, localSeat) ??
           session.def.flow.legalMoves(session.state, session.phase))
         : [];
 
     return (
-      <TableScreen
-        view={roomTableView(session, snapshot.seats, localSeat, legal, snapshot.room?.code ?? '')}
-        fx={snapshot.fx}
-        fxKey={snapshot.fxKey}
-        busy={!myTurn}
-        error={error}
-        onDraw={(source) => dispatch(`draw.${source}`)}
-        onDiscard={(card) => dispatch('discard', { card })}
-        onKnock={() => dispatch('knock')}
-        // A claim proves itself: the move carries the whole hand's openings,
-        // and the table checks the 31 — a bluff is refused without a trace.
-        onClaim={() => dispatch('blitz.claim', undefined, session.state.hands[localSeat] ?? [])}
-        onQuit={quit}
-      />
+      <>
+        <TableScreen
+          view={roomTableView(
+            match,
+            betweenRounds ? null : session.phase.actor,
+            snapshot.seats,
+            localSeat,
+            legal,
+          )}
+          fx={snapshot.fx}
+          fxKey={snapshot.fxKey}
+          busy={!myTurn}
+          error={error}
+          onDraw={(source) => dispatch(`draw.${source}`)}
+          onDiscard={(card) => dispatch('discard', { card })}
+          onKnock={() => dispatch('knock')}
+          onQuit={quit}
+        />
+        {betweenRounds && (
+          <RoundEndOverlay
+            fx={snapshot.fx}
+            seats={snapshot.seats.map(({ seat, name, avatarId }) => ({ seat, name, avatarId }))}
+            livesBySeat={Object.fromEntries(match.lives.map((lives, seat) => [seat, lives]))}
+            // Every seat readies for itself, and the last one deals — so a peer
+            // that is still watching the chips fall is not dealt over.
+            onNextRound={() => {
+              if (!match.readied.includes(localSeat)) dispatch('ready');
+            }}
+          />
+        )}
+      </>
     );
   },
 
+  /*
+   * The MATCH is the thing that ends, not the round.
+   *
+   * This used to report the moment a session's status went to `ended`, which
+   * on the round def was after one deal — so a friend room showed the podium
+   * after a single hand, with that hand's values where the match score belongs
+   * and `mode: 'fast'` hardcoded over whatever was actually being played. The
+   * match def only ends when the format says so, and its result carries every
+   * seat's standing, so both are now simply true.
+   */
   roomReport({ session, snapshot, localSeat }) {
     if (session.status !== 'ended' || !session.result) return null;
     return {
@@ -353,13 +437,14 @@ export const blitzTablePack = defineTablePack<
         session.lastAppliedHash ?? session.log.length,
       ),
       game: 'blitz',
-      mode: 'fast',
+      mode: session.state.format === 'lives' ? 'classic' : 'fast',
       result: session.result,
       localSeat,
-      // Rank, not `winner`: a Blitz round can be tied at the top, and a tie
+      // Rank, not `winner`: a Blitz match can be tied at the top, and a tie
       // leaves `winner` null — which told both seats who had just shared first
       // that they had lost, jingle and all.
       won: wonByRank(session.result, localSeat),
+      stats: session.state.metrics[localSeat] ?? { blitzes: 0, knocks: 0, knockWins: 0 },
       seats: snapshot.seats.map((seat) => ({
         seat: seat.seat,
         name: seat.name,

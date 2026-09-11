@@ -14,6 +14,8 @@ export interface PodiumEntry extends SeatView {
   livesLeft: number | null;
   /** Wild's ranking detail: cards still in hand when the deal ended. */
   cardsLeft: number | null;
+  /** Blitz's non-knockout formats: rounds this seat took. */
+  roundWins: number | null;
   /** Cribbage match games won. */
   gamesWon: number;
   /** Cribbage's final peg total in the last game. */
@@ -38,6 +40,7 @@ export function derivePodium(result: MatchResult, seats: readonly SeatInfo[]): P
     const view: SeatView = toSeatView(info);
     const livesRaw = ranking.detail?.livesLeft;
     const cardsRaw = ranking.detail?.cards;
+    const roundWinsRaw = ranking.detail?.roundWins;
     entries.push({
       ...view,
       rank: ranking.rank,
@@ -46,6 +49,8 @@ export function derivePodium(result: MatchResult, seats: readonly SeatInfo[]): P
       knockWins: detailNumber(ranking.detail, 'knockWins'),
       livesLeft: typeof livesRaw === 'number' && Number.isFinite(livesRaw) ? livesRaw : null,
       cardsLeft: typeof cardsRaw === 'number' && Number.isFinite(cardsRaw) ? cardsRaw : null,
+      roundWins:
+        typeof roundWinsRaw === 'number' && Number.isFinite(roundWinsRaw) ? roundWinsRaw : null,
       gamesWon: detailNumber(ranking.detail, 'wins'),
       pegTotal: detailNumber(ranking.detail, 'total'),
     });
