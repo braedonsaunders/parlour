@@ -225,7 +225,10 @@ function WildTableScreenView(props: WildTableScreenProps) {
           <PickupCounter pickup={pickup} fxKey={props.fxKey} players={view.players} />
           <Announcer calls={calls} fxKey={props.fxKey} />
           {view.decision === 'jump-in' && !localBusy && (
-            <div className={`${wildStyles.jumpBanner} panel-soft`} role="alertdialog">
+            <div
+              className={`${wildStyles.jumpBanner} ${wildStyles.urgentPanel}`}
+              role="alertdialog"
+            >
               <strong>Exact match — jump in?</strong>
               <button
                 type="button"
@@ -878,6 +881,14 @@ const PICKUP_DONE: Record<WildPickup['reason'], string> = {
  * Putting it in the prompt makes the real choice visible, and the button is
  * absent rather than disabled when the hand cannot answer — most hands cannot,
  * and a dead button invites a tap that does nothing.
+ *
+ * This is a decision on a clock, so it is written to be *scanned*, not read.
+ * It used to open with a sentence of rules — how a Draw Four may be played,
+ * what a call costs when it is right and when it is wrong, what stacking does
+ * to the next seat — three clauses and four numbers in body copy, over a
+ * translucent panel, in the few seconds the seat has to answer. Every number in
+ * it was already on a button. What is left is the two outcomes the choice turns
+ * on, as a pair of chips, and the buttons carry the rest.
  */
 function ChallengePrompt({
   challenge,
@@ -893,7 +904,7 @@ function ChallengePrompt({
   const stackCard = challenge.stackCards[0] ?? null;
   return (
     <motion.div
-      className={`${wildStyles.challengePrompt} panel-soft`}
+      className={`${wildStyles.challengePrompt} ${wildStyles.urgentPanel}`}
       role="alertdialog"
       aria-label="Challenge the Draw Four?"
       data-testid="challenge-prompt"
@@ -902,11 +913,14 @@ function ChallengePrompt({
       transition={{ duration: 0.26, ease: [0.34, 1.56, 0.64, 1] }}
     >
       <strong>{challenge.accusedName} played a Draw Four</strong>
-      <small>
-        They can only play it holding nothing in the old colour. Call it and they take{' '}
-        {challenge.amount} — be wrong and you take {challenge.penalty}.
-        {stackCard && ` Stack and the next seat faces ${challenge.stackAmount}.`}
-      </small>
+      <div className={wildStyles.challengeOdds}>
+        <span data-outcome="win">
+          Right <b>+{challenge.amount}</b> them
+        </span>
+        <span data-outcome="lose">
+          Wrong <b>+{challenge.penalty}</b> you
+        </span>
+      </div>
       <div className={wildStyles.challengeActions}>
         {stackCard && (
           <button
@@ -950,7 +964,10 @@ function SwapChooser({
   const targets = view.players.filter((player) => view.legal.swapTargets.includes(player.seat));
   return (
     <div className={wildStyles.chooser} role="dialog" aria-label="Choose a hand to take">
-      <div className={`${wildStyles.chooserPanel} panel-soft`} data-testid="swap-chooser">
+      <div
+        className={`${wildStyles.chooserPanel} ${wildStyles.urgentPanel}`}
+        data-testid="swap-chooser"
+      >
         <strong className="font-display text-lg font-extrabold text-hearth-50">
           Take whose hand?
         </strong>

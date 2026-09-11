@@ -640,8 +640,10 @@ describe('WildTableScreen turn affordances', () => {
 
     const prompt = container.querySelector('[data-testid="challenge-prompt"]');
     expect(prompt?.textContent).toContain('Slate played a Draw Four');
-    expect(prompt?.textContent).toContain('they take 4');
-    expect(prompt?.textContent).toContain('you take 6');
+    // Both stakes still have to be on screen — the prompt is allowed to be
+    // terse, not to hide half of the bet it is asking the seat to take.
+    expect(prompt?.textContent).toContain('Right +4 them');
+    expect(prompt?.textContent).toContain('Wrong +6 you');
 
     act(() =>
       container.querySelector<HTMLButtonElement>('[data-testid="accept-draw-four"]')?.click(),
@@ -685,8 +687,10 @@ describe('WildTableScreen turn affordances', () => {
       ),
     );
 
-    const prompt = container.querySelector('[data-testid="challenge-prompt"]');
-    expect(prompt?.textContent).toContain('next seat faces 8');
+    // What stacking costs the next seat is on the button that does it, rather
+    // than in a sentence above three buttons that already carry their numbers.
+    const stack = container.querySelector('[data-testid="stack-draw-four"]');
+    expect(stack?.textContent).toContain('8');
 
     act(() =>
       container.querySelector<HTMLButtonElement>('[data-testid="stack-draw-four"]')?.click(),

@@ -233,6 +233,30 @@
 
 /* --- decision overlays ---------------------------------------------------- */
 
+/*
+ * The chassis for anything the table is waiting on an answer to.
+ *
+ * These used to wear `panel-soft`, which is a 72–78% wash — right for a HUD
+ * pill that is decoration over felt, wrong for a prompt on a clock. Wild's felt
+ * is an illustrated room: lamplight, bookshelves, a cat. Read a three-number
+ * decision through that and the eye spends its first second separating the
+ * words from the wallpaper, which is most of the time the decision has.
+ *
+ * So these are opaque, and they blur what is behind them rather than letting it
+ * through. The ring is the same warm hearth line the turn affordances use, so
+ * the panel reads as the table asking rather than as an error.
+ */
+.urgentPanel {
+  border: 2px solid rgba(255, 225, 178, 0.72);
+  border-radius: var(--radius-chunky);
+  background: linear-gradient(180deg, rgba(20, 44, 56, 0.985), rgba(9, 22, 30, 0.995));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 243, 220, 0.22),
+    0 0 0 4px rgba(6, 14, 19, 0.55),
+    0 18px 40px rgba(2, 9, 13, 0.72);
+  backdrop-filter: blur(6px);
+}
+
 .chooser {
   position: absolute;
   inset: 0;
@@ -401,7 +425,16 @@
   gap: 0.8rem;
   align-items: center;
   transform: translateX(-50%);
-  padding: 0.55rem 0.9rem;
+  padding: 0.6rem 0.7rem 0.6rem 1rem;
+}
+
+/* A jump-in window is the shortest one Wild has, so its question is set at the
+   size of the answer rather than the size of a caption. */
+.jumpBanner strong {
+  font-family: var(--font-display), sans-serif;
+  font-size: 1.02rem;
+  font-weight: 800;
+  color: #fff3dc;
 }
 
 .cardCount {
@@ -650,15 +683,54 @@
 
 .challengePrompt strong {
   font-family: var(--font-display), sans-serif;
-  font-size: 0.98rem;
+  font-size: 1.15rem;
   font-weight: 800;
+  line-height: 1.15;
   color: #fff3dc;
 }
 
-.challengePrompt small {
-  color: rgba(214, 226, 232, 0.72);
-  font-size: 0.72rem;
-  line-height: 1.4;
+/*
+ * The whole decision, as two chips.
+ *
+ * A call is a bet with two outcomes and the seat only needs to compare their
+ * sizes, so they are set side by side in tabular figures at the same weight —
+ * the comparison is the layout. Green and rose carry which is which without
+ * being read, and the words stay in front of the numbers so the chips are not
+ * two bare integers floating over a felt full of other integers.
+ */
+.challengeOdds {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.4rem;
+}
+
+.challengeOdds span {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.3rem;
+  padding: 0.24rem 0.6rem;
+  border: 1px solid currentcolor;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.challengeOdds span b {
+  font-family: var(--font-display), sans-serif;
+  font-size: 1rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.challengeOdds span[data-outcome='win'] {
+  color: #9de7bd;
+}
+
+.challengeOdds span[data-outcome='lose'] {
+  color: #f4a0ae;
 }
 
 .challengeActions {
@@ -1086,8 +1158,12 @@
   }
 
   .challengePrompt strong,
-  .challengePrompt small {
+  .challengeOdds {
     grid-column: 1;
+  }
+
+  .challengeOdds {
+    justify-content: flex-start;
   }
 
   .challengeActions {
