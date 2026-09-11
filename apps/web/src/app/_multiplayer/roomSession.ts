@@ -193,6 +193,17 @@ export const RECONNECT_GRACE_MS = 12_000;
 const LISTING_DEBOUNCE_MS = 1_000;
 
 /**
+ * How long a self-opening is given to land before this seat says it again.
+ *
+ * Long enough that an ordinary round trip is never doubled up, short enough
+ * that a dropped one is a pause rather than a dead table. The move is
+ * idempotent at the table — a second copy of an opening that already landed is
+ * refused as a move the position no longer wants — so saying it twice is cheap
+ * and saying it once too few is the whole match.
+ */
+const SELF_OPEN_RETRY_MS = 2_000;
+
+/**
  * Opening a room takes no privacy tier by default, because nobody has asked
  * for one yet: {@link tierFor} answers open until the shipped default flips.
  * A caller — today only tests; eventually the create screen — may request
@@ -317,7 +328,23 @@ export class MultiplayerRoomSession {
   private primedDeck: {
     participants: readonly number[];
     deck: Promise<readonly string[]>;
+    /** Its deck epoch, once the ceremony has allocated one. */
+    epoch: number | null;
   } | null = null;
+  /**
+   * Deck epochs a primed run created that have not been dealt from.
+   *
+   * A primed ceremony is an optimisation — next round's shuffle, run while
+   * this one is still being played — so its cards are not on the table and may
+   * never be. Recovery still has to cover every epoch that IS on the table, so
+   * the two have to be told apart: a seat dropping mid-round otherwise made
+   * the room demand that seat's share of a deck nobody had been dealt, fail to
+   * get it, and pause the table with "waiting for more players" while the
+   * round it was actually playing was perfectly recoverable.
+   *
+   * An epoch leaves this set when a deal takes it, and only then.
+   */
+  private readonly primedEpochs = new Set<number>();
   private openPending = false;
   /** One host deal at a time when players leave the podium together. */
   private rematchPending = false;
@@ -331,8 +358,25 @@ export class MultiplayerRoomSession {
   private readonly localDealFaults = new Map<SeatId, string>();
   /** bot turns already scheduled, keyed by log position, so none fires twice */
   private readonly scheduledBotTurns = new Set<string>();
-  /** self-openings already sent, keyed by seat and log position, so none fires twice */
-  private readonly sentSelfOpens = new Set<string>();
+  /**
+   * Self-openings in flight, keyed by the DUTY — seat, move and the exact
+   * handles it covers — against the moment it was last sent.
+   *
+   * This used to be a plain set keyed by log position, which made every
+   * obligation a single shot: the client marked it sent, and if that packet
+   * never landed — dropped in flight, refused while the position moved, sent a
+   * beat before a peer reconnected — nothing ever asked again. The log could
+   * not advance either, because the round was waiting on that very reveal, so
+   * the key stayed fresh forever and the table sat in the showdown with nobody
+   * able to do anything. Reported as a knock that never scored.
+   *
+   * Keyed by the duty and retried while it is still outstanding, a lost packet
+   * costs a beat instead of the match. The duty disappears the moment the
+   * openings land, because the pack stops reporting it.
+   */
+  private readonly sentSelfOpens = new Map<string, number>();
+  /** Retry timer for an outstanding self-opening, so a silent drop still heals. */
+  private selfOpenRetry: ReturnType<typeof setTimeout> | null = null;
   /** the host's proactive re-veil in flight, so a send can await it, not race it */
   private reveilInFlight: Promise<void> | null = null;
   /**
@@ -1285,9 +1329,20 @@ export class MultiplayerRoomSession {
     const participants = this.ceremonySeats();
     if (participants.length === 0) return;
 
-    const deck = this.shuffleNextHand(participants);
-    deck.catch(() => undefined);
-    this.primedDeck = { participants, deck };
+    const primed: {
+      participants: readonly number[];
+      deck: Promise<readonly string[]>;
+      epoch: number | null;
+    } = {
+      participants,
+      epoch: null,
+      deck: this.shuffleNextHand(participants, (epoch) => {
+        primed.epoch = epoch;
+        this.primedEpochs.add(epoch);
+      }),
+    };
+    primed.deck.catch(() => undefined);
+    this.primedDeck = primed;
   }
 
   /** The primed deck when it is still valid for the seats now at the table. */
@@ -1299,17 +1354,28 @@ export class MultiplayerRoomSession {
     const same =
       primed.participants.length === now.length &&
       primed.participants.every((seat, index) => seat === now[index]);
-    return same ? primed.deck : null;
+    if (!same) return null;
+    // Dealt from, so it is on the table now and recovery owes it a share like
+    // any other epoch. A primed run discarded here keeps its exemption for
+    // good, because nobody was ever dealt from it.
+    if (primed.epoch !== null) this.primedEpochs.delete(primed.epoch);
+    return primed.deck;
   }
 
-  private shuffleNextHand(seats?: readonly number[]): Promise<readonly string[]> {
+  private shuffleNextHand(
+    seats?: readonly number[],
+    onEpoch?: (epoch: number) => void,
+  ): Promise<readonly string[]> {
     // Queued with every other mid-round ceremony: a primed next hand
     // cascading while a stock re-veil runs would interleave their transcript
     // entries differently on different peers, and the chain would fork.
-    return this.queueCeremony(() => this.shuffleNextHandNow(seats));
+    return this.queueCeremony(() => this.shuffleNextHandNow(seats, onEpoch));
   }
 
-  private async shuffleNextHandNow(seats?: readonly number[]): Promise<readonly string[]> {
+  private async shuffleNextHandNow(
+    seats?: readonly number[],
+    onEpoch?: (epoch: number) => void,
+  ): Promise<readonly string[]> {
     const veil = this.veil;
     const settings = this.snapshot.settings;
     if (!veil || !settings) throw new Error('this room is not running Veil');
@@ -1317,6 +1383,7 @@ export class MultiplayerRoomSession {
     if (!support) throw new Error(`${settings.gameId} cannot run a veiled room`);
 
     const epoch = this.allocateEpoch();
+    onEpoch?.(epoch);
     const participants = seats ?? this.ceremonySeats();
     if (participants.length === 0) throw new Error('no connected seat can shuffle the next hand');
 
@@ -1725,9 +1792,12 @@ export class MultiplayerRoomSession {
     const veil = this.veil;
     if (!veil || seat === this.snapshot.localSeat) return;
     veil.room.markSeatLost(seat);
-    // Every epoch, not just the opening deal: a recycled stock has its own
-    // layer, and leaving that one sealed would wedge the round just as surely.
-    const epochs = veil.session.liveEpochs();
+    // Every epoch the table is actually playing from — not just the opening
+    // deal, because a recycled stock has its own layer and leaving that one
+    // sealed would wedge the round just as surely. A primed next-round deck is
+    // the exception: nobody has been dealt from it, and demanding this seat's
+    // share of it made a recoverable round look unrecoverable.
+    const epochs = veil.session.liveEpochs().filter((epoch) => !this.primedEpochs.has(epoch));
     const results = await Promise.all(epochs.map((epoch) => veil.room.recoverSeat(seat, epoch)));
     const recovered = results.length > 0 && results.every(Boolean);
     this.update({
@@ -1940,6 +2010,7 @@ export class MultiplayerRoomSession {
    * The host also answers for bot-held seats, whose rebuilt faces it can read.
    */
   private maybeOpenOwnReveals(): void {
+    this.clearSelfOpenRetry();
     if (!this.authority || !this.veil || !this.transport || this.snapshot.security.paused) return;
     const settings = this.snapshot.settings;
     if (!settings) return;
@@ -1958,15 +2029,19 @@ export class MultiplayerRoomSession {
       }
     }
 
+    const now = Date.now();
+    let outstanding = false;
     for (const { seat, asBot } of owed) {
       const pending = pack.selfOpenPending(session.state, seat);
       if (!pending) continue;
+      outstanding = true;
       // The faces must have peeled first; refreshView re-runs this as each
       // opening lands, so a hand still in flight is answered moments later.
       if (!pending.handles.every((handle) => known.has(handle))) continue;
-      const key = `${seat}:${pending.move}:${session.log.length}`;
-      if (this.sentSelfOpens.has(key)) continue;
-      this.sentSelfOpens.add(key);
+      const key = `${seat}:${pending.move}:${[...pending.handles].sort().join(',')}`;
+      const sentAt = this.sentSelfOpens.get(key);
+      if (sentAt !== undefined && now - sentAt < SELF_OPEN_RETRY_MS) continue;
+      this.sentSelfOpens.set(key, now);
       try {
         if (asBot) {
           this.transport.sendAsBot({
@@ -1979,10 +2054,28 @@ export class MultiplayerRoomSession {
           this.send(pending.move, undefined, pending.handles);
         }
       } catch {
-        // Refused means the position moved — a claim landed, the round scored.
-        // The next applied packet re-evaluates whatever duty remains.
+        // Refused means the position moved — a claim landed, the round scored —
+        // or this seat is momentarily unseated. Either way the duty is still
+        // ours to discharge, so give the token back and let the retry ask again
+        // rather than leaving the table waiting on a packet we never sent.
+        this.sentSelfOpens.delete(key);
       }
     }
+
+    // Nothing else will advance the log while the round is waiting on these, so
+    // the retry cannot ride on the next packet — it needs its own beat.
+    if (outstanding) {
+      this.selfOpenRetry = setTimeout(() => {
+        this.selfOpenRetry = null;
+        this.maybeOpenOwnReveals();
+      }, SELF_OPEN_RETRY_MS);
+    }
+  }
+
+  private clearSelfOpenRetry(): void {
+    if (this.selfOpenRetry === null) return;
+    clearTimeout(this.selfOpenRetry);
+    this.selfOpenRetry = null;
   }
 
   /**
@@ -2055,6 +2148,7 @@ export class MultiplayerRoomSession {
 
   close(): void {
     this.fxQueue.clear();
+    this.clearSelfOpenRetry();
     if (this.snapshot.isHost && this.snapshot.stage === 'lobby') {
       this.transport?.announceClosed();
     }
