@@ -35,19 +35,54 @@ const { FakeHowl } = vi.hoisted(() => {
     unloaded = false;
 
     html5: boolean;
+    /**
+     * Ordered record of what the controller did to this voice. The varispeed
+     * fix is entirely about ORDER — the element has to be in tape mode before
+     * it plays and before any rate lands on it — so the log is the assertion.
+     */
+    nodeLog: string[] = [];
+    _sounds: Array<{ _node: Record<string, unknown> }>;
 
     constructor(opts: { src: string[]; format?: string[]; loop?: boolean; html5?: boolean }) {
       this.src = opts.src[0]!;
       this.format = opts.format;
       this.loop = opts.loop ?? false;
       this.html5 = opts.html5 ?? false;
+      // Howler parks a GainNode in this slot for a Web Audio voice and an
+      // <audio> element for an HTML5 one. Only the latter has play().
+      const log = this.nodeLog;
+      this._sounds = [
+        {
+          _node: this.html5
+            ? {
+                paused: true,
+                play: () => {
+                  log.push('node.play');
+                  return Promise.resolve();
+                },
+                set preservesPitch(value: boolean) {
+                  log.push(`preservesPitch=${value}`);
+                },
+                get preservesPitch() {
+                  return false;
+                },
+              }
+            : { gain: {} },
+        },
+      ];
       FakeHowl.instances.push(this);
     }
 
     play(id?: number): number {
+      if (this.html5) this.nodeLog.push('play');
       const soundId = id ?? nextSoundId++;
       this.playingIds.add(soundId);
       return soundId;
+    }
+
+    rate(value: number): this {
+      if (this.html5) this.nodeLog.push(`rate=${value}`);
+      return this;
     }
 
     pause(id?: number): void {
@@ -540,6 +575,55 @@ describe('MusicController', () => {
     controller.keepAlive();
     expect(play).toHaveBeenCalledTimes(1);
     expect(controller.getState()).toMatchObject({ status: 'playing', trackId: 'title-1' });
+  });
+
+  /*
+   * The final-minute lift is a resample, and on an Apple touch device it is a
+   * resample performed by an <audio> element. Those only do it cleanly if they
+   * were put in tape mode before the rate arrived — switch a playing element
+   * from pitch-preserving to varispeed and the renderer rebuilds underneath
+   * the song, which is heard as the music wowing up and down in pitch and
+   * tempo. So the order is the contract, and it is worth pinning.
+   */
+  it('arms varispeed before an element plays and before the lift lands', () => {
+    asAppleTouchDevice();
+    const controller = new MusicController(makeManager());
+    controller.setMenu(true);
+    controller.play();
+    const howl = howlFor('music-title.m4a')!;
+    expect(howl.nodeLog).toEqual(['preservesPitch=false', 'play']);
+
+    controller.setFrantic(1.07);
+    expect(howl.nodeLog).toEqual([
+      'preservesPitch=false',
+      'play',
+      'preservesPitch=false',
+      'rate=1.07',
+    ]);
+  });
+
+  it('starts a song that begins mid-lift already in tape mode', () => {
+    asAppleTouchDevice();
+    const controller = new MusicController(makeManager());
+    controller.play();
+    controller.setFrantic(1.07);
+    const before = FakeHowl.instances.length;
+    controller.next();
+
+    const started = FakeHowl.instances.slice(before).at(-1)!;
+    expect(started.nodeLog).toEqual(['preservesPitch=false', 'play', 'rate=1.07']);
+  });
+
+  it('does not poke the rate onto a Web Audio voice, which has no element', () => {
+    const controller = new MusicController(makeManager());
+    controller.setMenu(true);
+    controller.play();
+    const howl = howlFor('music-title.m4a')!;
+    expect(howl.html5).toBe(false);
+
+    controller.setFrantic(1.07);
+    expect(howl.nodeLog).toEqual([]);
+    expect(controller.getState().rate).toBe(1.07);
   });
 
   it('restarts a silenced voice without changing tracks', () => {

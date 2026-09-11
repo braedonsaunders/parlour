@@ -1,0 +1,562 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>parlour · final minute lab</title>
+    <style>
+      :root {
+        --bg: #12081f;
+        --panel: #1e1030;
+        --panel2: #2a1740;
+        --ink: #ffeeda;
+        --dim: #b99ecf;
+        --amber: #ffb25a;
+        --pink: #f792c8;
+        --teal: #7fe0c3;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        padding: 2rem 1.4rem 4rem;
+        color: var(--ink);
+        font:
+          15px/1.5 -apple-system,
+          'Segoe UI',
+          sans-serif;
+        background:
+          radial-gradient(120% 60% at 50% -10%, #6b2a52 0%, transparent 60%),
+          linear-gradient(180deg, #2a0f3a 0%, var(--bg) 45%);
+        min-height: 100vh;
+      }
+      main {
+        max-width: 880px;
+        margin: 0 auto;
+        display: grid;
+        gap: 1.2rem;
+      }
+      h1 {
+        margin: 0;
+        font-size: 1.5rem;
+      }
+      h1 small {
+        display: block;
+        font-size: 0.8rem;
+        font-weight: 400;
+        color: var(--dim);
+      }
+      section {
+        background: var(--panel);
+        border: 1px solid #3d2358;
+        border-radius: 1rem;
+        padding: 1.1rem 1.2rem;
+      }
+      h2 {
+        margin: 0 0 0.7rem;
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        letter-spacing: 0.18em;
+        color: var(--amber);
+      }
+      .tracks {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+        gap: 0.5rem;
+      }
+      .track {
+        display: flex;
+        gap: 0.55rem;
+        align-items: center;
+        padding: 0.5rem 0.7rem;
+        border: 1px solid #3d2358;
+        border-radius: 0.65rem;
+        background: var(--panel2);
+        color: var(--ink);
+        cursor: pointer;
+        text-align: left;
+        font: inherit;
+        font-size: 0.82rem;
+      }
+      .track:hover {
+        border-color: var(--amber);
+      }
+      .track.playing {
+        border-color: var(--teal);
+        box-shadow: 0 0 14px rgba(127, 224, 195, 0.35);
+      }
+      .track small {
+        display: block;
+        color: var(--dim);
+        font-size: 0.68rem;
+      }
+      .row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 1rem 1.6rem;
+        align-items: center;
+      }
+      label {
+        display: grid;
+        gap: 0.25rem;
+        font-size: 0.78rem;
+        color: var(--dim);
+      }
+      label b {
+        color: var(--ink);
+        font-weight: 600;
+      }
+      input[type='range'] {
+        width: 170px;
+        accent-color: var(--amber);
+      }
+      select,
+      input[type='file'] {
+        background: var(--panel2);
+        color: var(--ink);
+        border: 1px solid #3d2358;
+        border-radius: 0.5rem;
+        padding: 0.35rem 0.5rem;
+        font: inherit;
+        font-size: 0.82rem;
+      }
+      .bigbtn {
+        font: inherit;
+        font-weight: 800;
+        font-size: 1.1rem;
+        letter-spacing: 0.03em;
+        cursor: pointer;
+        padding: 1rem 1.8rem;
+        border-radius: 1rem;
+        border: 2px solid #ffd9a6;
+        color: #331303;
+        background: linear-gradient(180deg, #ffcf7e, #f0812f);
+        box-shadow: 0 10px 26px -10px rgba(240, 129, 47, 0.8);
+      }
+      .bigbtn:disabled {
+        opacity: 0.45;
+        cursor: default;
+      }
+      .ghost {
+        font: inherit;
+        cursor: pointer;
+        padding: 0.5rem 0.95rem;
+        border-radius: 0.7rem;
+        border: 1px solid #3d2358;
+        background: transparent;
+        color: var(--ink);
+      }
+      .seekrow {
+        display: flex;
+        align-items: center;
+        gap: 0.8rem;
+        margin-top: 0.9rem;
+      }
+      #seek {
+        flex: 1;
+        width: auto;
+        accent-color: var(--teal);
+      }
+      #clock {
+        font-variant-numeric: tabular-nums;
+        color: var(--dim);
+        font-size: 0.82rem;
+        min-width: 8.5ch;
+        text-align: right;
+      }
+      #phase {
+        min-height: 1.5em;
+        font-size: 0.95rem;
+        color: var(--teal);
+      }
+      #countdown {
+        font-size: 2.6rem;
+        font-weight: 800;
+        color: var(--pink);
+        min-width: 2ch;
+        font-variant-numeric: tabular-nums;
+        line-height: 1;
+      }
+      .hint {
+        color: var(--dim);
+        font-size: 0.75rem;
+        margin-top: 0.45rem;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>
+        final minute · sound lab
+        <small
+          >pick a song, seek anywhere you like, then run the whole ending with one button</small
+        >
+      </h1>
+
+      <section>
+        <h2>1 · song</h2>
+        <div class="tracks" id="tracks"></div>
+        <div class="hint">Custom track: <input type="file" id="customFile" accept="audio/*" /></div>
+        <div class="seekrow">
+          <button class="ghost" id="playpause">⏯</button>
+          <input type="range" id="seek" min="0" max="1000" value="0" />
+          <span id="clock">0:00 / 0:00</span>
+        </div>
+      </section>
+
+      <section>
+        <h2>2 · run it</h2>
+        <div class="row" style="margin-bottom: 0.8rem">
+          <button class="bigbtn" id="runAll" disabled>▶ Run the whole ending</button>
+          <span id="countdown"></span>
+          <span id="phase"></span>
+        </div>
+        <div class="row">
+          <button class="ghost" id="speedOnly">speed-up only</button>
+          <button class="ghost" id="finishOnly">final 15s only</button>
+          <button class="ghost" id="stopAll">↺ back to normal</button>
+        </div>
+        <div class="hint">
+          The whole ending = Mario-Kart speed-up now → a few frantic seconds → tick-down from 15 →
+          finish sound, music out.
+        </div>
+        <div class="hint" id="iosNote" hidden>
+          On iPhone/iPad the speed-up lands in one step rather than gliding: every write to
+          playbackRate resyncs the audio renderer there, so a glide is heard as wobble. The music
+          duck under the finish is also silent — iOS ignores volume on a media element.
+        </div>
+      </section>
+
+      <section>
+        <h2>3 · tuning</h2>
+        <div class="row">
+          <label
+            ><b>Speed up · <span id="speedVal">7</span>%</b>
+            <input type="range" id="speed" min="3" max="15" step="1" value="7"
+          /></label>
+          <label
+            ><b>Frantic gap · <span id="gapVal">5</span>s</b>
+            <input type="range" id="gap" min="2" max="15" step="1" value="5"
+          /></label>
+          <label
+            ><b>Tick</b>
+            <select id="tickPick">
+              <option value="audio/cues/cue-tick-clock.m4a">clock — mechanical tick ✓</option>
+              <option value="audio/cues/cue-tick-clave.m4a">clave — warm knock</option>
+              <option value="synth">mallet — soft synth blip</option>
+            </select></label
+          >
+          <label
+            ><b>Tick volume · <span id="tickVolVal">110</span>%</b>
+            <input type="range" id="tickVol" min="0" max="150" value="110"
+          /></label>
+          <button class="ghost" id="tickSolo">▶ tick</button>
+        </div>
+        <div class="row" style="margin-top: 0.8rem">
+          <label
+            ><b>Finish</b>
+            <select id="endPick">
+              <option value="audio/cues/cue-end-flutter-drama-a.m4a">
+                drama A — 1.7s hard flurry, decisive snap (new)
+              </option>
+              <option value="audio/cues/cue-end-flutter-drama-b.m4a">
+                drama B — 1.8s whirlwind, final slap (new)
+              </option>
+              <option value="audio/cues/cue-end-flutter-drama-c.m4a">
+                drama C — 1.7s hard riffle, two slow flips (new)
+              </option>
+              <option value="audio/cues/cue-end-flutter-full-a.m4a">
+                flutter full A — dense, slows to a stop
+              </option>
+              <option value="audio/cues/cue-end-flutter-full-b.m4a">
+                flutter full B — big cascade, ramps down
+              </option>
+              <option value="audio/cues/cue-end-flutter.m4a">flutter — original small fan</option>
+              <option value="audio/cues/cue-end-riffle.m4a">
+                riffle — shuffle cascade, deck tap
+              </option>
+              <option value="audio/cues/cue-end-cascade.m4a">
+                cascade — deck flutters onto felt
+              </option>
+              <option value="audio/sfx/stock-shuffle.mp3">
+                in-game shuffle — the sound the game already uses
+              </option>
+              <option value="audio/cues/cue-end-bell.m4a">bell — cozy marimba flourish</option>
+              <option value="audio/cues/cue-end-horn.m4a">horn — rounded blast</option>
+              <option value="audio/cues/cue-end-gong.m4a">gong — soft and final</option>
+            </select></label
+          >
+          <label
+            ><b>Finish volume · <span id="endVolVal">110</span>%</b>
+            <input type="range" id="endVol" min="0" max="200" value="110"
+          /></label>
+          <button class="ghost" id="endSolo">▶ finish</button>
+        </div>
+      </section>
+    </main>
+
+    <script>
+      (() => {
+        const SONGS = [];
+        for (const [scene, icon] of [
+          ['campfire', '🔥'],
+          ['casino', '🎲'],
+          ['snug', '🛋️'],
+          ['beach', '🌴'],
+        ]) {
+          for (let i = 1; i <= 3; i++)
+            SONGS.push({
+              id: `${scene}-${i}`,
+              label: `${icon} ${scene} ${i}`,
+              src: `audio/music/music-${scene}-${i}.m4a`,
+            });
+        }
+
+        const $ = (id) => document.getElementById(id);
+        const music = new Audio();
+        music.loop = true;
+        // Mario Kart style: pitch rides with tempo. Plain resampling, no smearing.
+        music.preservesPitch = false;
+        music.webkitPreservesPitch = false;
+        music.mozPreservesPitch = false;
+        window.__music = music;
+        let current = null;
+        let seeking = false;
+        const timers = new Set();
+        const later = (fn, ms) => {
+          const t = setTimeout(() => {
+            timers.delete(t);
+            fn();
+          }, ms);
+          timers.add(t);
+          return t;
+        };
+        const clearAllTimers = () => {
+          for (const t of timers) clearTimeout(t);
+          timers.clear();
+        };
+
+        const ac = new (window.AudioContext || window.webkitAudioContext)();
+        const buffers = new Map();
+        async function cueBuffer(src) {
+          if (!buffers.has(src)) {
+            const data = await (await fetch(src)).arrayBuffer();
+            buffers.set(src, await ac.decodeAudioData(data));
+          }
+          return buffers.get(src);
+        }
+        async function playFile(src, gainPct) {
+          await ac.resume();
+          const s = ac.createBufferSource();
+          s.buffer = await cueBuffer(src);
+          const g = ac.createGain();
+          g.gain.value = gainPct / 100;
+          s.connect(g).connect(ac.destination);
+          s.start();
+        }
+        /* soft synthesized mallet blip: warm sine with a quick pitch dip, fast decay */
+        function malletTick(gainPct) {
+          const t0 = ac.currentTime;
+          const osc = ac.createOscillator();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(1040, t0);
+          osc.frequency.exponentialRampToValueAtTime(830, t0 + 0.07);
+          const g = ac.createGain();
+          g.gain.setValueAtTime(0.0001, t0);
+          g.gain.exponentialRampToValueAtTime(0.5 * (gainPct / 100), t0 + 0.006);
+          g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.11);
+          osc.connect(g).connect(ac.destination);
+          osc.start(t0);
+          osc.stop(t0 + 0.13);
+        }
+        function playTick() {
+          const pick = $('tickPick').value;
+          const vol = Number($('tickVol').value);
+          if (pick === 'synth') malletTick(vol);
+          else playFile(pick, vol);
+        }
+        const playFinish = () => playFile($('endPick').value, Number($('endVol').value));
+
+        /* --- song grid + transport ---------------------------------------- */
+        const tracksEl = $('tracks');
+        for (const song of SONGS) {
+          const b = document.createElement('button');
+          b.className = 'track';
+          b.innerHTML = `<span>${song.label}<small>${song.src.split('/').pop()}</small></span>`;
+          b.onclick = () => selectSong(song, b);
+          tracksEl.appendChild(b);
+        }
+        $('customFile').onchange = (e) => {
+          const f = e.target.files[0];
+          if (f)
+            selectSong({ id: 'custom', label: `🎧 ${f.name}`, src: URL.createObjectURL(f) }, null);
+        };
+
+        function selectSong(song, btn) {
+          document.querySelectorAll('.track').forEach((t) => t.classList.remove('playing'));
+          if (btn) btn.classList.add('playing');
+          current = song;
+          stopAll(true);
+          music.src = song.src;
+          music.play();
+          $('runAll').disabled = false;
+          setPhase(`playing ${song.label}`);
+        }
+
+        const fmt = (s) =>
+          isFinite(s)
+            ? `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`
+            : '0:00';
+        music.addEventListener('timeupdate', () => {
+          if (!seeking && music.duration)
+            $('seek').value = (music.currentTime / music.duration) * 1000;
+          $('clock').textContent = `${fmt(music.currentTime)} / ${fmt(music.duration)}`;
+        });
+        $('seek').addEventListener('input', () => {
+          seeking = true;
+        });
+        $('seek').addEventListener('change', () => {
+          if (music.duration) music.currentTime = (Number($('seek').value) / 1000) * music.duration;
+          seeking = false;
+        });
+        $('playpause').onclick = () => {
+          if (music.paused) music.play();
+          else music.pause();
+        };
+
+        const setPhase = (t) => {
+          $('phase').textContent = t;
+        };
+        for (const [id, out] of [
+          ['speed', 'speedVal'],
+          ['gap', 'gapVal'],
+          ['tickVol', 'tickVolVal'],
+          ['endVol', 'endVolVal'],
+        ]) {
+          $(id).oninput = () => {
+            $(out).textContent = $(id).value;
+          };
+        }
+
+        /* --- the sequence -------------------------------------------------- */
+        /*
+         * iPhone, iPad, iPod — including desktop-class iPad, which reports MacIntel.
+         * On those, <audio> playback goes through AVFoundation and every write to
+         * playbackRate makes the audio renderer resync against the media clock. A
+         * per-frame glide is ~70 of those in a second and a bit, which is heard as
+         * the song wowing up and down in pitch and tempo instead of lifting. The
+         * shipped game sets the rate once for exactly this reason; so does the lab,
+         * on the devices that need it, so an audition here is honest about what the
+         * phone will do.
+         */
+        const APPLE_TOUCH =
+          /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+          (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+        if (APPLE_TOUCH) $('iosNote').hidden = false;
+
+        let rampRaf = 0;
+        function rampTo(target, ms) {
+          cancelAnimationFrame(rampRaf);
+          // Varispeed has to be armed before the rate moves, never after: iOS reads
+          // preservesPitch when it sets up a rate change, and flipping it mid-
+          // resample rebuilds the renderer underneath the song.
+          music.preservesPitch = false;
+          music.webkitPreservesPitch = false;
+          if (APPLE_TOUCH || ms <= 0) {
+            music.playbackRate = target;
+            return;
+          }
+          const from = music.playbackRate;
+          const start = performance.now();
+          const frame = (now) => {
+            const u = Math.min(1, (now - start) / ms);
+            music.playbackRate = from + (target - from) * (1 - Math.pow(1 - u, 3));
+            if (u < 1) rampRaf = requestAnimationFrame(frame);
+          };
+          rampRaf = requestAnimationFrame(frame);
+        }
+
+        function speedUp() {
+          if (!current) return;
+          if (music.paused) music.play();
+          rampTo(1 + Number($('speed').value) / 100, 1200);
+          setPhase(`⚡ final minute — ${current.label} up ${$('speed').value}%`);
+        }
+
+        function finalFifteen(onDone) {
+          let left = 15;
+          music.volume = 0.8; // sit the music back so the ticks read
+          const step = () => {
+            $('countdown').textContent = left > 0 ? left : '';
+            if (left <= 0) {
+              playFinish();
+              // Convention: duck hard under the stinger (≈ -7 dB over ~0.4s), keep
+              // the music breathing underneath rather than cutting it dead.
+              const from = music.volume;
+              const t0 = performance.now();
+              const dive = (now) => {
+                const u = Math.min(1, (now - t0) / 400);
+                music.volume = from + (0.45 - from) * u;
+                if (u < 1) requestAnimationFrame(dive);
+              };
+              requestAnimationFrame(dive);
+              music.playbackRate = 1;
+              setPhase('🏁 time! music ducked to 45% under the cards — ↺ resets');
+              if (onDone) onDone();
+              return;
+            }
+            const rate = left <= 5 ? 4 : left <= 10 ? 2 : 1;
+            for (let i = 0; i < rate; i++) later(playTick, (i * 1000) / rate);
+            left -= 1;
+            later(step, 1000);
+          };
+          step();
+        }
+
+        function runAll() {
+          if (!current) return;
+          stopSequenceOnly();
+          speedUp();
+          later(
+            () => {
+              setPhase(`⏳ ticking down — ${current.label}`);
+              finalFifteen();
+            },
+            Number($('gap').value) * 1000,
+          );
+        }
+
+        function stopSequenceOnly() {
+          clearAllTimers();
+          cancelAnimationFrame(rampRaf);
+          $('countdown').textContent = '';
+        }
+        function stopAll(silent) {
+          stopSequenceOnly();
+          music.playbackRate = 1;
+          music.volume = 1;
+          if (!silent && current) {
+            if (music.paused) music.play();
+            setPhase(`playing ${current.label}`);
+          }
+        }
+
+        $('runAll').onclick = runAll;
+        $('speedOnly').onclick = () => {
+          stopSequenceOnly();
+          speedUp();
+        };
+        $('finishOnly').onclick = () => {
+          if (!current) return;
+          stopSequenceOnly();
+          setPhase(`⏳ ticking down — ${current.label}`);
+          finalFifteen();
+        };
+        $('stopAll').onclick = () => stopAll(false);
+        $('tickSolo').onclick = playTick;
+        $('endSolo').onclick = playFinish;
+      })();
+    </script>
+  </body>
+</html>

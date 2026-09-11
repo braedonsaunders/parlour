@@ -58,14 +58,29 @@ type HowlHtml5 = {
   _sounds?: Array<{ _node?: HTMLMediaElement }>;
 };
 
+/**
+ * The <audio> element behind a Howl, when there is one. A Web Audio voice has
+ * a GainNode in the same slot, so callers that want media-element behaviour
+ * have to be told apart from the ones that just want the node.
+ */
 function html5NodeOf(howl: Howl): HTMLMediaElement | undefined {
-  return (howl as unknown as HowlHtml5)._sounds?.[0]?._node;
+  const node = (howl as unknown as HowlHtml5)._sounds?.[0]?._node;
+  return node && typeof node.play === 'function' ? node : undefined;
 }
 
 /**
  * A frantic rate must be varispeed, not a time-stretch. Browsers default
  * `preservesPitch` on, which runs a phase-vocoder that smears percussive
  * mixes; turning it off gives clean tape-style resampling.
+ *
+ * Call this before the element is ever asked to play, and again before any
+ * rate change — never after one. iOS maps the flag onto AVFoundation's
+ * `audioTimePitchAlgorithm`, which the audio renderer reads when it sets up a
+ * rate change rather than continuously. Flipping it on an element that is
+ * already resampling makes the renderer rebuild mid-stream, and the song wows
+ * in and out of pitch and tempo while it resettles. Desktop never showed this
+ * because desktop music is Web Audio, where the rate lives on the buffer
+ * source; only Apple touch devices play the soundtrack through an element.
  */
 function setVarispeed(node: HTMLMediaElement): void {
   try {
@@ -344,9 +359,13 @@ export class MusicController {
     if (resolved === this.state.rate) return;
     this.state.rate = resolved;
     for (const voice of this.voices.values()) {
-      if (voice.soundId !== null) voice.howl.rate(resolved, voice.soundId);
+      // Varispeed first: the element has to already be in tape mode when the
+      // rate lands, not be switched into it afterwards. One write, never a
+      // ramp — every write to `playbackRate` is a resync on an iOS element,
+      // so a per-frame glide is a minute of wobble rather than a smooth lift.
       const node = html5NodeOf(voice.howl);
       if (node) setVarispeed(node);
+      if (voice.soundId !== null) voice.howl.rate(resolved, voice.soundId);
     }
     this.notify();
   }
@@ -481,6 +500,8 @@ export class MusicController {
 
     const existing = this.voices.get(trackId);
     if (existing) {
+      const existingNode = html5NodeOf(existing.howl);
+      if (existingNode) setVarispeed(existingNode);
       const soundId = existing.howl.play(existing.soundId ?? undefined);
       existing.soundId = soundId;
       existing.gain = this.gainFor(trackId);
@@ -506,6 +527,13 @@ export class MusicController {
       failed: false,
     };
     this.voices.set(trackId, voice);
+    // Howler hands out pooled <audio> elements, so a fresh voice can be
+    // holding a node a previous song left in whatever mode. Put it in tape
+    // mode now, while it is still silent: a song that starts during the final
+    // minute has its rate applied the moment it plays, and an element only
+    // resamples cleanly if it was already set up for it.
+    const startingNode = html5NodeOf(voice.howl);
+    if (startingNode) setVarispeed(startingNode);
     voice.howl.once('loaderror', () => {
       voice.failed = true;
       if (generation !== this.transitionGeneration || !this.wantPlaying) return;
@@ -521,8 +549,6 @@ export class MusicController {
     voice.gain = this.gainFor(trackId);
     voice.howl.fade(0, voice.gain, fadeMs, soundId);
     if (this.state.rate !== 1) voice.howl.rate(this.state.rate, soundId);
-    const node = html5NodeOf(voice.howl);
-    if (node) setVarispeed(node);
   }
 
   /** Drops a voice we have moved on from, handing its media slot straight back. */
