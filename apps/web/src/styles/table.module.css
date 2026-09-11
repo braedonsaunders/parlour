@@ -1258,9 +1258,22 @@ button.card {
        short of the screen to leave the arc its gutters. At full width the
        corner cards sit on the bezel. */
     --hand-rail-max: calc(100vw - 2rem);
-    /* Sink the lower half behind the phone edge, matching the landscape hand.
-       The home indicator is below the interactive, readable half of the card. */
-    bottom: -6rem;
+    /*
+     * Sink the lower half of the card behind the phone edge — but behind the
+     * SAFE edge, not the glass one. A flat -6rem measured the crop from the
+     * bottom of the screen, which is fine on a phone with a bezel and wrong on
+     * every modern one: the home indicator then sits on top of the exposed
+     * band and eats a third of it, leaving barely a rank corner showing.
+     *
+     * A 7.2rem card is 10.27rem tall and its top edge sits 11.5rem above the
+     * rail's own bottom, so offsetting the rail by the inset less 6.37rem puts
+     * exactly half the card above the safe edge on any device. On a notched
+     * iPhone that lifts the fan ~28px; on a phone with no inset it is within a
+     * few pixels of where it already was. Either way the readable half — rank
+     * corner, colour and the top of the central mark — is fully in the clear,
+     * and the card still reads as held from below rather than laid on the felt.
+     */
+    bottom: calc(env(safe-area-inset-bottom, 0px) - 6.37rem);
     height: 12.4rem;
   }
   /* The fan's outermost cards rotate away from centre. The rail remains

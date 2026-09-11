@@ -210,9 +210,29 @@ describe('portrait hands', () => {
     expect(portrait).not.toMatch(/\.handFan\s*\{[^}]*transform:\s*translateY/s);
   });
 
-  it('keeps a full deck-sized card and sinks its lower half behind the screen edge', () => {
+  it('keeps a full deck-sized card and sinks its lower half behind the safe edge', () => {
     expect(portrait).toMatch(/--hand-card-width:\s*7\.2rem/);
-    expect(portrait).toMatch(/bottom:\s*-6rem/);
+    /*
+     * The crop is measured from the safe edge, not the glass one. A bare
+     * `-6rem` puts the home indicator on top of the exposed band and leaves a
+     * third of the card showing instead of half, which is the complaint that
+     * brought this rule here. The offset must therefore carry the inset.
+     */
+    expect(portrait).toMatch(
+      /bottom:\s*calc\(\s*env\(safe-area-inset-bottom[^)]*\)\s*-\s*6\.37rem\s*\)/,
+    );
+  });
+
+  it('still hides enough of the card that it reads as held, not laid down', () => {
+    /*
+     * Half a 10.27rem card, and no more: the rail's own top edge sits 11.5rem
+     * above its bottom, so an offset shallower than about -6.2rem would start
+     * showing a whole card face and the hand would stop reading as a hand.
+     */
+    const offset = Number(
+      portrait.match(/bottom:\s*calc\(\s*env\([^)]*\)\s*-\s*(\d+\.?\d*)rem\s*\)/)?.[1],
+    );
+    expect(offset).toBeGreaterThanOrEqual(6.2);
   });
 });
 
