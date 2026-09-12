@@ -468,10 +468,18 @@ export class VeilRoom {
       );
       return;
     }
-    this.link.send(
-      { type: 'veil.peel', epoch, position, forSeat: this.session.seat, locked },
-      peer,
-    );
+    // The retry interval calls this on a timer, so a wire that has gone since
+    // the opening started would throw where nobody is waiting. A chain that
+    // cannot be spoken down is a failed opening, which open()'s caller already
+    // knows how to hear.
+    try {
+      this.link.send(
+        { type: 'veil.peel', epoch, position, forSeat: this.session.seat, locked },
+        peer,
+      );
+    } catch {
+      this.fail(epoch, position, 'the room closed');
+    }
   }
 
   private async applyRecoveredShare(

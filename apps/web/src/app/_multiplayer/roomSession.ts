@@ -1070,6 +1070,11 @@ export class MultiplayerRoomSession {
     // have been left or replaced while it ran. Announcing into a closed
     // transport would throw where nobody is waiting to catch it.
     if (this.transport !== transport) return;
+    // Two attachments can overlap — the host's start and a seating presence
+    // both reach for one, and both pass their `!this.veil` check before either
+    // finishes loading its material. The room that loses keeps re-asking its
+    // unanswered hops on a timer that nothing owns any more, so drop it here.
+    this.veil?.room.cancelAll();
     this.veil = { session, room };
     await room.announce();
     if (this.transport !== transport) return;
