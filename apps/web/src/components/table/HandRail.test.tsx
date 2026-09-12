@@ -219,20 +219,21 @@ describe('portrait hands', () => {
      * brought this rule here. The offset must therefore carry the inset.
      */
     expect(portrait).toMatch(
-      /bottom:\s*calc\(\s*env\(safe-area-inset-bottom[^)]*\)\s*-\s*6\.37rem\s*\)/,
+      /bottom:\s*calc\(\s*env\(safe-area-inset-bottom[^)]*\)\s*-\s*6rem\s*\)/,
     );
   });
 
-  it('still hides enough of the card that it reads as held, not laid down', () => {
+  it('moves the dock by the inset without also sinking it deeper', () => {
     /*
-     * Half a 10.27rem card, and no more: the rail's own top edge sits 11.5rem
-     * above its bottom, so an offset shallower than about -6.2rem would start
-     * showing a whole card face and the hand would stop reading as a hand.
+     * The inset is the only new term. 6rem is the depth this rail has always
+     * docked at and the depth the browser gate's budget is drawn around — gin's
+     * portrait fan clears it by about 4px under the Linux WebKit that gate
+     * runs, so a deeper offset fails there while reading fine on macOS.
      */
     const offset = Number(
       portrait.match(/bottom:\s*calc\(\s*env\([^)]*\)\s*-\s*(\d+\.?\d*)rem\s*\)/)?.[1],
     );
-    expect(offset).toBeGreaterThanOrEqual(6.2);
+    expect(offset).toBe(6);
   });
 });
 

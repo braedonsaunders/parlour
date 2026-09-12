@@ -1265,15 +1265,18 @@ button.card {
      * every modern one: the home indicator then sits on top of the exposed
      * band and eats a third of it, leaving barely a rank corner showing.
      *
-     * A 7.2rem card is 10.27rem tall and its top edge sits 11.5rem above the
-     * rail's own bottom, so offsetting the rail by the inset less 6.37rem puts
-     * exactly half the card above the safe edge on any device. On a notched
-     * iPhone that lifts the fan ~28px; on a phone with no inset it is within a
-     * few pixels of where it already was. Either way the readable half — rank
-     * corner, colour and the top of the central mark — is fully in the clear,
-     * and the card still reads as held from below rather than laid on the felt.
+     * The inset is what moves, and only the inset. The depth stays at the 6rem
+     * this rail has always docked at, so a phone with no inset lands exactly
+     * where it did and a notched one lifts by its indicator — which is the
+     * whole of the complaint. Deepening it as well costs the browser gate: the
+     * dock budget leaves gin's portrait fan about 4px of room under the Linux
+     * WebKit it runs, and a further 0.37rem is 5.9px of it.
+     *
+     * Either way the readable half — rank corner, colour and the top of the
+     * central mark — is fully in the clear, and the card still reads as held
+     * from below rather than laid on the felt.
      */
-    bottom: calc(env(safe-area-inset-bottom, 0px) - 6.37rem);
+    bottom: calc(env(safe-area-inset-bottom, 0px) - 6rem);
     height: 12.4rem;
   }
   /* The fan's outermost cards rotate away from centre. The rail remains
