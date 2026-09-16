@@ -237,15 +237,48 @@
   transform: rotate(-16deg);
 }
 
+/*
+ * The centre cluster — stock and discard — for every game that has one.
+ *
+ * `--piles-scale` exists because the felt's middle is the one place whose right
+ * size is a property of the SCREEN rather than of the game. The base 0.78 was
+ * picked against a laptop in a browser window and then inherited by the desktop
+ * app, where it is simply too small: the draw pile and the card in play are
+ * what everyone at the table is looking at, and on a full-size display they sat
+ * smaller than the cards in your own hand. The step up below is keyed on having
+ * the room for it, so phones and short landscape windows are untouched.
+ */
 .piles {
+  --piles-scale: 0.78;
   position: absolute;
   left: 50%;
   top: 46%;
   z-index: 5;
   display: flex;
   gap: clamp(1.2rem, 3vw, 2.8rem);
-  transform: translate(-50%, -50%) scale(0.78);
+  transform: translate(-50%, -50%) scale(var(--piles-scale));
   isolation: isolate;
+}
+
+/* Desktop and large tablets: enough felt that the piles can be the focal point
+   they are meant to be. The glow inset grows with them or it crops the cards. */
+@media (min-width: 900px) and (min-height: 620px) {
+  .piles {
+    --piles-scale: 1.02;
+  }
+  .piles[data-local-turn='true']::before {
+    inset: -1.9rem -2.3rem;
+  }
+}
+
+/* The top step is gated on HEIGHT more than width. The turn pill rides above
+   the piles and scales with them, and the badge row above it sits at a fixed
+   share of the felt — so the thing that runs out first on a 16:10 laptop is
+   headroom, not width. */
+@media (min-width: 1280px) and (min-height: 900px) {
+  .piles {
+    --piles-scale: 1.16;
+  }
 }
 
 .piles[data-local-turn='true']::before {
@@ -1246,8 +1279,8 @@ button.card {
     font-size: clamp(4rem, 18vw, 9rem);
   }
   .piles {
+    --piles-scale: 0.85;
     top: 48%;
-    transform: translate(-50%, -50%) scale(0.85);
   }
   /* Portrait keeps the same real card size as short landscape. The fan step is
      the part that compresses as the hand grows, so even a huge Wild hand stays
@@ -1351,8 +1384,8 @@ button.card {
     transform-origin: bottom left;
   }
   .piles {
+    --piles-scale: 0.62;
     top: 50.5%;
-    transform: translate(-50%, -50%) scale(0.62);
   }
   .piles[data-local-turn='true']::before {
     inset: -0.65rem -1rem;

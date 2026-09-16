@@ -14,6 +14,14 @@
   pointer-events: none;
 }
 
+/* The desktop piles are bigger (see `--piles-scale`), and the whisper that
+   rides above them grows with them. Same lift as Wild, for the same reason. */
+@media (orientation: landscape) and (min-width: 900px) and (min-height: 620px) {
+  .tableBadges {
+    top: 19%;
+  }
+}
+
 .suitChip {
   display: inline-flex;
   align-items: center;

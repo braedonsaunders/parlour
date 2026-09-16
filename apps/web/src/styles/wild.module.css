@@ -179,6 +179,18 @@
   pointer-events: none;
 }
 
+/*
+ * The pill rides above the piles and scales with them, so the desktop step up
+ * in `--piles-scale` (table.module.css) spends this row's clearance. Give it
+ * back by moving the row, not by keeping the piles small: the felt above it is
+ * empty at these sizes, and the draw pile is what the table is looking at.
+ */
+@media (orientation: landscape) and (min-width: 900px) and (min-height: 620px) {
+  .tableBadges {
+    top: 20%;
+  }
+}
+
 .colorChip {
   display: inline-flex;
   align-items: center;
