@@ -1,8 +1,12 @@
-import { makeRng } from '@parlour/engine';
+import { isVeilHandle, makeRng } from '@parlour/engine';
 import { blitzConfigSchema } from '@parlour/game-blitz';
-import { wildpileConfig } from '@parlour/game-wildpile';
+import { wildpileConfig, type WildpileRules, type WildpileState } from '@parlour/game-wildpile';
 import { afterEach, describe, expect, it } from 'vitest';
-import { clearActiveMultiplayerSession, MultiplayerRoomSession } from '../roomSession';
+import {
+  clearActiveMultiplayerSession,
+  multiplayerSession,
+  MultiplayerRoomSession,
+} from '../roomSession';
 import { stepActor, type ActorReport } from './actors';
 import { DuelNet } from './netsim';
 
@@ -186,4 +190,78 @@ describe('play again deals immediately', () => {
     }, 10_000);
     expect(report.errors, report.errors.join('\n')).toEqual([]);
   }, 150_000);
+
+  /**
+   * The rematch a player actually sees.
+   *
+   * Every assertion above is about the room's bookkeeping — the seed moved, the
+   * tier held, the hashes agree — and a table can pass all of them while one
+   * seat stares at the backs of its own cards. That is what the second match of
+   * a veiled Wild room looked like from the guest's chair: the hand arrives as
+   * handles, nothing peels them, and because the screen paints an unread handle
+   * as a card back (WildCard, correctly), the player has no card to play and
+   * burns the turn clock every turn.
+   *
+   * So this asserts the only thing that matters to the person holding the
+   * cards: after Play Again, BOTH seats can read their own hand.
+   */
+  it('lets both seats read their own hand after a veiled Wild rematch', async () => {
+    const net = new DuelNet({ seed: 8303 });
+    const rng = makeRng(8303);
+    const seat = seatFactory(net);
+    const host = seat('again3-host', 'Hosta');
+    const guest = seat('again3-guest', 'Guesty');
+    const room = await host.create({
+      gameId: 'wildpile',
+      seats: 2,
+      security: 'veil',
+      config: WILD_CONFIG,
+    });
+    await guest.join(room.code);
+    await eventually(() => expect(guest.getSnapshot().localSeat).toBe(1), 10_000);
+    await host.start();
+    await eventually(() => expect(guest.getSnapshot().stage).toBe('table'), 20_000);
+    const firstSeed = host.getSnapshot().session!.seed;
+
+    const handOf = (peer: MultiplayerRoomSession) => {
+      const snapshot = peer.getSnapshot();
+      const session = multiplayerSession<WildpileState, WildpileRules>(snapshot, 'wildpile');
+      return session?.state.hands[snapshot.localSeat!] ?? [];
+    };
+    const readable = (peer: MultiplayerRoomSession, who: string) => {
+      const hand = handOf(peer);
+      expect(hand.length, `${who} holds no cards`).toBeGreaterThan(0);
+      expect(hand.filter(isVeilHandle), `${who} cannot read ${hand.join(',')}`).toEqual([]);
+    };
+
+    // The FIRST deal peels on both sides — the bug is only in the second one,
+    // so proving the opening is healthy is what makes the failure below mean
+    // "the rematch broke it" rather than "veil never worked here".
+    await eventually(() => {
+      readable(host, 'host (first deal)');
+      readable(guest, 'guest (first deal)');
+    }, 20_000);
+
+    // Play the match out. Wild ends when a seat empties its hand.
+    const report: ActorReport = { errors: [], staleTaps: 0, sent: 0 };
+    await eventually(() => {
+      stepActor(host, 'wildpile', rng, report);
+      stepActor(guest, 'wildpile', rng, report);
+      expect(host.getSnapshot().session?.status).toBe('ended');
+      expect(guest.getSnapshot().session?.status).toBe('ended');
+    }, 90_000);
+
+    await host.rematch();
+    await eventually(() => {
+      expect(guest.getSnapshot().session?.seed).not.toBe(firstSeed);
+      expect(guest.getSnapshot().session?.seed).toBe(host.getSnapshot().session?.seed);
+    }, 30_000);
+
+    // The whole point: a fresh veiled deal both players can actually play.
+    await eventually(() => {
+      readable(host, 'host (rematch)');
+      readable(guest, 'guest (rematch)');
+    }, 30_000);
+    expect(report.errors, report.errors.join('\n')).toEqual([]);
+  }, 200_000);
 });
