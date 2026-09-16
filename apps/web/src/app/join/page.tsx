@@ -63,13 +63,25 @@ export default function JoinPage() {
   const submit = useCallback(
     async (code: string, expectedHost?: string) => {
       if (checking) return;
+      /*
+       * Adopt a live session only if it is one this player can actually sit in.
+       *
+       * The old test was "not closed, and has a room or is connecting", which
+       * is also true of a session that reached the table and was never seated.
+       * That one renders as "Connecting securely…" with no error and no way
+       * out, and because every later press was handed the same dead session
+       * back, pressing the button again changed nothing. A session with no
+       * seat is not a table to rejoin — it is one to throw away.
+       */
       const live = getActiveMultiplayerSession();
       if (live) {
         const snap = live.getSnapshot();
-        if (snap.connection !== 'closed' && (snap.room || snap.connection === 'connecting')) {
+        if (snap.connection !== 'closed' && snap.room && snap.localSeat !== null) {
           setRoomSession(live);
           return;
         }
+        live.close();
+        clearActiveMultiplayerSession();
       }
       setChecking(true);
       setError(null);

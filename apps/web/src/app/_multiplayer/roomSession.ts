@@ -161,6 +161,8 @@ type SessionDependencies = {
   heartbeatTimeoutMs?: number;
   /** how long a veiled round holds a dropped seat open before recovering it */
   reconnectGraceMs?: number;
+  /** how long a connected join waits to be given a chair before giving up */
+  seatAssignmentTimeoutMs?: number;
 };
 
 type Listener = () => void;
@@ -174,6 +176,35 @@ type Listener = () => void;
  */
 const DEAL_ROUND_TIMEOUT_MS = 10_000;
 const REMATCH_TIMEOUT_MS = 10_000;
+
+/**
+ * How long a connected guest waits to be given a chair before giving up.
+ *
+ * Reaching the host is not the same as being seated: the handshake finishes,
+ * and the seat arrives a moment later on a `peer.joined` presence event. When
+ * that event never came — a relay that dropped it, a host that never answered —
+ * `join` still resolved with a room handle and a null seat, and the join screen
+ * has no state for that. It shows "Connecting securely…" forever: no error, no
+ * timeout, and no way to try again, because the half-joined session is now the
+ * active one and the next attempt is handed straight back to it.
+ *
+ * So the wait is bounded and its failure is loud. Long enough to cover a slow
+ * relay and a phone waking its radio, short enough that a player learns the
+ * table is not answering while they still have the patience to retry.
+ */
+const SEAT_ASSIGNMENT_TIMEOUT_MS = 15_000;
+const SEAT_ASSIGNMENT_POLL_MS = 100;
+
+/** A join that reached the room but was never given a chair at it. */
+export class SeatNeverArrivedError extends Error {
+  constructor(readonly code: string) {
+    super(
+      `Table ${code} answered, but never sat you down. The host may have started without ` +
+        'you, or the table may be full. Ask for a fresh invite and try again.',
+    );
+    this.name = 'SeatNeverArrivedError';
+  }
+}
 
 /**
  * How long a veiled round holds a seat open for a player who dropped.
@@ -518,7 +549,19 @@ export class MultiplayerRoomSession {
       // seat, so publish the commitment again now that both room and seat are
       // available.
       this.commitDealShare();
-      if (settings.security === 'veil' && assignedSeat !== null && !this.veil) {
+      // Connected is not seated. The chair usually arrives on a presence event
+      // a moment after the handshake, so wait for it here rather than handing
+      // back a room this player has no place at — see
+      // SEAT_ASSIGNMENT_TIMEOUT_MS for what the silent version looked like.
+      const seat = await this.waitForLocalSeat();
+      if (seat === null) throw new SeatNeverArrivedError(verdict.code);
+      // Waiting for the seat means the presence event that carries it may have
+      // already started the attach (`acceptPresence` does the same thing for a
+      // seat that arrives late). `attachVeil` is async, so `this.veil` is still
+      // null while that is in flight — the in-flight promise is what says so,
+      // and laying a second set of shuffle layers for one seat is not a thing
+      // this table can survive.
+      if (settings.security === 'veil' && !this.veil && !this.veilAttach) {
         this.veilAttach = this.attachVeil(
           settings,
           this.authority?.getSession().seed ?? this.seed,
@@ -527,9 +570,70 @@ export class MultiplayerRoomSession {
       return room;
     } catch (error) {
       if (!this.transport) signaling.close();
-      this.fail(error, `Table ${code} isn't answering. Check the code and try again.`);
+      // A join that got as far as a room but no chair leaves a transport
+      // behind. Hand it back rather than leaving a half-connected session for
+      // the next attempt to adopt: the retry has to start from nothing.
+      if (error instanceof SeatNeverArrivedError) {
+        this.teardownTransport();
+        this.update({ connection: 'closed' });
+      }
+      this.fail(
+        error,
+        error instanceof SeatNeverArrivedError
+          ? error.message
+          : `Table ${code} isn't answering. Check the code and try again.`,
+      );
       throw error;
     }
+  }
+
+  /**
+   * Waits for the chair the host assigns after the handshake.
+   *
+   * Polled rather than awaited on a presence subscription because the seat can
+   * land either way round: `peer.joined` may already have been delivered while
+   * the join continuation was still queued, in which case there is no future
+   * event to wait for and the snapshot is simply already right.
+   *
+   * The transport's own seat map is consulted as well as this session's, and
+   * that is the belt to the braces. The snapshot's seats are built from
+   * presence EVENTS, and the transport only emits those for seats that changed
+   * against what it already held — so a welcome whose presence snapshot the
+   * peer had somehow already applied seats the player in the transport and
+   * announces nothing. The room is then permanently one notification short of
+   * knowing where its own player is sitting, which is indistinguishable, on
+   * screen, from never having been let in.
+   */
+  private async waitForLocalSeat(): Promise<number | null> {
+    const deadline =
+      Date.now() + (this.dependencies.seatAssignmentTimeoutMs ?? SEAT_ASSIGNMENT_TIMEOUT_MS);
+    for (;;) {
+      const peerId = this.snapshot.room?.peerId;
+      const seat =
+        this.snapshot.localSeat ??
+        this.seatForLocalProfile() ??
+        (peerId ? (this.transport?.seatForPeerId(peerId) ?? null) : null);
+      if (seat !== null) {
+        if (this.snapshot.localSeat !== seat) this.adoptLocalSeat(seat);
+        return seat;
+      }
+      if (this.snapshot.connection === 'closed' || Date.now() >= deadline) return null;
+      await new Promise((resolve) => setTimeout(resolve, SEAT_ASSIGNMENT_POLL_MS));
+    }
+  }
+
+  /** Records a chair the transport knows about but no presence event announced. */
+  private adoptLocalSeat(seat: number): void {
+    const others = this.snapshot.seats.filter((chair) => chair.seat !== seat);
+    this.update({
+      localSeat: seat,
+      seats: [...others, { ...this.profile, seat, connected: true, bot: false }].sort(
+        (left, right) => left.seat - right.seat,
+      ),
+    });
+    // The commitment is published per seat, and the earlier attempt had no seat
+    // to publish for.
+    this.commitDealShare();
   }
 
   /**
@@ -1639,6 +1743,24 @@ export class MultiplayerRoomSession {
     // nested inside the round on the table.
     const mine = roomGame(settings.gameId).privateHandles(state, seat);
 
+    /*
+     * NOTE: this filters on `knownFaces`, which is wider than what the table
+     * can actually SHOW — it includes surrogate faces, cards belonging to a
+     * seat that dropped and whose layer this room rebuilt so a bot could play
+     * the chair. `presented` overlays `visibleFaces`, which excludes those. So
+     * a handle held only as a surrogate that later reaches this seat's own hand
+     * (Wild's hand swap does exactly that) is skipped here as "already known"
+     * and still refused by the renderer, and the player is left looking at the
+     * back of a card in their own hand.
+     *
+     * Narrowing this to `visibleFaces` looks like the fix and is not: peeling a
+     * position whose layer came back through recovery fails the deck check and
+     * surfaces "a share was computed dishonestly" to the player, which the duel
+     * harness catches on both the walkover and the quit-and-rejoin scenarios.
+     * The real repair belongs on the render side — a seat is entitled to see a
+     * card in its own hand however the room came to be able to read it — and
+     * that is a privacy-boundary change worth making deliberately.
+     */
     const wanted = mine.filter(
       (card): card is string => typeof card === 'string' && !veil.session.knownFaces().has(card),
     );

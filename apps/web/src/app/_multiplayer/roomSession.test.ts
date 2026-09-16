@@ -230,6 +230,51 @@ describe('multiplayer route composition', () => {
     vi.restoreAllMocks();
   });
 
+  /**
+   * Reaching a table is not the same as being let in.
+   *
+   * The handshake finishes before the host has decided where — or whether — the
+   * arriving player sits, so `join` used to resolve with a room handle and a
+   * null seat and leave the chair to turn up on a later presence event. When it
+   * never turned up, nothing said so: the join screen has exactly two states,
+   * "connecting" and "error", and a room with no seat is neither. It sat on
+   * "Connecting securely…" indefinitely, and because that half-joined session
+   * became the active one, every later press of the button was handed straight
+   * back to it and did nothing at all.
+   *
+   * A full table is the easiest way to be refused a chair, so it is what this
+   * uses — but the assertion is about the shape of the failure, not the cause:
+   * a join that cannot seat you must reject, and reject in time to retry.
+   */
+  it('fails a join that connects but is never given a seat', async () => {
+    const broker = new MockSignalingBroker();
+    const rtc = new MockRtcNetwork();
+    const host = new MultiplayerRoomSession(
+      { name: 'Host', avatarId: 'ember', profileId: 'full-host-profile' },
+      { signaling: broker.signaling('full-host-peer'), peerConnection: rtc.factory('full-host') },
+    );
+    const guest = new MultiplayerRoomSession(
+      { name: 'Guest', avatarId: 'cobalt', profileId: 'full-guest-profile' },
+      {
+        signaling: broker.signaling('full-guest-peer'),
+        peerConnection: rtc.factory('full-guest'),
+        seatAssignmentTimeoutMs: 1_000,
+      },
+    );
+    sessions.push(host, guest);
+
+    const room = await host.create({ seats: 2 });
+    host.addBot(1);
+    await eventually(() => expect(host.getSnapshot().seats).toHaveLength(2));
+
+    await expect(guest.join(room.code)).rejects.toThrow(/never sat you down/i);
+    // Said out loud, and the session left dead rather than half-alive, so the
+    // join screen throws it away instead of adopting it on the next attempt.
+    expect(guest.getSnapshot().error).toMatch(/never sat you down/i);
+    expect(guest.getSnapshot().localSeat).toBeNull();
+    expect(guest.getSnapshot().connection).toBe('closed');
+  }, 15_000);
+
   // D3 seam: a share link carries a host-binding capability because a 4-char
   // code is a public locator, not an authenticator. roomSession must forward it
   // to the directory lookup AND the transport, so a squatter who republishes
