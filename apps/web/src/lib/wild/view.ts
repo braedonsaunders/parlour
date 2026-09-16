@@ -19,6 +19,15 @@ export interface WildSeatView {
 export interface WildTableView {
   players: readonly WildSeatView[];
   localSeat: number;
+  /**
+   * The match is still being played.
+   *
+   * Distinct from `activeSeat !== null`, which goes null for the duration of
+   * every jump-in window — several times a hand. Anything that asks "is this
+   * match still running" (the clock, the music) has to ask this instead, or it
+   * flickers off and on with the interrupts.
+   */
+  live: boolean;
   activeSeat: number | null;
   stockCount: number;
   /** Top-first, capped for the pile display. */
@@ -142,6 +151,7 @@ export function wildTableView(
      * announces itself by playing; until then the table simply waits, exactly
      * as it does for Rat Screw's slap window.
      */
+    live: playing,
     activeSeat: playing && state.interrupt ? null : session.phase.actor,
     stockCount: state.stock.length,
     discard: state.discard.slice(0, 3),

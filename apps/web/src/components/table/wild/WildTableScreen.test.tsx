@@ -9,6 +9,7 @@ import { FX_TIMING } from '@/lib/table/fx-motion';
 import { WildTableScreen } from './WildTableScreen';
 
 const VIEW: WildTableView = {
+  live: true,
   players: [
     {
       seat: 0,
@@ -260,7 +261,7 @@ describe('WildTableScreen turn affordances', () => {
     act(() =>
       root.render(
         createElement(WildTableScreen, {
-          view: { ...VIEW, activeSeat: null, decision: null },
+          view: { ...VIEW, live: false, activeSeat: null, decision: null },
           fx: [],
           fxKey: 0,
           matchEndsAt,
@@ -268,6 +269,42 @@ describe('WildTableScreen turn affordances', () => {
       ),
     );
     expect(getMusicController().getState().rate).toBe(1);
+  });
+
+  /**
+   * A jump-in window has no active seat — that is what stops the turn ring
+   * walking the table — and on Wild one opens on almost every card played.
+   * Reading that as "the match stopped" dropped the lift back to 1× and put it
+   * straight back a moment later, so the closing minute warbled up and down in
+   * pitch instead of holding one clean step.
+   */
+  it('holds the final-minute lift through a jump-in window', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-24T12:00:00Z'));
+    const matchEndsAt = Date.now() + 90_000;
+    act(() =>
+      root.render(createElement(WildTableScreen, { view: VIEW, fx: [], fxKey: 0, matchEndsAt })),
+    );
+    act(() => void vi.advanceTimersByTime(31_000));
+    expect(getMusicController().getState().rate).toBeCloseTo(1.07);
+
+    act(() =>
+      root.render(
+        createElement(WildTableScreen, {
+          // Still live; simply nobody's turn while the table waits for a jump.
+          view: { ...VIEW, activeSeat: null, decision: null },
+          fx: [],
+          fxKey: 0,
+          matchEndsAt,
+        }),
+      ),
+    );
+    expect(getMusicController().getState().rate).toBeCloseTo(1.07);
+
+    act(() =>
+      root.render(createElement(WildTableScreen, { view: VIEW, fx: [], fxKey: 0, matchEndsAt })),
+    );
+    expect(getMusicController().getState().rate).toBeCloseTo(1.07);
   });
 
   it('ducks the music under the time-up flutter as the clock zeroes', () => {
@@ -286,7 +323,7 @@ describe('WildTableScreen turn affordances', () => {
     act(() =>
       root.render(
         createElement(WildTableScreen, {
-          view: { ...VIEW, activeSeat: null, decision: null },
+          view: { ...VIEW, live: false, activeSeat: null, decision: null },
           fx: [],
           fxKey: 0,
           matchEndsAt,

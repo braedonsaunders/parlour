@@ -448,6 +448,7 @@ const RATSCREW_VIEW: RatscrewTableView = {
 };
 
 const WILD_VIEW: WildTableView = {
+  live: true,
   players: [
     {
       seat: 0,

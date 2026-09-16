@@ -127,7 +127,18 @@ function WildTableScreenView(props: WildTableScreenProps) {
   // itself reacts to lives up here now, and it flips once; the digits are
   // owned by the leaves that show them.
   const finalMinute = useFinalMinute(props.matchEndsAt);
-  const running = Boolean(view) && view?.activeSeat !== null;
+  /*
+   * "The match is still being played" — `view.live`, not `activeSeat !== null`.
+   *
+   * The table deliberately has no active seat while a jump-in window is open,
+   * which on Wild is most of the time: every card played opens one. Reading
+   * that as "the match stopped" released the final-minute lift and re-armed it
+   * a moment later, over and over, so the last minute wobbled up and down in
+   * pitch instead of holding the one clean 7% step it is supposed to be. It
+   * also tore down and rebuilt the closing countdown's timers on every one of
+   * those flickers.
+   */
+  const running = Boolean(view) && (view?.live ?? false);
   // Wild brings its own soundtrack: tropical house while seated, released on
   // the way out. The final minute is Mario Kart, not a different song — the
   // same track lifts 7% with the pitch riding along, the last fifteen seconds

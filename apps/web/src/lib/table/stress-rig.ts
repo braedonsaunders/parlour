@@ -230,6 +230,7 @@ export class StressRig {
     return {
       players,
       localSeat: 0,
+      live: true,
       activeSeat,
       stockCount: this.stock,
       discard: this.discard,
