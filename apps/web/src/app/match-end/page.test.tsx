@@ -104,7 +104,7 @@ describe('match end screen', () => {
     play('m3', 3_000, 2);
     render();
     expect(container.querySelector('[data-testid="match-rivalry"]')?.textContent).toContain(
-      'This sitting · 3 games',
+      'Today · 3 games',
     );
     expect(container.querySelector('[data-testid="rivalry-verdict"]')?.textContent).toBe(
       'You lead 2–1',

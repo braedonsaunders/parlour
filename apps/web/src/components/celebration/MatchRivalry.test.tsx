@@ -19,7 +19,7 @@ function text(testId: string): string {
 
 const DUEL: Rivalry = {
   game: 'blitz',
-  sittingGames: 7,
+  todayGames: 7,
   duel: true,
   standings: [
     {
@@ -27,7 +27,7 @@ const DUEL: Rivalry = {
       name: 'Gf',
       avatarId: 'plum',
       kind: 'friend',
-      sitting: { games: 7, wins: 4, losses: 3, ties: 0 },
+      today: { games: 7, wins: 4, losses: 3, ties: 0 },
       allTime: { games: 21, wins: 12, losses: 8, ties: 1 },
     },
   ],
@@ -45,9 +45,9 @@ afterEach(() => {
 });
 
 describe('MatchRivalry', () => {
-  it('leads with the sitting scoreline and who is ahead', () => {
+  it('leads with today’s scoreline and who is ahead', () => {
     render(DUEL);
-    expect(text('match-rivalry')).toContain('This sitting · 7 games');
+    expect(text('match-rivalry')).toContain('Today · 7 games');
     expect(text('rivalry-verdict')).toBe('You lead 4–3');
     expect(text('rivalry-score')).toBe('4–3');
     expect(text('rivalry-alltime')).toBe('All time · 12–8–1 vs Gf · 21 matches');
@@ -56,7 +56,7 @@ describe('MatchRivalry', () => {
   it('names the friend when they are the one ahead', () => {
     render({
       ...DUEL,
-      standings: [{ ...DUEL.standings[0]!, sitting: { games: 5, wins: 2, losses: 3, ties: 0 } }],
+      standings: [{ ...DUEL.standings[0]!, today: { games: 5, wins: 2, losses: 3, ties: 0 } }],
     });
     expect(text('rivalry-verdict')).toBe('Gf leads 3–2');
   });
@@ -64,22 +64,32 @@ describe('MatchRivalry', () => {
   it('calls a level series all square', () => {
     render({
       ...DUEL,
-      standings: [{ ...DUEL.standings[0]!, sitting: { games: 4, wins: 2, losses: 2, ties: 0 } }],
+      standings: [{ ...DUEL.standings[0]!, today: { games: 4, wins: 2, losses: 2, ties: 0 } }],
     });
     expect(text('rivalry-verdict')).toBe('All square at 2–2');
   });
 
-  it('falls back to the all-time record on the first game of a sitting', () => {
-    render({ ...DUEL, sittingGames: 1 });
-    expect(text('match-rivalry')).toContain('Where you stand');
-    expect(text('rivalry-score')).toBe('12–8–1');
-    expect(text('rivalry-alltime')).toBe('12–8–1 vs Gf · 21 matches');
+  /**
+   * The headline is the same question on every screen. It used to swap to the
+   * all-time record for the first game of a run and back again for the second,
+   * which read as the score resetting between matches.
+   */
+  it('still leads with today on the first game of the day', () => {
+    render({
+      ...DUEL,
+      todayGames: 1,
+      standings: [{ ...DUEL.standings[0]!, today: { games: 1, wins: 0, losses: 1, ties: 0 } }],
+    });
+    expect(text('match-rivalry')).toContain('Today');
+    expect(text('match-rivalry')).not.toContain('games');
+    expect(text('rivalry-score')).toBe('0–1');
+    expect(text('rivalry-alltime')).toBe('All time · 12–8–1 vs Gf · 21 matches');
   });
 
   it('lists a row per opponent at a fuller table', () => {
     render({
       game: 'wild',
-      sittingGames: 3,
+      todayGames: 3,
       duel: false,
       standings: [
         DUEL.standings[0]!,
@@ -88,7 +98,7 @@ describe('MatchRivalry', () => {
           name: 'Slate',
           avatarId: 'slate',
           kind: 'bot',
-          sitting: { games: 3, wins: 3, losses: 0, ties: 0 },
+          today: { games: 3, wins: 3, losses: 0, ties: 0 },
           allTime: { games: 9, wins: 6, losses: 3, ties: 0 },
         },
       ],

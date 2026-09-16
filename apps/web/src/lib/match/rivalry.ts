@@ -2,16 +2,32 @@ import type { GameId } from '@/lib/games';
 import { headToHead, type MatchRecord, type OpponentKind } from '@/stores/history';
 
 /**
- * Rivalry view model: the "you lead 3–2 tonight, 12–7 all time" line the match
+ * Rivalry view model: the "you lead 3–2 today, 12–7 all time" line the match
  * end screen shows once the same faces have played more than once.
  *
  * Game-agnostic on purpose — it reads only the shared history ledger, so every
  * game on the shelf (and every game added later) gets the same standings for
  * free. Pure, no React.
+ *
+ * The headline used to be "this sitting": the run of back-to-back matches with
+ * this exact table and this exact game, broken by any gap over two hours. Two
+ * things were wrong with it, and players hit both in one evening.
+ *
+ * It was invisible. Nothing on screen says where a sitting starts, so a run
+ * that quietly broke — someone dealt a different game in between, or the two
+ * hours lapsed — read as the score being wrong rather than as a new run.
+ *
+ * Worse, the screen changed WHICH number it led with depending on how long the
+ * run was: one match in, the headline was the all-time record; from the second
+ * match on it silently became the sitting. So the line went "17–9" after one
+ * game and "0–2" after the next, which looks exactly like a scoreboard that
+ * lost its memory. It had not; it was answering a different question.
+ *
+ * Today is the unit people actually keep score in, and it is the one unit that
+ * needs no explaining: it starts at midnight and it counts every game you
+ * played against that person, whichever ones you played. All time stays, as a
+ * footnote, and the headline is always the same question.
  */
-
-/** Matches this close together are one sitting; a longer gap starts a new one. */
-export const SITTING_GAP_MS = 2 * 60 * 60 * 1000;
 
 export interface Tally {
   games: number;
@@ -25,16 +41,16 @@ export interface RivalStanding {
   name: string;
   avatarId: string;
   kind: OpponentKind;
-  /** this sitting: the run of back-to-back matches with this exact table */
-  sitting: Tally;
+  /** today, local time: every match against them since midnight, any game */
+  today: Tally;
   /** every recorded match against them, across every game */
   allTime: Tally;
 }
 
 export interface Rivalry {
   game: GameId;
-  /** matches in the current sitting, including the one that just finished */
-  sittingGames: number;
+  /** matches played against this same table today, including the one just finished */
+  todayGames: number;
   /** a straight two-hander, so the UI can lead with a single scoreline */
   duel: boolean;
   standings: readonly RivalStanding[];
@@ -42,13 +58,24 @@ export interface Rivalry {
 
 const EMPTY: Tally = { games: 0, wins: 0, losses: 0, ties: 0 };
 
+/** Midnight before `at`, in the player's own timezone. */
+export function startOfLocalDay(at: number): number {
+  const date = new Date(at);
+  date.setHours(0, 0, 0, 0);
+  return date.getTime();
+}
+
 /**
- * A sitting is "the same people, the same game" — opponents identified by their
- * stable history keys so a friend who renames themselves still counts.
+ * The same people, whatever they played.
+ *
+ * Deliberately not keyed on the game: "we played eight tonight" counts the
+ * Wild and the Blitz together, because the two people at the table do.
  */
-function rosterKey(record: MatchRecord): string {
-  const keys = record.opponents.map((opponent) => opponent.key).sort();
-  return `${record.game}|${keys.join(',')}`;
+function tableKey(record: MatchRecord): string {
+  return record.opponents
+    .map((opponent) => opponent.key)
+    .sort()
+    .join(',');
 }
 
 function tallyIndex(records: readonly MatchRecord[]): Map<string, Tally> {
@@ -72,28 +99,25 @@ export function deriveRivalry(records: readonly MatchRecord[], matchId?: string)
   if (anchorIndex < 0) return null;
   const anchor = ordered[anchorIndex]!;
 
-  const roster = rosterKey(anchor);
-  const sitting: MatchRecord[] = [anchor];
-  for (let i = anchorIndex + 1; i < ordered.length; i += 1) {
-    const record = ordered[i]!;
-    if (rosterKey(record) !== roster) break;
-    if (sitting[sitting.length - 1]!.at - record.at > SITTING_GAP_MS) break;
-    sitting.push(record);
-  }
+  // Compared as day starts rather than against a 24-hour window, so the two
+  // days a year that are not 24 hours long still have exactly one midnight.
+  const day = startOfLocalDay(anchor.at);
+  const todayRecords = ordered.filter((record) => startOfLocalDay(record.at) === day);
+  const table = tableKey(anchor);
 
-  const sittingTallies = tallyIndex(sitting);
+  const todayTallies = tallyIndex(todayRecords);
   const allTimeTallies = tallyIndex(ordered);
 
   return {
     game: anchor.game,
-    sittingGames: sitting.length,
+    todayGames: todayRecords.filter((record) => tableKey(record) === table).length,
     duel: anchor.opponents.length === 1,
     standings: anchor.opponents.map((opponent) => ({
       key: opponent.key,
       name: opponent.name,
       avatarId: opponent.avatarId,
       kind: opponent.kind,
-      sitting: sittingTallies.get(opponent.key) ?? EMPTY,
+      today: todayTallies.get(opponent.key) ?? EMPTY,
       allTime: allTimeTallies.get(opponent.key) ?? EMPTY,
     })),
   };
@@ -102,9 +126,7 @@ export function deriveRivalry(records: readonly MatchRecord[], matchId?: string)
 /** Nothing to brag about after a one-off first meeting — the UI stays hidden. */
 export function hasRivalryToShow(rivalry: Rivalry | null): rivalry is Rivalry {
   if (!rivalry) return false;
-  return (
-    rivalry.sittingGames > 1 || rivalry.standings.some((standing) => standing.allTime.games > 1)
-  );
+  return rivalry.todayGames > 1 || rivalry.standings.some((standing) => standing.allTime.games > 1);
 }
 
 /** "3–2" style scoreline, ties appended only when they happened. */
