@@ -61,6 +61,41 @@ describe('wildpile under Veil', () => {
     expect(legal).toContain('draw');
   });
 
+  it('keeps the turn after a veiled draw so the seat can open and play the card', () => {
+    const { session } = veiled();
+    const stockTop = (session.state as WildpileState).stock[0]!;
+    const drew = sessionApply(wildpileGame, session, 0, 'draw');
+
+    expect(drew.rejected).toBeUndefined();
+    expect(drew.session.state.drawnCard).toBe(stockTop);
+    expect(drew.session.state.turn).toBe(0);
+    expect(drew.session.phase.actor).toBe(0);
+
+    const played = sessionApply(
+      wildpileGame,
+      drew.session,
+      0,
+      'playCard',
+      { card: 'red-9-0' },
+      { reveals: [[stockTop, 'red-9-0']] },
+    );
+    expect(played.rejected).toBeUndefined();
+    expect(played.session.state.drawnCard).toBeNull();
+    expect(played.session.state.discard[0]).toBe('red-9-0');
+  });
+
+  it('stops a draw-to-match on the first handle instead of emptying the stock', () => {
+    const { session } = veiled(2, { ...defaults, drawToMatch: true });
+    const stockBefore = (session.state as WildpileState).stock.length;
+    const drew = sessionApply(wildpileGame, session, 0, 'draw');
+
+    expect(drew.rejected).toBeUndefined();
+    expect(drew.session.state.hands[0]).toHaveLength(defaults.handSize + 1);
+    expect(drew.session.state.stock).toHaveLength(stockBefore - 1);
+    expect(drew.session.state.drawnCard).toBeTruthy();
+    expect(drew.session.state.turn).toBe(0);
+  });
+
   it('plays a card by opening it, and the pile takes the real face', () => {
     const { session } = veiled();
     const handle = (session.state as WildpileState).hands[0]![0]!;

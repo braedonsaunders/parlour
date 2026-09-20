@@ -12,12 +12,18 @@ import {
   clearActiveMultiplayerSession,
   expectedRoomGameId,
   getActiveMultiplayerSession,
+  isRoomResuming,
+  multiplayerProfile,
   multiplayerSession,
+  readRoomResumeTicket,
+  resumeMultiplayerSession,
   subscribeActiveMultiplayerSession,
+  subscribeRoomResume,
   type MultiplayerRoomSession,
   type MultiplayerRoomSnapshot,
 } from '@/app/_multiplayer/roomSession';
 import { isSeatLeftFault } from '@/lib/multiplayer/veil';
+import { useProfileStore } from '@/stores/profile';
 import { tableHandoffDelayMs } from './fx-motion';
 
 /**
@@ -285,6 +291,30 @@ export function useExpectedRoom(gameId: string): boolean {
     () => expectedRoomGameId() === gameId,
     () => false,
   );
+}
+
+/**
+ * Rebuilds a friend room after the PWA process died.
+ *
+ * The in-memory handle is gone; the durable ticket is not. Table pages and
+ * the podium both call this so a one-second app switch does not dump the
+ * player out of a live lobby.
+ */
+export function useResumeActiveRoom(gameId?: string | null): { resuming: boolean } {
+  const name = useProfileStore((state) => state.name);
+  const avatarId = useProfileStore((state) => state.avatarId);
+  const resuming = useSyncExternalStore(subscribeRoomResume, isRoomResuming, () => false);
+
+  useEffect(() => {
+    const live = getActiveMultiplayerSession();
+    if (live && live.getSnapshot().connection !== 'closed') return;
+    const ticket = readRoomResumeTicket();
+    if (!ticket) return;
+    if (gameId && ticket.gameId !== gameId) return;
+    void resumeMultiplayerSession(multiplayerProfile(name, avatarId));
+  }, [avatarId, gameId, name]);
+
+  return { resuming };
 }
 
 const subscribeNoop = () => () => {};

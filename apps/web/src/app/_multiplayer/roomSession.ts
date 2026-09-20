@@ -45,7 +45,7 @@ import {
   DealSeedRound,
   rematchDealSeed,
 } from '@/lib/multiplayer/dealSeed';
-import { validateRoomCode } from '@/lib/rooms/code';
+import { validateRoomCode, validateRoomHostPubkey } from '@/lib/rooms/code';
 import { hasValidSeatCount } from '@/lib/rooms/seatRange';
 import type { MultiplayerGameId } from '@/lib/rooms/gameIds';
 import { botTurnDelayMs, fxTimelineDurationMs } from '@/lib/table/fx-motion';
@@ -522,19 +522,22 @@ export class MultiplayerRoomSession {
       this.prepare(settings, signaling);
       const room = await this.transport!.join(verdict.code, announcement, expectedHost);
       const assignedSeat = this.transport!.seatForPeerId(room.peerId);
-      const knownSeats = this.snapshot.seats.filter(
-        (seat) => seat.seat !== 0 && seat.seat !== assignedSeat,
-      );
+      // Welcome already applied presence, so seat 0 usually has the host's
+      // real name. Replacing that chair with a "Host" placeholder used to
+      // wipe the name the guest had just learned — and nothing later rewrote
+      // it, because applyPresence only emits peer.joined for a new chair.
+      const others = this.snapshot.seats.filter((seat) => seat.seat !== assignedSeat);
+      const hostSeat = others.find((seat) => seat.seat === 0) ?? {
+        name: 'Host',
+        avatarId: 'ember',
+        profileId: room.hostId,
+        seat: 0,
+        connected: true,
+        bot: false,
+      };
       const joinedSeats: MultiplayerSeat[] = [
-        {
-          name: 'Host',
-          avatarId: 'ember',
-          profileId: room.hostId,
-          seat: 0,
-          connected: true,
-          bot: false,
-        },
-        ...knownSeats,
+        hostSeat,
+        ...others.filter((seat) => seat.seat !== 0),
       ];
       if (assignedSeat !== null) {
         joinedSeats.push({ ...this.profile, seat: assignedSeat, connected: true, bot: false });
@@ -2322,12 +2325,17 @@ export class MultiplayerRoomSession {
   private attachPageLifecycle(): void {
     if (typeof document === 'undefined' || this.detachPageLifecycle) return;
     const hidden = () => this.transport?.setPageHidden(true);
+    const visible = () => this.transport?.setPageHidden(false);
     const visibility = () => this.transport?.setPageHidden(document.visibilityState === 'hidden');
     document.addEventListener('visibilitychange', visibility);
     window.addEventListener('pagehide', hidden);
+    // iOS standalone often restores from bfcache with `pageshow` and no
+    // matching visibilitychange. That is the moment the mesh has to redial.
+    window.addEventListener('pageshow', visible);
     this.detachPageLifecycle = () => {
       document.removeEventListener('visibilitychange', visibility);
       window.removeEventListener('pagehide', hidden);
+      window.removeEventListener('pageshow', visible);
     };
   }
 
@@ -2601,6 +2609,14 @@ export class MultiplayerRoomSession {
     // a guest arriving, a bot filling in, a peer dropping — rather than
     // needing each of them to remember.
     if (patch.seats !== undefined || patch.stage !== undefined) this.scheduleListingSync();
+    // Host election rewrites `room.hostId`. The resume ticket has to follow
+    // or a phone that reloads after a migration knocks on the dead host.
+    if (
+      getActiveMultiplayerSession() === this &&
+      (patch.room !== undefined || patch.gameId !== undefined)
+    ) {
+      rememberActiveRoom(this);
+    }
     for (const listener of this.listeners) listener();
   }
 }
@@ -2618,6 +2634,17 @@ export class MultiplayerRoomSession {
 const ACTIVE_ROOM_KEY = '__parlourActiveRoom';
 const ACTIVE_LISTENERS_KEY = '__parlourActiveRoomListeners';
 const ROOM_MARKER_KEY = 'parlour.active-room';
+/** Survives an iOS PWA process kill. sessionStorage often does not. */
+export const ROOM_RESUME_KEY = 'parlour.room-resume';
+/** Long enough for a podium chat; short enough that yesterday's table dies. */
+export const ROOM_RESUME_TTL_MS = 4 * 60 * 60 * 1000;
+
+export type RoomResumeTicket = {
+  code: string;
+  hostId: string;
+  gameId: string;
+  savedAt: number;
+};
 
 type ActiveRoomTab = {
   [ACTIVE_ROOM_KEY]?: MultiplayerRoomSession | null;
@@ -2635,12 +2662,20 @@ function activeListeners(): Set<Listener> {
 }
 
 function rememberActiveRoom(session: MultiplayerRoomSession): void {
-  const gameId = session.getSnapshot().gameId;
+  const snapshot = session.getSnapshot();
   try {
-    if (gameId) sessionStorage.setItem(ROOM_MARKER_KEY, gameId);
+    if (snapshot.gameId) sessionStorage.setItem(ROOM_MARKER_KEY, snapshot.gameId);
   } catch {
     // Private mode can refuse storage; the in-memory handle is still enough
     // for same-tab navigation.
+  }
+  if (snapshot.room && snapshot.gameId) {
+    writeRoomResumeTicket({
+      code: snapshot.room.code,
+      hostId: snapshot.room.hostId,
+      gameId: snapshot.gameId,
+      savedAt: Date.now(),
+    });
   }
 }
 
@@ -2650,6 +2685,63 @@ function forgetActiveRoom(): void {
   } catch {
     // ignore
   }
+  forgetRoomResumeTicket();
+}
+
+function writeRoomResumeTicket(ticket: RoomResumeTicket): void {
+  try {
+    localStorage.setItem(ROOM_RESUME_KEY, JSON.stringify(ticket));
+  } catch {
+    // Private mode can refuse storage.
+  }
+}
+
+function forgetRoomResumeTicket(): void {
+  try {
+    localStorage.removeItem(ROOM_RESUME_KEY);
+  } catch {
+    // ignore
+  }
+}
+
+export function readRoomResumeTicket(): RoomResumeTicket | null {
+  try {
+    const raw = localStorage.getItem(ROOM_RESUME_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<RoomResumeTicket>;
+    if (
+      typeof parsed.code !== 'string' ||
+      typeof parsed.hostId !== 'string' ||
+      typeof parsed.gameId !== 'string' ||
+      typeof parsed.savedAt !== 'number'
+    ) {
+      return null;
+    }
+    if (!validateRoomCode(parsed.code).ok) return null;
+    if (!validateRoomHostPubkey(parsed.hostId)) return null;
+    if (Date.now() - parsed.savedAt > ROOM_RESUME_TTL_MS) {
+      forgetRoomResumeTicket();
+      return null;
+    }
+    return {
+      code: parsed.code,
+      hostId: parsed.hostId,
+      gameId: parsed.gameId,
+      savedAt: parsed.savedAt,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function resumeTicketIsSpent(error: unknown): boolean {
+  if (error instanceof SeatNeverArrivedError) return true;
+  const message = error instanceof Error ? error.message : String(error);
+  return (
+    /host does not match/i.test(message) ||
+    /Room is full/i.test(message) ||
+    /closed the lobby/i.test(message)
+  );
 }
 
 /** English, like the other session errors — the join page surfaces it as-is. */
@@ -2657,10 +2749,75 @@ export const LOBBY_CLOSED = 'The host closed the lobby.';
 
 export function expectedRoomGameId(): string | null {
   try {
-    return sessionStorage.getItem(ROOM_MARKER_KEY);
+    const marked = sessionStorage.getItem(ROOM_MARKER_KEY);
+    if (marked) return marked;
   } catch {
-    return null;
+    // sessionStorage can throw in private mode; the durable ticket is next.
   }
+  return readRoomResumeTicket()?.gameId ?? null;
+}
+
+let resumeInFlight: Promise<MultiplayerRoomSession | null> | null = null;
+const resumeListeners = new Set<Listener>();
+
+function notifyRoomResume(): void {
+  for (const listener of resumeListeners) listener();
+}
+
+export function subscribeRoomResume(listener: Listener): () => void {
+  resumeListeners.add(listener);
+  return () => {
+    resumeListeners.delete(listener);
+  };
+}
+
+export function isRoomResuming(): boolean {
+  return resumeInFlight !== null;
+}
+
+/**
+ * Rebuilds the in-memory room from the durable ticket after a PWA kill.
+ *
+ * The mesh does not survive a process death. What survives is the code, the
+ * host pin, and this player's profile id — enough to sit back down in the
+ * same chair. A live session is left alone; a closed one is replaced.
+ */
+export async function resumeMultiplayerSession(
+  profile: MultiplayerProfile,
+  dependencies?: SessionDependencies,
+): Promise<MultiplayerRoomSession | null> {
+  const live = getActiveMultiplayerSession();
+  if (live && live.getSnapshot().connection !== 'closed') return live;
+  if (resumeInFlight) return resumeInFlight;
+
+  const ticket = readRoomResumeTicket();
+  if (!ticket) return null;
+
+  resumeInFlight = (async () => {
+    const attempts = 3;
+    for (let attempt = 0; attempt < attempts; attempt++) {
+      const session = new MultiplayerRoomSession(profile, dependencies);
+      try {
+        await session.join(ticket.code, ticket.hostId);
+        activateMultiplayerSession(session);
+        return session;
+      } catch (error) {
+        session.close();
+        if (resumeTicketIsSpent(error) || attempt === attempts - 1) {
+          forgetActiveRoom();
+          for (const listener of activeListeners()) listener();
+          return null;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 750 * (attempt + 1)));
+      }
+    }
+    return null;
+  })().finally(() => {
+    resumeInFlight = null;
+    notifyRoomResume();
+  });
+  notifyRoomResume();
+  return resumeInFlight;
 }
 
 export function activateMultiplayerSession(session: MultiplayerRoomSession): void {

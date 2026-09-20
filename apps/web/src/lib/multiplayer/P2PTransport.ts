@@ -900,7 +900,41 @@ export class P2PTransport implements Transport {
       return;
     }
     this.resilience.forgiveSilence(this.now());
+    // iOS standalone often kills the data channel the moment the PWA is
+    // backgrounded. The delayed redial path is for a flaky radio; coming
+    // back from a freeze has to dial now, or the player sits on a podium
+    // that no longer has a room behind it.
+    this.resumeLinks();
     this.heartbeat();
+  }
+
+  /**
+   * Reopens every seat this peer should still be talking to.
+   *
+   * A frozen page cannot run the redial timer, and iOS often marks the
+   * existing connection failed before `pagehide` even fires. Drop the
+   * corpses and offer again immediately — same glare rule as `retire`.
+   */
+  private resumeLinks(): void {
+    if (!this.resilience || this.closed) return;
+    this.redials.clear();
+    const peers = new Set<string>();
+    if (!this.isHost()) peers.add(this.resilience.hostId);
+    for (const occupant of this.resilience.seats.values()) {
+      if (!occupant.bot) peers.add(occupant.peerId);
+    }
+    for (const peerId of peers) {
+      if (peerId === this.signaling.publicKey) continue;
+      const link = this.links.get(peerId);
+      if (link?.channel?.readyState === 'open') continue;
+      if (link) {
+        this.links.delete(peerId);
+        link.pc.close();
+      }
+      const dials =
+        peerId === this.resilience.hostId ? !this.isHost() : this.signaling.publicKey < peerId;
+      if (dials) void this.connect(peerId, true).catch(() => undefined);
+    }
   }
 
   private heartbeat(): void {

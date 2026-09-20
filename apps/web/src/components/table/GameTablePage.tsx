@@ -11,6 +11,7 @@ import {
   useActiveRoom,
   useExpectedRoom,
   useIsClient,
+  useResumeActiveRoom,
   useRoomTable,
   type RoomTable,
 } from '@/lib/table/useRoomTable';
@@ -193,6 +194,7 @@ export function GameTablePage<TSnapshot, TDispatch, TTransport, S, C extends Rul
   const room = useActiveRoom(pack.gameId);
   const expectedRoom = useExpectedRoom(pack.gameId);
   const isClient = useIsClient();
+  useResumeActiveRoom(pack.gameId);
   // Two components rather than two branches in one: the solo table and the room
   // table hold different hooks, so swapping between them has to remount.
   // Until this tab is on the client snapshot, and while a room handoff is

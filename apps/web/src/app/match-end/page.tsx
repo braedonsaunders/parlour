@@ -13,7 +13,7 @@ import { getGame } from '@/lib/games';
 import { deriveRivalry, hasRivalryToShow } from '@/lib/match/rivalry';
 import { isMultiplayerGameId } from '@/lib/rooms/gameIds';
 import { tableRouteFor } from '@/lib/rooms/tableRoute';
-import { useAnyActiveRoom } from '@/lib/table/useRoomTable';
+import { useAnyActiveRoom, useResumeActiveRoom } from '@/lib/table/useRoomTable';
 import { useHistoryStore } from '@/stores/history';
 import { useMatchFlowStore } from '@/stores/matchFlow';
 import { useProfileStore } from '@/stores/profile';
@@ -32,6 +32,7 @@ export default function MatchEndPage() {
   const profileAvatarId = useProfileStore((s) => s.avatarId);
   const profileName = useProfileStore((s) => s.name);
   const { room: activeRoom, snapshot: activeRoomSnapshot } = useAnyActiveRoom();
+  const { resuming } = useResumeActiveRoom();
   const [rematching, setRematching] = useState(false);
   const [rematchError, setRematchError] = useState<string | null>(null);
 
@@ -72,19 +73,26 @@ export default function MatchEndPage() {
    */
   const waitingOnHost =
     Boolean(snapshot?.id?.startsWith('multiplayer:')) &&
-    activeRoomSnapshot !== null &&
-    activeRoomSnapshot.connection !== 'closed' &&
+    activeRoomSnapshot?.connection === 'connected' &&
     !activeRoomSnapshot.isHost;
+
+  const rejoining =
+    resuming ||
+    activeRoomSnapshot?.connection === 'connecting' ||
+    activeRoomSnapshot?.connection === 'reconnecting';
 
   const playAgain = useCallback(() => {
     if (rematching) return;
     // The handler is a closure the table registered; a reload leaves the
-    // snapshot but not the closure, so fall back to that game's own setup.
-    if (playAgainHandler) {
+    // snapshot but not the closure. A resumed room can still deal the next
+    // match itself — sending the player to solo setup is how a phone that
+    // flicked away for a second left the lobby.
+    const start = playAgainHandler ?? (activeRoom ? () => activeRoom.rematch() : null);
+    if (start) {
       setRematching(true);
       setRematchError(null);
       try {
-        void Promise.resolve(playAgainHandler()).then(
+        void Promise.resolve(start()).then(
           () => setRematching(false),
           (error: unknown) => {
             setRematching(false);
@@ -102,13 +110,42 @@ export default function MatchEndPage() {
     // closure: depending on `snapshot?.game` while the body reads `snapshot`
     // makes the compiler infer a broader dependency than the one declared, and
     // it then declines to memoize the component at all.
-  }, [fallbackRoute, playAgainHandler, rematching, router]);
+  }, [activeRoom, fallbackRoute, playAgainHandler, rematching, router]);
 
   const leaveRoom = useCallback(() => {
-    if (!snapshot?.id?.startsWith('multiplayer:') || !activeRoom) return;
-    activeRoom.close();
+    activeRoom?.close();
     clearActiveMultiplayerSession();
-  }, [activeRoom, snapshot?.id]);
+  }, [activeRoom]);
+
+  const nextMatchStatus = waitingOnHost ? (
+    <p
+      role="status"
+      data-testid="waiting-for-host"
+      className="max-w-[14rem] self-center text-center text-sm font-semibold text-dusk-100/85"
+    >
+      {t('matchEnd.hostDeals')}
+    </p>
+  ) : rejoining ? (
+    <p
+      role="status"
+      data-testid="rejoining-room"
+      className="max-w-[14rem] self-center text-center text-sm font-semibold text-dusk-100/85"
+    >
+      {t('room.reconnecting')}
+    </p>
+  ) : (
+    <button
+      type="button"
+      onClick={playAgain}
+      disabled={rematching}
+      aria-busy={rematching}
+      className={`btn-fat ${styles.primary}`}
+      data-testid="play-again"
+    >
+      {t('matchEnd.playAgain')}
+      {rematching ? '…' : ''}
+    </button>
+  );
 
   return (
     <main className={styles.page} data-testid="match-end-page">
@@ -124,27 +161,7 @@ export default function MatchEndPage() {
             )}
           </MatchPodium>
           <div className={styles.actions}>
-            {waitingOnHost ? (
-              <p
-                role="status"
-                data-testid="waiting-for-host"
-                className="max-w-[14rem] self-center text-center text-sm font-semibold text-dusk-100/85"
-              >
-                {t('matchEnd.hostDeals')}
-              </p>
-            ) : (
-              <button
-                type="button"
-                onClick={playAgain}
-                disabled={rematching}
-                aria-busy={rematching}
-                className={`btn-fat ${styles.primary}`}
-                data-testid="play-again"
-              >
-                {t('matchEnd.playAgain')}
-                {rematching ? '…' : ''}
-              </button>
-            )}
+            {nextMatchStatus}
             <Link href="/" onClick={leaveRoom} className={`btn-fat btn-fat--ghost ${styles.back}`}>
               {t('common.back')}
             </Link>
@@ -155,6 +172,21 @@ export default function MatchEndPage() {
             </p>
           ) : null}
         </>
+      ) : rejoining || activeRoom ? (
+        <div className={`panel-soft mx-6 max-w-md p-8 text-center ${styles.empty}`}>
+          <p
+            role="status"
+            data-testid="rejoining-room"
+            className="text-sm font-semibold text-dusk-100/85"
+          >
+            {waitingOnHost ? t('matchEnd.hostDeals') : t('room.reconnecting')}
+          </p>
+          <div className="mt-5 flex justify-center">
+            <Link href="/" onClick={leaveRoom} className={`btn-fat btn-fat--ghost ${styles.back}`}>
+              {t('common.back')}
+            </Link>
+          </div>
+        </div>
       ) : (
         <div className={`panel-soft mx-6 max-w-md p-8 text-center ${styles.empty}`}>
           <h1 className="font-display text-2xl font-extrabold text-hearth-50">

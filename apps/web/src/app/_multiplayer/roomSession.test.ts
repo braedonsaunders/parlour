@@ -55,6 +55,8 @@ import {
   LOBBY_CLOSED,
   multiplayerSession,
   MultiplayerRoomSession,
+  readRoomResumeTicket,
+  resumeMultiplayerSession,
   type MultiplayerGameId,
 } from './roomSession';
 
@@ -322,7 +324,7 @@ describe('multiplayer route composition', () => {
     const broker = new MockSignalingBroker();
     const rtc = new MockRtcNetwork();
     const host = new MultiplayerRoomSession(
-      { name: 'Host', avatarId: 'ember', profileId: 'host-profile' },
+      { name: 'Rosa', avatarId: 'ember', profileId: 'host-profile' },
       { signaling: broker.signaling('host-peer'), peerConnection: rtc.factory('host'), seed: 42 },
     );
     const guest = new MultiplayerRoomSession(
@@ -342,7 +344,7 @@ describe('multiplayer route composition', () => {
       });
       expect(guest.getSnapshot().seats.find((seat) => seat.seat === 0)).toMatchObject({
         profileId: 'host-profile',
-        name: 'Host',
+        name: 'Rosa',
         avatarId: 'ember',
       });
     });
@@ -780,7 +782,65 @@ describe('multiplayer route composition', () => {
     clearActiveMultiplayerSession();
     expect(getActiveMultiplayerSession()).toBeNull();
     expect(expectedRoomGameId()).toBeNull();
+    expect(readRoomResumeTicket()).toBeNull();
   });
+
+  it('rejoins from the durable ticket after the in-memory room dies', async () => {
+    const broker = new MockSignalingBroker();
+    const rtc = new MockRtcNetwork();
+    const hostSignaling = broker.signaling('resume-host-peer');
+    const host = new MultiplayerRoomSession(
+      { name: 'Rosa', avatarId: 'ember', profileId: 'resume-host-profile' },
+      {
+        signaling: hostSignaling,
+        peerConnection: rtc.factory('resume-host'),
+        seed: 17,
+      },
+    );
+    const guest = new MultiplayerRoomSession(
+      { name: 'Guest', avatarId: 'cobalt', profileId: 'resume-guest-profile' },
+      {
+        signaling: broker.signaling('resume-guest-peer'),
+        peerConnection: rtc.factory('resume-guest'),
+        seed: 18,
+      },
+    );
+    sessions.push(host, guest);
+
+    const room = await host.create({ seats: 2 });
+    await guest.join(room.code, hostSignaling.publicKey);
+    await eventually(() => expect(guest.getSnapshot().localSeat).toBe(1));
+    activateMultiplayerSession(guest);
+
+    expect(readRoomResumeTicket()).toMatchObject({
+      code: room.code,
+      hostId: room.hostId,
+      gameId: 'blitz',
+    });
+
+    // The PWA process died: the mesh is gone, the ticket is not.
+    guest.close();
+    (globalThis as { __parlourActiveRoom?: unknown }).__parlourActiveRoom = null;
+    expect(getActiveMultiplayerSession()).toBeNull();
+    expect(expectedRoomGameId()).toBe('blitz');
+
+    const resumed = await resumeMultiplayerSession(
+      {
+        name: 'Guest',
+        avatarId: 'cobalt',
+        profileId: 'resume-guest-profile',
+      },
+      {
+        signaling: broker.signaling('resume-guest2-peer'),
+        peerConnection: rtc.factory('resume-guest2'),
+        seed: 19,
+      },
+    );
+    expect(resumed).not.toBeNull();
+    if (resumed) sessions.push(resumed);
+    await eventually(() => expect(resumed?.getSnapshot().localSeat).toBe(1));
+    expect(resumed?.getSnapshot().seats.find((seat) => seat.seat === 0)?.name).toBe('Rosa');
+  }, 15_000);
 
   it('deals both peers the same replayable veiled hands', async () => {
     const broker = new MockSignalingBroker();

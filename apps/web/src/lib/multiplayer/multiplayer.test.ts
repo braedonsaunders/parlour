@@ -645,6 +645,25 @@ describe('only the current host may move the board', () => {
     transport.close();
   });
 
+  it('redials the host as soon as the page is visible again', () => {
+    const { transport, harness } = guestOnBlitz();
+    harness.resilience.assignSeat(0, 'host', 'p-host');
+    harness.resilience.seePeer('host', Date.now());
+    const connect = vi.fn().mockResolvedValue(undefined);
+    (transport as unknown as { connect: typeof connect }).connect = connect;
+    (transport as unknown as { links: Map<string, { pc: { close: () => void } }> }).links.set(
+      'host',
+      { pc: { close: vi.fn() } },
+    );
+    (transport as unknown as { redials: Map<string, number> }).redials.set('host', 3);
+
+    transport.setPageHidden(false);
+
+    expect(connect).toHaveBeenCalledWith('host', true);
+    expect((transport as unknown as { redials: Map<string, number> }).redials.size).toBe(0);
+    transport.close();
+  });
+
   it('ignores an applied packet that did not come from the host', async () => {
     const { transport, harness, authority, packet } = guestOnBlitz();
     const before = authority.exportSnapshot();

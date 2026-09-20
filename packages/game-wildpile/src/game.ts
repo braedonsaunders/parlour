@@ -953,7 +953,12 @@ const draw: Move<WildpileState> = {
     // A forced pickup trails the card that caused it; a voluntary draw is instant.
     const drawn = drawCards(state, seat, count, ctx, {
       delayMs: forced ? FORCED_DRAW_DELAY_MS : 0,
-      stopWhen: forced ? undefined : (card) => canPlay(state, card),
+      // A handle is not "unplayable" — the table simply cannot tell yet. Stop
+      // so the seat that can peel it still gets the usual play-or-pass beat.
+      // Drawing through the whole stock was the friend-room bug: every veiled
+      // card failed `canPlay`, the turn ended, and a perfectly legal draw
+      // could never be thrown on the same turn.
+      stopWhen: forced ? undefined : (card) => isVeilHandle(card) || canPlay(state, card),
       // A pickup the seat did not choose is the one worth counting out loud.
       announce: forced ? 'penalty' : undefined,
     });
@@ -971,8 +976,11 @@ const draw: Move<WildpileState> = {
 
     // A pickup is a lost turn. A voluntary draw that lands something playable
     // keeps the turn: standard play lets you use the card you just drew.
+    // Under Veil the face is still a handle, so "can it be played?" is a
+    // question only the drawer can answer after they peel. Holding the turn
+    // is what lets them.
     const taken = hand(settled, seat).at(-1) ?? null;
-    if (!forced && taken !== null && canPlay(settled, taken)) {
+    if (!forced && taken !== null && (isVeilHandle(taken) || canPlay(settled, taken))) {
       ctx.fx.emit('wildpile.drew-playable', { seat, card: taken });
       return { ...settled, drawnCard: taken };
     }

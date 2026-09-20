@@ -188,6 +188,29 @@ describe('match end screen', () => {
     expect(container.querySelector('[data-testid="waiting-for-host"]')).not.toBeNull();
   });
 
+  it('holds the podium while a friend room is reconnecting', () => {
+    play('multiplayer:ABCD:1:finished', 1_000, 1);
+    const roomSnapshot = {
+      gameId: 'blitz',
+      connection: 'reconnecting',
+      session: { status: 'ended' },
+      isHost: false,
+    } as unknown as MultiplayerRoomSnapshot;
+    const room = {
+      getSnapshot: () => roomSnapshot,
+      subscribe: () => () => {},
+      close: vi.fn(),
+      rematch: vi.fn(),
+    } as unknown as MultiplayerRoomSession;
+    activateMultiplayerSession(room);
+    render();
+
+    expect(container.querySelector('[data-testid="rejoining-room"]')?.textContent).toMatch(
+      /Reconnecting/,
+    );
+    expect(container.querySelector('[data-testid="play-again"]')).toBeNull();
+  });
+
   it('closes a finished friend room only when the player leaves the podium', () => {
     play('multiplayer:ABCD:1:finished', 1_000, 1);
     const close = vi.fn();
