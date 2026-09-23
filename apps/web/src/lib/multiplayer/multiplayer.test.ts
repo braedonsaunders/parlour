@@ -13,6 +13,7 @@ import {
   EMOTES,
   EngineAuthority,
   HEARTBEAT_TIMEOUT_MS,
+  ISOLATION_GRACE_MS,
   MultiplayerState,
   NostrSignaling,
   P2PTransport,
@@ -152,6 +153,7 @@ describe('resilience state', () => {
       hostId: 'peer-b',
       term: 1,
       resend: [{ id: 'pending-1', seat: 1, move: 'draw' }],
+      isolated: false,
     });
   });
 
@@ -267,6 +269,7 @@ describe('resilience state', () => {
       hostId: 'host',
       term: 0,
       resend: [],
+      isolated: false,
     });
     expect(state.seats.get(0)?.bot).toBe(false);
   });
@@ -781,5 +784,288 @@ describe('a host claim has to survive the host still being there', () => {
     guest.seePeer('peer-m', 1_000);
     guest.seePeer('peer-b', 1_000);
     expect(guest.considerHostClaim('peer-z', 1, false, 99_999)).toBe(false);
+  });
+});
+
+/*
+ * Reported from two phones: a few seconds of silence between games left each
+ * one hosting its own table against a bot, and each awarded itself the match.
+ * Nobody had left. These are the pieces that let a stalled link come back.
+ */
+describe('a stalled link heals instead of splitting the table', () => {
+  function guestHearingOnlyTheHost() {
+    const guest = new MultiplayerState('peer-g', 'peer-h');
+    guest.assignSeat(0, 'peer-h', 'profile-h');
+    guest.assignSeat(1, 'peer-g', 'profile-g');
+    guest.seePeer('peer-h', 0);
+    return guest;
+  }
+
+  it('does not take the table while it can hear nobody at all', () => {
+    const guest = guestHearingOnlyTheHost();
+    const result = guest.expireAndElect(
+      HEARTBEAT_TIMEOUT_MS + 1,
+      HEARTBEAT_TIMEOUT_MS,
+      false,
+      ISOLATION_GRACE_MS,
+    );
+    expect(result).toMatchObject({ changed: false, hostId: 'peer-h', isolated: true });
+    expect(guest.seats.get(0)?.bot).toBe(false);
+  });
+
+  it('still elects itself once the silence outlasts the grace', () => {
+    const guest = guestHearingOnlyTheHost();
+    const result = guest.expireAndElect(
+      HEARTBEAT_TIMEOUT_MS + ISOLATION_GRACE_MS + 1,
+      HEARTBEAT_TIMEOUT_MS,
+      false,
+      ISOLATION_GRACE_MS,
+    );
+    expect(result).toMatchObject({ changed: true, hostId: 'peer-g', term: 1, isolated: false });
+    expect(guest.seats.get(0)?.bot).toBe(true);
+  });
+
+  it('elects on the ordinary timeout when another peer is still audible', () => {
+    const guest = new MultiplayerState('peer-g', 'peer-h');
+    guest.seePeer('peer-h', 0);
+    guest.seePeer('peer-c', HEARTBEAT_TIMEOUT_MS);
+    const result = guest.expireAndElect(
+      HEARTBEAT_TIMEOUT_MS + 1,
+      HEARTBEAT_TIMEOUT_MS,
+      false,
+      ISOLATION_GRACE_MS,
+    );
+    expect(result).toMatchObject({ changed: true, hostId: 'peer-c', isolated: false });
+  });
+
+  it('hands the table back to the exact host it replaced blind', () => {
+    const guest = guestHearingOnlyTheHost();
+    guest.expireAndElect(60_000, HEARTBEAT_TIMEOUT_MS, false, ISOLATION_GRACE_MS);
+    expect(guest.hostId).toBe('peer-g');
+
+    expect(guest.yieldToReturningHost('peer-x', 0)).toBe(false);
+    expect(guest.yieldToReturningHost('peer-h', 1)).toBe(false);
+    expect(guest.yieldToReturningHost('peer-h', 0)).toBe(true);
+    expect(guest.hostId).toBe('peer-h');
+    expect(guest.electionTerm).toBe(0);
+    // Once, not every heartbeat after.
+    expect(guest.yieldToReturningHost('peer-h', 0)).toBe(false);
+  });
+
+  it('never yields a table it was elected to by peers it could hear', () => {
+    const guest = new MultiplayerState('peer-a', 'peer-h');
+    guest.seePeer('peer-h', 0);
+    guest.seePeer('peer-c', HEARTBEAT_TIMEOUT_MS);
+    guest.expireAndElect(HEARTBEAT_TIMEOUT_MS + 1);
+    expect(guest.hostId).toBe('peer-a');
+    expect(guest.yieldToReturningHost('peer-h', 0)).toBe(false);
+  });
+
+  it('gives a quiet player their seat back when they are heard again', () => {
+    const host = new MultiplayerState('peer-h', 'peer-h');
+    host.assignSeat(0, 'peer-h', 'profile-h');
+    host.assignSeat(1, 'peer-g', 'profile-g');
+    host.assignBotSeat(2);
+    host.seePeer('peer-g', 0);
+    host.expireAndElect(HEARTBEAT_TIMEOUT_MS + 1);
+    expect(host.seats.get(1)?.bot).toBe(true);
+    const before = host.exportPresence().version;
+
+    expect(host.readmit('peer-g')).toEqual({ seat: 1, profileId: 'profile-g' });
+    expect(host.seats.get(1)).toEqual({ peerId: 'peer-g', profileId: 'profile-g', bot: false });
+    expect(host.exportPresence().version).toBe(before + 1);
+    expect(host.readmit('peer-g')).toBeNull();
+    expect(host.readmit('bot:2')).toBeNull();
+  });
+});
+
+describe('the transport heals a stall on the channel it already has', () => {
+  function stubPool() {
+    const subscriptions: { close: ReturnType<typeof vi.fn> }[] = [];
+    const pool = {
+      ensureRelay: vi.fn(),
+      publish: vi.fn(() => []),
+      querySync: vi.fn(async () => []),
+      subscribeMany: vi.fn(() => {
+        const subscription = { close: vi.fn() };
+        subscriptions.push(subscription);
+        return subscription;
+      }),
+      close: vi.fn(),
+    };
+    return { pool, subscriptions };
+  }
+
+  type Harness = {
+    resilience: MultiplayerState;
+    links: Map<string, unknown>;
+    startRoom(code: string, hostId: string): void;
+    receiveWire(peerId: string, message: unknown): Promise<void>;
+    receiveSignal(peerId: string, signal: unknown): Promise<void>;
+    heartbeat(): void;
+    sendTo: ReturnType<typeof vi.fn>;
+  };
+
+  function transportFor(hostId: 'self' | string, options: { peerConnection?: () => unknown } = {}) {
+    let clock = 1_000;
+    const { pool, subscriptions } = stubPool();
+    const signaling = new NostrSignaling({ relays: [], pool });
+    const transport = new P2PTransport({
+      authority: counterAuthority(),
+      profileId: 'profile-local',
+      signaling,
+      origin: 'https://parlour.test',
+      now: () => clock,
+      ...(options.peerConnection
+        ? { peerConnection: options.peerConnection as () => RTCPeerConnection }
+        : {}),
+    });
+    const harness = transport as unknown as Harness;
+    harness.sendTo = vi.fn();
+    harness.startRoom('AB2Z', hostId === 'self' ? signaling.publicKey : hostId);
+    const presence: { kind: string; state?: string; seat?: number }[] = [];
+    transport.onPresence((event) => presence.push(event as (typeof presence)[number]));
+    return {
+      transport,
+      harness,
+      signaling,
+      presence,
+      subscriptions,
+      advance: (ms: number) => {
+        clock += ms;
+      },
+    };
+  }
+
+  it('gives the seat back when a player the host timed out speaks again', async () => {
+    const { transport, harness, signaling, presence, advance } = transportFor('self');
+    transport.holdLobby(false);
+    harness.resilience.assignSeat(0, signaling.publicKey, 'profile-local');
+    harness.resilience.assignSeat(1, 'peer-g', 'profile-g');
+    harness.resilience.seePeer('peer-g', 1_000);
+
+    advance(HEARTBEAT_TIMEOUT_MS + 1_001);
+    harness.heartbeat();
+    expect(harness.resilience.seats.get(1)?.bot).toBe(true);
+
+    await harness.receiveWire('peer-g', { type: 'heartbeat', sentAt: 1 });
+
+    expect(harness.resilience.seats.get(1)?.bot).toBe(false);
+    expect(presence).toContainEqual(expect.objectContaining({ kind: 'seat.reclaimed', seat: 1 }));
+    transport.close();
+  });
+
+  it('reports the host silent without deposing it, and live again when it speaks', async () => {
+    const { transport, harness, signaling, presence, advance } = transportFor('peer-h');
+    transport.holdLobby(false);
+    harness.resilience.assignSeat(0, 'peer-h', 'profile-h');
+    harness.resilience.assignSeat(1, signaling.publicKey, 'profile-local');
+    harness.resilience.seePeer('peer-h', 1_000);
+
+    advance(HEARTBEAT_TIMEOUT_MS + 1_001);
+    harness.heartbeat();
+    expect(harness.resilience.hostId).toBe('peer-h');
+    expect(presence).toContainEqual({ kind: 'connection', state: 'reconnecting' });
+
+    await harness.receiveWire('peer-h', {
+      type: 'heartbeat',
+      sentAt: 1,
+      hostId: 'peer-h',
+      term: 0,
+    });
+    expect(presence.at(-1)).toEqual({ kind: 'connection', state: 'connected' });
+    transport.close();
+  });
+
+  it('steps down and asks for the table when the host it replaced was there all along', async () => {
+    const { transport, harness, signaling, presence, advance } = transportFor('peer-h');
+    transport.holdLobby(false);
+    harness.resilience.assignSeat(0, 'peer-h', 'profile-h');
+    harness.resilience.assignSeat(1, signaling.publicKey, 'profile-local');
+    harness.resilience.seePeer('peer-h', 1_000);
+
+    advance(HEARTBEAT_TIMEOUT_MS + ISOLATION_GRACE_MS + 1_001);
+    harness.heartbeat();
+    expect(harness.resilience.hostId).toBe(signaling.publicKey);
+
+    await harness.receiveWire('peer-h', {
+      type: 'heartbeat',
+      sentAt: 1,
+      hostId: 'peer-h',
+      term: 0,
+    });
+
+    expect(harness.resilience.hostId).toBe('peer-h');
+    expect(harness.sendTo).toHaveBeenCalledWith('peer-h', {
+      type: 'sync.request',
+      expectedSeq: 0,
+    });
+    expect(presence).toContainEqual({ kind: 'host.changed', hostId: 'peer-h' });
+    transport.close();
+  });
+
+  it('answers a fresh offer on a new connection instead of renegotiating the dead one', async () => {
+    const made: { closed: boolean; answered: boolean }[] = [];
+    const peerConnection = () => {
+      const record = { closed: false, answered: false };
+      made.push(record);
+      const pc = {
+        remoteDescription: null as RTCSessionDescriptionInit | null,
+        signalingState: 'stable' as RTCSignalingState,
+        async setRemoteDescription(description: RTCSessionDescriptionInit) {
+          pc.remoteDescription = description;
+        },
+        async createAnswer() {
+          record.answered = true;
+          return { type: 'answer', sdp: 'answer' };
+        },
+        async setLocalDescription() {},
+        async addIceCandidate() {},
+        close() {
+          record.closed = true;
+        },
+      };
+      return pc;
+    };
+    const { transport, harness, signaling } = transportFor('self', { peerConnection });
+    vi.spyOn(signaling, 'send').mockResolvedValue();
+
+    await harness.receiveSignal('peer-g', { type: 'offer', sdp: 'first' });
+    await harness.receiveSignal('peer-g', { type: 'offer', sdp: 'second' });
+
+    expect(made).toHaveLength(2);
+    expect(made[0]).toEqual({ closed: true, answered: true });
+    expect(made[1]).toEqual({ closed: false, answered: true });
+    transport.close();
+  });
+
+  it('ignores an answer to an offer it has already abandoned', async () => {
+    const setRemoteDescription = vi.fn();
+    const peerConnection = () => ({
+      remoteDescription: null,
+      signalingState: 'stable',
+      setRemoteDescription,
+      async addIceCandidate() {},
+      close() {},
+    });
+    const { transport, harness } = transportFor('self', { peerConnection });
+
+    await harness.receiveSignal('peer-g', { type: 'ice', candidate: { candidate: 'x' } });
+    await harness.receiveSignal('peer-g', { type: 'answer', sdp: 'late' });
+
+    expect(setRemoteDescription).not.toHaveBeenCalled();
+    transport.close();
+  });
+
+  it('renews the signalling subscription when the page comes back', () => {
+    const { transport, subscriptions } = transportFor('peer-h');
+    expect(subscriptions).toHaveLength(1);
+
+    transport.setPageHidden(false);
+
+    expect(subscriptions).toHaveLength(2);
+    expect(subscriptions[0]!.close).toHaveBeenCalled();
+    expect(subscriptions[1]!.close).not.toHaveBeenCalled();
+    transport.close();
   });
 });

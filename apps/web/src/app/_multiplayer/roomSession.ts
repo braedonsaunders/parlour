@@ -159,6 +159,8 @@ type SessionDependencies = {
   seed?: number;
   heartbeatIntervalMs?: number;
   heartbeatTimeoutMs?: number;
+  /** how long a guest that hears nobody waits before taking the table over */
+  isolationGraceMs?: number;
   /** how long a veiled round holds a dropped seat open before recovering it */
   reconnectGraceMs?: number;
   /** how long a connected join waits to be given a chair before giving up */
@@ -2395,6 +2397,7 @@ export class MultiplayerRoomSession {
       peerConnection: this.dependencies.peerConnection,
       heartbeatIntervalMs: this.dependencies.heartbeatIntervalMs,
       heartbeatTimeoutMs: this.dependencies.heartbeatTimeoutMs,
+      isolationGraceMs: this.dependencies.isolationGraceMs,
     });
     this.attachPageLifecycle();
     this.transport.onEvent((packet) => this.accept(packet));
@@ -2567,6 +2570,12 @@ export class MultiplayerRoomSession {
         });
         return;
       }
+      // The host timed THIS seat out while its packets were stuck, and the
+      // news arrived with them. Holding our own chair open for ourselves, and
+      // then awarding the opponent a walkover on our own screen, is the one
+      // reading that is certainly wrong: we are here. The host gives the seat
+      // back as soon as it hears us, and the presence that says so follows.
+      if (presence.seat === this.snapshot.localSeat) return;
       // At a veiled table the chair is HELD, not taken over: nothing plays it
       // during the hold, so labelling it a bot was a lie that read as a bot
       // asleep at the table. It stays the absent player, marked away, until

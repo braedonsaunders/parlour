@@ -14,6 +14,7 @@ import {
 import {
   HEARTBEAT_INTERVAL_MS,
   HEARTBEAT_TIMEOUT_MS,
+  ISOLATION_GRACE_MS,
   STALLED_CLOCK_MS,
   MultiplayerState,
   houseBotPeerId,
@@ -50,13 +51,36 @@ import type {
 
 /** How long to wait before redialling a peer whose connection died. */
 const REDIAL_DELAY_MS = 1_000;
-/** Redials before a peer is treated as genuinely gone rather than flaky. */
+/** Quick redials after a link dies, before the slower watchdog takes over. */
 const MAX_REDIALS = 3;
+/**
+ * How long a dial may go unanswered before it is torn down and placed again,
+ * doubling per attempt up to the cap.
+ *
+ * An offer that reaches nobody — the other phone was frozen, or the relay that
+ * carried it had dropped our subscription — leaves a connection that never
+ * fails, because it never started. Nothing used to notice, so a player who
+ * came back from another app sat beside a table that had stopped ringing them.
+ */
+const DIAL_PATIENCE_MS = 6_000;
+const MAX_DIAL_PATIENCE_MS = 30_000;
+/**
+ * The least time between two renewals of the signalling subscription.
+ *
+ * A relay socket that errors out takes our subscription with it for good, and
+ * a backgrounded phone loses its sockets as a matter of course. Offers and
+ * answers ride that subscription, so while any link is down it is renewed,
+ * no more often than this.
+ */
+const SIGNAL_REFRESH_MS = 15_000;
 
 type PeerLink = {
   pc: RTCPeerConnection;
   channel?: RTCDataChannel;
+  /** candidates waiting for a remote description they belong to */
   pendingIce: RTCIceCandidateInit[];
+  /** when this connection was begun, so a dial nobody answers can be retried */
+  startedAt: number;
   /** DataChannels are ordered, so async packet handling must stay ordered too. */
   inbox: Promise<void>;
   profileId?: string;
@@ -73,6 +97,8 @@ type P2PTransportOptions = {
   now?: () => number;
   heartbeatIntervalMs?: number;
   heartbeatTimeoutMs?: number;
+  /** how long a guest that hears nobody waits before electing itself */
+  isolationGraceMs?: number;
   randomBytes?: (length: number) => Uint8Array;
   peerConnection?: (configuration: RTCConfiguration) => RTCPeerConnection;
 };
@@ -87,6 +113,7 @@ export class P2PTransport implements Transport {
   private readonly now: () => number;
   private readonly heartbeatIntervalMs: number;
   private readonly heartbeatTimeoutMs: number;
+  private readonly isolationGraceMs: number;
   private readonly randomBytes: (length: number) => Uint8Array;
   private readonly peerConnection: (configuration: RTCConfiguration) => RTCPeerConnection;
   private readonly links = new Map<string, PeerLink>();
@@ -103,6 +130,11 @@ export class P2PTransport implements Transport {
   /** Redials spent on a peer since it last held an open channel. */
   private readonly redials = new Map<string, number>();
   private readonly redialTimers = new Set<ReturnType<typeof setTimeout>>();
+  /** Watchdog redials spent on a peer since it last held an open channel. */
+  private readonly dialAttempts = new Map<string, number>();
+  private lastSignalRefreshAt = -Infinity;
+  /** the host has gone quiet and this peer, hearing nobody, is waiting on it */
+  private hostQuiet = false;
   private resilience?: MultiplayerState;
   private roomCode?: string;
   private signalSubscription?: { close(): void };
@@ -136,6 +168,7 @@ export class P2PTransport implements Transport {
     this.now = options.now ?? (() => Date.now());
     this.heartbeatIntervalMs = options.heartbeatIntervalMs ?? HEARTBEAT_INTERVAL_MS;
     this.heartbeatTimeoutMs = options.heartbeatTimeoutMs ?? HEARTBEAT_TIMEOUT_MS;
+    this.isolationGraceMs = options.isolationGraceMs ?? ISOLATION_GRACE_MS;
     this.randomBytes =
       options.randomBytes ??
       ((length) => {
@@ -399,10 +432,52 @@ export class P2PTransport implements Transport {
     this.roomCode = code;
     this.resilience = new MultiplayerState(this.signaling.publicKey, hostId);
     this.resilience.seePeer(this.signaling.publicKey, this.now());
-    this.signalSubscription = this.signaling.subscribe(code, (sender, signal) => {
-      void this.receiveSignal(sender, signal);
-    });
+    this.subscribeSignals();
     this.heartbeatTimer = setInterval(() => this.heartbeat(), this.heartbeatIntervalMs);
+  }
+
+  /**
+   * (Re)opens the subscription offers and answers arrive on.
+   *
+   * Renewing is not a formality. nostr-tools drops a relay — and every
+   * subscription on it — for good when its socket errors, and an iOS PWA loses
+   * its sockets whenever it is backgrounded. A phone back from a text message
+   * could still send an offer (publishing reconnects) but never hear the
+   * answer, so it redialled into silence until the app was restarted.
+   */
+  private subscribeSignals(): void {
+    if (!this.roomCode || this.closed) return;
+    this.signalSubscription?.close();
+    this.lastSignalRefreshAt = this.now();
+    this.signalSubscription = this.signaling.subscribe(this.roomCode, (sender, signal) => {
+      void this.receiveSignal(sender, signal).catch(() => undefined);
+    });
+  }
+
+  /**
+   * Whether this peer places the call to `peerId`, rather than waiting for it.
+   *
+   * Guests call the host, and between guests the lower id calls. The host
+   * calls nobody. It used to call any guest whose id sorted above its own,
+   * while that guest was calling the host too, so every redial between them
+   * was a pair of crossed offers.
+   */
+  private dialsTo(peerId: string): boolean {
+    if (!this.resilience) return false;
+    if (peerId === this.resilience.hostId) return !this.isHost();
+    return !this.isHost() && this.signaling.publicKey < peerId;
+  }
+
+  /** Every human this peer should hold a channel to: the host, and the seats. */
+  private expectedPeers(): Set<string> {
+    const peers = new Set<string>();
+    if (!this.resilience) return peers;
+    if (!this.isHost()) peers.add(this.resilience.hostId);
+    for (const [seat, occupant] of this.resilience.seats) {
+      if (occupant.peerId !== houseBotPeerId(seat)) peers.add(occupant.peerId);
+    }
+    peers.delete(this.signaling.publicKey);
+    return peers;
   }
 
   private handle(code: string): RoomHandle {
@@ -433,9 +508,7 @@ export class P2PTransport implements Transport {
     link.pc.close();
 
     const spent = this.redials.get(peerId) ?? 0;
-    const dials =
-      peerId === this.resilience?.hostId ? !this.isHost() : this.signaling.publicKey < peerId;
-    if (!dials || spent >= MAX_REDIALS) return;
+    if (!this.dialsTo(peerId) || spent >= MAX_REDIALS) return;
     this.redials.set(peerId, spent + 1);
     const timer = setTimeout(() => {
       this.redialTimers.delete(timer);
@@ -457,7 +530,7 @@ export class P2PTransport implements Transport {
 
   private createLink(peerId: string): PeerLink {
     const pc = this.peerConnection({ iceServers: this.iceServers });
-    const link: PeerLink = { pc, pendingIce: [], inbox: Promise.resolve() };
+    const link: PeerLink = { pc, pendingIce: [], inbox: Promise.resolve(), startedAt: this.now() };
     this.links.set(peerId, link);
     pc.onicecandidate = (event) => {
       if (event.candidate) {
@@ -499,6 +572,7 @@ export class P2PTransport implements Transport {
       // A peer that reaches an open channel has spent none of its redials: the
       // cap is there for a peer that has left, not one on a flaky phone.
       this.redials.delete(peerId);
+      this.dialAttempts.delete(peerId);
       this.resilience?.seePeer(peerId, this.now());
       this.sendTo(peerId, { type: 'hello', profile: this.profile });
       this.emitPresence({ kind: 'connection', state: 'connected' });
@@ -519,35 +593,87 @@ export class P2PTransport implements Transport {
   }
 
   private async receiveSignal(peerId: string, signal: SignalPayload): Promise<void> {
+    if (this.closed || peerId === this.signaling.publicKey) return;
     let link = this.links.get(peerId);
-    if (!link) link = this.createLink(peerId);
     if (signal.type === 'offer') {
+      /*
+       * An offer is always a brand-new connection: nothing here renegotiates.
+       * So one arriving over a link that has already been used means the
+       * other side has given up on it, whatever our end still believes. It
+       * used to be applied to the old connection as a renegotiation, which
+       * fails outright on a new DTLS fingerprint, and a phone back from the
+       * background could not reach a host that had not yet noticed it left.
+       */
+      if (link && (link.pc.remoteDescription || link.channel)) {
+        // Crossed offers: whoever places the call keeps its own.
+        if (link.pc.signalingState === 'have-local-offer' && this.dialsTo(peerId)) return;
+        const carried = link.pendingIce;
+        this.links.delete(peerId);
+        link.pc.close();
+        link = this.createLink(peerId);
+        link.pendingIce.push(...carried);
+      }
+      link ??= this.createLink(peerId);
       await link.pc.setRemoteDescription({ type: 'offer', sdp: signal.sdp });
       await this.flushIce(link);
       const answer = await link.pc.createAnswer();
       await link.pc.setLocalDescription(answer);
       await this.signaling.send(this.roomCode!, peerId, { type: 'answer', sdp: answer.sdp ?? '' });
     } else if (signal.type === 'answer') {
+      // An answer to an offer we have since abandoned has nothing to attach to.
+      if (!link || link.pc.signalingState !== 'have-local-offer') return;
       await link.pc.setRemoteDescription({ type: 'answer', sdp: signal.sdp });
       await this.flushIce(link);
-    } else if (link.pc.remoteDescription) {
-      await link.pc.addIceCandidate(signal.candidate);
     } else {
-      link.pendingIce.push(signal.candidate);
+      link ??= this.createLink(peerId);
+      const remote = link.pc.remoteDescription;
+      if (remote && belongsTo(signal.candidate, remote.sdp)) {
+        await link.pc.addIceCandidate(signal.candidate).catch(() => undefined);
+      } else {
+        // Early, or for the connection an offer still on its way will open.
+        link.pendingIce.push(signal.candidate);
+      }
     }
   }
 
   private async flushIce(link: PeerLink): Promise<void> {
-    for (const candidate of link.pendingIce.splice(0)) await link.pc.addIceCandidate(candidate);
+    const sdp = link.pc.remoteDescription?.sdp ?? '';
+    const waiting = link.pendingIce.splice(0);
+    for (const candidate of waiting) {
+      if (belongsTo(candidate, sdp)) {
+        await link.pc.addIceCandidate(candidate).catch(() => undefined);
+      } else {
+        link.pendingIce.push(candidate);
+      }
+    }
   }
 
   private async receiveWire(peerId: string, message: WireMessage): Promise<void> {
     this.resilience?.seePeer(peerId, this.now());
+    this.noticeReturn(peerId);
     switch (message.type) {
       case 'heartbeat':
         // Said before the operating system froze their page. `seePeer` above
         // has already cleared any previous hold, so this is the live one.
         if (message.away) this.resilience?.holdAway(peerId, this.now());
+        if (
+          message.hostId === peerId &&
+          message.term !== undefined &&
+          this.resilience?.yieldToReturningHost(peerId, message.term)
+        ) {
+          // We took the table because we could hear nobody, and the host we
+          // replaced was there all along: the silence was ours. Hand it back
+          // and take the host's position rather than keep a second table.
+          this.pendingResync = true;
+          this.pendingHostMigration = true;
+          this.sendTo(peerId, {
+            type: 'sync.request',
+            expectedSeq: this.authority.exportSnapshot().log.length,
+          });
+          this.emitPresence({ kind: 'host.changed', hostId: peerId });
+          this.emitPresence({ kind: 'connection', state: 'connected' });
+          return;
+        }
         if (
           message.hostId === peerId &&
           message.term !== undefined &&
@@ -766,6 +892,36 @@ export class P2PTransport implements Transport {
     }
   }
 
+  /**
+   * Any packet from a peer is proof it is still there.
+   *
+   * Two things were waiting on that proof and never got it. A guest that had
+   * reported the host silent stayed "reconnecting" through a live table. And a
+   * host that had handed a quiet player's seat to a bot kept it there, because
+   * only a `hello` on a new channel gave a seat back, and a stall does not
+   * close the channel. The player's own moves were then refused as coming
+   * from a seat they no longer held.
+   */
+  private noticeReturn(peerId: string): void {
+    const resilience = this.resilience;
+    if (!resilience) return;
+    if (this.hostQuiet && peerId === resilience.hostId) {
+      this.hostQuiet = false;
+      this.emitPresence({ kind: 'connection', state: 'connected' });
+    }
+    if (!this.isHost() || this.lobbyHold) return;
+    const readmitted = resilience.readmit(peerId);
+    if (!readmitted) return;
+    this.authority.setSeatBot(readmitted.seat, false);
+    this.broadcastPresence();
+    this.emitPresence({
+      kind: 'seat.reclaimed',
+      peerId,
+      seat: readmitted.seat,
+      profile: this.profileFor(peerId, readmitted.profileId),
+    });
+  }
+
   private welcome(peerId: string, profileId: string): void {
     const reclaimed = this.resilience!.reclaimSeat(peerId, profileId);
     const seat = reclaimed ?? this.firstOpenSeat();
@@ -900,6 +1056,7 @@ export class P2PTransport implements Transport {
       return;
     }
     this.resilience.forgiveSilence(this.now());
+    this.subscribeSignals();
     // iOS standalone often kills the data channel the moment the PWA is
     // backgrounded. The delayed redial path is for a flaky radio; coming
     // back from a freeze has to dial now, or the player sits on a podium
@@ -918,23 +1075,48 @@ export class P2PTransport implements Transport {
   private resumeLinks(): void {
     if (!this.resilience || this.closed) return;
     this.redials.clear();
-    const peers = new Set<string>();
-    if (!this.isHost()) peers.add(this.resilience.hostId);
-    for (const occupant of this.resilience.seats.values()) {
-      if (!occupant.bot) peers.add(occupant.peerId);
-    }
-    for (const peerId of peers) {
-      if (peerId === this.signaling.publicKey) continue;
+    this.dialAttempts.clear();
+    for (const peerId of this.expectedPeers()) {
       const link = this.links.get(peerId);
       if (link?.channel?.readyState === 'open') continue;
+      if (!this.dialsTo(peerId)) continue;
       if (link) {
         this.links.delete(peerId);
         link.pc.close();
       }
-      const dials =
-        peerId === this.resilience.hostId ? !this.isHost() : this.signaling.publicKey < peerId;
-      if (dials) void this.connect(peerId, true).catch(() => undefined);
+      void this.connect(peerId, true).catch(() => undefined);
     }
+  }
+
+  /**
+   * Keeps ringing any peer whose channel is down, for as long as it holds a seat.
+   *
+   * The quick redials in `retire` only run off a connection that FAILED, and
+   * give up after three. A dial into a frozen phone never fails — it never
+   * starts — so the link sat half-built forever and `connect` refused to
+   * replace it. This notices a dial nobody answered and places it again, with
+   * a growing pause, and keeps the signalling subscription those dials depend
+   * on alive while it does.
+   */
+  private maintainLinks(now: number): void {
+    if (!this.resilience || this.closed) return;
+    let down = false;
+    for (const peerId of this.expectedPeers()) {
+      const link = this.links.get(peerId);
+      if (link?.channel?.readyState === 'open') continue;
+      down = true;
+      if (!this.dialsTo(peerId)) continue;
+      const attempts = this.dialAttempts.get(peerId) ?? 0;
+      const patience = Math.min(DIAL_PATIENCE_MS * 2 ** attempts, MAX_DIAL_PATIENCE_MS);
+      if (link && now - link.startedAt < patience) continue;
+      this.dialAttempts.set(peerId, attempts + 1);
+      if (link) {
+        this.links.delete(peerId);
+        link.pc.close();
+      }
+      void this.connect(peerId, true).catch(() => undefined);
+    }
+    if (down && now - this.lastSignalRefreshAt >= SIGNAL_REFRESH_MS) this.subscribeSignals();
   }
 
   private heartbeat(): void {
@@ -969,7 +1151,18 @@ export class P2PTransport implements Transport {
     });
     const before = new Map(this.resilience.seats);
     const beforePresence = this.resilience.exportPresence();
-    const election = this.resilience.expireAndElect(now, this.heartbeatTimeoutMs, this.lobbyHold);
+    const election = this.resilience.expireAndElect(
+      now,
+      this.heartbeatTimeoutMs,
+      this.lobbyHold,
+      this.isolationGraceMs,
+    );
+    if (election.isolated && !this.hostQuiet) {
+      this.hostQuiet = true;
+      this.emitPresence({ kind: 'connection', state: 'reconnecting' });
+    }
+    if (election.changed) this.hostQuiet = false;
+    this.maintainLinks(now);
     if (election.changed && this.lobbyHold) {
       this.emitPresence({ kind: 'room.closed' });
       this.close();
@@ -1112,4 +1305,17 @@ export class P2PTransport implements Transport {
     if (!this.roomCode || !this.resilience) throw new Error('join or create a room first');
     if (this.closed) throw new Error('transport is closed');
   }
+}
+
+/**
+ * Whether a trickled candidate was gathered for the session `sdp` describes.
+ *
+ * A redial's candidates can land before its offer, while the link still holds
+ * the dead session's description. Handing them to that session wastes them;
+ * holding them for the offer they belong to is what lets the new link form.
+ */
+function belongsTo(candidate: RTCIceCandidateInit, sdp: string): boolean {
+  const fragment = candidate.usernameFragment;
+  if (!fragment) return true;
+  return !/a=ice-ufrag:/.test(sdp) || sdp.includes(`a=ice-ufrag:${fragment}`);
 }

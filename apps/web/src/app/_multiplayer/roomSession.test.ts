@@ -160,6 +160,7 @@ class MockRtcNetwork {
 class MockPeerConnection {
   connectionState: RTCPeerConnectionState = 'new';
   remoteDescription: RTCSessionDescription | null = null;
+  signalingState: RTCSignalingState = 'stable';
   onicecandidate: RTCPeerConnection['onicecandidate'] = null;
   ondatachannel: RTCPeerConnection['ondatachannel'] = null;
   onconnectionstatechange: RTCPeerConnection['onconnectionstatechange'] = null;
@@ -194,10 +195,13 @@ class MockPeerConnection {
     return { type: 'answer' as const, sdp: this.id };
   }
 
-  async setLocalDescription() {}
+  async setLocalDescription(description?: RTCSessionDescriptionInit) {
+    this.signalingState = description?.type === 'offer' ? 'have-local-offer' : 'stable';
+  }
 
   async setRemoteDescription(description: RTCSessionDescriptionInit) {
     this.remoteDescription = description as RTCSessionDescription;
+    this.signalingState = description.type === 'offer' ? 'have-remote-offer' : 'stable';
     if (description.type === 'offer' && description.sdp) {
       this.initiator = this.network.get(description.sdp);
     }

@@ -130,6 +130,58 @@ describe('fast two-player veiled duels', () => {
     expect(report.outcome).toBe('completed');
   }, 150_000);
 
+  it('rides out a Wild link that goes silent past the heartbeat timeout', async () => {
+    const report = await runDuel({
+      gameId: 'wildpile',
+      seed: 808,
+      config: WILD_CONFIG,
+      fault: { kind: 'guest-stall', afterPlies: 6, awayMs: 4_000 },
+      stallMs: 20_000,
+    });
+    expectClean(report);
+    expect(report.outcome).toBe('completed');
+  }, 150_000);
+
+  it('rides out a Blitz link that goes silent past the heartbeat timeout', async () => {
+    const report = await runDuel({
+      gameId: 'blitz',
+      seed: 909,
+      config: BLITZ_CONFIG,
+      fault: { kind: 'guest-stall', afterPlies: 4, awayMs: 4_000 },
+      stallMs: 20_000,
+    });
+    expectClean(report);
+    expect(report.outcome).toBe('completed');
+  }, 150_000);
+
+  it('rides out a Blitz host whose link goes silent past the heartbeat timeout', async () => {
+    const report = await runDuel({
+      gameId: 'blitz',
+      seed: 919,
+      config: BLITZ_CONFIG,
+      fault: { kind: 'host-stall', afterPlies: 4, awayMs: 4_000 },
+      stallMs: 20_000,
+    });
+    expectClean(report);
+    expect(report.outcome).toBe('completed');
+  }, 150_000);
+
+  it('hands the table back when a guest that took it over hears the host again', async () => {
+    // Long enough that the isolated guest stops waiting and elects itself,
+    // short of the seat hold, so both sides are still holding for each other
+    // when the link comes back.
+    const report = await runDuel({
+      gameId: 'wildpile',
+      seed: 929,
+      config: WILD_CONFIG,
+      fault: { kind: 'guest-stall', afterPlies: 6, awayMs: 9_000 },
+      reconnectGraceMs: 30_000,
+      stallMs: 25_000,
+    });
+    expectClean(report);
+    expect(report.outcome).toBe('completed');
+  }, 150_000);
+
   it('sweeps seeds across both games (scaled by PARLOUR_FULL_SIM)', async () => {
     const perGame = simGames(2, 12);
     const failures: string[] = [];

@@ -31,6 +31,19 @@ export const AWAY_GRACE_MS = 90_000;
  */
 export const STALLED_CLOCK_MS = 10_000;
 
+/**
+ * How long a guest that can hear nobody waits before taking over as host.
+ *
+ * When the host and every other peer go quiet at the same moment, the likeliest
+ * explanation is this device's own link: a Wi-Fi hiccup, a radio handoff, a
+ * retransmit backing off. Electing itself on the ordinary timeout left a phone
+ * that stalled for four seconds hosting a private table of bots, while the real
+ * host held its chair — two tables, each awarding itself the walkover. So an
+ * isolated guest reports that it is reconnecting and only takes over once the
+ * silence has outlasted a hiccup.
+ */
+export const ISOLATION_GRACE_MS = 15_000;
+
 export function validatePresenceSnapshot(snapshot: unknown, maxSeats: number): PresenceSnapshot {
   if (
     !snapshot ||
@@ -99,6 +112,15 @@ export class MultiplayerState {
   private readonly pending = new Map<string, PlayerAction>();
   private presenceVersion = 0;
   private hostTerm = 0;
+  /**
+   * The host this peer replaced by electing itself while it could hear nobody.
+   *
+   * That election is a guess that the host died, made from the one vantage
+   * point that cannot tell a dead host from a dead local link. If the host
+   * turns out to be alive, this peer is the one that was cut off, and it
+   * steps back down rather than running a second table.
+   */
+  private provisional: { hostId: string; term: number } | null = null;
 
   constructor(
     readonly localPeerId: string,
@@ -153,7 +175,47 @@ export class MultiplayerState {
     if (!wins) return false;
     this.hostId = hostId;
     this.hostTerm = term;
+    this.provisional = null;
     return true;
+  }
+
+  /**
+   * Steps back down to the host this peer replaced while it was isolated.
+   *
+   * Only the peer that elected itself blind gives way, and only to the exact
+   * host and term it replaced — never to a stranger or to a term raised
+   * since. That keeps it out of reach of anyone else on the mesh, and it means
+   * the two sides of a healed stall cannot both yield and leave the room with
+   * no host at all.
+   */
+  yieldToReturningHost(hostId: string, term: number): boolean {
+    const replaced = this.provisional;
+    if (!replaced || replaced.hostId !== hostId || replaced.term !== term) return false;
+    if (this.hostId !== this.localPeerId) return false;
+    this.hostId = hostId;
+    this.hostTerm = term;
+    this.provisional = null;
+    return true;
+  }
+
+  /**
+   * Hands a live peer back the chair its silence cost it.
+   *
+   * Expiry turns a quiet human's seat over to a bot, and used to be the end of
+   * it: nothing un-botted the seat except a fresh `hello`, which only a new
+   * data channel sends. A stall leaves the old channel open, so a player whose
+   * Wi-Fi hiccupped came back to find the host playing their hand. Hearing from
+   * them again is the proof they are back.
+   */
+  readmit(peerId: string): { seat: number; profileId: ProfileId } | null {
+    for (const [seat, occupant] of this.seats) {
+      if (occupant.peerId === peerId && occupant.bot && occupant.peerId !== houseBotPeerId(seat)) {
+        this.seats.set(seat, { ...occupant, bot: false });
+        this.presenceVersion++;
+        return { seat, profileId: occupant.profileId };
+      }
+    }
+    return null;
   }
 
   seePeer(peerId: string, now: number): void {
@@ -296,26 +358,64 @@ export class MultiplayerState {
      * Match: keep the chair and hand it to a bot.
      */
     releaseExpired = false,
-  ): { changed: boolean; hostId: string; term: number; resend: PlayerAction[] } {
+    /** how long a guest that can hear nobody holds off electing itself */
+    isolationGraceMs = 0,
+  ): {
+    changed: boolean;
+    hostId: string;
+    term: number;
+    resend: PlayerAction[];
+    /** the host is overdue but this peer can hear nobody, so it is waiting */
+    isolated: boolean;
+  } {
     const expired = new Set<string>();
     for (const [peerId, seenAt] of this.lastSeen) {
       if (peerId === this.localPeerId) continue;
       // A peer that said it was going away is not missing, it is minimised.
       if (this.isAway(peerId, now)) continue;
-      if (now - seenAt > timeoutMs) {
-        expired.add(peerId);
-        this.lastSeen.delete(peerId);
-        this.awayUntil.delete(peerId);
-      }
+      if (now - seenAt > timeoutMs) expired.add(peerId);
     }
+
     const previousHostId = this.hostId;
+    const hostSeenAt = this.lastSeen.get(previousHostId);
+    const audible = [...this.lastSeen.keys()].filter(
+      (peerId) => peerId !== this.localPeerId && !expired.has(peerId),
+    );
+    const isolated =
+      previousHostId !== this.localPeerId &&
+      expired.has(previousHostId) &&
+      audible.length === 0 &&
+      hostSeenAt !== undefined &&
+      now - hostSeenAt <= timeoutMs + isolationGraceMs;
+    if (isolated) {
+      // Nothing is decided while the silence might be ours. Keeping every
+      // peer on the books is what lets the next packet from any of them
+      // simply resume the table.
+      return {
+        changed: false,
+        hostId: this.hostId,
+        term: this.hostTerm,
+        resend: [],
+        isolated: true,
+      };
+    }
+
+    for (const peerId of expired) {
+      this.lastSeen.delete(peerId);
+      this.awayUntil.delete(peerId);
+    }
     const hostExpired = expired.has(previousHostId);
     if (hostExpired) {
+      const previousTerm = this.hostTerm;
       const candidates = [this.localPeerId, ...this.lastSeen.keys()].filter(
         (peerId) => !expired.has(peerId),
       );
       this.hostId = candidates.sort()[0] ?? this.localPeerId;
       this.hostTerm++;
+      this.provisional =
+        this.hostId === this.localPeerId && audible.length === 0
+          ? { hostId: previousHostId, term: previousTerm }
+          : null;
     }
 
     let presenceChanged = false;
@@ -336,6 +436,7 @@ export class MultiplayerState {
       hostId: this.hostId,
       term: this.hostTerm,
       resend: hostExpired ? [...this.pending.values()] : [],
+      isolated: false,
     };
   }
 }

@@ -28,13 +28,20 @@ export type DuelFaultKind =
   /** the HOST's device dies mid-match: the guest must inherit the table */
   | 'host-crash'
   /** the guest quits cleanly, then a new session rejoins the same seat */
-  | 'guest-quit-rejoin';
+  | 'guest-quit-rejoin'
+  /**
+   * the guest's link goes silent for `awayMs`, then everything it held lands:
+   * nobody left, so the match must carry on as if nothing happened
+   */
+  | 'guest-stall'
+  /** the same silence on the HOST's link */
+  | 'host-stall';
 
 export interface DuelFault {
   kind: DuelFaultKind;
   /** trigger once the host has this many applied actions in its log */
   afterPlies: number;
-  /** for rejoin: how long the seat stays gone before coming back */
+  /** for rejoin: how long the seat stays gone before coming back; for a stall, its length */
   awayMs?: number;
 }
 
@@ -125,6 +132,7 @@ function progressSignature(peers: readonly MultiplayerRoomSession[]): string {
       const snapshot = peer.getSnapshot();
       return [
         snapshot.stage,
+        snapshot.connection,
         snapshot.session?.log.length ?? -1,
         snapshot.session?.status ?? 'none',
         snapshot.security.ceremony.laid,
@@ -165,6 +173,9 @@ export async function runDuel(options: DuelOptions): Promise<DuelReport> {
         // test with recovery it never needed.
         heartbeatIntervalMs: 150,
         heartbeatTimeoutMs: 2_500,
+        // Scaled with the timeout: an isolated guest still waits out a hiccup
+        // before taking the table, without a host crash costing the lane 15s.
+        isolationGraceMs: 5_000,
         reconnectGraceMs: options.reconnectGraceMs ?? 1_500,
       },
     );
@@ -268,6 +279,8 @@ export async function runDuel(options: DuelOptions): Promise<DuelReport> {
       } else if (fault.kind === 'host-crash') {
         gone = 'host';
         net.crash(label('host'));
+      } else if (fault.kind === 'guest-stall' || fault.kind === 'host-stall') {
+        net.stall(label(fault.kind === 'guest-stall' ? 'guest' : 'host'), fault.awayMs ?? 5_000);
       } else {
         gone = 'guest';
         guest.close();

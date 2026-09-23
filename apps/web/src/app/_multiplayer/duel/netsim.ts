@@ -89,7 +89,8 @@ class Link {
     const { minMs, maxMs } = this.profile();
     const delay = minMs + this.net.rng.float() * Math.max(0, maxMs - minMs);
     const now = this.net.elapsed();
-    const at = Math.max(now + delay, this.lastAt);
+    const held = Math.max(...this.endpoints.map((endpoint) => this.net.stalledUntil(endpoint)));
+    const at = Math.max(now + delay, this.lastAt, held + delay);
     this.lastAt = at;
     this.pending++;
     setTimeout(
@@ -109,6 +110,8 @@ export class DuelNet {
   readonly rng: Rng;
   private readonly startedAt = Date.now();
   private readonly crashed = new Set<string>();
+  /** device label → elapsed ms until which its links hold every packet */
+  private readonly stalls = new Map<string, number>();
   private readonly links = new Map<string, Link>();
   private readonly signal: LatencyProfile;
   private readonly data: LatencyProfile;
@@ -138,6 +141,20 @@ export class DuelNet {
   /** Pull the plug on a device: every link it touches goes silent, both ways. */
   crash(label: string): void {
     this.crashed.add(label);
+  }
+
+  /**
+   * Hold every packet to or from a device for `ms`, then deliver the lot in
+   * order — a Wi-Fi hiccup, an SCTP retransmit backing off, or a phone whose
+   * main thread froze. Nothing is lost and no channel closes; the other side
+   * just hears silence long enough to trip its heartbeat timeout.
+   */
+  stall(label: string, ms: number): void {
+    this.stalls.set(label, this.elapsed() + ms);
+  }
+
+  stalledUntil(label: string): number {
+    return this.stalls.get(label) ?? -Infinity;
   }
 
   /** Plug it back in (a rejoining player builds NEW sessions; links revive). */
@@ -254,6 +271,7 @@ class DuelDataChannel {
 export class DuelPeerConnection {
   connectionState: RTCPeerConnectionState = 'new';
   remoteDescription: RTCSessionDescription | null = null;
+  signalingState: RTCSignalingState = 'stable';
   onicecandidate: RTCPeerConnection['onicecandidate'] = null;
   ondatachannel: RTCPeerConnection['ondatachannel'] = null;
   onconnectionstatechange: RTCPeerConnection['onconnectionstatechange'] = null;
@@ -296,10 +314,13 @@ export class DuelPeerConnection {
     (this.onconnectionstatechange as (() => void) | null)?.();
   }
 
-  async setLocalDescription(): Promise<void> {}
+  async setLocalDescription(description?: RTCSessionDescriptionInit): Promise<void> {
+    this.signalingState = description?.type === 'offer' ? 'have-local-offer' : 'stable';
+  }
 
   async setRemoteDescription(description: RTCSessionDescriptionInit): Promise<void> {
     this.remoteDescription = description as RTCSessionDescription;
+    this.signalingState = description.type === 'offer' ? 'have-remote-offer' : 'stable';
     if (description.type === 'offer' && description.sdp) {
       this.initiator = this.net.rtcPeer(description.sdp);
     }
