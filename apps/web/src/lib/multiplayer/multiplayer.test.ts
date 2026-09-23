@@ -1057,6 +1057,46 @@ describe('the transport heals a stall on the channel it already has', () => {
     transport.close();
   });
 
+  it('still sends from its own chair while the host has it marked as a bot', () => {
+    const { transport, harness, signaling } = transportFor('peer-h');
+    harness.resilience.applyPresence(
+      {
+        version: 2,
+        seats: [
+          [0, { peerId: 'peer-h', profileId: 'profile-h', bot: false }],
+          [1, { peerId: signaling.publicKey, profileId: 'profile-local', bot: true }],
+        ],
+      },
+      2,
+    );
+
+    transport.send({ id: 'tap', seat: 1, move: 'increment' });
+
+    expect(harness.sendTo).toHaveBeenCalledWith('peer-h', {
+      type: 'intent',
+      action: { id: 'tap', seat: 1, move: 'increment' },
+    });
+    transport.close();
+  });
+
+  it('leaves applied packets to the snapshot a stepped-down host is waiting for', async () => {
+    const { transport, harness } = transportFor('peer-h');
+    const host = counterAuthority();
+    const packet = await host.apply({ id: 'moved', seat: 0, move: 'increment' });
+    Object.assign(harness, { pendingResync: true, pendingHostMigration: true });
+    const presence: { kind: string }[] = [];
+    transport.onPresence((event) => presence.push(event));
+
+    await harness.receiveWire('peer-h', { type: 'applied', packet });
+
+    const local = (transport as unknown as { authority: ReturnType<typeof counterAuthority> })
+      .authority;
+    expect(local.exportSnapshot().log).toHaveLength(0);
+    expect(presence.map(({ kind }) => kind)).not.toContain('error');
+    expect(harness.sendTo).not.toHaveBeenCalled();
+    transport.close();
+  });
+
   it('renews the signalling subscription when the page comes back', () => {
     const { transport, subscriptions } = transportFor('peer-h');
     expect(subscriptions).toHaveLength(1);

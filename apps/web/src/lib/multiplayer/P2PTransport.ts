@@ -218,7 +218,11 @@ export class P2PTransport implements Transport {
     if (!action.id || !Number.isInteger(action.seat) || !action.move) {
       throw new Error('invalid player action');
     }
-    if (this.seatForPeer(this.signaling.publicKey) !== action.seat) {
+    // Our own chair counts even while the host has it marked as a bot. That
+    // mark means the host timed us out during a stall and the news reached us
+    // first. The host gives the seat back when this intent lands, and refusing
+    // the tap here only flashed an error at a player who never left.
+    if (this.ownSeat() !== action.seat) {
       throw new Error('action seat does not belong to this profile');
     }
     this.resilience?.trackPending(action);
@@ -753,6 +757,12 @@ export class P2PTransport implements Transport {
         if (!resilience || peerId !== resilience.hostId) return;
         resilience.confirmAction(message.packet.actionId);
         if (this.isHost()) return;
+        // We just gave back a table we had been holding on our own, and the
+        // host's snapshot is on its way. It covers this packet, because the
+        // channel is ordered and the host sends the snapshot after everything
+        // it had applied. Playing the packet onto a position we know is wrong
+        // only produces a fault to show the player.
+        if (this.pendingHostMigration) return;
         const remote = await this.authority.applyRemote(message.packet);
         if (remote.fault) {
           this.emitPresence({
@@ -962,6 +972,13 @@ export class P2PTransport implements Transport {
   private firstOpenSeat(): number | null {
     const limit = this.authority.exportSnapshot().settings.seats;
     for (let seat = 0; seat < limit; seat++) if (!this.resilience!.seats.has(seat)) return seat;
+    return null;
+  }
+
+  private ownSeat(): number | null {
+    for (const [seat, occupant] of this.resilience!.seats) {
+      if (occupant.peerId === this.signaling.publicKey) return seat;
+    }
     return null;
   }
 

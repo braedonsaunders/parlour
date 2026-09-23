@@ -2441,7 +2441,7 @@ export class MultiplayerRoomSession {
             },
       });
       if (notification.reason !== 'rematch') this.verifyPublishedDeal();
-      void this.openMyHandles();
+      this.settlePosition();
     });
     this.transport.onRematchRequest(() => {
       if (this.snapshot.isHost) void this.beginRematch().catch(() => undefined);
@@ -2465,6 +2465,18 @@ export class MultiplayerRoomSession {
       stage: 'table',
     });
     this.fxQueue.push(packet.fx);
+    this.settlePosition();
+  }
+
+  /**
+   * Everything the room owes a position once it is adopted.
+   *
+   * A snapshot moves the table as surely as a packet does, and used to get
+   * only half of this: it reopened this seat's cards and nothing else. A guest
+   * resynced onto a showdown therefore never answered the reveal it owed, and
+   * the table waited on it for good.
+   */
+  private settlePosition(): void {
     // A draw may have handed this seat a handle it cannot read yet.
     if (this.veil) {
       void this.openMyHandles();
