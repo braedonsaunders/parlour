@@ -69,6 +69,37 @@ describe('wildTableView', () => {
     expect(view.legal.playCards).toEqual(['red-5-0']);
   });
 
+  it('only lifts a drawn card while playing it is still a real option', () => {
+    const transport = new WildTransport({
+      mode: 'party',
+      seats: 2,
+      seed: 91,
+      player: { name: 'Host', avatarId: 'ember' },
+    });
+    const snapshot = transport.getSnapshot();
+    const drawn = {
+      ...snapshot,
+      session: {
+        ...snapshot.session,
+        phase: { ...snapshot.session.phase, phase: 'play', actor: 0 },
+        state: {
+          ...snapshot.session.state,
+          turn: 0,
+          drawnCard: 'blue-2-0',
+          hands: snapshot.session.state.hands.map((hand, seat) =>
+            seat === 0 ? [...hand, 'blue-2-0'] : hand,
+          ),
+        },
+      },
+    };
+
+    expect(wildTableView(drawn, [{ id: 'pass' }], 0).drawnCard).toBeNull();
+    expect(
+      wildTableView(drawn, [{ id: 'playCard', payload: { card: 'blue-2-0' } }, { id: 'pass' }], 0)
+        .drawnCard,
+    ).toBe('blue-2-0');
+  });
+
   /*
    * A veiled room opens the jump-in window to every seat, one after another, so
    * an active seat that followed the window's actor toured the whole table on

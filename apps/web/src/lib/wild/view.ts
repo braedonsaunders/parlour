@@ -162,7 +162,14 @@ export function wildTableView(
     hand: state.hands[localSeat] ?? [],
     decision: isLocalTurn ? localDecision(session.phase.phase, offered) : null,
     lastCardArmed: state.calledLastCard[localSeat] ?? false,
-    drawnCard: state.turn === localSeat ? state.drawnCard : null,
+    // A drawn card only rises out of the fan while it is a genuine play-or-keep
+    // choice. In a veiled room the shared reducer briefly holds every private
+    // draw open; once this seat peels an unplayable face, it should look like a
+    // kept card while the room automatically passes the turn.
+    drawnCard:
+      state.turn === localSeat && state.drawnCard !== null && playCards.includes(state.drawnCard)
+        ? state.drawnCard
+        : null,
     challenge: challengeView(snapshot, localSeat, playCards),
     catchable: exposed && exposed.seat !== localSeat ? exposed : null,
     legal: {

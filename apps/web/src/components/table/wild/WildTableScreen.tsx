@@ -270,28 +270,32 @@ function WildTableScreenView(props: WildTableScreenProps) {
         </TablePlayfield>
 
         {/* No draw button for an ordinary turn: the stock pile is the draw. A
-          pending pickup is the exception — at a veiled table the flow cannot
-          take it for you (it cannot see whether you were holding the answer),
-          so the pile you owe is offered as something to accept. */}
+          pending pickup is offered only when stacking makes accepting it a
+          real choice. Once a privately peeled hand proves there is no answer,
+          the room takes the pile automatically. */}
         <TableActionRail className={wildStyles.actionRail}>
           <AnimatePresence initial={false}>
-            {view.pendingDraw > 0 && view.legal.draw && !view.challenge && !localBusy && (
-              <motion.button
-                key="take-pickup"
-                type="button"
-                data-testid="take-pickup"
-                // Plain amber, like the pile it is about — this is the table
-                // waiting on you, not an alarm.
-                className="btn-fat"
-                initial={{ opacity: 0, scale: 0.7, y: 12 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.7, y: 12 }}
-                transition={{ duration: 0.2, ease: [0.34, 1.56, 0.64, 1] }}
-                onClick={props.onDraw}
-              >
-                Take +{view.pendingDraw}
-              </motion.button>
-            )}
+            {view.pendingDraw > 0 &&
+              view.legal.draw &&
+              view.legal.playCards.length > 0 &&
+              !view.challenge &&
+              !localBusy && (
+                <motion.button
+                  key="take-pickup"
+                  type="button"
+                  data-testid="take-pickup"
+                  // Plain amber, like the pile it is about — this is the table
+                  // waiting on you, not an alarm.
+                  className="btn-fat"
+                  initial={{ opacity: 0, scale: 0.7, y: 12 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.7, y: 12 }}
+                  transition={{ duration: 0.2, ease: [0.34, 1.56, 0.64, 1] }}
+                  onClick={props.onDraw}
+                >
+                  Take +{view.pendingDraw}
+                </motion.button>
+              )}
             {view.catchable && view.legal.catchLastCard && !deal.dealing && (
               <motion.button
                 key="catch-last-card"
@@ -307,7 +311,7 @@ function WildTableScreenView(props: WildTableScreenProps) {
                 Catch {view.catchable.name}!
               </motion.button>
             )}
-            {view.legal.pass && !localBusy && (
+            {view.legal.pass && view.drawnCard !== null && !localBusy && (
               <motion.button
                 key="pass"
                 type="button"
@@ -766,6 +770,7 @@ function LocalHand({
               <WildCard
                 card={card}
                 disabled={!canChoose || !playable}
+                muted={showLegality && !playable}
                 onClick={() => onPlay?.(card)}
               />
             </HandRailCard>

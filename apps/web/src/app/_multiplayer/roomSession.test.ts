@@ -49,6 +49,7 @@ import type { RoomSettings } from '@/lib/multiplayer/types';
 import { MULTIPLAYER_GAME_IDS, ROOM_GAMES } from '@/lib/rooms/gameRegistry';
 import {
   activateMultiplayerSession,
+  automaticWildRoomMove,
   clearActiveMultiplayerSession,
   expectedRoomGameId,
   getActiveMultiplayerSession,
@@ -219,6 +220,108 @@ async function eventually(assertion: () => void, attempts = 40, delayMs = 0) {
   }
   assertion();
 }
+
+describe('automatic Wild room decisions', () => {
+  const rules = applyPreset(wildpileConfig, 'party');
+
+  function position(state: Partial<WildpileState>) {
+    const session = createSession(wildpileGame, { seed: 19, config: rules, seats: 2 });
+    return {
+      ...session,
+      phase: { phase: 'play', actor: 0, round: 1 },
+      state: {
+        ...session.state,
+        turn: 0,
+        interrupt: null,
+        awaitingColor: null,
+        awaitingSwap: null,
+        catchable: null,
+        challenge: null,
+        ...state,
+      },
+    };
+  }
+
+  it('takes a pickup when the peeled hand has nothing to stack', () => {
+    const session = position({
+      hands: [['blue-1-0', 'green-7-0'], ['yellow-3-0']],
+      discard: ['red-draw-two-0'],
+      activeColor: 'red',
+      pendingDraw: 2,
+      pendingKind: 'draw-two',
+      drawnCard: null,
+    });
+
+    expect(
+      automaticWildRoomMove('wildpile', session as Parameters<typeof automaticWildRoomMove>[1], 0),
+    ).toEqual({ id: 'draw' });
+  });
+
+  it('waits when a pickup can be stacked or a drawn card can be played', () => {
+    const stackable = position({
+      hands: [['red-draw-two-1', 'green-7-0'], ['yellow-3-0']],
+      discard: ['red-draw-two-0'],
+      activeColor: 'red',
+      pendingDraw: 2,
+      pendingKind: 'draw-two',
+      drawnCard: null,
+    });
+    const playableDraw = position({
+      hands: [['blue-1-0', 'red-4-0'], ['yellow-3-0']],
+      discard: ['red-5-0'],
+      activeColor: 'red',
+      pendingDraw: 0,
+      pendingKind: null,
+      drawnCard: 'red-4-0',
+    });
+
+    expect(
+      automaticWildRoomMove(
+        'wildpile',
+        stackable as Parameters<typeof automaticWildRoomMove>[1],
+        0,
+      ),
+    ).toBeNull();
+    expect(
+      automaticWildRoomMove(
+        'wildpile',
+        playableDraw as Parameters<typeof automaticWildRoomMove>[1],
+        0,
+      ),
+    ).toBeNull();
+  });
+
+  it('keeps an unplayable draw automatically, but never guesses through a handle', () => {
+    const unplayable = position({
+      hands: [['green-7-0', 'blue-4-0'], ['yellow-3-0']],
+      discard: ['red-5-0'],
+      activeColor: 'red',
+      pendingDraw: 0,
+      pendingKind: null,
+      drawnCard: 'blue-4-0',
+    });
+    const stillVeiled = position({
+      ...unplayable.state,
+      hands: [['green-7-0', 'v#41'], ['yellow-3-0']],
+      drawnCard: 'v#41',
+    });
+
+    expect(
+      automaticWildRoomMove(
+        'wildpile',
+        unplayable as Parameters<typeof automaticWildRoomMove>[1],
+        0,
+      ),
+    ).toEqual({ id: 'pass' });
+    expect(
+      automaticWildRoomMove(
+        'wildpile',
+        stillVeiled as Parameters<typeof automaticWildRoomMove>[1],
+        0,
+      ),
+    ).toBeNull();
+  });
+});
 
 describe('multiplayer route composition', () => {
   const sessions: MultiplayerRoomSession[] = [];

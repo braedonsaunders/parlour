@@ -6,6 +6,7 @@ import { getMusicController } from '@/lib/audio/MusicController';
 import type { WildTableView } from '@/lib/wild/view';
 import { fanOpenAtMs } from '@/lib/table/arrival-presentation';
 import { FX_TIMING } from '@/lib/table/fx-motion';
+import tableStyles from '@/styles/table.module.css';
 import { WildTableScreen } from './WildTableScreen';
 
 const VIEW: WildTableView = {
@@ -138,6 +139,33 @@ describe('WildTableScreen turn affordances', () => {
     expect(invalid?.closest('[data-playable]')?.getAttribute('data-playable')).toBe('false');
     expect(container.querySelector('[data-local-turn="true"]')).not.toBeNull();
     expect(container.textContent).toContain('Your turn');
+  });
+
+  it('keeps the whole hand at full contrast while another player acts', () => {
+    act(() => {
+      root.render(
+        createElement(WildTableScreen, {
+          view: {
+            ...VIEW,
+            activeSeat: 1,
+            decision: null,
+            legal: { ...VIEW.legal, playCards: [], draw: false },
+          },
+          fx: [],
+          fxKey: 0,
+          busy: true,
+        }),
+      );
+    });
+
+    const cards = [...container.querySelectorAll<HTMLButtonElement>('[data-hand-card] button')];
+    expect(cards.every((card) => card.disabled)).toBe(true);
+    expect(cards.every((card) => !card.classList.contains(tableStyles.cardDisabled!))).toBe(true);
+    expect(
+      cards.every(
+        (card) => card.closest('[data-hand-card]')?.getAttribute('data-playable') === null,
+      ),
+    ).toBe(true);
   });
 
   it('automatically inserts cards into the Wild mobile order as the hand changes', () => {
@@ -595,6 +623,24 @@ describe('WildTableScreen turn affordances', () => {
     expect(onPass).toHaveBeenCalledOnce();
   });
 
+  it('does not offer pickup confirmation when taking the pile is the only option', () => {
+    act(() =>
+      root.render(
+        createElement(WildTableScreen, {
+          view: {
+            ...VIEW,
+            pendingDraw: 2,
+            legal: { ...VIEW.legal, playCards: [], draw: true },
+          },
+          fx: [],
+          fxKey: 0,
+        }),
+      ),
+    );
+
+    expect(container.querySelector('[data-testid="take-pickup"]')).toBeNull();
+  });
+
   it('throws a card-drop flourish when a card lands on the pile', () => {
     act(() =>
       root.render(
@@ -766,11 +812,7 @@ describe('WildTableScreen turn affordances', () => {
     );
   });
 
-  /*
-   * A veiled table cannot take a pickup for you — it cannot see whether you were
-   * holding the answer — so the pile you owe has to be something you can accept.
-   */
-  it('offers the pending pickup as an action when the table is waiting on it', () => {
+  it('offers the pending pickup when taking it competes with a stack', () => {
     const onDraw = vi.fn();
     act(() =>
       root.render(
@@ -778,7 +820,7 @@ describe('WildTableScreen turn affordances', () => {
           view: {
             ...VIEW,
             pendingDraw: 6,
-            legal: { ...VIEW.legal, playCards: [], draw: true },
+            legal: { ...VIEW.legal, playCards: ['red-draw-two-1'], draw: true },
           },
           fx: [],
           fxKey: 0,

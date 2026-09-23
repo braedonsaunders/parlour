@@ -9,6 +9,8 @@ export type WildCardProps = {
   faceDown?: boolean;
   compact?: boolean;
   disabled?: boolean;
+  /** Visual de-emphasis, separate from whether the button accepts input. */
+  muted?: boolean;
   rotation?: number;
   onClick?: () => void;
 };
@@ -19,6 +21,7 @@ export function WildCard({
   faceDown: askedFaceDown = false,
   compact = false,
   disabled = false,
+  muted = disabled,
   rotation = 0,
   onClick,
 }: WildCardProps) {
@@ -35,7 +38,7 @@ export function WildCard({
   const className = [
     tableStyles.card,
     compact ? tableStyles.cardCompact : '',
-    disabled ? tableStyles.cardDisabled : '',
+    muted ? tableStyles.cardDisabled : '',
     faceDown ? wildStyles.back : wildStyles.face,
     face ? colorClass(face) : '',
   ]

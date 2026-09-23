@@ -251,8 +251,38 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 2.4rem;
+  min-height: 2.75rem;
   margin-bottom: 0.2rem;
+  padding: 0.24rem 0.85rem 0.24rem 0.35rem;
+  border: 1px solid rgba(255, 216, 154, 0.42);
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(255, 197, 111, 0.18), rgba(85, 44, 24, 0.28));
+  box-shadow:
+    0 8px 24px rgba(3, 10, 14, 0.32),
+    inset 0 1px rgba(255, 255, 255, 0.12);
+  color: inherit;
+  cursor: pointer;
+  pointer-events: auto;
+  transition:
+    border-color 160ms ease,
+    background 160ms ease,
+    transform 160ms var(--ease-pop);
+}
+
+.countdownWrap:not(:disabled):hover {
+  border-color: rgba(255, 224, 176, 0.78);
+  background: linear-gradient(180deg, rgba(255, 197, 111, 0.27), rgba(85, 44, 24, 0.36));
+  transform: translateY(-2px);
+}
+
+.countdownWrap:focus-visible {
+  outline: 3px solid var(--hearth-glow);
+  outline-offset: 3px;
+}
+
+.countdownWrap:disabled {
+  cursor: wait;
+  opacity: 0.76;
 }
 
 .countdownRing {

@@ -332,6 +332,8 @@ export class MultiplayerRoomSession {
   private recycleActionPending = false;
   /** A no-match jump-in is declined from here, so it cannot re-enter send. */
   private autoDeclinePending = false;
+  /** Wild decisions with only one honest outcome are sent once per log position. */
+  private autoWildPending: string | null = null;
   /** a veiled redeal ceremony already under way, so it cannot start twice */
   private redealPending = false;
   /**
@@ -890,6 +892,7 @@ export class MultiplayerRoomSession {
       this.scheduledBotTurns.clear();
       this.recycleActionPending = false;
       this.autoDeclinePending = false;
+      this.autoWildPending = null;
       this.redealPending = false;
       this.openPending = false;
       this.transport.publishRematch();
@@ -2119,6 +2122,7 @@ export class MultiplayerRoomSession {
     if (!this.authority) return;
     this.update({ session: this.presented(this.authority.getSession()) });
     this.maybeAutoDeclineJump();
+    this.maybeAutoResolveWild();
     this.maybeOpenOwnReveals();
   }
 
@@ -2235,6 +2239,43 @@ export class MultiplayerRoomSession {
       this.send('declineJump');
     } finally {
       this.autoDeclinePending = false;
+    }
+  }
+
+  /**
+   * Finishes Wild choices that stop being choices once this seat has peeled
+   * its own cards.
+   *
+   * The shared Veil state only holds handles, so the engine cannot know that a
+   * +2 has nothing to stack with or that a freshly drawn card is unplayable.
+   * This seat can know both after its private peel. Sending the sole legal
+   * outcome here keeps that privacy boundary intact without parking the table
+   * behind “Take +2” or “Keep it”. A playable drawn card still waits for the
+   * player, because play-versus-keep is a real decision.
+   */
+  private maybeAutoResolveWild(): void {
+    if (
+      !this.authority ||
+      !this.transport ||
+      this.snapshot.localSeat === null ||
+      this.snapshot.security.paused
+    ) {
+      return;
+    }
+    const session = this.presented(this.authority.getSession());
+    const move = automaticWildRoomMove(this.snapshot.gameId, session, this.snapshot.localSeat);
+    if (!move) {
+      this.autoWildPending = null;
+      return;
+    }
+    const key = `${session.log.length}:${move.id}`;
+    if (this.autoWildPending === key) return;
+    this.autoWildPending = key;
+    try {
+      this.send(move.id, move.payload);
+    } catch (error) {
+      this.autoWildPending = null;
+      throw error;
     }
   }
 
@@ -2436,6 +2477,7 @@ export class MultiplayerRoomSession {
     this.maybeDealVeiledHand();
     this.maybeOpenVeiledCards();
     this.maybeAutoDeclineJump();
+    this.maybeAutoResolveWild();
     this.maybeOpenOwnReveals();
     this.maybeReveilSpentStock();
   }
@@ -2894,6 +2936,47 @@ export function multiplayerSession<S, C extends RuleValues>(
   gameId: string,
 ): GameSession<S, C> | null {
   return snapshot.gameId === gameId ? (snapshot.session as GameSession<S, C> | null) : null;
+}
+
+/**
+ * The local-only Wild move that remains after private cards have been peeled.
+ *
+ * This deliberately does not run on handles: until every card in the acting
+ * hand is readable, “nothing stacks” and “the draw is unplayable” are guesses.
+ */
+export function automaticWildRoomMove(
+  gameId: MultiplayerGameId | null,
+  session: MultiplayerGameSession,
+  localSeat: number,
+): LegalMove | null {
+  if (
+    gameId !== 'wildpile' ||
+    session.status !== 'playing' ||
+    session.phase.actor !== localSeat ||
+    seatHandStillVeiled(session.state, localSeat)
+  ) {
+    return null;
+  }
+
+  const legal = session.def.flow.legalMoves(session.state as never, session.phase);
+  const canPlay = legal.some((move) => move.id === 'playCard');
+  const state = session.state as { drawnCard?: unknown; pendingDraw?: unknown };
+
+  if (typeof state.drawnCard === 'string' && !canPlay && legal.some((move) => move.id === 'pass')) {
+    return { id: 'pass' };
+  }
+
+  if (
+    typeof state.pendingDraw === 'number' &&
+    state.pendingDraw > 0 &&
+    !canPlay &&
+    !legal.some((move) => move.id === 'challengeDrawFour') &&
+    legal.some((move) => move.id === 'draw')
+  ) {
+    return { id: 'draw' };
+  }
+
+  return null;
 }
 
 function stateHolds(state: unknown, handle: string): boolean {

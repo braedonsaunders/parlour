@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import type { FxEvent } from '@parlour/engine';
 import { stateHash } from '@parlour/engine';
 import {
@@ -67,6 +67,7 @@ function RoundEndChoreography({ fx, seats, livesBySeat, onNextRound }: RoundEndO
 
   const [progress, setProgress] = useState<Progress>({ revealed: [], banner: false, losses: [] });
   const [jumpedToEnd, setJumpedToEnd] = useState(false);
+  const [ready, setReady] = useState(false);
 
   const collapsed = Boolean(plan) && (reducedMotion || jumpedToEnd);
   const shownProgress: Progress =
@@ -75,19 +76,23 @@ function RoundEndChoreography({ fx, seats, livesBySeat, onNextRound }: RoundEndO
       : progress;
 
   const firedRef = useRef(false);
+  const onNextRoundRef = useRef(onNextRound);
+  useEffect(() => {
+    onNextRoundRef.current = onNextRound;
+  }, [onNextRound]);
+  const finishOnce = useCallback(() => {
+    if (firedRef.current) return;
+    firedRef.current = true;
+    setReady(true);
+    onNextRoundRef.current();
+  }, []);
 
   useEffect(() => {
     if (!plan) return;
 
-    firedRef.current = false;
     const scheduled: number[] = [];
     const schedule = (fn: () => void, delayMs: number) => {
       scheduled.push(window.setTimeout(fn, Math.max(0, delayMs)));
-    };
-    const finishOnce = () => {
-      if (firedRef.current) return;
-      firedRef.current = true;
-      onNextRound();
     };
 
     if (collapsed) {
@@ -128,7 +133,7 @@ function RoundEndChoreography({ fx, seats, livesBySeat, onNextRound }: RoundEndO
     schedule(finishOnce, plan.nextReadyAtMs);
 
     return () => clearTimeouts(scheduled);
-  }, [plan, onNextRound, collapsed]);
+  }, [plan, collapsed, finishOnce]);
 
   if (!plan) return null;
 
@@ -170,7 +175,13 @@ function RoundEndChoreography({ fx, seats, livesBySeat, onNextRound }: RoundEndO
         </div>
 
         {shownProgress.banner && (
-          <div className={styles.countdownWrap}>
+          <button
+            type="button"
+            className={styles.countdownWrap}
+            data-testid="next-hand"
+            disabled={ready}
+            onClick={finishOnce}
+          >
             <span
               key={`${plan.nextReadyAtMs}-${plan.bannerAtMs}`}
               className={styles.countdownRing}
@@ -178,8 +189,10 @@ function RoundEndChoreography({ fx, seats, livesBySeat, onNextRound }: RoundEndO
                 animationDuration: `${Math.max(400, plan.nextReadyAtMs - plan.bannerAtMs)}ms`,
               }}
             />
-            <span className={styles.countdownLabel}>next hand…</span>
-          </div>
+            <span className={styles.countdownLabel}>
+              {ready ? 'Ready ✓ · waiting for table' : 'Ready for next hand'}
+            </span>
+          </button>
         )}
       </section>
     </div>
