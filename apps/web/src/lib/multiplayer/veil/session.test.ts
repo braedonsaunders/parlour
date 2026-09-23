@@ -31,13 +31,15 @@ class Room {
   constructor(
     readonly seatCount: number,
     readonly seed = 4242,
+    /** what every seat but the host was built with, before it hears the host */
+    guestSeed = seed,
   ) {
     this.seats = Array.from(
       { length: seatCount },
       (_, seat) =>
         new VeilSession({
           roomCode: 'ABCD',
-          seed,
+          seed: seat === 0 ? seed : guestSeed,
           seat,
           seats: seatCount,
           gameId: def.id,
@@ -245,6 +247,27 @@ describe('the ceremony refuses shortcuts', () => {
     });
     await wrongRules.start();
     expect(await wrongRules.adoptRound(header)).toMatch(/different rules/);
+  });
+
+  it('reads its own cards when it attached before learning the host’s seed', async () => {
+    // A guest attaches Veil the moment it is seated, which on a slow device is
+    // before the host's snapshot has replaced its provisional seed. The header
+    // decides — decoding through its own seed, it read no card at all.
+    const room = new Room(2, 4242, 9001);
+    await room.openRound();
+    await room.runCeremony();
+    const deck = new Set(def.veil!.deck(CONFIG).cardIds);
+    expect(deck.has(room.openTo(1, 0))).toBe(true);
+    expect(deck.has(room.openTo(0, 1))).toBe(true);
+  });
+
+  it('will not adopt a header built for another room', async () => {
+    const room = new Room(2);
+    const keys = await Promise.all(room.seats.map((session) => session.start()));
+    const header = await room.seats[0]!.openRound(keys, def.veil!.deck(CONFIG).cardIds);
+    expect(await room.seats[1]!.adoptRound({ ...header, roundId: `WXYZ:${room.seed}:0` })).toMatch(
+      /another room/,
+    );
   });
 
   it('will not resolve a handle this seat was never dealt', async () => {

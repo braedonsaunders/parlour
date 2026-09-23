@@ -28,6 +28,7 @@ import {
   openEpoch,
   positionForHandle,
   roundIdFor,
+  seedFromRoundId,
   shareFor,
   type CeremonyFault,
   type VeilEpoch,
@@ -128,8 +129,16 @@ export class VeilSession {
 
   readonly recovery: RecoveryPolicy;
 
+  /**
+   * The seed every epoch's codebook derives from. It starts as the one this
+   * client was built with and is replaced by the host's when a header is
+   * adopted — see adoptRound.
+   */
+  private seed: number;
+
   constructor(private readonly options: VeilSessionOptions) {
     this.recovery = recoveryPolicyFor(options.seats);
+    this.seed = options.seed;
   }
 
   get seat(): SeatId {
@@ -185,7 +194,7 @@ export class VeilSession {
       throw new Error('every seat that shuffles must publish a key');
     }
     const header: VeilRoundHeader = {
-      roundId: roundIdFor(this.options.roomCode, this.options.seed, 0),
+      roundId: roundIdFor(this.options.roomCode, this.seed, 0),
       gameId: this.options.gameId,
       rulesHash: await hashTagged('rules', this.options.config),
       seats: this.options.seats,
@@ -213,6 +222,14 @@ export class VeilSession {
     ) {
       return 'the header does not carry this seat’s key';
     }
+    // The codebook is derived from the seed, so a seat decoding through any
+    // other seed than the host's reads no card at all — every peel then fails
+    // as "a share was computed dishonestly". A guest attaches Veil as soon as
+    // it is seated, which on a slow device can be before the host's snapshot
+    // has replaced its own provisional seed, so the header is what decides.
+    const seed = seedFromRoundId(this.options.roomCode, header.roundId, 0);
+    if (seed === null) return 'the header belongs to another room';
+    this.seed = seed;
     this.transcript = await VeilTranscript.open(header);
     await this.beginEpoch(0, header.deck, laying);
     return null;
@@ -243,7 +260,7 @@ export class VeilSession {
     let latest = -1;
     for (const key of this.epochs.keys()) if (key > latest) latest = key;
     if (epoch !== latest + 1) throw new Error(`deck epoch ${epoch} is out of sequence`);
-    const roundId = roundIdFor(this.options.roomCode, this.options.seed, epoch);
+    const roundId = roundIdFor(this.options.roomCode, this.seed, epoch);
     const opened = await openEpoch(
       epoch,
       roundId,

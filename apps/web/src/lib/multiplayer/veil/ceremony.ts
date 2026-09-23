@@ -79,6 +79,17 @@ export function roundIdFor(roomCode: string, seed: number, epoch: number): strin
   return `${roomCode}:${seed >>> 0}:${epoch}`;
 }
 
+/** The seed a round header was built on, or null if it names another room or epoch. */
+export function seedFromRoundId(roomCode: string, roundId: string, epoch: number): number | null {
+  const prefix = `${roomCode}:`;
+  const suffix = `:${epoch}`;
+  if (!roundId.startsWith(prefix) || !roundId.endsWith(suffix)) return null;
+  const seed = roundId.slice(prefix.length, roundId.length - suffix.length);
+  if (!/^\d+$/.test(seed)) return null;
+  const value = Number(seed);
+  return value <= 0xffff_ffff ? value : null;
+}
+
 function copyList<T>(value: readonly T[] | null | undefined, label: string): T[] {
   if (!Array.isArray(value)) throw new Error(`${label} is missing`);
   return value.slice();
