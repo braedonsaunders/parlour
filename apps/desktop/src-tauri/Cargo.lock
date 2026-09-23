@@ -2151,7 +2151,7 @@ dependencies = [
 
 [[package]]
 name = "parlour-desktop"
-version = "0.5.4"
+version = "0.5.5"
 dependencies = [
  "tauri",
  "tauri-build",
