@@ -19,16 +19,13 @@ name: Balance and soak gates
 #
 # See packages/engine/src/sim/scale.ts.
 
-# Nightly, not per-push. These are statistical and real-time claims: a
-# full-sample balance run and duels driven by real clocks. They take tens of
-# minutes, they answer a question nobody asks per-commit ("has bot strength
-# moved?"), and run in the blocking lane they failed for runner load rather
-# than for regressions. Nightly keeps the signal and takes it off the path
-# between a push and a deploy; `workflow_dispatch` is there for when a change
-# to bots or pacing deserves the answer immediately.
+# Manual only. These are statistical and real-time claims: a full-sample
+# balance run and duels driven by real clocks. They take tens of minutes and
+# answer a question nobody asks per-commit ("has bot strength moved?"). The
+# nightly schedule went red on runner load night after night and was switched
+# off; run it from the Actions tab when a change to bots or pacing deserves the
+# answer.
 on:
-  schedule:
-    - cron: '0 7 * * *'
   workflow_dispatch:
     inputs:
       games:
