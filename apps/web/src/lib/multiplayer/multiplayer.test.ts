@@ -69,6 +69,58 @@ describe('room identity', () => {
   });
 });
 
+describe('deal messages before peer membership', () => {
+  it('repeats the commitment before reveal and delivers both once the peer is seated', async () => {
+    const signaling = new NostrSignaling({
+      relays: [],
+      pool: {
+        ensureRelay: vi.fn(),
+        publish: vi.fn(() => []),
+        querySync: vi.fn(async () => []),
+        subscribeMany: vi.fn(() => ({ close() {} })),
+        close: vi.fn(),
+      },
+    });
+    const transport = new P2PTransport({
+      authority: counterAuthority(),
+      profileId: 'local',
+      signaling,
+      origin: 'https://parlour.test',
+    });
+    const harness = transport as unknown as {
+      startRoom(code: string, hostId: string): void;
+      receiveWire(peerId: string, message: unknown): Promise<void>;
+      broadcast: ReturnType<typeof vi.fn>;
+    };
+    harness.startRoom('AB2Z', 'host');
+    harness.broadcast = vi.fn();
+    const commit = { type: 'deal.commit' as const, commit: 'a'.repeat(64) };
+    const reveal = { type: 'deal.reveal' as const, nonce: 'b'.repeat(64) };
+    transport.sendDeal(commit);
+    harness.broadcast.mockClear();
+    transport.sendDeal(reveal);
+    expect(harness.broadcast.mock.calls.map(([message]) => message)).toEqual([commit, reveal]);
+
+    const received = vi.fn();
+    transport.onDeal(received);
+    await harness.receiveWire('late-peer', commit);
+    await harness.receiveWire('late-peer', reveal);
+    expect(received).not.toHaveBeenCalled();
+    await harness.receiveWire('host', {
+      type: 'presence.state',
+      presence: {
+        version: 1,
+        seats: [[1, { peerId: 'late-peer', profileId: 'late', bot: false }]],
+      },
+    });
+    expect(received.mock.calls).toEqual([
+      [1, commit],
+      [1, reveal],
+    ]);
+    transport.close();
+  });
+});
+
 describe('resilience state', () => {
   it('broadcasts versioned seats to every guest and preserves them through host loss', () => {
     const host = new MultiplayerState('peer-a', 'peer-a');

@@ -467,6 +467,33 @@ describe('multiplayer route composition', () => {
     );
   });
 
+  it('does not reuse action IDs when the same profile opens a new session', async () => {
+    const broker = new MockSignalingBroker();
+    const rtc = new MockRtcNetwork();
+    const actionIds: string[] = [];
+
+    for (const index of [0, 1]) {
+      const session = new MultiplayerRoomSession(
+        { name: 'Host', avatarId: 'ember', profileId: 'same-profile' },
+        {
+          signaling: broker.signaling(`action-session-${index}`),
+          peerConnection: rtc.factory(`action-session-${index}`),
+          seed: 42,
+        },
+      );
+      sessions.push(session);
+      await session.create({ seats: 2 });
+      session.send('draw.stock');
+      const authority = (
+        session as unknown as { authority: EngineAuthority<BlitzMatchState, BlitzConfig> }
+      ).authority;
+      await eventually(() => expect(authority.exportSnapshot().acceptedActions).toHaveLength(1));
+      actionIds.push(authority.exportSnapshot().acceptedActions[0]!.id);
+    }
+
+    expect(new Set(actionIds).size).toBe(2);
+  });
+
   /**
    * Friend rooms share one deal path, and it is the veiled one. Every pack
    * supports it, so no game is left on a weaker path than its neighbours —
